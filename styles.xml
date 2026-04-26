@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TradingBot" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">#0d1117</item>
+        <item name="colorPrimaryDark">#0d1117</item>
+        <item name="colorAccent">#f5c842</item>
+        <item name="android:windowBackground">#0d1117</item>
+    </style>
+</resources>
