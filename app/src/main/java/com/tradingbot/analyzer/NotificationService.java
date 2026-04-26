@@ -26,7 +26,6 @@ public class NotificationService extends NotificationListenerService {
 
     // =========================================================
     //  FILTRE 1 — APPLICATIONS AUTORISEES UNIQUEMENT
-    //  Telegram, WhatsApp, SMS sont ignores automatiquement
     // =========================================================
     private static final List<String> ALLOWED_APPS = Arrays.asList(
         "com.twitter.android",    // X/Twitter
@@ -42,7 +41,7 @@ public class NotificationService extends NotificationListenerService {
     );
 
     // =========================================================
-    //  FILTRE 2 — MOTS-CLES TRADING UNIQUEMENT
+    //  FILTRE 2 — MOTS-CLES TRADING
     // =========================================================
     private static final List<String> KEYWORDS = Arrays.asList(
         "war","attack","missile","sanction","conflict","crisis","invasion",
@@ -55,7 +54,7 @@ public class NotificationService extends NotificationListenerService {
     );
 
     // =========================================================
-    //  DETECTION AUTOMATIQUE DES ACTIFS
+    //  ACTIFS
     // =========================================================
     private static final String[][] ASSETS = {
         {"GOLD",   "gold,xauusd,or,fed,rate,war,conflict,sanction,nuclear,inflation,powell"},
@@ -66,17 +65,15 @@ public class NotificationService extends NotificationListenerService {
     };
 
     // =========================================================
-    //  DECLENCHEMENT INSTANTANE A CHAQUE NOTIFICATION
+    //  DECLENCHEMENT A CHAQUE NOTIFICATION
     // =========================================================
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-
-        // Verifier si le bot est actif
         boolean botActive = getSharedPreferences("TradingBot", MODE_PRIVATE)
             .getBoolean("bot_active", false);
         if (!botActive) return;
 
-        // FILTRE 1 — Par application
+        // FILTRE PAR APPLICATION
         String packageName = sbn.getPackageName();
         boolean isAllowed = false;
         for (String allowed : ALLOWED_APPS) {
@@ -85,9 +82,8 @@ public class NotificationService extends NotificationListenerService {
                 break;
             }
         }
-        if (!isAllowed) return; // Ignore Telegram, WhatsApp, SMS etc.
+        if (!isAllowed) return;
 
-        // Extraire le texte de la notification
         Bundle extras = sbn.getNotification().extras;
         String title   = extras.getString(Notification.EXTRA_TITLE, "");
         String text    = extras.getString(Notification.EXTRA_TEXT, "");
@@ -95,48 +91,31 @@ public class NotificationService extends NotificationListenerService {
         String full    = bigText.isEmpty() ? text : bigText;
         String combined = (title + " " + full).trim();
 
-        if (combined.isEmpty()) return;
+        if (combined.isEmpty() || !isTradingRelevant(combined)) return;
 
-        // FILTRE 2 — Par mots-cles trading
-        if (!isTradingRelevant(combined)) {
-            if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[SKIP] Non trading: "
-                    + combined.substring(0, Math.min(40, combined.length())));
-            return;
-        }
-
-        // Notification pertinente detectee
         String appName = getAppName(packageName);
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("[NOTIF] " + appName + ": "
                 + combined.substring(0, Math.min(60, combined.length())) + "...");
 
-        final String ft = combined;
-        final String fa = appName;
+        final String ft = combined, fa = appName;
         exec.submit(() -> processNotification(this, fa, ft));
     }
 
     // =========================================================
-    //  PIPELINE : CLAUDE API -> TELEGRAM -> NOTIF LOCALE
+    //  PIPELINE PRINCIPAL
     // =========================================================
     public static void processNotification(Context ctx, String appName, String text) {
         List<String> assets = detectAssets(text);
         String assetsStr    = String.join(", ", assets);
-
-        if (MainActivity.instance != null)
-            MainActivity.instance.addLog("[BOT] Analyse " + assetsStr + "...");
-
-        // Appel Claude API
-        String analysis = analyzeWithClaude(text, assetsStr);
-
+        String analysis     = analyzeWithClaude(text, assetsStr);
         String ts = new java.text.SimpleDateFormat(
             "dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
 
-        // Message Telegram — sans emojis complexes pour eviter erreurs encodage
         String tgMsg = "*ALERTE TRADING* - " + ts + "\n"
             + "Source: " + appName + "\n\n"
             + "NEWS:\n" + text.substring(0, Math.min(300, text.length())) + "\n\n"
-            + "ANALYSE FONDAMENTALE:\n" + analysis;
+            + "ANALYSE:\n" + analysis;
 
         sendTelegram(tgMsg);
         showLocalNotif(ctx, assetsStr, analysis);
@@ -146,158 +125,101 @@ public class NotificationService extends NotificationListenerService {
     }
 
     // =========================================================
-    //  CLAUDE API — CORRIGE SANS EMOJIS (FIX ERREUR 400)
+    //  CLAUDE API — MEME STRUCTURE QUE L'ANCIEN QUI MARCHAIT
     // =========================================================
     private static String analyzeWithClaude(String text, String assets) {
         try {
-            // Verification cle API
-            if (MainActivity.CLAUDE_API_KEY == null
-                || MainActivity.CLAUDE_API_KEY.trim().isEmpty()) {
-                return "Cle Claude API non configuree";
-            }
-
-            // CORRECTION ERREUR 400 :
-            // Supprimer TOUS les caracteres non-ASCII (emojis, accents speciaux)
-            // qui corrompent le JSON envoye a l'API
-            String cleanText = text
-                .replaceAll("[^\\x00-\\x7F]", " ")  // supprime non-ASCII
-                .replaceAll("\"", "'")               // echappe les guillemets
-                .replaceAll("\\\\", " ")             // echappe les backslash
-                .replaceAll("\\s+", " ")             // normalise les espaces
-                .trim();
-
-            // Prompt 100% ASCII — zero emoji — zero caractere special
-            String prompt = "You are an expert financial trading analyst. "
-                + "Breaking news: \"" + cleanText + "\". "
-                + "Assets to analyze: " + assets + ". "
-                + "For each asset provide: "
-                + "IMPACT (Bullish/Bearish/Neutral), "
-                + "SIGNAL (BUY/SELL/WAIT), "
-                + "REASON (1 sentence), "
-                + "CONVICTION (Low/Medium/High), "
-                + "SUMMARY ([asset] -> [BUY/SELL]). "
-                + "Be concise. Reply in French.";
-
-            // Construction JSON via JSONObject — methode la plus sure
-            JSONObject msgObj = new JSONObject();
-            msgObj.put("role", "user");
-            msgObj.put("content", prompt);
-
-            JSONArray msgsArr = new JSONArray();
-            msgsArr.put(msgObj);
-
-            JSONObject body = new JSONObject();
-            body.put("model", CLAUDE_MODEL);
-            body.put("max_tokens", 1024);
-            body.put("messages", msgsArr);
-
-            String bodyStr = body.toString();
-
-            // Log debug
-            if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[API] Envoi " + bodyStr.length() + " chars...");
-
-            // Connexion HTTP
             URL url = new URL("https://api.anthropic.com/v1/messages");
             HttpURLConnection c = (HttpURLConnection) url.openConnection();
             c.setRequestMethod("POST");
             c.setRequestProperty("Content-Type", "application/json");
-            c.setRequestProperty("x-api-key", MainActivity.CLAUDE_API_KEY.trim());
+            c.setRequestProperty("x-api-key", MainActivity.CLAUDE_API_KEY);
             c.setRequestProperty("anthropic-version", "2023-06-01");
-            c.setRequestProperty("Content-Length",
-                String.valueOf(bodyStr.getBytes("UTF-8").length));
             c.setDoOutput(true);
             c.setConnectTimeout(15000);
             c.setReadTimeout(30000);
 
-            // Envoi de la requete
+            // Prompt sans emojis — meme style que l'ancien
+            String prompt = "Tu es analyste financier expert en trading.\n"
+                + "News: \"" + text + "\"\nActifs: " + assets + "\n\n"
+                + "Analyse courte par actif:\n"
+                + "IMPACT: Haussier/Baissier/Neutre\n"
+                + "SIGNAL: BUY/SELL/WAIT\n"
+                + "RAISON: 1 phrase\n"
+                + "CONVICTION: Faible/Moyenne/Forte\n"
+                + "RESUME: [actif] -> [BUY/SELL]";
+
+            JSONObject msg = new JSONObject();
+            msg.put("role", "user");
+            msg.put("content", prompt);
+            JSONArray msgs = new JSONArray();
+            msgs.put(msg);
+            JSONObject body = new JSONObject();
+            body.put("model", CLAUDE_MODEL);
+            body.put("max_tokens", 1024);
+            body.put("messages", msgs);
+
             OutputStream os = c.getOutputStream();
-            os.write(bodyStr.getBytes("UTF-8"));
-            os.flush();
+            os.write(body.toString().getBytes("UTF-8"));
             os.close();
 
-            // Lecture de la reponse
-            int code = c.getResponseCode();
-
-            if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[API] Code: " + code);
-
-            InputStream is = (code == 200) ? c.getInputStream() : c.getErrorStream();
-            BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+            // MEME STRUCTURE HTTP QUE L'ANCIEN QUI MARCHAIT
+            // getResponseCode() appele une seule fois
+            BufferedReader br = new BufferedReader(new InputStreamReader(
+                c.getResponseCode() == 200 ? c.getInputStream() : c.getErrorStream()
+            ));
             StringBuilder sb = new StringBuilder();
             String line;
             while ((line = br.readLine()) != null) sb.append(line);
             br.close();
-            c.disconnect();
 
-            if (code == 200) {
-                // Succes — extraire le texte de la reponse
-                JSONObject resp = new JSONObject(sb.toString());
-                return resp.getJSONArray("content")
-                           .getJSONObject(0)
-                           .getString("text");
-            } else {
-                // Erreur — afficher le detail pour debug
-                String errDetail = sb.toString();
-                if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("[API] Erreur " + code + ": "
-                        + errDetail.substring(0, Math.min(200, errDetail.length())));
-                return "Erreur API " + code + " - voir journal app";
-            }
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[API] Reponse recue OK");
+
+            return new JSONObject(sb.toString())
+                .getJSONArray("content")
+                .getJSONObject(0)
+                .getString("text");
 
         } catch (Exception e) {
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[API] Exception: " + e.getMessage());
+                MainActivity.instance.addLog("[API] Erreur: " + e.getMessage());
             return "Erreur: " + e.getMessage();
         }
     }
 
     // =========================================================
-    //  ENVOI TELEGRAM
+    //  TELEGRAM
     // =========================================================
     private static void sendTelegram(String message) {
         try {
-            if (MainActivity.TELEGRAM_TOKEN == null
-                || MainActivity.TELEGRAM_TOKEN.trim().isEmpty()) return;
-
             String enc = URLEncoder.encode(message, "UTF-8");
-            URL url = new URL("https://api.telegram.org/bot"
-                + MainActivity.TELEGRAM_TOKEN.trim()
-                + "/sendMessage?chat_id=" + MainActivity.TELEGRAM_CHAT_ID.trim()
-                + "&text=" + enc
-                + "&parse_mode=Markdown");
-
+            URL url = new URL("https://api.telegram.org/bot" + MainActivity.TELEGRAM_TOKEN
+                + "/sendMessage?chat_id=" + MainActivity.TELEGRAM_CHAT_ID
+                + "&text=" + enc + "&parse_mode=Markdown");
             HttpURLConnection c = (HttpURLConnection) url.openConnection();
             c.setConnectTimeout(10000);
-            c.setReadTimeout(10000);
-            int code = c.getResponseCode();
+            c.getResponseCode();
             c.disconnect();
-
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog(
-                    code == 200 ? "[TG] Envoye OK" : "[TG] Erreur code: " + code);
-
+                MainActivity.instance.addLog("[TG] Envoye OK");
         } catch (Exception e) {
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[TG] Exception: " + e.getMessage());
+                MainActivity.instance.addLog("[TG] Erreur: " + e.getMessage());
         }
     }
 
     // =========================================================
-    //  NOTIFICATION PUSH LOCALE
+    //  NOTIFICATION LOCALE
     // =========================================================
     private static void showLocalNotif(Context ctx, String assets, String analysis) {
         NotificationManager nm = (NotificationManager)
             ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             nm.createNotificationChannel(new NotificationChannel(
-                CHANNEL_ID, "Trading Alerts",
-                NotificationManager.IMPORTANCE_HIGH));
-
+                CHANNEL_ID, "Trading Alerts", NotificationManager.IMPORTANCE_HIGH));
         String summary = analysis.length() > 150
             ? analysis.substring(0, 150) + "..." : analysis;
-
         nm.notify(NOTIF_ID, new NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Signal Trading - " + assets)
@@ -314,8 +236,7 @@ public class NotificationService extends NotificationListenerService {
     // =========================================================
     private boolean isTradingRelevant(String text) {
         String lower = text.toLowerCase();
-        for (String kw : KEYWORDS)
-            if (lower.contains(kw)) return true;
+        for (String kw : KEYWORDS) if (lower.contains(kw)) return true;
         return false;
     }
 
@@ -327,10 +248,7 @@ public class NotificationService extends NotificationListenerService {
                 if (lower.contains(kw.trim()) && !found.contains(a[0])) {
                     found.add(a[0]); break;
                 }
-        if (found.isEmpty()) {
-            found.add("GOLD");
-            found.add("BTCUSD");
-        }
+        if (found.isEmpty()) { found.add("GOLD"); found.add("BTCUSD"); }
         return found;
     }
 
