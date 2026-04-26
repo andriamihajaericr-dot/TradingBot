@@ -25,23 +25,23 @@ public class NotificationService extends NotificationListenerService {
     private final ExecutorService exec = Executors.newFixedThreadPool(3);
 
     // =========================================================
-    //  FILTRE 1 — APPLICATIONS AUTORISEES UNIQUEMENT
+    //  APPLICATIONS AUTORISEES UNIQUEMENT
     // =========================================================
     private static final List<String> ALLOWED_APPS = Arrays.asList(
-        "com.twitter.android",    // X/Twitter
-        "com.brave.browser",      // Brave
-        "com.android.chrome",     // Chrome
-        "com.chrome.beta",        // Chrome Beta
-        "org.mozilla.firefox",    // Firefox
-        "org.mozilla.fenix",      // Firefox Fenix
-        "com.coinglass.app",      // Coinglass
-        "com.financialjuice",     // FinancialJuice
-        "com.investing.app",      // Investing.com
-        "com.reuters.news"        // Reuters
+        "com.twitter.android",
+        "com.brave.browser",
+        "com.android.chrome",
+        "com.chrome.beta",
+        "org.mozilla.firefox",
+        "org.mozilla.fenix",
+        "com.coinglass.app",
+        "com.financialjuice",
+        "com.investing.app",
+        "com.reuters.news"
     );
 
     // =========================================================
-    //  FILTRE 2 — MOTS-CLES TRADING
+    //  MOTS-CLES TRADING
     // =========================================================
     private static final List<String> KEYWORDS = Arrays.asList(
         "war","attack","missile","sanction","conflict","crisis","invasion",
@@ -73,13 +73,11 @@ public class NotificationService extends NotificationListenerService {
             .getBoolean("bot_active", false);
         if (!botActive) return;
 
-        // FILTRE PAR APPLICATION
         String packageName = sbn.getPackageName();
         boolean isAllowed = false;
         for (String allowed : ALLOWED_APPS) {
             if (packageName.toLowerCase().contains(allowed.toLowerCase())) {
-                isAllowed = true;
-                break;
+                isAllowed = true; break;
             }
         }
         if (!isAllowed) return;
@@ -125,7 +123,7 @@ public class NotificationService extends NotificationListenerService {
     }
 
     // =========================================================
-    //  CLAUDE API — MEME STRUCTURE QUE L'ANCIEN QUI MARCHAIT
+    //  CLAUDE API — FIX "No value for content"
     // =========================================================
     private static String analyzeWithClaude(String text, String assets) {
         try {
@@ -139,7 +137,6 @@ public class NotificationService extends NotificationListenerService {
             c.setConnectTimeout(15000);
             c.setReadTimeout(30000);
 
-            // Prompt sans emojis — meme style que l'ancien
             String prompt = "Tu es analyste financier expert en trading.\n"
                 + "News: \"" + text + "\"\nActifs: " + assets + "\n\n"
                 + "Analyse courte par actif:\n"
@@ -161,29 +158,50 @@ public class NotificationService extends NotificationListenerService {
 
             OutputStream os = c.getOutputStream();
             os.write(body.toString().getBytes("UTF-8"));
+            os.flush();
             os.close();
 
-            // MEME STRUCTURE HTTP QUE L'ANCIEN QUI MARCHAIT
-            // getResponseCode() appele une seule fois
-            BufferedReader br = new BufferedReader(new InputStreamReader(
-                c.getResponseCode() == 200 ? c.getInputStream() : c.getErrorStream()
-            ));
+            // ✅ FIX — Lire le code HTTP AVANT de lire le body
+            int responseCode = c.getResponseCode();
+
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[API] HTTP code: " + responseCode);
+
+            // Lire le body selon le code
+            InputStream is = (responseCode == 200)
+                ? c.getInputStream()
+                : c.getErrorStream();
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
             StringBuilder sb = new StringBuilder();
             String line;
             while ((line = br.readLine()) != null) sb.append(line);
             br.close();
+            c.disconnect();
+
+            String responseBody = sb.toString();
 
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[API] Reponse recue OK");
+                MainActivity.instance.addLog("[API] Body recu: "
+                    + responseBody.substring(0, Math.min(100, responseBody.length())));
 
-            return new JSONObject(sb.toString())
-                .getJSONArray("content")
-                .getJSONObject(0)
-                .getString("text");
+            if (responseCode == 200) {
+                // Succes — parser la reponse Claude
+                JSONObject resp = new JSONObject(responseBody);
+                return resp.getJSONArray("content")
+                           .getJSONObject(0)
+                           .getString("text");
+            } else {
+                // ✅ Afficher l'erreur EXACTE dans le journal
+                // pour savoir pourquoi l'API refuse
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[API] ERREUR EXACTE: " + responseBody);
+                return "Erreur API " + responseCode + " - voir journal";
+            }
 
         } catch (Exception e) {
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[API] Erreur: " + e.getMessage());
+                MainActivity.instance.addLog("[API] Exception: " + e.getMessage());
             return "Erreur: " + e.getMessage();
         }
     }
