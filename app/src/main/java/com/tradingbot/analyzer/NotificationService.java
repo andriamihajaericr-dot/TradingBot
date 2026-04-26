@@ -43,7 +43,7 @@ public class NotificationService extends NotificationListenerService {
         "org.mozilla.firefox",
         "org.mozilla.fenix",
         "com.coinglass.android",
-        "com.financialjuice",
+        "com.financialjuice.androidapp",
         "com.investing.app",
         "com.reuters.news"
     );
