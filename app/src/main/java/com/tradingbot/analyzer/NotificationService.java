@@ -25,13 +25,11 @@ public class NotificationService extends NotificationListenerService {
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     
-    // Fenêtre de temps pour combiner les événements (30 minutes)
-    private static final long TIME_WINDOW_MS = 30 * 60 * 1000;
+    private static final long TIME_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
     
-    private final ExecutorService exec = Executors.newFixedThreadPool(5);
+    private final ExecutorService exec = Executors.newFixedThreadPool(3);
     private EventDatabase eventDb;
     
-    // File d'attente pour traiter les événements manqués
     private final ScheduledExecutorService scheduler = 
         Executors.newScheduledThreadPool(1);
 
@@ -49,24 +47,36 @@ public class NotificationService extends NotificationListenerService {
     );
 
     private static final List<String> KEYWORDS = Arrays.asList(
+        // Géopolitique
         "war","attack","missile","sanction","conflict","crisis","invasion",
         "nuclear","terror","breaking","urgent","alert","flash",
         "guerre","attaque","conflit","crise",
+        
+        // Économie
         "fed","rate","inflation","cpi","nfp","gdp","fomc","powell","recession","taux",
+        "ecb","boe","boj",
+        
+        // Actifs
         "gold","xauusd","silver","oil","bitcoin","btc","crypto","etf",
         "dollar","usd","gbp","jpy","eur","nasdaq","sp500","dow",
-        "reuters","bloomberg","breaking news",
-        // Ajout pour événements économiques
+        
+        // Pétrole
+        "crude","wti","brent","opec","petroleum","barrel","eia","api",
+        
+        // Calendrier économique
         "forecast","expected","actual","previous","release","consensus",
-        "pmi","ppi","retail","unemployment","jobless","housing","trade"
+        "pmi","ppi","retail","unemployment","jobless","housing"
     );
 
     private static final String[][] ASSETS = {
         {"GOLD",   "gold,xauusd,or,fed,rate,war,conflict,sanction,nuclear,inflation,powell"},
-        {"BTCUSD", "bitcoin,btc,crypto,etf,binance,coinbase,hack,sec"},
-        {"GBPUSD", "gbp,pound,boe,uk,britain,sterling"},
+        {"BTCUSD", "bitcoin,btc,crypto,etf,binance,coinbase"},
+        {"GBPUSD", "gbp,pound,boe,uk,britain,sterling,cable"},
         {"USDJPY", "jpy,yen,boj,japan"},
+        {"EURUSD", "eur,euro,ecb,europe"},
         {"NASDAQ", "nasdaq,sp500,dow,wall street,stock,tech"},
+        {"OIL",    "oil,crude,wti,brent,opec,petroleum,barrel,eia,api"},
+        {"USDCAD", "cad,loonie,canada"},
     };
 
     @Override
@@ -74,17 +84,15 @@ public class NotificationService extends NotificationListenerService {
         super.onCreate();
         eventDb = new EventDatabase(this);
         
-        // Traiter les événements manqués au démarrage
         exec.submit(() -> processMissedEvents());
         
-        // Nettoyer les vieux événements périodiquement
         scheduler.scheduleAtFixedRate(
             () -> eventDb.cleanOldEvents(),
             1, 24, TimeUnit.HOURS
         );
         
         if (MainActivity.instance != null)
-            MainActivity.instance.addLog("[SERVICE] Démarrage avec persistance");
+            MainActivity.instance.addLog("[SERVICE] Démarré avec filtrage strict");
     }
 
     @Override
@@ -103,76 +111,73 @@ public class NotificationService extends NotificationListenerService {
         String full = bigText.isEmpty() ? text : bigText;
         String combined = (title + " " + full).trim();
 
-        if (combined.isEmpty() || !isTradingRelevant(combined)) return;
+        if (combined.isEmpty() || combined.length() < 20) return;
+        if (!isTradingRelevant(combined)) return;
 
         String appName = getAppName(packageName);
         
-        // Générer un ID unique pour l'événement
-        String eventId = generateEventId(appName, title, combined);
+        // DÉTECTION ET FILTRAGE STRICT
+        EconomicEventDetector.DetectedEvent detectedEvent = 
+            EconomicEventDetector.detectEvent(title, full);
         
-        // Déterminer le type d'événement
-        String eventType = "news"; // Par défaut
-        EconomicEventDetector.EconomicEvent economicEvent = null;
-        
-        // Détecter si c'est un événement économique
-        if (appName.equals("FinancialJuice") || appName.equals("Investing.com")) {
-            economicEvent = EconomicEventDetector.parseEconomicEvent(title, full);
-            if (economicEvent != null && economicEvent.isComplete()) {
-                eventType = "economic";
-            }
-        }
-        
-        List<String> assets = detectAssets(combined);
-        String assetsStr = String.join(", ", assets);
-        
-        // Sauvegarder dans la DB
-        boolean saved = eventDb.saveEvent(
-            eventId, packageName, appName, eventType, 
-            title, combined, assetsStr
-        );
-        
-        if (!saved) {
-            // Événement déjà traité (doublon)
+        // RÈGLE #1: Rejeter si impact = Neutre
+        if (!detectedEvent.shouldNotify()) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[FILTRE] Rejeté (impact=" + 
+                    detectedEvent.impact + "): " + 
+                    combined.substring(0, Math.min(50, combined.length())));
             return;
         }
         
+        String eventId = generateEventId(appName, title, combined);
+        List<String> assets = detectAssets(combined);
+        String assetsStr = String.join(", ", assets);
+        
+        // Sauvegarder avec l'impact
+        boolean saved = eventDb.saveEvent(
+            eventId, packageName, appName, detectedEvent.eventType, 
+            title, combined, assetsStr, detectedEvent.impact
+        );
+        
+        if (!saved) return; // Doublon
+        
         if (MainActivity.instance != null)
-            MainActivity.instance.addLog("[NOTIF] " + appName + " [" + eventType + "]: " 
-                + combined.substring(0, Math.min(60, combined.length())) + "...");
+            MainActivity.instance.addLog("[" + detectedEvent.impact.toUpperCase() + "] " + 
+                appName + " [" + detectedEvent.eventType + "]: " + 
+                detectedEvent.getDescription());
 
         final String ft = combined;
         final String fa = appName;
-        final String fet = eventType;
-        final EconomicEventDetector.EconomicEvent fee = economicEvent;
+        final EconomicEventDetector.DetectedEvent fde = detectedEvent;
         
         exec.submit(() -> processNotificationWithContext(
-            this, eventId, fa, ft, fet, fee, assetsStr
+            this, eventId, fa, ft, fde, assetsStr
         ));
     }
 
-    // =========================================================
-    //  TRAITER LES ÉVÉNEMENTS MANQUÉS
-    // =========================================================
     private void processMissedEvents() {
         List<EventDatabase.StoredEvent> missed = eventDb.getUnprocessedEvents();
         
         if (missed.isEmpty()) return;
         
         if (MainActivity.instance != null)
-            MainActivity.instance.addLog("[RECOVERY] " + missed.size() 
-                + " événements non traités trouvés");
+            MainActivity.instance.addLog("[RECOVERY] " + missed.size() + 
+                " événements à traiter");
         
         for (EventDatabase.StoredEvent event : missed) {
             try {
-                // Rechercher des événements liés dans la fenêtre de temps
+                // Vérifier que l'impact est Haussier ou Baissier
+                if (!"Haussier".equals(event.impact) && !"Baissier".equals(event.impact)) {
+                    eventDb.markProcessed(event.id, "Ignoré (neutre)");
+                    continue;
+                }
+                
                 List<EventDatabase.StoredEvent> related = 
                     eventDb.getEventsInTimeWindow(event.timestamp, TIME_WINDOW_MS);
                 
                 if (related.size() > 1) {
-                    // Événement combiné
                     processCombinedEvents(this, related);
                 } else {
-                    // Événement simple
                     processStoredEvent(this, event);
                 }
                 
@@ -183,92 +188,71 @@ public class NotificationService extends NotificationListenerService {
         }
     }
 
-    // =========================================================
-    //  TRAITER AVEC CONTEXTE (NOUVEAU PIPELINE)
-    // =========================================================
     private static void processNotificationWithContext(
         Context ctx, String eventId, String appName, String text, 
-        String eventType, EconomicEventDetector.EconomicEvent economicData,
-        String assetsStr) {
+        EconomicEventDetector.DetectedEvent detectedEvent, String assetsStr) {
         
-        // Rechercher des événements dans la fenêtre de temps
         EventDatabase db = new EventDatabase(ctx);
         List<EventDatabase.StoredEvent> relatedEvents = 
             db.getEventsInTimeWindow(System.currentTimeMillis(), TIME_WINDOW_MS);
         
-        boolean hasCombination = false;
+        boolean hasCombination = relatedEvents.size() > 1;
         StringBuilder contextBuilder = new StringBuilder();
         
-        // Vérifier s'il y a des événements économiques ET des news
-        boolean hasEconomic = eventType.equals("economic");
-        boolean hasNews = false;
-        
-        for (EventDatabase.StoredEvent event : relatedEvents) {
-            if (event.eventType.equals("economic")) hasEconomic = true;
-            if (event.eventType.equals("news")) hasNews = true;
-        }
-        
-        hasCombination = hasEconomic && hasNews && relatedEvents.size() > 1;
-        
         if (hasCombination) {
-            // Construire le contexte combiné
             contextBuilder.append("CONTEXTE COMBINÉ:\n\n");
             
             for (EventDatabase.StoredEvent event : relatedEvents) {
-                contextBuilder.append("[").append(event.eventType.toUpperCase())
-                    .append("] ").append(event.title).append("\n");
-                contextBuilder.append(event.content.substring(
-                    0, Math.min(200, event.content.length()))).append("\n\n");
+                contextBuilder.append("[").append(event.impact).append(" - ")
+                    .append(event.eventType.toUpperCase()).append("] ")
+                    .append(event.title).append("\n");
             }
         }
         
         if (MainActivity.instance != null) {
-            if (hasCombination) {
-                MainActivity.instance.addLog("[BOT] Analyse COMBINÉE " + assetsStr 
-                    + " (" + relatedEvents.size() + " événements)...");
-            } else {
-                MainActivity.instance.addLog("[BOT] Analyse " + assetsStr + "...");
-            }
+            String combo = hasCombination ? " COMBINÉE" : "";
+            MainActivity.instance.addLog("[BOT] Analyse" + combo + " " + assetsStr + "...");
         }
 
-        // Analyse avec Groq
         String analysis = analyzeWithGroq(
-            text, assetsStr, eventType, economicData, 
+            text, assetsStr, detectedEvent, 
             hasCombination ? contextBuilder.toString() : null
         );
 
         String ts = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
             .format(new Date());
 
-        // Message Telegram enrichi
         StringBuilder tgMsg = new StringBuilder();
-        tgMsg.append("*").append(hasCombination ? "🔄 ALERTE COMBINÉE" : "⚡ ALERTE TRADING")
-            .append("* - ").append(ts).append("\n");
-        tgMsg.append("Source: ").append(appName);
         
-        if (eventType.equals("economic") && economicData != null) {
-            tgMsg.append(" [📊 ÉCONOMIQUE]\n\n");
-            tgMsg.append("*").append(economicData.indicator).append("* - ")
-                .append(economicData.country).append("\n");
-            tgMsg.append("Impact: ").append(economicData.impact).append("\n");
-            if (!economicData.forecast.equals("N/A"))
-                tgMsg.append("Prévision: ").append(economicData.forecast).append("\n");
-            if (!economicData.previous.equals("N/A"))
-                tgMsg.append("Précédent: ").append(economicData.previous).append("\n");
-            if (!economicData.actual.equals("N/A"))
-                tgMsg.append("Actuel: ").append(economicData.actual).append("\n");
-        } else {
-            tgMsg.append(" [📰 NEWS]\n\n");
+        String emoji = detectedEvent.impact.equals("Haussier") ? "📈" : "📉";
+        
+        tgMsg.append("*").append(emoji).append(" ");
+        tgMsg.append(hasCombination ? "ALERTE COMBINÉE" : "ALERTE TRADING");
+        tgMsg.append("* - ").append(ts).append("\n");
+        tgMsg.append("Source: ").append(appName);
+        tgMsg.append(" [").append(detectedEvent.eventType.toUpperCase()).append("]\n\n");
+        
+        tgMsg.append("*").append(detectedEvent.getDescription()).append("*\n");
+        tgMsg.append("Impact: ").append(detectedEvent.impact).append("\n");
+        
+        if (detectedEvent.forecast != null && !detectedEvent.forecast.isEmpty()) {
+            tgMsg.append("Prévision: ").append(detectedEvent.forecast).append("\n");
+        }
+        if (detectedEvent.previous != null && !detectedEvent.previous.isEmpty()) {
+            tgMsg.append("Précédent: ").append(detectedEvent.previous).append("\n");
+        }
+        if (detectedEvent.actual != null && !detectedEvent.actual.isEmpty()) {
+            tgMsg.append("Actuel: ").append(detectedEvent.actual).append("\n");
         }
         
-        tgMsg.append("\nDÉTAILS:\n").append(text.substring(0, Math.min(300, text.length())))
-            .append("\n\n");
+        tgMsg.append("\nDÉTAILS:\n")
+            .append(text.substring(0, Math.min(300, text.length()))).append("\n\n");
         
         if (hasCombination) {
             tgMsg.append("📌 ÉVÉNEMENTS LIÉS:\n");
             for (EventDatabase.StoredEvent event : relatedEvents) {
                 if (!event.eventId.equals(eventId)) {
-                    tgMsg.append("• [").append(event.eventType).append("] ")
+                    tgMsg.append("• [").append(event.impact).append("] ")
                         .append(event.title.substring(0, Math.min(50, event.title.length())))
                         .append("\n");
                 }
@@ -276,28 +260,25 @@ public class NotificationService extends NotificationListenerService {
             tgMsg.append("\n");
         }
         
-        tgMsg.append("ANALYSE:\n").append(analysis);
+        tgMsg.append("*ANALYSE:*\n").append(analysis);
 
         sendTelegram(tgMsg.toString());
-        showLocalNotif(ctx, assetsStr, analysis, hasCombination);
+        showLocalNotif(ctx, assetsStr, analysis, detectedEvent.impact);
         
-        // Marquer comme traité
         EventDatabase eventDb = new EventDatabase(ctx);
-        eventDb.markProcessed(
-            Integer.parseInt(eventId.split("_")[eventId.split("_").length - 1]), 
-            analysis
-        );
+        try {
+            int dbId = Integer.parseInt(eventId.substring(eventId.length() - 8), 16);
+            eventDb.markProcessed(dbId, analysis);
+        } catch (Exception e) {
+            // ID parsing failed, skip
+        }
 
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("[OK] Envoyé - " + assetsStr);
     }
 
-    // =========================================================
-    //  ANALYSE GROQ AMÉLIORÉE
-    // =========================================================
     private static String analyzeWithGroq(String text, String assets, 
-                                         String eventType, 
-                                         EconomicEventDetector.EconomicEvent economicData,
+                                         EconomicEventDetector.DetectedEvent event,
                                          String combinedContext) {
         try {
             if (MainActivity.CLAUDE_API_KEY == null || 
@@ -310,35 +291,38 @@ public class NotificationService extends NotificationListenerService {
             
             if (combinedContext != null) {
                 prompt.append(combinedContext).append("\n");
-                prompt.append("CONSIGNE: Analyse l'impact COMBINÉ de ces événements.\n\n");
             }
             
-            if (eventType.equals("economic") && economicData != null) {
-                prompt.append("ÉVÉNEMENT ÉCONOMIQUE:\n");
-                prompt.append("Indicateur: ").append(economicData.indicator).append("\n");
-                prompt.append("Pays: ").append(economicData.country).append("\n");
-                prompt.append("Prévision: ").append(economicData.forecast).append("\n");
-                prompt.append("Précédent: ").append(economicData.previous).append("\n");
-                prompt.append("Actuel: ").append(economicData.actual).append("\n");
-                prompt.append("Impact: ").append(economicData.impact).append("\n\n");
+            prompt.append("ÉVÉNEMENT ").append(event.eventType.toUpperCase()).append(":\n");
+            if (event.indicator != null) {
+                prompt.append("Indicateur: ").append(event.indicator).append("\n");
             }
+            if (event.country != null) {
+                prompt.append("Pays: ").append(event.country).append("\n");
+            }
+            if (event.forecast != null) {
+                prompt.append("Prévision: ").append(event.forecast).append("\n");
+            }
+            if (event.previous != null) {
+                prompt.append("Précédent: ").append(event.previous).append("\n");
+            }
+            if (event.actual != null) {
+                prompt.append("Actuel: ").append(event.actual).append("\n");
+            }
+            prompt.append("IMPACT DÉTECTÉ: ").append(event.impact).append("\n\n");
             
             prompt.append("News: \"").append(text).append("\"\n");
-            prompt.append("Actifs concernés: ").append(assets).append("\n\n");
-            prompt.append("Analyse détaillée par actif:\n");
-            prompt.append("IMPACT: Haussier/Baissier/Neutre\n");
-            prompt.append("SIGNAL: BUY/SELL/WAIT\n");
-            prompt.append("RAISON: 1 phrase claire\n");
-            prompt.append("CONVICTION: Faible/Moyenne/Forte\n");
-            if (economicData != null) {
-                prompt.append("ÉCART PRÉVISION: Analyse si actuel vs forecast significatif\n");
-            }
-            prompt.append("RÉSUMÉ: [actif] -> [BUY/SELL/WAIT]");
+            prompt.append("Actifs: ").append(assets).append("\n\n");
+            prompt.append("Analyse COURTE par actif:\n");
+            prompt.append("- SIGNAL: BUY/SELL/WAIT\n");
+            prompt.append("- RAISON: 1 phrase concise\n");
+            prompt.append("- CONVICTION: Faible/Moyenne/Forte\n");
+            prompt.append("RÉSUMÉ: [actif] -> [BUY/SELL] (conviction)");
 
             JSONObject systemMsg = new JSONObject();
             systemMsg.put("role", "system");
-            systemMsg.put("content", "Tu es un analyste financier expert. " +
-                "Réponds toujours en français. Sois précis et actionnable.");
+            systemMsg.put("content", "Analyste financier expert. Réponds en français, " +
+                "sois concis et actionnable.");
 
             JSONObject userMsg = new JSONObject();
             userMsg.put("role", "user");
@@ -351,7 +335,7 @@ public class NotificationService extends NotificationListenerService {
             JSONObject body = new JSONObject();
             body.put("model", GROQ_MODEL);
             body.put("messages", messages);
-            body.put("max_tokens", 1536);
+            body.put("max_tokens", 1024);
             body.put("temperature", 0.3);
 
             return callGroqAPI(body.toString());
@@ -381,9 +365,6 @@ public class NotificationService extends NotificationListenerService {
 
         int responseCode = c.getResponseCode();
 
-        if (MainActivity.instance != null)
-            MainActivity.instance.addLog("[GROQ] HTTP: " + responseCode);
-
         InputStream is = (responseCode == 200) 
             ? c.getInputStream() : c.getErrorStream();
 
@@ -394,58 +375,74 @@ public class NotificationService extends NotificationListenerService {
         br.close();
         c.disconnect();
 
-        String responseBody = sb.toString();
-
         if (responseCode == 200) {
-            JSONObject resp = new JSONObject(responseBody);
+            JSONObject resp = new JSONObject(sb.toString());
             return resp.getJSONArray("choices")
                        .getJSONObject(0)
                        .getJSONObject("message")
                        .getString("content");
         } else {
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[GROQ] Erreur: " + 
-                    responseBody.substring(0, Math.min(200, responseBody.length())));
+                MainActivity.instance.addLog("[GROQ] Erreur " + responseCode);
             return "Erreur Groq " + responseCode;
         }
     }
 
-    // =========================================================
-    //  TELEGRAM
-    // =========================================================
     private static void sendTelegram(String message) {
+        // Retry avec backoff
+        sendTelegramWithRetry(message, 0);
+    }
+    
+    private static void sendTelegramWithRetry(String message, int attempt) {
+        if (attempt >= 3) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[TG] Abandon après 3 tentatives");
+            return;
+        }
+        
         try {
             String enc = URLEncoder.encode(message, "UTF-8");
             URL url = new URL("https://api.telegram.org/bot" + 
                 MainActivity.TELEGRAM_TOKEN + "/sendMessage?chat_id=" + 
                 MainActivity.TELEGRAM_CHAT_ID + "&text=" + enc + 
                 "&parse_mode=Markdown");
+            
             HttpURLConnection c = (HttpURLConnection) url.openConnection();
             c.setConnectTimeout(10000);
-            c.getResponseCode();
+            c.setReadTimeout(10000);
+            int code = c.getResponseCode();
             c.disconnect();
-            if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[TG] Envoyé OK");
+            
+            if (code == 200) {
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[TG] Envoyé OK");
+            } else {
+                throw new IOException("HTTP " + code);
+            }
         } catch (Exception e) {
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[TG] Erreur: " + e.getMessage());
+                MainActivity.instance.addLog("[TG] Erreur (retry " + (attempt+1) + "): " + 
+                    e.getMessage());
+            
+            // Attendre avant retry (1s, 3s, 9s)
+            try {
+                Thread.sleep(1000 * (long)Math.pow(3, attempt));
+            } catch (InterruptedException ie) {}
+            
+            sendTelegramWithRetry(message, attempt + 1);
         }
     }
 
-    // =========================================================
-    //  NOTIFICATION LOCALE
-    // =========================================================
     private static void showLocalNotif(Context ctx, String assets, 
-                                      String analysis, boolean isCombined) {
+                                      String analysis, String impact) {
         NotificationManager nm = (NotificationManager)
             ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             nm.createNotificationChannel(new NotificationChannel(
                 CHANNEL_ID, "Trading Alerts", NotificationManager.IMPORTANCE_HIGH));
         
-        String title = isCombined 
-            ? "🔄 Signal Combiné - " + assets 
-            : "⚡ Signal Trading - " + assets;
+        String emoji = impact.equals("Haussier") ? "📈" : "📉";
+        String title = emoji + " " + impact + " - " + assets;
         
         String summary = analysis.length() > 150
             ? analysis.substring(0, 150) + "..." : analysis;
@@ -461,9 +458,6 @@ public class NotificationService extends NotificationListenerService {
             .build());
     }
 
-    // =========================================================
-    //  HELPERS
-    // =========================================================
     private boolean isAllowedApp(String packageName) {
         for (String allowed : ALLOWED_APPS)
             if (packageName.toLowerCase().contains(allowed.toLowerCase()))
@@ -524,35 +518,43 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private static void processStoredEvent(Context ctx, EventDatabase.StoredEvent event) {
-        // Traiter un événement stocké simple
         processNotification(ctx, event.appName, event.content);
     }
 
     private static void processCombinedEvents(Context ctx, 
                                              List<EventDatabase.StoredEvent> events) {
-        // Traiter un groupe d'événements combinés
-        // (implémentation similaire à processNotificationWithContext)
+        // Traiter le groupe d'événements
+        if (events.isEmpty()) return;
+        
+        EventDatabase.StoredEvent first = events.get(0);
+        processNotification(ctx, first.appName, first.content);
     }
 
     public static void processNotification(Context ctx, String appName, String text) {
         List<String> assets = detectAssets(text);
         String assetsStr = String.join(", ", assets);
 
+        EconomicEventDetector.DetectedEvent event = 
+            EconomicEventDetector.detectEvent("", text);
+        
+        if (!event.shouldNotify()) return; // Filtrer si neutre
+
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("[BOT] Analyse " + assetsStr + "...");
 
-        String analysis = analyzeWithGroq(text, assetsStr, "news", null, null);
+        String analysis = analyzeWithGroq(text, assetsStr, event, null);
 
         String ts = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
             .format(new Date());
 
-        String tgMsg = "*ALERTE TRADING* - " + ts + "\n" +
+        String emoji = event.impact.equals("Haussier") ? "📈" : "📉";
+        String tgMsg = "*" + emoji + " ALERTE TRADING* - " + ts + "\n" +
             "Source: " + appName + "\n\n" +
             "NEWS:\n" + text.substring(0, Math.min(300, text.length())) + "\n\n" +
             "ANALYSE:\n" + analysis;
 
         sendTelegram(tgMsg);
-        showLocalNotif(ctx, assetsStr, analysis, false);
+        showLocalNotif(ctx, assetsStr, analysis, event.impact);
 
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("[OK] Envoyé - " + assetsStr);
