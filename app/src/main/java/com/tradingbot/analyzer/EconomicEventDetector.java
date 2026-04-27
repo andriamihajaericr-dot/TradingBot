@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 public class EconomicEventDetector {
     
-    // Mots-clés pour détecter les événements économiques
+    // Patterns pour événements économiques
     private static final Pattern INDICATOR_PATTERN = Pattern.compile(
         "(CPI|NFP|GDP|PMI|PPI|Retail Sales|Unemployment|Interest Rate|FOMC|" +
         "Core CPI|PCE|Jobless Claims|Housing Starts|Trade Balance|" +
@@ -16,7 +16,7 @@ public class EconomicEventDetector {
     );
     
     private static final Pattern VALUE_PATTERN = Pattern.compile(
-        "(Forecast|Expected|Previous|Actual|Consensus)\\s*:?\\s*([\\d.]+[%MBK]?)",
+        "(Forecast|Expected|Previous|Actual|Consensus)\\s*:?\\s*([+-]?[\\d.]+[%MBK]?)",
         Pattern.CASE_INSENSITIVE
     );
     
@@ -25,30 +25,88 @@ public class EconomicEventDetector {
         Pattern.CASE_INSENSITIVE
     );
     
-    public static EconomicEvent parseEconomicEvent(String title, String content) {
+    // Patterns pour événements pétroliers
+    private static final Pattern OIL_INVENTORY_PATTERN = Pattern.compile(
+        "(EIA|API)\\s+(?:Crude)?\\s*(?:Oil)?\\s*(?:Inventory|Stockpile)[:\\s]*([+-][\\d.]+)\\s*(M|million)?",
+        Pattern.CASE_INSENSITIVE
+    );
+    
+    private static final Pattern OPEC_PATTERN = Pattern.compile(
+        "OPEC\\+?\\s+(?:cut|increase|reduce|boost)\\s+(?:production)?[:\\s]*([\\d.]+)?\\s*(M|million)?",
+        Pattern.CASE_INSENSITIVE
+    );
+    
+    private static final Pattern OIL_PRICE_PATTERN = Pattern.compile(
+        "(WTI|Brent)[:\\s@]*\\$?([\\d.]+)",
+        Pattern.CASE_INSENSITIVE
+    );
+    
+    public static DetectedEvent detectEvent(String title, String content) {
         String fullText = title + " " + content;
         
-        // Vérifier si c'est un événement économique
-        if (!isEconomicEvent(fullText)) {
-            return null;
+        DetectedEvent event = new DetectedEvent();
+        
+        // 1. Vérifier si c'est du pétrole
+        if (isOilEvent(fullText)) {
+            parseOilDetails(event, fullText);
+            event.eventType = "oil";
+        }
+        // 2. Sinon vérifier si c'est économique
+        else if (isEconomicEvent(fullText)) {
+            parseEconomicDetails(event, fullText);
+            event.eventType = "economic";
+        }
+        // 3. Sinon c'est une news générale
+        else {
+            event.eventType = "news";
         }
         
-        EconomicEvent event = new EconomicEvent();
+        // Déterminer l'IMPACT (Haussier/Baissier/Neutre)
+        event.impact = determineImpact(event, fullText);
         
-        // Extraire l'indicateur
-        Matcher indicatorMatcher = INDICATOR_PATTERN.matcher(fullText);
+        return event;
+    }
+    
+    private static void parseOilDetails(DetectedEvent event, String text) {
+        // Inventaires EIA/API
+        Matcher inventoryMatcher = OIL_INVENTORY_PATTERN.matcher(text);
+        if (inventoryMatcher.find()) {
+            event.indicator = inventoryMatcher.group(1) + " Inventory";
+            event.actual = inventoryMatcher.group(2);
+            event.country = "US";
+        }
+        
+        // OPEC
+        Matcher opecMatcher = OPEC_PATTERN.matcher(text);
+        if (opecMatcher.find()) {
+            event.indicator = "OPEC Production";
+            event.actual = opecMatcher.group(1);
+            event.country = "OPEC";
+        }
+        
+        // Prix
+        Matcher priceMatcher = OIL_PRICE_PATTERN.matcher(text);
+        if (priceMatcher.find()) {
+            event.indicator = priceMatcher.group(1) + " Crude";
+            event.actual = priceMatcher.group(2);
+        }
+    }
+    
+    private static void parseEconomicDetails(DetectedEvent event, String text) {
+        // Indicateur
+        Matcher indicatorMatcher = INDICATOR_PATTERN.matcher(text);
         if (indicatorMatcher.find()) {
             event.indicator = indicatorMatcher.group(1);
         }
         
-        // Extraire le pays
-        Matcher countryMatcher = COUNTRY_PATTERN.matcher(fullText);
+        // Pays
+        Matcher countryMatcher = COUNTRY_PATTERN.matcher(text);
         if (countryMatcher.find()) {
             event.country = countryMatcher.group(1);
         }
         
-        // Extraire les valeurs
-        Matcher valueMatcher = VALUE_PATTERN.matcher(fullText);
+        // Valeurs
+        Matcher valueMatcher = VALUE_PATTERN.matcher(text);
         while (valueMatcher.find()) {
             String type = valueMatcher.group(1).toLowerCase();
             String value = valueMatcher.group(2);
@@ -61,65 +119,166 @@ public class EconomicEventDetector {
                 event.actual = value;
             }
         }
+    }
+    
+    private static String determineImpact(DetectedEvent event, String text) {
+        String lower = text.toLowerCase();
         
-        // Déterminer l'impact
-        event.impact = determineImpact(event.indicator, fullText);
+        // === PÉTROLE ===
+        if (event.eventType.equals("oil")) {
+            // Inventaires EIA/API
+            if (event.indicator != null && event.indicator.contains("Inventory") && 
+                event.actual != null) {
+                try {
+                    double change = Double.parseDouble(event.actual.replace("+", ""));
+                    // Augmentation inventaires = baissier pour pétrole
+                    if (Math.abs(change) >= 2.0) { // >= 2M barils = significatif
+                        return change > 0 ? "Baissier" : "Haussier";
+                    }
+                } catch (Exception e) {}
+            }
+            
+            // OPEC coupe production = haussier
+            if (lower.contains("opec") && (lower.contains("cut") || lower.contains("reduce"))) {
+                return "Haussier";
+            }
+            
+            // OPEC augmente production = baissier
+            if (lower.contains("opec") && (lower.contains("increase") || lower.contains("boost"))) {
+                return "Baissier";
+            }
+            
+            // Géopolitique pétrolière
+            if (isOilGeopolitical(lower)) {
+                if (lower.contains("sanction") || lower.contains("attack") || 
+                    lower.contains("conflict")) {
+                    return "Haussier"; // Risque = hausse pétrole
+                }
+            }
+        }
         
-        return event;
+        // === ÉCONOMIQUE ===
+        else if (event.eventType.equals("economic")) {
+            // Comparer actual vs forecast
+            if (event.actual != null && event.forecast != null) {
+                try {
+                    double actual = parseNumericValue(event.actual);
+                    double forecast = parseNumericValue(event.forecast);
+                    double diff = actual - forecast;
+                    
+                    // Seuil de significativité
+                    if (Math.abs(diff) < 0.1) {
+                        return "Neutre"; // Différence trop faible
+                    }
+                    
+                    // Analyser selon l'indicateur
+                    String indicator = event.indicator != null ? 
+                        event.indicator.toUpperCase() : "";
+                    
+                    // Inflation (CPI, PPI) supérieure = baissier (risque hausse taux)
+                    if (indicator.contains("CPI") || indicator.contains("PPI") || 
+                        indicator.contains("INFLATION")) {
+                        return diff > 0 ? "Baissier" : "Haussier";
+                    }
+                    
+                    // Emploi (NFP) supérieur = haussier
+                    if (indicator.contains("NFP") || indicator.contains("EMPLOYMENT")) {
+                        return diff > 0 ? "Haussier" : "Baissier";
+                    }
+                    
+                    // GDP supérieur = haussier
+                    if (indicator.contains("GDP")) {
+                        return diff > 0 ? "Haussier" : "Baissier";
+                    }
+                    
+                    // Chômage supérieur = baissier
+                    if (indicator.contains("UNEMPLOYMENT") || indicator.contains("JOBLESS")) {
+                        return diff > 0 ? "Baissier" : "Haussier";
+                    }
+                    
+                    // PMI/ISM supérieur = haussier
+                    if (indicator.contains("PMI") || indicator.contains("ISM")) {
+                        return diff > 0 ? "Haussier" : "Baissier";
+                    }
+                    
+                } catch (Exception e) {}
+            }
+        }
+        
+        // === NEWS GÉNÉRALES ===
+        else {
+            // Guerre / conflit = haussier pour or, baissier pour actions
+            if (lower.contains("war") || lower.contains("invasion") || 
+                lower.contains("nuclear") || lower.contains("missile")) {
+                return "Baissier"; // Général = risk-off
+            }
+            
+            // Fed hawkish = baissier
+            if (lower.contains("fed") && (lower.contains("rate hike") || 
+                lower.contains("hawkish") || lower.contains("tighten"))) {
+                return "Baissier";
+            }
+            
+            // Fed dovish = haussier
+            if (lower.contains("fed") && (lower.contains("rate cut") || 
+                lower.contains("dovish") || lower.contains("pause"))) {
+                return "Haussier";
+            }
+        }
+        
+        return "Neutre";
+    }
+    
+    private static boolean isOilEvent(String text) {
+        String lower = text.toLowerCase();
+        return (lower.contains("oil") || lower.contains("crude") || 
+                lower.contains("wti") || lower.contains("brent") ||
+                lower.contains("opec") || lower.contains("eia") ||
+                lower.contains("petroleum") || lower.contains("barrel")) &&
+               !lower.contains("olive oil"); // Exclure huile d'olive !
     }
     
     private static boolean isEconomicEvent(String text) {
-        String lower = text.toLowerCase();
-        return lower.contains("forecast") || lower.contains("expected") ||
-               lower.contains("previous") || lower.contains("actual") ||
-               lower.contains("release") || lower.contains("data") ||
+        return text.matches("(?i).*(forecast|expected|actual|previous|consensus|release).*") &&
                INDICATOR_PATTERN.matcher(text).find();
     }
     
-    private static String determineImpact(String indicator, String text) {
-        if (indicator == null) return "Medium";
+    private static boolean isOilGeopolitical(String lower) {
+        boolean hasProducer = lower.contains("russia") || lower.contains("saudi") ||
+                             lower.contains("iran") || lower.contains("iraq") ||
+                             lower.contains("venezuela");
         
-        String lower = text.toLowerCase();
+        boolean hasEvent = lower.contains("sanction") || lower.contains("war") ||
+                          lower.contains("attack") || lower.contains("conflict");
         
-        // Événements à fort impact
-        if (indicator.matches("(?i)(NFP|CPI|FOMC|Interest Rate|GDP)") ||
-            lower.contains("breaking") || lower.contains("urgent")) {
-            return "High";
-        }
-        
-        // Événements à faible impact
-        if (indicator.matches("(?i)(Jobless Claims|Housing Starts)")) {
-            return "Low";
-        }
-        
-        return "Medium";
+        return hasProducer && hasEvent;
     }
     
-    public static class EconomicEvent {
+    private static double parseNumericValue(String value) {
+        // Retirer %, M, B, K et parser
+        String cleaned = value.replaceAll("[%MBK]", "").trim();
+        return Double.parseDouble(cleaned);
+    }
+    
+    public static class DetectedEvent {
+        public String eventType; // "economic", "oil", "news"
         public String indicator;
         public String country;
         public String forecast;
         public String previous;
         public String actual;
-        public String impact = "Medium";
+        public String impact; // "Haussier", "Baissier", "Neutre"
         
-        public boolean isComplete() {
-            return indicator != null && country != null;
+        public boolean shouldNotify() {
+            // RÈGLE STRICTE: notifier SEULEMENT si impact = Haussier ou Baissier
+            return "Haussier".equals(impact) || "Baissier".equals(impact);
         }
         
-        public JSONObject toJSON() {
-            try {
-                JSONObject json = new JSONObject();
-                json.put("indicator", indicator != null ? indicator : "Unknown");
-                json.put("country", country != null ? country : "Unknown");
-                json.put("forecast", forecast != null ? forecast : "N/A");
-                json.put("previous", previous != null ? previous : "N/A");
-                json.put("actual", actual != null ? actual : "N/A");
-                json.put("impact", impact);
-                return json;
-            } catch (Exception e) {
-                return new JSONObject();
+        public String getDescription() {
+            if (indicator != null) {
+                return indicator + (country != null ? " (" + country + ")" : "");
             }
+            return "Événement " + eventType;
         }
     }
 }
