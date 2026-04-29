@@ -33,19 +33,26 @@ public class NotificationService extends NotificationListenerService {
     private final ScheduledExecutorService scheduler = 
         Executors.newScheduledThreadPool(1);
 
+    // Cache pour daily report par actif
+    private static final Map<String, List<DailyReportEntry>> dailyReportByAsset = 
+        new ConcurrentHashMap<>();
+    
+    // Horaires des rapports (format 24h)
+    private static final int[] REPORT_HOURS = {8, 12, 16, 17, 21};
+    private static final int[] REPORT_MINUTES = {55, 55, 30, 0, 0};
+    
+    // Tracker des rapports envoyés aujourd'hui
+    private static final Set<String> sentReportsToday = new HashSet<>();
+
+    // Applications autorisées - RÉDUITES aux meilleures sources
     private static final List<String> ALLOWED_APPS = Arrays.asList(
-        "com.twitter.android",
-        "com.brave.browser",
-        "com.android.chrome",
-        "com.chrome.beta",
-        "org.mozilla.firefox",
-        "org.mozilla.fenix",
-        "com.coinglass.android",
-        "com.financialjuice.androidapp",
-        "com.investing.app",
-        "com.reuters.news"
+        "com.twitter.android",              // X/Twitter
+        "com.financialjuice.androidapp",    // FinancialJuice
+        "com.investing.app",                // Investing.com
+        "com.reuters.news"                  // Reuters
     );
 
+    // Mots-clés trading
     private static final List<String> KEYWORDS = Arrays.asList(
         // Géopolitique
         "war","attack","missile","sanction","conflict","crisis","invasion",
@@ -54,7 +61,7 @@ public class NotificationService extends NotificationListenerService {
         
         // Économie
         "fed","rate","inflation","cpi","nfp","gdp","fomc","powell","recession","taux",
-        "ecb","boe","boj",
+        "ecb","boe","boj","bank of england","bank of japan",
         
         // Actifs
         "gold","xauusd","silver","oil","bitcoin","btc","crypto","etf",
@@ -68,31 +75,131 @@ public class NotificationService extends NotificationListenerService {
         "pmi","ppi","retail","unemployment","jobless","housing"
     );
 
+    // Actifs détectables
     private static final String[][] ASSETS = {
-        {"GOLD",   "gold,xauusd,or,fed,rate,war,conflict,sanction,nuclear,inflation,powell"},
-        {"BTCUSD", "bitcoin,btc,crypto,etf,binance,coinbase"},
-        {"GBPUSD", "gbp,pound,boe,uk,britain,sterling,cable"},
-        {"USDJPY", "jpy,yen,boj,japan"},
-        {"EURUSD", "eur,euro,ecb,europe"},
-        {"NASDAQ", "nasdaq,sp500,dow,wall street,stock,tech"},
-        {"OIL",    "oil,crude,wti,brent,opec,petroleum,barrel,eia,api"},
-        {"USDCAD", "cad,loonie,canada"},
+        {"GOLD",   "gold,xauusd,or,fed,rate,war,conflict,sanction,nuclear,inflation,powell,safe haven"},
+        {"BTCUSD", "bitcoin,btc,crypto,etf,binance,coinbase,blockchain,ethereum"},
+        {"GBPUSD", "gbp,pound,boe,uk,britain,sterling,cable,bank of england,bailey"},
+        {"USDJPY", "jpy,yen,boj,japan,ueda,kuroda,intervention,yield curve"},
+        {"EURUSD", "eur,euro,ecb,europe,lagarde,draghi"},
+        {"SP500",  "sp500,s&p 500,s&p500,spx,spy,stock market,wall street,earnings"},
+        {"NASDAQ", "nasdaq,ndx,qqq,tech stocks,tech,vix,apple,tesla,nvidia,microsoft"},
+        {"OIL",    "oil,crude,wti,brent,opec,petroleum,barrel,eia,api,energy,saudi,russia oil"},
+        {"USDCAD", "cad,loonie,canada,boc"},
     };
+
+    // Priorités des comptes X/Twitter
+    private static final Map<String, Integer> PRIORITY_ACCOUNTS = new HashMap<>();
+
+    static {
+        // PRIORITÉ CRITIQUE 5/5
+        PRIORITY_ACCOUNTS.put("fxhedgers", 5);
+        PRIORITY_ACCOUNTS.put("deltaone", 5);
+        PRIORITY_ACCOUNTS.put("firstsquawk", 5);
+        PRIORITY_ACCOUNTS.put("livesquawk", 5);
+        PRIORITY_ACCOUNTS.put("financialjuice", 5);
+        PRIORITY_ACCOUNTS.put("kobeissiletter", 5);
+        PRIORITY_ACCOUNTS.put("nick_timiraos", 5);
+        
+        // PRIORITÉ HAUTE 4/5
+        PRIORITY_ACCOUNTS.put("federalreserve", 4);
+        PRIORITY_ACCOUNTS.put("bankofengland", 4);
+        PRIORITY_ACCOUNTS.put("boj_en", 4);
+        PRIORITY_ACCOUNTS.put("eiagov", 4);
+        PRIORITY_ACCOUNTS.put("javierblas", 4);
+        PRIORITY_ACCOUNTS.put("watcherguru", 4);
+        PRIORITY_ACCOUNTS.put("coinglass", 4);
+        PRIORITY_ACCOUNTS.put("zerohedge", 4);
+        PRIORITY_ACCOUNTS.put("markets", 4);
+        PRIORITY_ACCOUNTS.put("schuldensuehner", 4);
+        PRIORITY_ACCOUNTS.put("reutersuk", 4);
+        PRIORITY_ACCOUNTS.put("reutersjapan", 4);
+    }
+
+    // Mots-clés spécifiques par actif
+    private static final Map<String, String[]> ASSET_SPECIFIC_KEYWORDS = new HashMap<>();
+
+    static {
+        ASSET_SPECIFIC_KEYWORDS.put("GBPUSD", new String[]{
+            "bank of england", "boe", "bailey", "uk inflation", "uk cpi",
+            "uk pmi", "uk gdp", "sterling", "cable"
+        });
+        
+        ASSET_SPECIFIC_KEYWORDS.put("USDJPY", new String[]{
+            "bank of japan", "boj", "ueda", "yen", "jpy",
+            "japan cpi", "japan gdp", "intervention"
+        });
+        
+        ASSET_SPECIFIC_KEYWORDS.put("SP500", new String[]{
+            "sp500", "s&p 500", "s&p", "spx", "spy", "earnings", 
+            "fomc", "stock market", "wall street", "market open", "market close"
+        });
+        
+        ASSET_SPECIFIC_KEYWORDS.put("NASDAQ", new String[]{
+            "nasdaq", "ndx", "qqq", "tech stocks", "vix", 
+            "apple", "microsoft", "nvidia", "tesla"
+        });
+        
+        ASSET_SPECIFIC_KEYWORDS.put("OIL", new String[]{
+            "eia", "api", "opec", "crude", "wti", "brent", "barrel"
+        });
+        
+        ASSET_SPECIFIC_KEYWORDS.put("GOLD", new String[]{
+            "gold", "xauusd", "safe haven", "fed", "powell"
+        });
+        
+        ASSET_SPECIFIC_KEYWORDS.put("BTCUSD", new String[]{
+            "bitcoin", "btc", "crypto", "ethereum", "sec crypto"
+        });
+    }
 
     @Override
     public void onCreate() {
         super.onCreate();
         eventDb = new EventDatabase(this);
         
+        // Initialiser le cache par actif
+        for (String[] asset : ASSETS) {
+            dailyReportByAsset.put(asset[0], 
+                Collections.synchronizedList(new ArrayList<>()));
+        }
+        
         exec.submit(() -> processMissedEvents());
         
+        // Nettoyer vieux événements quotidiennement
         scheduler.scheduleAtFixedRate(
             () -> eventDb.cleanOldEvents(),
             1, 24, TimeUnit.HOURS
         );
         
+        // Vérifier toutes les minutes si un rapport doit être envoyé
+        scheduler.scheduleAtFixedRate(
+            () -> checkAndSendScheduledReports(),
+            0, 1, TimeUnit.MINUTES
+        );
+        
         if (MainActivity.instance != null)
-            MainActivity.instance.addLog("[SERVICE] Démarré avec filtrage strict");
+            MainActivity.instance.addLog("[SERVICE] Démarré - Rapports: 8h55, 12h55, 16h30, 17h, 21h");
+    }
+
+    // Classe pour stocker les entrées du rapport
+    private static class DailyReportEntry {
+        String timestamp;
+        String impact;
+        String eventType;
+        String description;
+        String summary;
+        String signal; // BUY/SELL/WAIT
+        
+        DailyReportEntry(String timestamp, String impact, String eventType, 
+                         String description, String summary, String signal) {
+            this.timestamp = timestamp;
+            this.impact = impact;
+            this.eventType = eventType;
+            this.description = description;
+            this.summary = summary;
+            this.signal = signal;
+        }
     }
 
     @Override
@@ -112,34 +219,52 @@ public class NotificationService extends NotificationListenerService {
         String combined = (title + " " + full).trim();
 
         if (combined.isEmpty() || combined.length() < 20) return;
+        
+        String appName = getAppName(packageName);
+        List<String> assets = detectAssets(combined);
+        
+        // FILTRAGE STRICT POUR X/TWITTER
+        if (appName.equals("X/Twitter")) {
+            int accountPriority = getAccountPriority(combined);
+            
+            if (accountPriority < 4) {
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[FILTRE] Compte X non prioritaire ignoré");
+                return;
+            }
+            
+            if (accountPriority == 4 && !hasAssetSpecificKeywords(combined, assets)) {
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[FILTRE] Pas de keywords pertinents");
+                return;
+            }
+            
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[X] Priorité " + accountPriority + "/5 ✓");
+        }
+        
         if (!isTradingRelevant(combined)) return;
 
-        String appName = getAppName(packageName);
-        
-        // DÉTECTION ET FILTRAGE STRICT
+        // DÉTECTION ET FILTRAGE STRICT PAR IMPACT
         EconomicEventDetector.DetectedEvent detectedEvent = 
             EconomicEventDetector.detectEvent(title, full);
         
-        // RÈGLE #1: Rejeter si impact = Neutre
         if (!detectedEvent.shouldNotify()) {
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[FILTRE] Rejeté (impact=" + 
-                    detectedEvent.impact + "): " + 
+                MainActivity.instance.addLog("[FILTRE] Impact neutre - rejeté: " + 
                     combined.substring(0, Math.min(50, combined.length())));
             return;
         }
         
         String eventId = generateEventId(appName, title, combined);
-        List<String> assets = detectAssets(combined);
         String assetsStr = String.join(", ", assets);
         
-        // Sauvegarder avec l'impact
         boolean saved = eventDb.saveEvent(
             eventId, packageName, appName, detectedEvent.eventType, 
             title, combined, assetsStr, detectedEvent.impact
         );
         
-        if (!saved) return; // Doublon
+        if (!saved) return;
         
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("[" + detectedEvent.impact.toUpperCase() + "] " + 
@@ -149,9 +274,10 @@ public class NotificationService extends NotificationListenerService {
         final String ft = combined;
         final String fa = appName;
         final EconomicEventDetector.DetectedEvent fde = detectedEvent;
+        final List<String> fAssets = assets;
         
         exec.submit(() -> processNotificationWithContext(
-            this, eventId, fa, ft, fde, assetsStr
+            this, eventId, fa, ft, fde, assetsStr, fAssets
         ));
     }
 
@@ -166,7 +292,6 @@ public class NotificationService extends NotificationListenerService {
         
         for (EventDatabase.StoredEvent event : missed) {
             try {
-                // Vérifier que l'impact est Haussier ou Baissier
                 if (!"Haussier".equals(event.impact) && !"Baissier".equals(event.impact)) {
                     eventDb.markProcessed(event.id, "Ignoré (neutre)");
                     continue;
@@ -190,7 +315,8 @@ public class NotificationService extends NotificationListenerService {
 
     private static void processNotificationWithContext(
         Context ctx, String eventId, String appName, String text, 
-        EconomicEventDetector.DetectedEvent detectedEvent, String assetsStr) {
+        EconomicEventDetector.DetectedEvent detectedEvent, String assetsStr,
+        List<String> assetsList) {
         
         EventDatabase db = new EventDatabase(ctx);
         List<EventDatabase.StoredEvent> relatedEvents = 
@@ -233,7 +359,7 @@ public class NotificationService extends NotificationListenerService {
         tgMsg.append(" [").append(detectedEvent.eventType.toUpperCase()).append("]\n\n");
         
         tgMsg.append("*").append(detectedEvent.getDescription()).append("*\n");
-        tgMsg.append("Impact: ").append(detectedEvent.impact).append("\n");
+        tgMsg.append("Impact Général: ").append(detectedEvent.impact).append("\n");
         
         if (detectedEvent.forecast != null && !detectedEvent.forecast.isEmpty()) {
             tgMsg.append("Prévision: ").append(detectedEvent.forecast).append("\n");
@@ -260,17 +386,20 @@ public class NotificationService extends NotificationListenerService {
             tgMsg.append("\n");
         }
         
-        tgMsg.append("*ANALYSE:*\n").append(analysis);
+        tgMsg.append("*ANALYSE PAR ACTIF:*\n").append(analysis);
 
         sendTelegram(tgMsg.toString());
         showLocalNotif(ctx, assetsStr, analysis, detectedEvent.impact);
+        
+        // Sauvegarder pour daily report par actif
+        saveToDailyReport(detectedEvent, text, analysis, assetsList);
         
         EventDatabase eventDb = new EventDatabase(ctx);
         try {
             int dbId = Integer.parseInt(eventId.substring(eventId.length() - 8), 16);
             eventDb.markProcessed(dbId, analysis);
         } catch (Exception e) {
-            // ID parsing failed, skip
+            // Ignore
         }
 
         if (MainActivity.instance != null)
@@ -309,20 +438,29 @@ public class NotificationService extends NotificationListenerService {
             if (event.actual != null) {
                 prompt.append("Actuel: ").append(event.actual).append("\n");
             }
-            prompt.append("IMPACT DÉTECTÉ: ").append(event.impact).append("\n\n");
+            
+            prompt.append("\nIMPORTANT: Impact général détecté = ").append(event.impact);
+            prompt.append("\nCeci est l'impact MACRO. Analyse maintenant l'impact SPÉCIFIQUE par actif.\n");
+            prompt.append("Exemple: Si impact général = Baissier (risk-off), alors:\n");
+            prompt.append("- GOLD: HAUSSIER (valeur refuge)\n");
+            prompt.append("- NASDAQ: BAISSIER (aversion au risque)\n");
+            prompt.append("- USD: peut être HAUSSIER (dollar fort)\n\n");
             
             prompt.append("News: \"").append(text).append("\"\n");
-            prompt.append("Actifs: ").append(assets).append("\n\n");
-            prompt.append("Analyse COURTE par actif:\n");
-            prompt.append("- SIGNAL: BUY/SELL/WAIT\n");
-            prompt.append("- RAISON: 1 phrase concise\n");
-            prompt.append("- CONVICTION: Faible/Moyenne/Forte\n");
-            prompt.append("RÉSUMÉ: [actif] -> [BUY/SELL] (conviction)");
+            prompt.append("Actifs à analyser: ").append(assets).append("\n\n");
+            
+            prompt.append("Donne une analyse TRÈS COURTE pour CHAQUE actif listé:\n");
+            prompt.append("Format strict par actif (max 2 lignes):\n");
+            prompt.append("[ACTIF]: IMPACT (Haussier/Baissier) → SIGNAL (BUY/SELL/WAIT) - Raison en 1 phrase\n\n");
+            prompt.append("Exemple:\n");
+            prompt.append("GOLD: Haussier → BUY - Valeur refuge en période de tensions\n");
+            prompt.append("NASDAQ: Baissier → SELL - Risk-off favorise sortie des tech\n\n");
+            prompt.append("RÉSUMÉ FINAL: Liste compacte [actif→signal]");
 
             JSONObject systemMsg = new JSONObject();
             systemMsg.put("role", "system");
             systemMsg.put("content", "Analyste financier expert. Réponds en français, " +
-                "sois concis et actionnable.");
+                "ultra concis (max 2 lignes par actif). Différencie impact MACRO vs SPÉCIFIQUE.");
 
             JSONObject userMsg = new JSONObject();
             userMsg.put("role", "user");
@@ -389,7 +527,6 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private static void sendTelegram(String message) {
-        // Retry avec backoff
         sendTelegramWithRetry(message, 0);
     }
     
@@ -424,7 +561,6 @@ public class NotificationService extends NotificationListenerService {
                 MainActivity.instance.addLog("[TG] Erreur (retry " + (attempt+1) + "): " + 
                     e.getMessage());
             
-            // Attendre avant retry (1s, 3s, 9s)
             try {
                 Thread.sleep(1000 * (long)Math.pow(3, attempt));
             } catch (InterruptedException ie) {}
@@ -442,7 +578,7 @@ public class NotificationService extends NotificationListenerService {
                 CHANNEL_ID, "Trading Alerts", NotificationManager.IMPORTANCE_HIGH));
         
         String emoji = impact.equals("Haussier") ? "📈" : "📉";
-        String title = emoji + " " + impact + " - " + assets;
+        String title = emoji + " Impact " + impact + " - " + assets;
         
         String summary = analysis.length() > 150
             ? analysis.substring(0, 150) + "..." : analysis;
@@ -456,6 +592,267 @@ public class NotificationService extends NotificationListenerService {
             .setAutoCancel(true)
             .setVibrate(new long[]{0, 300, 100, 300})
             .build());
+    }
+
+    // === DAILY REPORT SYSTÈME PAR ACTIF ===
+    
+    private static void saveToDailyReport(EconomicEventDetector.DetectedEvent event, 
+                                         String text, String analysis, List<String> assets) {
+        String timestamp = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+        String summary = text.substring(0, Math.min(120, text.length()));
+        
+        // Extraire le signal de l'analyse
+        String signal = extractSignalFromAnalysis(analysis);
+        
+        // Sauvegarder pour chaque actif concerné
+        for (String asset : assets) {
+            List<DailyReportEntry> assetCache = dailyReportByAsset.get(asset);
+            if (assetCache != null) {
+                DailyReportEntry entry = new DailyReportEntry(
+                    timestamp,
+                    event.impact,
+                    event.eventType,
+                    event.getDescription(),
+                    summary,
+                    signal
+                );
+                
+                assetCache.add(entry);
+                
+                // Garder max 30 événements par actif
+                if (assetCache.size() > 30) {
+                    assetCache.remove(0);
+                }
+            }
+        }
+    }
+    
+    private static String extractSignalFromAnalysis(String analysis) {
+        if (analysis.contains("BUY")) return "BUY";
+        if (analysis.contains("SELL")) return "SELL";
+        return "WAIT";
+    }
+    
+    // Vérifier si un rapport doit être envoyé
+    private void checkAndSendScheduledReports() {
+        Calendar cal = Calendar.getInstance();
+        int currentHour = cal.get(Calendar.HOUR_OF_DAY);
+        int currentMinute = cal.get(Calendar.MINUTE);
+        int currentDay = cal.get(Calendar.DAY_OF_YEAR);
+        
+        // Réinitialiser à minuit
+        Calendar todayStart = Calendar.getInstance();
+        todayStart.set(Calendar.HOUR_OF_DAY, 0);
+        todayStart.set(Calendar.MINUTE, 0);
+        
+        if (cal.getTimeInMillis() - todayStart.getTimeInMillis() < 60000) {
+            sentReportsToday.clear();
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[REPORT] Nouveau jour - reset");
+        }
+        
+        // Vérifier chaque horaire programmé
+        for (int i = 0; i < REPORT_HOURS.length; i++) {
+            int reportHour = REPORT_HOURS[i];
+            int reportMinute = REPORT_MINUTES[i];
+            
+            String reportKey = currentDay + "_" + reportHour + "_" + reportMinute;
+            
+            if (currentHour == reportHour && 
+                currentMinute == reportMinute && 
+                !sentReportsToday.contains(reportKey)) {
+                
+                generateScheduledReport(reportHour, reportMinute);
+                sentReportsToday.add(reportKey);
+                
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[REPORT] Rapport " + reportHour + "h" + 
+                        String.format("%02d", reportMinute) + " envoyé");
+            }
+        }
+    }
+    
+    // Générer un rapport programmé avec résumé par actif
+    private void generateScheduledReport(int hour, int minute) {
+        // Vérifier s'il y a au moins un événement
+        boolean hasEvents = false;
+        for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
+            if (!cache.isEmpty()) {
+                hasEvents = true;
+                break;
+            }
+        }
+        
+        if (!hasEvents) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[REPORT] Aucun événement - rapport ignoré");
+            return;
+        }
+        
+        StringBuilder report = new StringBuilder();
+        
+        // En-tête
+        String reportTitle = getReportTitle(hour, minute);
+        report.append("📊 *").append(reportTitle).append("*\n");
+        report.append(new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+            .format(new Date()));
+        report.append("\n\n");
+        
+        // Statistiques globales
+        int totalEvents = 0;
+        int haussier = 0, baissier = 0;
+        
+        for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
+            totalEvents += cache.size();
+            for (DailyReportEntry entry : cache) {
+                if ("Haussier".equals(entry.impact)) haussier++;
+                if ("Baissier".equals(entry.impact)) baissier++;
+            }
+        }
+        
+        report.append("*Vue d'ensemble: ").append(totalEvents).append(" événements*\n");
+        report.append("📈 Haussiers: ").append(haussier).append(" | ");
+        report.append("📉 Baissiers: ").append(baissier).append("\n\n");
+        
+        // Rapport par actif (seulement ceux avec des événements)
+        report.append("*📌 RÉSUMÉ PAR ACTIF:*\n\n");
+        
+        for (String[] assetInfo : ASSETS) {
+            String assetName = assetInfo[0];
+            List<DailyReportEntry> assetCache = dailyReportByAsset.get(assetName);
+            
+            if (assetCache == null || assetCache.isEmpty()) continue;
+            
+            // Compter les signaux pour cet actif
+            int buyCount = 0, sellCount = 0, waitCount = 0;
+            String dominantImpact = "";
+            int haussierCount = 0, baissierCount = 0;
+            
+            for (DailyReportEntry entry : assetCache) {
+                if ("BUY".equals(entry.signal)) buyCount++;
+                if ("SELL".equals(entry.signal)) sellCount++;
+                if ("WAIT".equals(entry.signal)) waitCount++;
+                if ("Haussier".equals(entry.impact)) haussierCount++;
+                if ("Baissier".equals(entry.impact)) baissierCount++;
+            }
+            
+            dominantImpact = haussierCount > baissierCount ? "📈 Haussier" : "📉 Baissier";
+            
+            // Emoji selon l'actif
+            String assetEmoji = getAssetEmoji(assetName);
+            
+            report.append(assetEmoji).append(" *").append(assetName).append("* - ");
+            report.append(assetCache.size()).append(" evt - ");
+            report.append(dominantImpact).append("\n");
+            
+            // Signaux dominants
+            String dominantSignal = "";
+            if (buyCount > sellCount && buyCount > waitCount) {
+                dominantSignal = "🟢 BUY dominant (" + buyCount + ")";
+            } else if (sellCount > buyCount && sellCount > waitCount) {
+                dominantSignal = "🔴 SELL dominant (" + sellCount + ")";
+            } else {
+                dominantSignal = "⚪ Mixte (B:" + buyCount + " S:" + sellCount + ")";
+            }
+            
+            report.append("   Signal: ").append(dominantSignal).append("\n");
+            
+            // Derniers événements (max 3 les plus récents)
+            int eventCount = Math.min(3, assetCache.size());
+            for (int i = assetCache.size() - eventCount; i < assetCache.size(); i++) {
+                DailyReportEntry entry = assetCache.get(i);
+                report.append("   • ").append(entry.timestamp).append(" - ");
+                report.append(entry.description.substring(0, Math.min(40, entry.description.length())));
+                report.append("\n");
+            }
+            
+            report.append("\n");
+        }
+        
+        report.append("_Prochain rapport: ").append(getNextReportTime(hour, minute)).append("_");
+        
+        sendTelegram(report.toString());
+        
+        // Nettoyer le cache après le rapport de 21h
+        if (hour == 21) {
+            for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
+                cache.clear();
+            }
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[REPORT] Cache nettoyé (fin de journée)");
+        }
+    }
+    
+    private String getAssetEmoji(String asset) {
+        switch (asset) {
+            case "GOLD": return "🥇";
+            case "BTCUSD": return "₿";
+            case "GBPUSD": return "🇬🇧";
+            case "USDJPY": return "🇯🇵";
+            case "EURUSD": return "🇪🇺";
+            case "SP500": return "📊";
+            case "NASDAQ": return "💻";
+            case "OIL": return "🛢️";
+            case "USDCAD": return "🇨🇦";
+            default: return "📈";
+        }
+    }
+    
+    private String getReportTitle(int hour, int minute) {
+        if (hour == 8 && minute == 55) {
+            return "RAPPORT PRÉ-OUVERTURE EUROPÉENNE";
+        } else if (hour == 12 && minute == 55) {
+            return "RAPPORT MI-JOURNÉE";
+        } else if (hour == 16 && minute == 30) {
+            return "RAPPORT PRÉ-CLÔTURE EUROPÉENNE";
+        } else if (hour == 17 && minute == 0) {
+            return "RAPPORT CLÔTURE EUROPÉENNE";
+        } else if (hour == 21 && minute == 0) {
+            return "RAPPORT FIN DE JOURNÉE";
+        }
+        return "RAPPORT TRADING";
+    }
+    
+    private String getNextReportTime(int currentHour, int currentMinute) {
+        for (int i = 0; i < REPORT_HOURS.length; i++) {
+            if (REPORT_HOURS[i] > currentHour || 
+                (REPORT_HOURS[i] == currentHour && REPORT_MINUTES[i] > currentMinute)) {
+                return REPORT_HOURS[i] + "h" + String.format("%02d", REPORT_MINUTES[i]);
+            }
+        }
+        return "8h55 (demain)";
+    }
+
+    // === HELPERS ===
+
+    private static int getAccountPriority(String text) {
+        String lower = text.toLowerCase();
+        
+        for (Map.Entry<String, Integer> entry : PRIORITY_ACCOUNTS.entrySet()) {
+            String account = entry.getKey();
+            if (lower.contains(account) || lower.contains("@" + account)) {
+                return entry.getValue();
+            }
+        }
+        
+        return 1;
+    }
+
+    private static boolean hasAssetSpecificKeywords(String text, List<String> assets) {
+        String lower = text.toLowerCase();
+        
+        for (String asset : assets) {
+            String[] keywords = ASSET_SPECIFIC_KEYWORDS.get(asset);
+            if (keywords != null) {
+                for (String kw : keywords) {
+                    if (lower.contains(kw)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
     }
 
     private boolean isAllowedApp(String packageName) {
@@ -490,10 +887,6 @@ public class NotificationService extends NotificationListenerService {
 
     private String getAppName(String pkg) {
         if (pkg.contains("twitter") || pkg.contains(".x")) return "X/Twitter";
-        if (pkg.contains("brave")) return "Brave";
-        if (pkg.contains("chrome")) return "Chrome";
-        if (pkg.contains("firefox")) return "Firefox";
-        if (pkg.contains("coinglass")) return "Coinglass";
         if (pkg.contains("financial")) return "FinancialJuice";
         if (pkg.contains("investing")) return "Investing.com";
         if (pkg.contains("reuters")) return "Reuters";
@@ -523,9 +916,7 @@ public class NotificationService extends NotificationListenerService {
 
     private static void processCombinedEvents(Context ctx, 
                                              List<EventDatabase.StoredEvent> events) {
-        // Traiter le groupe d'événements
         if (events.isEmpty()) return;
-        
         EventDatabase.StoredEvent first = events.get(0);
         processNotification(ctx, first.appName, first.content);
     }
@@ -537,7 +928,7 @@ public class NotificationService extends NotificationListenerService {
         EconomicEventDetector.DetectedEvent event = 
             EconomicEventDetector.detectEvent("", text);
         
-        if (!event.shouldNotify()) return; // Filtrer si neutre
+        if (!event.shouldNotify()) return;
 
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("[BOT] Analyse " + assetsStr + "...");
@@ -550,11 +941,14 @@ public class NotificationService extends NotificationListenerService {
         String emoji = event.impact.equals("Haussier") ? "📈" : "📉";
         String tgMsg = "*" + emoji + " ALERTE TRADING* - " + ts + "\n" +
             "Source: " + appName + "\n\n" +
+            "Impact Général: " + event.impact + "\n\n" +
             "NEWS:\n" + text.substring(0, Math.min(300, text.length())) + "\n\n" +
-            "ANALYSE:\n" + analysis;
+            "*ANALYSE PAR ACTIF:*\n" + analysis;
 
         sendTelegram(tgMsg);
         showLocalNotif(ctx, assetsStr, analysis, event.impact);
+        
+        saveToDailyReport(event, text, analysis, assets);
 
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("[OK] Envoyé - " + assetsStr);
