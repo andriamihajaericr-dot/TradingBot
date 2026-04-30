@@ -42,7 +42,8 @@ public class NotificationService extends NotificationListenerService {
     private static final int[] REPORT_MINUTES = {55, 55, 30, 0, 0};
     
     // Tracker des rapports envoyés aujourd'hui
-    private static final Set<String> sentReportsToday = new HashSet<>();
+    private static final Set<String> sentReportsToday = 
+        Collections.synchronizedSet(new HashSet<>());
 
     // Applications autorisées - RÉDUITES aux meilleures sources
     private static final List<String> ALLOWED_APPS = Arrays.asList(
@@ -86,6 +87,7 @@ public class NotificationService extends NotificationListenerService {
         {"NASDAQ", "nasdaq,ndx,qqq,tech stocks,tech,vix,apple,tesla,nvidia,microsoft"},
         {"OIL",    "oil,crude,wti,brent,opec,petroleum,barrel,eia,api,energy,saudi,russia oil"},
         {"USDCAD", "cad,loonie,canada,boc"},
+        {"AUDUSD", "aud,aussie,australia,rba"},
     };
 
     // Priorités des comptes X/Twitter
@@ -151,6 +153,10 @@ public class NotificationService extends NotificationListenerService {
         ASSET_SPECIFIC_KEYWORDS.put("BTCUSD", new String[]{
             "bitcoin", "btc", "crypto", "ethereum", "sec crypto"
         });
+        
+        ASSET_SPECIFIC_KEYWORDS.put("AUDUSD", new String[]{
+            "aud", "aussie", "australia", "rba", "iron ore"
+        });
     }
 
     @Override
@@ -172,14 +178,17 @@ public class NotificationService extends NotificationListenerService {
             1, 24, TimeUnit.HOURS
         );
         
-        // Vérifier toutes les minutes si un rapport doit être envoyé
+        // Vérifier toutes les minutes pour rapports programmés + résumé quotidien
         scheduler.scheduleAtFixedRate(
-            () -> checkAndSendScheduledReports(),
+            () -> {
+                checkAndSendScheduledReports();
+                checkAndSendDailySummary();
+            },
             0, 1, TimeUnit.MINUTES
         );
         
         if (MainActivity.instance != null)
-            MainActivity.instance.addLog("[SERVICE] Démarré - Rapports: 8h55, 12h55, 16h30, 17h, 21h");
+            MainActivity.instance.addLog("[SERVICE] Démarré - Rapports: 8h55, 12h55, 16h30, 17h, 21h | Résumé: 7h00");
     }
 
     // Classe pour stocker les entrées du rapport
@@ -783,6 +792,176 @@ public class NotificationService extends NotificationListenerService {
         }
     }
     
+    // === RÉSUMÉ MARCHÉ QUOTIDIEN (7h00) ===
+    
+    private void checkAndSendDailySummary() {
+    Calendar cal = Calendar.getInstance();
+    int currentHour = cal.get(Calendar.HOUR_OF_DAY);
+    int currentMinute = cal.get(Calendar.MINUTE);
+    
+    // Résumé à 7h00 (07h45)
+    if (currentHour == 7 && currentMinute == 45) {
+        String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+            .format(new Date());
+        
+        if (!sentReportsToday.contains("summary_" + today)) {
+            generateAndSendMarketSummary();
+            sentReportsToday.add("summary_" + today);
+        }
+    } 
+    // Résumé à 12h45
+    else if (currentHour == 12 && currentMinute == 45) {
+        String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+            .format(new Date());
+        
+        if (!sentReportsToday.contains("summary_" + today)) {
+            generateAndSendMarketSummary();
+            sentReportsToday.add("summary_" + today);
+        }
+    } 
+    // Résumé à 16h15
+    else if (currentHour == 16 && currentMinute == 15) {
+        String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+            .format(new Date());
+        
+        if (!sentReportsToday.contains("summary_" + today)) {
+            generateAndSendMarketSummary();
+            sentReportsToday.add("summary_" + today);
+        }
+    } 
+    // Résumé à 17h00
+    else if (currentHour == 17 && currentMinute == 0) {
+        String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+            .format(new Date());
+        
+        if (!sentReportsToday.contains("summary_" + today)) {
+            generateAndSendMarketSummary();
+            sentReportsToday.add("summary_" + today);
+        }
+    }
+    }
+    
+    private void generateAndSendMarketSummary() {
+        // Construire le contexte depuis les événements du jour précédent
+        StringBuilder context = new StringBuilder();
+        
+        int totalEvents = 0;
+        for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
+            totalEvents += cache.size();
+            
+            // Récupérer les 5 événements les plus récents par actif
+            int start = Math.max(0, cache.size() - 5);
+            for (int i = start; i < cache.size(); i++) {
+                DailyReportEntry entry = cache.get(i);
+                context.append("- ").append(entry.timestamp).append(" : ")
+                       .append(entry.description).append(" (Impact: ")
+                       .append(entry.impact).append(")\n");
+            }
+        }
+        
+        if (totalEvents == 0) {
+            context.append("Aucun événement majeur capté hier.");
+        }
+        
+        // Générer le prompt avec le contexte
+        String basePrompt = generateDailyMarketSummaryPrompt();
+        String fullPrompt = basePrompt.replace(
+            "[ICI SERA INJECTÉ LE CONTEXTE DES ÉVÉNEMENTS DU JOUR]", 
+            context.toString()
+        );
+        
+        // Appeler Groq pour générer le résumé
+        try {
+            if (MainActivity.CLAUDE_API_KEY == null || 
+                MainActivity.CLAUDE_API_KEY.trim().isEmpty()) {
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[SUMMARY] Clé API manquante");
+                return;
+            }
+
+            JSONObject systemMsg = new JSONObject();
+            systemMsg.put("role", "system");
+            systemMsg.put("content", 
+                "Tu es un analyste de marché expert. Génère un résumé professionnel, " +
+                "concis et orienté trading en français. Respecte STRICTEMENT la structure " +
+                "et la limite de 340 mots.");
+
+            JSONObject userMsg = new JSONObject();
+            userMsg.put("role", "user");
+            userMsg.put("content", fullPrompt);
+
+            JSONArray messages = new JSONArray();
+            messages.put(systemMsg);
+            messages.put(userMsg);
+
+            JSONObject body = new JSONObject();
+            body.put("model", GROQ_MODEL);
+            body.put("messages", messages);
+            body.put("max_tokens", 800);
+            body.put("temperature", 0.4);
+
+            String summary = callGroqAPI(body.toString());
+            
+            // Envoyer sur Telegram
+            String telegramMsg = "📰 *RÉSUMÉ MARCHÉ QUOTIDIEN*\n" +
+                new SimpleDateFormat("EEEE dd MMMM yyyy", Locale.FRENCH)
+                    .format(new Date()) + "\n\n" +
+                summary;
+            
+            sendTelegram(telegramMsg);
+            
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[SUMMARY] Résumé marché envoyé");
+
+        } catch (Exception e) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[SUMMARY] Erreur: " + e.getMessage());
+        }
+    }
+    
+    private static String generateDailyMarketSummaryPrompt() {
+        return 
+            "Résumé marché ultra-court en français (max 340 mots).\n\n" +
+            
+            "Actifs à analyser : Gold (XAUUSD), S&P500, Nasdaq, GBPUSD, USDJPY, BTCUSD, AUDUSD, Pétrole (Brent/WTI).\n\n" +
+            
+            "Date et heure actuelles : " + 
+            new SimpleDateFormat("EEEE dd/MM/yyyy 'à' HH:mm 'EAT (UTC+3)'", Locale.FRENCH)
+                .format(new Date()) + "\n\n" +
+            
+            "Structure OBLIGATOIRE :\n\n" +
+            
+            "1. **TOP 3 DRIVERS DU JOUR** + heure de sortie\n" +
+            "   → Si un nouveau driver important est apparu dans les dernières 8 heures, commence par \"**NOUVEAU DRIVER :**\" + heure précise (heure US ET).\n" +
+            "   → Si les drivers principaux persistent sans changement majeur depuis hier, mentionne-le explicitement (\"Pas de nouveau driver majeur depuis hier soir\").\n\n" +
+            
+            "2. **ANALYSE PAR ACTIF** (1 ligne maximum par actif) :\n" +
+            "   Format strict : [Actif] : [variation %] | Bias : [Bullish/Bearish/Neutre] | Raison brève\n" +
+            "   Exemple : GOLD : +0.8% | Bias : Bullish | Refuge face tensions Iran\n\n" +
+            
+            "3. **THÈME DOMINANT** + sentiment global du marché\n\n" +
+            
+            "4. **ÉVÉNEMENTS MAJEURS À VENIR**\n" +
+            "   Liste les 4-5 événements les plus importants avec format EXACT :\n" +
+            "   \"[Jour] DD/MM/YYYY à HH:MM ET (HH:MM EAT) : [Événement]\"\n" +
+            "   Exemple : Mercredi 29/04/2026 à 14:00 ET (20:00 EAT) : Décision Fed + Conférence Powell\n" +
+            "   Priorise : Fed, résultats Big Tech, données macro US/EU, risques géopolitiques.\n\n" +
+            
+            "RÈGLES CRITIQUES :\n" +
+            "- Sois très concis, clair, professionnel et directement orienté trading.\n" +
+            "- Le Bias court-terme (intraday à 1-3 jours) doit être réaliste et direct.\n" +
+            "- Priorise SYSTÉMATIQUEMENT les actualités des dernières 12-18 heures.\n" +
+            "- Compare brièvement avec la situation de la veille si pertinent.\n" +
+            "- Mentionne TOUJOURS les heures des news et événements clés.\n" +
+            "- Garde un ton neutre et factuel.\n" +
+            "- MAX 340 mots STRICT.\n\n" +
+            
+            "Contexte actuel basé sur les événements captés hier :\n" +
+            "[ICI SERA INJECTÉ LE CONTEXTE DES ÉVÉNEMENTS DU JOUR]\n\n" +
+            
+            "Génère maintenant le résumé marché.";
+    }
+    
     private String getAssetEmoji(String asset) {
         switch (asset) {
             case "GOLD": return "🥇";
@@ -794,6 +973,7 @@ public class NotificationService extends NotificationListenerService {
             case "NASDAQ": return "💻";
             case "OIL": return "🛢️";
             case "USDCAD": return "🇨🇦";
+            case "AUDUSD": return "🇦🇺";
             default: return "📈";
         }
     }
