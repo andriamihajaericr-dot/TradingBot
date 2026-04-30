@@ -37,6 +37,12 @@ public class NotificationService extends NotificationListenerService {
     private static final Map<String, List<DailyReportEntry>> dailyReportByAsset = 
         new ConcurrentHashMap<>();
     
+    // Cache pour détecter les nouveaux drivers
+    private static final Map<String, Long> knownDrivers = 
+        new ConcurrentHashMap<>();
+    private static long lastSummaryTime = 0;
+    private static final long MIN_SUMMARY_INTERVAL = 30 * 60 * 1000; // 2 heures minimum
+    
     // Horaires des rapports (format 24h)
     private static final int[] REPORT_HOURS = {8, 12, 16, 17, 21};
     private static final int[] REPORT_MINUTES = {55, 55, 30, 0, 0};
@@ -45,33 +51,24 @@ public class NotificationService extends NotificationListenerService {
     private static final Set<String> sentReportsToday = 
         Collections.synchronizedSet(new HashSet<>());
 
-    // Applications autorisées - RÉDUITES aux meilleures sources
+    // Applications autorisées
     private static final List<String> ALLOWED_APPS = Arrays.asList(
-        "com.twitter.android",              // X/Twitter
-        "com.financialjuice.androidapp",    // FinancialJuice
-        "com.investing.app",                // Investing.com
-        "com.reuters.news"                  // Reuters
+        "com.twitter.android",
+        "com.financialjuice.androidapp",
+        "com.investing.app",
+        "com.reuters.news"
     );
 
     // Mots-clés trading
     private static final List<String> KEYWORDS = Arrays.asList(
-        // Géopolitique
         "war","attack","missile","sanction","conflict","crisis","invasion",
         "nuclear","terror","breaking","urgent","alert","flash",
         "guerre","attaque","conflit","crise",
-        
-        // Économie
         "fed","rate","inflation","cpi","nfp","gdp","fomc","powell","recession","taux",
         "ecb","boe","boj","bank of england","bank of japan",
-        
-        // Actifs
         "gold","xauusd","silver","oil","bitcoin","btc","crypto","etf",
         "dollar","usd","gbp","jpy","eur","nasdaq","sp500","dow",
-        
-        // Pétrole
         "crude","wti","brent","opec","petroleum","barrel","eia","api",
-        
-        // Calendrier économique
         "forecast","expected","actual","previous","release","consensus",
         "pmi","ppi","retail","unemployment","jobless","housing"
     );
@@ -94,7 +91,6 @@ public class NotificationService extends NotificationListenerService {
     private static final Map<String, Integer> PRIORITY_ACCOUNTS = new HashMap<>();
 
     static {
-        // PRIORITÉ CRITIQUE 5/5
         PRIORITY_ACCOUNTS.put("fxhedgers", 5);
         PRIORITY_ACCOUNTS.put("deltaone", 5);
         PRIORITY_ACCOUNTS.put("firstsquawk", 5);
@@ -102,8 +98,6 @@ public class NotificationService extends NotificationListenerService {
         PRIORITY_ACCOUNTS.put("financialjuice", 5);
         PRIORITY_ACCOUNTS.put("kobeissiletter", 5);
         PRIORITY_ACCOUNTS.put("nick_timiraos", 5);
-        
-        // PRIORITÉ HAUTE 4/5
         PRIORITY_ACCOUNTS.put("federalreserve", 4);
         PRIORITY_ACCOUNTS.put("bankofengland", 4);
         PRIORITY_ACCOUNTS.put("boj_en", 4);
@@ -164,7 +158,6 @@ public class NotificationService extends NotificationListenerService {
         super.onCreate();
         eventDb = new EventDatabase(this);
         
-        // Initialiser le cache par actif
         for (String[] asset : ASSETS) {
             dailyReportByAsset.put(asset[0], 
                 Collections.synchronizedList(new ArrayList<>()));
@@ -172,13 +165,11 @@ public class NotificationService extends NotificationListenerService {
         
         exec.submit(() -> processMissedEvents());
         
-        // Nettoyer vieux événements quotidiennement
         scheduler.scheduleAtFixedRate(
             () -> eventDb.cleanOldEvents(),
             1, 24, TimeUnit.HOURS
         );
         
-        // Vérifier toutes les minutes pour rapports programmés + résumé quotidien
         scheduler.scheduleAtFixedRate(
             () -> {
                 checkAndSendScheduledReports();
@@ -188,17 +179,16 @@ public class NotificationService extends NotificationListenerService {
         );
         
         if (MainActivity.instance != null)
-            MainActivity.instance.addLog("[SERVICE] Démarré - Rapports: 8h55, 12h55, 16h30, 17h, 21h | Résumé: 7h00");
+            MainActivity.instance.addLog("[SERVICE] Démarré - Rapports: 8h55, 12h55, 16h30, 17h, 21h | Résumé: 7h55 + auto si nouveau driver");
     }
 
-    // Classe pour stocker les entrées du rapport
     private static class DailyReportEntry {
         String timestamp;
         String impact;
         String eventType;
         String description;
         String summary;
-        String signal; // BUY/SELL/WAIT
+        String signal;
         
         DailyReportEntry(String timestamp, String impact, String eventType, 
                          String description, String summary, String signal) {
@@ -232,7 +222,6 @@ public class NotificationService extends NotificationListenerService {
         String appName = getAppName(packageName);
         List<String> assets = detectAssets(combined);
         
-        // FILTRAGE STRICT POUR X/TWITTER
         if (appName.equals("X/Twitter")) {
             int accountPriority = getAccountPriority(combined);
             
@@ -254,7 +243,6 @@ public class NotificationService extends NotificationListenerService {
         
         if (!isTradingRelevant(combined)) return;
 
-        // DÉTECTION ET FILTRAGE STRICT PAR IMPACT
         EconomicEventDetector.DetectedEvent detectedEvent = 
             EconomicEventDetector.detectEvent(title, full);
         
@@ -284,6 +272,25 @@ public class NotificationService extends NotificationListenerService {
         final String fa = appName;
         final EconomicEventDetector.DetectedEvent fde = detectedEvent;
         final List<String> fAssets = assets;
+        
+        // Vérifier si c'est un nouveau driver majeur
+        if (isNewMajorDriver(detectedEvent, combined)) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[DRIVER] Nouveau driver détecté ! Résumé sera re-généré");
+            
+            // Déclencher un résumé si > 2h depuis le dernier
+            long now = System.currentTimeMillis();
+            if (now - lastSummaryTime > MIN_SUMMARY_INTERVAL) {
+                exec.submit(() -> {
+                    try {
+                        Thread.sleep(30000); // Attendre 30s pour collecter les infos
+                        generateAndSendMarketSummary();
+                    } catch (Exception e) {
+                        // Ignore
+                    }
+                });
+            }
+        }
         
         exec.submit(() -> processNotificationWithContext(
             this, eventId, fa, ft, fde, assetsStr, fAssets
@@ -400,7 +407,6 @@ public class NotificationService extends NotificationListenerService {
         sendTelegram(tgMsg.toString());
         showLocalNotif(ctx, assetsStr, analysis, detectedEvent.impact);
         
-        // Sauvegarder pour daily report par actif
         saveToDailyReport(detectedEvent, text, analysis, assetsList);
         
         EventDatabase eventDb = new EventDatabase(ctx);
@@ -610,10 +616,8 @@ public class NotificationService extends NotificationListenerService {
         String timestamp = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
         String summary = text.substring(0, Math.min(120, text.length()));
         
-        // Extraire le signal de l'analyse
         String signal = extractSignalFromAnalysis(analysis);
         
-        // Sauvegarder pour chaque actif concerné
         for (String asset : assets) {
             List<DailyReportEntry> assetCache = dailyReportByAsset.get(asset);
             if (assetCache != null) {
@@ -628,7 +632,6 @@ public class NotificationService extends NotificationListenerService {
                 
                 assetCache.add(entry);
                 
-                // Garder max 30 événements par actif
                 if (assetCache.size() > 30) {
                     assetCache.remove(0);
                 }
@@ -642,14 +645,94 @@ public class NotificationService extends NotificationListenerService {
         return "WAIT";
     }
     
-    // Vérifier si un rapport doit être envoyé
+    // Détecter si un nouveau driver majeur est apparu
+    private static boolean isNewMajorDriver(EconomicEventDetector.DetectedEvent event, String text) {
+        String lower = text.toLowerCase();
+        
+        boolean isMajorEvent = 
+            // Banques centrales
+            (lower.contains("fed") && (lower.contains("rate") || lower.contains("powell") || lower.contains("fomc"))) ||
+            (lower.contains("boe") && lower.contains("rate")) ||
+            (lower.contains("boj") && lower.contains("intervention")) ||
+            (lower.contains("ecb") && lower.contains("rate")) ||
+            
+            // Données macro critiques
+            lower.contains("nfp") ||
+            (lower.contains("cpi") && event.actual != null) ||
+            (lower.contains("gdp") && event.actual != null) ||
+            
+            // Pétrole majeur
+            (lower.contains("opec") && (lower.contains("cut") || lower.contains("increase"))) ||
+            (lower.contains("eia") && event.actual != null) ||
+            
+            // Géopolitique critique
+            ((lower.contains("war") || lower.contains("attack") || lower.contains("nuclear")) &&
+             (lower.contains("breaking") || lower.contains("urgent"))) ||
+            
+            // Big Tech earnings
+            ((lower.contains("apple") || lower.contains("microsoft") || 
+              lower.contains("nvidia") || lower.contains("tesla")) && lower.contains("earnings"));
+        
+        if (!isMajorEvent) {
+            return false;
+        }
+        
+        String driverSignature = createDriverSignature(event, text);
+        
+        // Vérifier si déjà connu dans les dernières 8 heures
+        Long lastSeen = knownDrivers.get(driverSignature);
+        long now = System.currentTimeMillis();
+        
+        if (lastSeen != null && (now - lastSeen < 8 * 60 * 60 * 1000)) {
+            return false; // Driver déjà connu récemment
+        }
+        
+        // Nouveau driver
+        knownDrivers.put(driverSignature, now);
+        cleanOldDrivers();
+        
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("[DRIVER] ⚡ NOUVEAU: " + 
+                driverSignature.substring(0, Math.min(40, driverSignature.length())));
+        
+        return true;
+    }
+    
+    private static String createDriverSignature(EconomicEventDetector.DetectedEvent event, String text) {
+        String lower = text.toLowerCase();
+        StringBuilder sig = new StringBuilder();
+        
+        if (event.indicator != null) {
+            sig.append(event.indicator).append("_");
+        }
+        
+        if (event.country != null) {
+            sig.append(event.country).append("_");
+        }
+        
+        if (lower.contains("fed")) sig.append("fed_");
+        if (lower.contains("boe")) sig.append("boe_");
+        if (lower.contains("boj")) sig.append("boj_");
+        if (lower.contains("opec")) sig.append("opec_");
+        if (lower.contains("nfp")) sig.append("nfp_");
+        if (lower.contains("cpi")) sig.append("cpi_");
+        if (lower.contains("war")) sig.append("war_");
+        if (lower.contains("nuclear")) sig.append("nuclear_");
+        
+        return sig.toString();
+    }
+    
+    private static void cleanOldDrivers() {
+        long cutoff = System.currentTimeMillis() - (8 * 60 * 60 * 1000); // 8 heures
+        knownDrivers.entrySet().removeIf(entry -> entry.getValue() < cutoff);
+    }
+    
     private void checkAndSendScheduledReports() {
         Calendar cal = Calendar.getInstance();
         int currentHour = cal.get(Calendar.HOUR_OF_DAY);
         int currentMinute = cal.get(Calendar.MINUTE);
         int currentDay = cal.get(Calendar.DAY_OF_YEAR);
         
-        // Réinitialiser à minuit
         Calendar todayStart = Calendar.getInstance();
         todayStart.set(Calendar.HOUR_OF_DAY, 0);
         todayStart.set(Calendar.MINUTE, 0);
@@ -660,7 +743,6 @@ public class NotificationService extends NotificationListenerService {
                 MainActivity.instance.addLog("[REPORT] Nouveau jour - reset");
         }
         
-        // Vérifier chaque horaire programmé
         for (int i = 0; i < REPORT_HOURS.length; i++) {
             int reportHour = REPORT_HOURS[i];
             int reportMinute = REPORT_MINUTES[i];
@@ -681,9 +763,7 @@ public class NotificationService extends NotificationListenerService {
         }
     }
     
-    // Générer un rapport programmé avec résumé par actif
     private void generateScheduledReport(int hour, int minute) {
-        // Vérifier s'il y a au moins un événement
         boolean hasEvents = false;
         for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
             if (!cache.isEmpty()) {
@@ -700,14 +780,12 @@ public class NotificationService extends NotificationListenerService {
         
         StringBuilder report = new StringBuilder();
         
-        // En-tête
         String reportTitle = getReportTitle(hour, minute);
         report.append("📊 *").append(reportTitle).append("*\n");
         report.append(new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
             .format(new Date()));
         report.append("\n\n");
         
-        // Statistiques globales
         int totalEvents = 0;
         int haussier = 0, baissier = 0;
         
@@ -723,7 +801,6 @@ public class NotificationService extends NotificationListenerService {
         report.append("📈 Haussiers: ").append(haussier).append(" | ");
         report.append("📉 Baissiers: ").append(baissier).append("\n\n");
         
-        // Rapport par actif (seulement ceux avec des événements)
         report.append("*📌 RÉSUMÉ PAR ACTIF:*\n\n");
         
         for (String[] assetInfo : ASSETS) {
@@ -732,7 +809,6 @@ public class NotificationService extends NotificationListenerService {
             
             if (assetCache == null || assetCache.isEmpty()) continue;
             
-            // Compter les signaux pour cet actif
             int buyCount = 0, sellCount = 0, waitCount = 0;
             String dominantImpact = "";
             int haussierCount = 0, baissierCount = 0;
@@ -747,14 +823,12 @@ public class NotificationService extends NotificationListenerService {
             
             dominantImpact = haussierCount > baissierCount ? "📈 Haussier" : "📉 Baissier";
             
-            // Emoji selon l'actif
             String assetEmoji = getAssetEmoji(assetName);
             
             report.append(assetEmoji).append(" *").append(assetName).append("* - ");
             report.append(assetCache.size()).append(" evt - ");
             report.append(dominantImpact).append("\n");
             
-            // Signaux dominants
             String dominantSignal = "";
             if (buyCount > sellCount && buyCount > waitCount) {
                 dominantSignal = "🟢 BUY dominant (" + buyCount + ")";
@@ -766,7 +840,6 @@ public class NotificationService extends NotificationListenerService {
             
             report.append("   Signal: ").append(dominantSignal).append("\n");
             
-            // Derniers événements (max 3 les plus récents)
             int eventCount = Math.min(3, assetCache.size());
             for (int i = assetCache.size() - eventCount; i < assetCache.size(); i++) {
                 DailyReportEntry entry = assetCache.get(i);
@@ -782,7 +855,6 @@ public class NotificationService extends NotificationListenerService {
         
         sendTelegram(report.toString());
         
-        // Nettoyer le cache après le rapport de 21h
         if (hour == 21) {
             for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
                 cache.clear();
@@ -792,64 +864,32 @@ public class NotificationService extends NotificationListenerService {
         }
     }
     
-    // === RÉSUMÉ MARCHÉ QUOTIDIEN (7h00) ===
+    // === RÉSUMÉ MARCHÉ QUOTIDIEN (7h55) + AUTO SI NOUVEAU DRIVER ===
     
     private void checkAndSendDailySummary() {
-    Calendar cal = Calendar.getInstance();
-    int currentHour = cal.get(Calendar.HOUR_OF_DAY);
-    int currentMinute = cal.get(Calendar.MINUTE);
-    
-    // Résumé à 7h00 (07h45)
-    if (currentHour == 7 && currentMinute == 45) {
-        String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-            .format(new Date());
+        Calendar cal = Calendar.getInstance();
+        int currentHour = cal.get(Calendar.HOUR_OF_DAY);
+        int currentMinute = cal.get(Calendar.MINUTE);
         
-        if (!sentReportsToday.contains("summary_" + today)) {
-            generateAndSendMarketSummary();
-            sentReportsToday.add("summary_" + today);
+        // Résumé programmé à 7h55
+        if (currentHour == 7 && currentMinute == 55) {
+            String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+                .format(new Date());
+            
+            if (!sentReportsToday.contains("summary_" + today)) {
+                generateAndSendMarketSummary();
+                sentReportsToday.add("summary_" + today);
+            }
         }
-    } 
-    // Résumé à 12h45
-    else if (currentHour == 12 && currentMinute == 45) {
-        String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-            .format(new Date());
-        
-        if (!sentReportsToday.contains("summary_" + today)) {
-            generateAndSendMarketSummary();
-            sentReportsToday.add("summary_" + today);
-        }
-    } 
-    // Résumé à 16h15
-    else if (currentHour == 16 && currentMinute == 15) {
-        String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-            .format(new Date());
-        
-        if (!sentReportsToday.contains("summary_" + today)) {
-            generateAndSendMarketSummary();
-            sentReportsToday.add("summary_" + today);
-        }
-    } 
-    // Résumé à 17h00
-    else if (currentHour == 17 && currentMinute == 0) {
-        String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-            .format(new Date());
-        
-        if (!sentReportsToday.contains("summary_" + today)) {
-            generateAndSendMarketSummary();
-            sentReportsToday.add("summary_" + today);
-        }
-    }
     }
     
     private void generateAndSendMarketSummary() {
-        // Construire le contexte depuis les événements du jour précédent
         StringBuilder context = new StringBuilder();
         
         int totalEvents = 0;
         for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
             totalEvents += cache.size();
             
-            // Récupérer les 5 événements les plus récents par actif
             int start = Math.max(0, cache.size() - 5);
             for (int i = start; i < cache.size(); i++) {
                 DailyReportEntry entry = cache.get(i);
@@ -860,17 +900,15 @@ public class NotificationService extends NotificationListenerService {
         }
         
         if (totalEvents == 0) {
-            context.append("Aucun événement majeur capté hier.");
+            context.append("Aucun événement majeur capté récemment.");
         }
         
-        // Générer le prompt avec le contexte
         String basePrompt = generateDailyMarketSummaryPrompt();
         String fullPrompt = basePrompt.replace(
             "[ICI SERA INJECTÉ LE CONTEXTE DES ÉVÉNEMENTS DU JOUR]", 
             context.toString()
         );
         
-        // Appeler Groq pour générer le résumé
         try {
             if (MainActivity.CLAUDE_API_KEY == null || 
                 MainActivity.CLAUDE_API_KEY.trim().isEmpty()) {
@@ -902,13 +940,14 @@ public class NotificationService extends NotificationListenerService {
 
             String summary = callGroqAPI(body.toString());
             
-            // Envoyer sur Telegram
             String telegramMsg = "📰 *RÉSUMÉ MARCHÉ QUOTIDIEN*\n" +
                 new SimpleDateFormat("EEEE dd MMMM yyyy", Locale.FRENCH)
                     .format(new Date()) + "\n\n" +
                 summary;
             
             sendTelegram(telegramMsg);
+            
+            lastSummaryTime = System.currentTimeMillis();
             
             if (MainActivity.instance != null)
                 MainActivity.instance.addLog("[SUMMARY] Résumé marché envoyé");
@@ -922,31 +961,23 @@ public class NotificationService extends NotificationListenerService {
     private static String generateDailyMarketSummaryPrompt() {
         return 
             "Résumé marché ultra-court en français (max 340 mots).\n\n" +
-            
             "Actifs à analyser : Gold (XAUUSD), S&P500, Nasdaq, GBPUSD, USDJPY, BTCUSD, AUDUSD, Pétrole (Brent/WTI).\n\n" +
-            
             "Date et heure actuelles : " + 
             new SimpleDateFormat("EEEE dd/MM/yyyy 'à' HH:mm 'EAT (UTC+3)'", Locale.FRENCH)
                 .format(new Date()) + "\n\n" +
-            
             "Structure OBLIGATOIRE :\n\n" +
-            
             "1. **TOP 3 DRIVERS DU JOUR** + heure de sortie\n" +
             "   → Si un nouveau driver important est apparu dans les dernières 8 heures, commence par \"**NOUVEAU DRIVER :**\" + heure précise (heure US ET).\n" +
             "   → Si les drivers principaux persistent sans changement majeur depuis hier, mentionne-le explicitement (\"Pas de nouveau driver majeur depuis hier soir\").\n\n" +
-            
             "2. **ANALYSE PAR ACTIF** (1 ligne maximum par actif) :\n" +
             "   Format strict : [Actif] : [variation %] | Bias : [Bullish/Bearish/Neutre] | Raison brève\n" +
             "   Exemple : GOLD : +0.8% | Bias : Bullish | Refuge face tensions Iran\n\n" +
-            
             "3. **THÈME DOMINANT** + sentiment global du marché\n\n" +
-            
             "4. **ÉVÉNEMENTS MAJEURS À VENIR**\n" +
             "   Liste les 4-5 événements les plus importants avec format EXACT :\n" +
             "   \"[Jour] DD/MM/YYYY à HH:MM ET (HH:MM EAT) : [Événement]\"\n" +
             "   Exemple : Mercredi 29/04/2026 à 14:00 ET (20:00 EAT) : Décision Fed + Conférence Powell\n" +
             "   Priorise : Fed, résultats Big Tech, données macro US/EU, risques géopolitiques.\n\n" +
-            
             "RÈGLES CRITIQUES :\n" +
             "- Sois très concis, clair, professionnel et directement orienté trading.\n" +
             "- Le Bias court-terme (intraday à 1-3 jours) doit être réaliste et direct.\n" +
@@ -955,10 +986,8 @@ public class NotificationService extends NotificationListenerService {
             "- Mentionne TOUJOURS les heures des news et événements clés.\n" +
             "- Garde un ton neutre et factuel.\n" +
             "- MAX 340 mots STRICT.\n\n" +
-            
-            "Contexte actuel basé sur les événements captés hier :\n" +
+            "Contexte actuel basé sur les événements captés récemment :\n" +
             "[ICI SERA INJECTÉ LE CONTEXTE DES ÉVÉNEMENTS DU JOUR]\n\n" +
-            
             "Génère maintenant le résumé marché.";
     }
     
