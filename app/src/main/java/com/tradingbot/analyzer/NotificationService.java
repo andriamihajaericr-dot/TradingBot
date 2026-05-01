@@ -1208,7 +1208,7 @@ public class NotificationService extends NotificationListenerService {
             "   → Si les drivers principaux persistent sans changement majeur depuis hier, mentionne-le explicitement (\"Pas de nouveau driver majeur depuis hier soir\").\n\n" +
             "2. **ANALYSE PAR ACTIF** (1 ligne maximum par actif) :\n" +
             "   Format strict : [Actif] : [variation %] | Bias : [Bullish/Bearish/Neutre] | Raison brève\n" +
-            "   Exemple : GOLD : +0.8% | Bias : Bullish | Refuge face tensions Iran\n\n" +
+            "   Exemple : => GOLD : +0.8% | Bias : Bullish | Refuge face tensions Iran\n\n" +
             "3. **THÈME DOMINANT** + sentiment global du marché\n\n" +
             "4. **ÉVÉNEMENTS MAJEURS À VENIR**\n" +
             "   Liste les 4-5 événements les plus importants avec format EXACT :\n" +
