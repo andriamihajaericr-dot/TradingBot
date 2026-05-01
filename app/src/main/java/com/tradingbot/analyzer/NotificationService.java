@@ -25,7 +25,7 @@ public class NotificationService extends NotificationListenerService {
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     
-    private static final long TIME_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+    private static final long TIME_WINDOW_MS = 30 * 60 * 1000;
     
     private final ExecutorService exec = Executors.newFixedThreadPool(3);
     private EventDatabase eventDb;
@@ -33,27 +33,21 @@ public class NotificationService extends NotificationListenerService {
     private final ScheduledExecutorService scheduler = 
         Executors.newScheduledThreadPool(1);
 
-    // Cache pour daily report par actif
     private static final Map<String, List<DailyReportEntry>> dailyReportByAsset = 
         new ConcurrentHashMap<>();
     
-    // Cache pour détecter les nouveaux drivers
     private static final Map<String, Long> knownDrivers = 
         new ConcurrentHashMap<>();
     
-    // Tracking du dernier résumé envoyé
     private static String lastSummaryDriverSignature = "";
     private static boolean dailySummaryAlreadySent = false;
     
-    // Horaires des rapports (format 24h)
     private static final int[] REPORT_HOURS = {8, 12, 16, 17, 21};
     private static final int[] REPORT_MINUTES = {55, 55, 30, 0, 0};
     
-    // Tracker des rapports envoyés aujourd'hui
     private static final Set<String> sentReportsToday = 
         Collections.synchronizedSet(new HashSet<>());
 
-    // Applications autorisées
     private static final List<String> ALLOWED_APPS = Arrays.asList(
         "com.twitter.android",
         "com.financialjuice.androidapp",
@@ -61,38 +55,180 @@ public class NotificationService extends NotificationListenerService {
         "com.reuters.news"
     );
 
-    // Mots-clés trading
+    // === MOTS-CLÉS ENRICHIS PAR CATÉGORIE ===
     private static final List<String> KEYWORDS = Arrays.asList(
+        // Géopolitique
         "war","attack","missile","sanction","conflict","crisis","invasion",
-        "nuclear","terror","breaking","urgent","alert","flash",
-        "guerre","attaque","conflit","crise",
-        "fed","rate","inflation","cpi","nfp","gdp","fomc","powell","recession","taux",
-        "ecb","boe","boj","bank of england","bank of japan",
-        "gold","xauusd","silver","oil","bitcoin","btc","crypto","etf",
-        "dollar","usd","gbp","jpy","eur","nasdaq","sp500","dow",
-        "crude","wti","brent","opec","petroleum","barrel","eia","api",
-        "forecast","expected","actual","previous","release","consensus",
-        "pmi","ppi","retail","unemployment","jobless","housing"
+        "nuclear","terror","breaking","urgent","alert","flash","strike",
+        "guerre","attaque","conflit","crise","iran","israel","ukraine","russia",
+        "china","taiwan","north korea","middle east",
+        
+        // Banques centrales
+        "fed","fomc","powell","yellen","federal reserve","rate hike","rate cut",
+        "boe","bailey","bank of england","mpc",
+        "boj","ueda","kuroda","bank of japan","yen intervention",
+        "ecb","lagarde","draghi","european central bank",
+        "rba","reserve bank australia","lowe",
+        "boc","bank of canada","macklem",
+        
+        // Données macro US
+        "nfp","non-farm payroll","payroll","jobs report","employment",
+        "cpi","inflation","core inflation","pce","price index",
+        "gdp","gross domestic product","growth",
+        "fomc minutes","fed minutes","beige book",
+        "retail sales","consumer spending","personal spending",
+        "ism","pmi","manufacturing","services","purchasing managers",
+        "housing starts","building permits","home sales","existing home",
+        "jobless claims","unemployment","initial claims",
+        "consumer confidence","sentiment","university of michigan",
+        "ppi","producer price","wholesale",
+        "trade balance","exports","imports","deficit",
+        "durable goods","factory orders","industrial production",
+        
+        // Données macro UK
+        "uk cpi","uk inflation","uk gdp","uk employment","uk retail",
+        "uk pmi","uk manufacturing","uk services",
+        
+        // Données macro Japan
+        "japan cpi","japan gdp","japan pmi","tankan","boj minutes",
+        "japan trade","japan machinery orders",
+        
+        // Données macro Europe
+        "eurozone","euro area","eu cpi","eu gdp","eu pmi",
+        "german","germany","ifo","zew","bundesbank",
+        "french","france","italy","spain",
+        
+        // Données macro Australia
+        "australia","aussie","rba minutes","aus employment","aus cpi",
+        
+        // Or
+        "gold","xauusd","precious metal","bullion","safe haven",
+        "gold price","gold rally","gold sell-off",
+        
+        // Crypto
+        "bitcoin","btc","crypto","cryptocurrency","ethereum","eth",
+        "binance","coinbase","sec crypto","crypto etf","spot etf",
+        "blockchain","defi","altcoin","satoshi","mining",
+        "crypto regulation","crypto crash","crypto rally",
+        
+        // Forex général
+        "dollar","usd","dxy","dollar index","greenback",
+        "forex","fx","currency","exchange rate","cross",
+        
+        // GBP
+        "pound","sterling","cable","gbp","brexit",
+        
+        // JPY
+        "yen","jpy","carry trade","yen weakness","yen strength",
+        
+        // EUR
+        "euro","eur","single currency",
+        
+        // AUD
+        "aussie dollar","aud","commodity currency",
+        
+        // CAD
+        "loonie","cad","canadian dollar",
+        
+        // Indices
+        "sp500","s&p 500","spx","spy","wall street","dow jones","dow",
+        "nasdaq","ndx","qqq","tech stocks","faang","magnificent 7",
+        "russell","small cap","vix","fear index","volatility",
+        "futures","stock futures","equity futures",
+        
+        // Pétrole
+        "oil","crude","wti","brent","petroleum","barrel","energy",
+        "opec","opec+","saudi","russia oil","iran oil","shale",
+        "eia","api","oil inventory","oil stockpile","crude inventory",
+        "oil production","oil demand","oil supply","refinery",
+        "gasoline","diesel","natural gas","lng",
+        
+        // Big Tech / Earnings
+        "earnings","quarterly results","revenue","guidance","eps",
+        "apple","aapl","microsoft","msft","alphabet","googl",
+        "amazon","amzn","meta","nvidia","nvda","tesla","tsla",
+        "netflix","nflx","facebook","instagram",
+        
+        // Finance / Banking
+        "treasury","bonds","yields","10-year","30-year","2-year",
+        "debt ceiling","government shutdown","default",
+        "bank","banking","credit","jpmorgan","goldman","morgan stanley",
+        "fed funds","interest rate","basis points","dovish","hawkish",
+        
+        // Calendrier économique
+        "forecast","expected","actual","previous","consensus","release",
+        "preliminary","revised","final reading","flash estimate",
+        "better than expected","worse than expected","miss","beat"
     );
 
-    // Actifs détectables
+    // === ACTIFS ENRICHIS ===
     private static final String[][] ASSETS = {
-        {"GOLD",   "gold,xauusd,or,fed,rate,war,conflict,sanction,nuclear,inflation,powell,safe haven"},
-        {"BTCUSD", "bitcoin,btc,crypto,etf,binance,coinbase,blockchain,ethereum"},
-        {"GBPUSD", "gbp,pound,boe,uk,britain,sterling,cable,bank of england,bailey"},
-        {"USDJPY", "jpy,yen,boj,japan,ueda,kuroda,intervention,yield curve"},
-        {"EURUSD", "eur,euro,ecb,europe,lagarde,draghi"},
-        {"SP500",  "sp500,s&p 500,s&p500,spx,spy,stock market,wall street,earnings"},
-        {"NASDAQ", "nasdaq,ndx,qqq,tech stocks,tech,vix,apple,tesla,nvidia,microsoft"},
-        {"OIL",    "oil,crude,wti,brent,opec,petroleum,barrel,eia,api,energy,saudi,russia oil"},
-        {"USDCAD", "cad,loonie,canada,boc"},
-        {"AUDUSD", "aud,aussie,australia,rba"},
+        {"GOLD", 
+         "gold,xauusd,xau,bullion,precious metal,safe haven," +
+         "gold price,gold rally,gold futures,gold etf,gld,spot gold," +
+         "gold miners,barrick,newmont,fed gold,gold reserve"},
+        
+        {"BTCUSD", 
+         "bitcoin,btc,crypto,cryptocurrency,satoshi,blockchain," +
+         "coinbase,binance,ethereum,eth,altcoin,defi,nft," +
+         "spot etf,grayscale,microstrategy,saylor,halving," +
+         "crypto regulation,sec crypto,gbtc,btc etf"},
+        
+        {"GBPUSD", 
+         "gbp,pound,sterling,cable,bank of england,boe,bailey," +
+         "uk inflation,uk cpi,uk gdp,uk pmi,uk employment," +
+         "uk retail,brexit,northern ireland,scotland," +
+         "gilt,uk bonds,ftse,london,mpc meeting"},
+        
+        {"USDJPY", 
+         "jpy,yen,usdjpy,bank of japan,boj,ueda,kuroda," +
+         "yen intervention,carry trade,japan cpi,japan gdp," +
+         "tankan,nikkei,topix,japanese yen,jgb,japan bonds," +
+         "weak yen,strong yen,yen depreciation"},
+        
+        {"EURUSD", 
+         "eur,euro,eurusd,ecb,lagarde,draghi,eurozone," +
+         "euro area,eu cpi,eu gdp,eu pmi,single currency," +
+         "germany,france,italy,spain,ifo,zew," +
+         "euro strength,euro weakness,peripheral bonds"},
+        
+        {"SP500", 
+         "sp500,s&p 500,s&p500,spx,spy,wall street," +
+         "stock market,us stocks,equity,american stocks," +
+         "500 index,large cap,blue chip,dow jones,dow," +
+         "market rally,market sell-off,stock futures,equity index"},
+        
+        {"NASDAQ", 
+         "nasdaq,ndx,qqq,tech stocks,technology,faang," +
+         "magnificent 7,apple,microsoft,nvidia,tesla,amazon,meta," +
+         "alphabet,google,netflix,semiconductor,chip stocks," +
+         "tech rally,tech sell-off,nasdaq 100,nasdaq futures"},
+        
+        {"OIL", 
+         "oil,crude,wti,brent,petroleum,barrel,energy," +
+         "opec,opec+,saudi,russia oil,iran oil,iraq oil," +
+         "eia,api,oil inventory,crude inventory,stockpile," +
+         "oil production,oil demand,shale,fracking,drilling," +
+         "gasoline,diesel,refinery,natural gas,lng," +
+         "oil price,crude price,energy sector,exxon,chevron"},
+        
+        {"USDCAD", 
+         "cad,loonie,canadian dollar,usdcad,boc,bank of canada," +
+         "canada,canadian,macklem,oil canada,wcs,western canadian," +
+         "tsx,toronto,canada employment,canada cpi,canada gdp"},
+        
+        {"AUDUSD", 
+         "aud,aussie,australian dollar,audusd,rba,reserve bank australia," +
+         "australia,lowe,iron ore,china australia,commodity currency," +
+         "asx,sydney,australia employment,australia cpi,aus gdp," +
+         "mining,bhp,rio tinto,coal australia"}
     };
 
-    // Priorités des comptes X/Twitter
+    // === COMPTES X/TWITTER PRIORITAIRES (ENRICHIS) ===
     private static final Map<String, Integer> PRIORITY_ACCOUNTS = new HashMap<>();
 
     static {
+        // PRIORITÉ CRITIQUE 5/5 - Alertes temps réel
         PRIORITY_ACCOUNTS.put("fxhedgers", 5);
         PRIORITY_ACCOUNTS.put("deltaone", 5);
         PRIORITY_ACCOUNTS.put("firstsquawk", 5);
@@ -100,58 +236,122 @@ public class NotificationService extends NotificationListenerService {
         PRIORITY_ACCOUNTS.put("financialjuice", 5);
         PRIORITY_ACCOUNTS.put("kobeissiletter", 5);
         PRIORITY_ACCOUNTS.put("nick_timiraos", 5);
+        
+        // PRIORITÉ HAUTE 4/5 - Sources officielles & experts
         PRIORITY_ACCOUNTS.put("federalreserve", 4);
         PRIORITY_ACCOUNTS.put("bankofengland", 4);
         PRIORITY_ACCOUNTS.put("boj_en", 4);
+        PRIORITY_ACCOUNTS.put("ecb", 4);
         PRIORITY_ACCOUNTS.put("eiagov", 4);
+        
+        // Calendrier économique & données
+        PRIORITY_ACCOUNTS.put("forexfactory", 4);
+        PRIORITY_ACCOUNTS.put("investingcom", 4);
+        PRIORITY_ACCOUNTS.put("teconomics", 4);
+        PRIORITY_ACCOUNTS.put("tradingeconomics", 4);
+        
+        // Pétrole & Commodities
         PRIORITY_ACCOUNTS.put("javierblas", 4);
+        PRIORITY_ACCOUNTS.put("oott_energy", 4);
+        PRIORITY_ACCOUNTS.put("amena__bakr", 4);
+        
+        // Crypto
         PRIORITY_ACCOUNTS.put("watcherguru", 4);
         PRIORITY_ACCOUNTS.put("coinglass", 4);
+        PRIORITY_ACCOUNTS.put("glassnode", 4);
+        
+        // Macro & Marchés
         PRIORITY_ACCOUNTS.put("zerohedge", 4);
         PRIORITY_ACCOUNTS.put("markets", 4);
         PRIORITY_ACCOUNTS.put("schuldensuehner", 4);
         PRIORITY_ACCOUNTS.put("reutersuk", 4);
         PRIORITY_ACCOUNTS.put("reutersjapan", 4);
+        PRIORITY_ACCOUNTS.put("business", 4);
+        PRIORITY_ACCOUNTS.put("sino_market", 4);
+        PRIORITY_ACCOUNTS.put("carlquintanilla", 4);
+        
+        // Experts Forex
+        PRIORITY_ACCOUNTS.put("ole_s_hansen", 4);
+        PRIORITY_ACCOUNTS.put("robinbrooksiif", 4);
+        PRIORITY_ACCOUNTS.put("hkuppy", 4);
+        
+        // PRIORITÉ MOYENNE 3/5 - Analyses & Recherche
+        PRIORITY_ACCOUNTS.put("economics", 3);
+        PRIORITY_ACCOUNTS.put("ft", 3);
+        PRIORITY_ACCOUNTS.put("wsj", 3);
+        PRIORITY_ACCOUNTS.put("sentimentrader", 3);
+        PRIORITY_ACCOUNTS.put("vandaresearch", 3);
     }
 
-    // Mots-clés spécifiques par actif
+    // === MOTS-CLÉS SPÉCIFIQUES ENRICHIS PAR ACTIF ===
     private static final Map<String, String[]> ASSET_SPECIFIC_KEYWORDS = new HashMap<>();
 
     static {
         ASSET_SPECIFIC_KEYWORDS.put("GBPUSD", new String[]{
-            "bank of england", "boe", "bailey", "uk inflation", "uk cpi",
-            "uk pmi", "uk gdp", "sterling", "cable"
+            "bank of england", "boe", "bailey", "mpc meeting",
+            "uk inflation", "uk cpi", "uk gdp", "uk pmi", "uk employment",
+            "uk retail", "uk manufacturing", "uk services",
+            "sterling", "cable", "pound", "brexit", "gilt", "ftse"
         });
         
         ASSET_SPECIFIC_KEYWORDS.put("USDJPY", new String[]{
-            "bank of japan", "boj", "ueda", "yen", "jpy",
-            "japan cpi", "japan gdp", "intervention"
+            "bank of japan", "boj", "ueda", "kuroda", "yen", "jpy",
+            "japan cpi", "japan gdp", "japan pmi", "tankan",
+            "intervention", "carry trade", "jgb", "nikkei",
+            "weak yen", "strong yen", "yen depreciation"
+        });
+        
+        ASSET_SPECIFIC_KEYWORDS.put("EURUSD", new String[]{
+            "ecb", "lagarde", "draghi", "euro", "eur", "eurozone",
+            "euro area", "single currency", "eu cpi", "eu gdp", "eu pmi",
+            "germany", "ifo", "zew", "france", "italy", "spain",
+            "peripheral", "german bund"
         });
         
         ASSET_SPECIFIC_KEYWORDS.put("SP500", new String[]{
-            "sp500", "s&p 500", "s&p", "spx", "spy", "earnings", 
-            "fomc", "stock market", "wall street", "market open", "market close"
+            "sp500", "s&p 500", "s&p", "spx", "spy",
+            "stock market", "wall street", "dow", "dow jones",
+            "earnings", "quarterly results", "guidance",
+            "stock futures", "equity futures", "market open",
+            "market close", "vix", "volatility"
         });
         
         ASSET_SPECIFIC_KEYWORDS.put("NASDAQ", new String[]{
-            "nasdaq", "ndx", "qqq", "tech stocks", "vix", 
-            "apple", "microsoft", "nvidia", "tesla"
+            "nasdaq", "ndx", "qqq", "tech stocks", "technology",
+            "apple", "microsoft", "nvidia", "tesla", "amazon", "meta",
+            "alphabet", "google", "faang", "magnificent 7",
+            "semiconductor", "chip stocks", "ai stocks"
         });
         
         ASSET_SPECIFIC_KEYWORDS.put("OIL", new String[]{
-            "eia", "api", "opec", "crude", "wti", "brent", "barrel"
+            "eia", "api", "opec", "opec+", "crude", "wti", "brent",
+            "barrel", "oil inventory", "crude inventory", "stockpile",
+            "oil production", "oil demand", "saudi", "russia oil",
+            "iran oil", "shale", "refinery", "gasoline", "natural gas"
         });
         
         ASSET_SPECIFIC_KEYWORDS.put("GOLD", new String[]{
-            "gold", "xauusd", "safe haven", "fed", "powell"
+            "gold", "xauusd", "bullion", "safe haven", "precious metal",
+            "gold price", "gold rally", "gold miners",
+            "fed", "powell", "inflation", "real yields"
         });
         
         ASSET_SPECIFIC_KEYWORDS.put("BTCUSD", new String[]{
-            "bitcoin", "btc", "crypto", "ethereum", "sec crypto"
+            "bitcoin", "btc", "crypto", "cryptocurrency", "ethereum",
+            "sec crypto", "spot etf", "coinbase", "binance",
+            "halving", "microstrategy", "grayscale", "blockchain"
+        });
+        
+        ASSET_SPECIFIC_KEYWORDS.put("USDCAD", new String[]{
+            "cad", "loonie", "canada", "canadian", "boc",
+            "bank of canada", "oil canada", "wcs", "tsx",
+            "canada employment", "canada cpi"
         });
         
         ASSET_SPECIFIC_KEYWORDS.put("AUDUSD", new String[]{
-            "aud", "aussie", "australia", "rba", "iron ore"
+            "aud", "aussie", "australia", "australian", "rba",
+            "reserve bank australia", "iron ore", "china australia",
+            "asx", "mining", "coal", "bhp"
         });
     }
 
@@ -181,7 +381,7 @@ public class NotificationService extends NotificationListenerService {
         );
         
         if (MainActivity.instance != null)
-            MainActivity.instance.addLog("[SERVICE] Démarré - Résumé 7h55 + auto si nouveau driver post-7h55");
+            MainActivity.instance.addLog("[SERVICE] Démarré - 200+ keywords | 30+ comptes X | 10 actifs");
     }
 
     private static class DailyReportEntry {
@@ -229,7 +429,8 @@ public class NotificationService extends NotificationListenerService {
             
             if (accountPriority < 4) {
                 if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("[FILTRE] Compte X non prioritaire ignoré");
+                    MainActivity.instance.addLog("[FILTRE] Compte X priorité " + 
+                        accountPriority + " - ignoré");
                 return;
             }
             
@@ -250,8 +451,7 @@ public class NotificationService extends NotificationListenerService {
         
         if (!detectedEvent.shouldNotify()) {
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[FILTRE] Impact neutre - rejeté: " + 
-                    combined.substring(0, Math.min(50, combined.length())));
+                MainActivity.instance.addLog("[FILTRE] Impact neutre - rejeté");
             return;
         }
         
@@ -275,12 +475,10 @@ public class NotificationService extends NotificationListenerService {
         final EconomicEventDetector.DetectedEvent fde = detectedEvent;
         final List<String> fAssets = assets;
         
-        // NOUVEAU: Vérifier si c'est un nouveau driver majeur POST-7h55
         if (isNewMajorDriver(detectedEvent, combined)) {
             if (MainActivity.instance != null)
                 MainActivity.instance.addLog("[DRIVER] ⚡ NOUVEAU DRIVER DÉTECTÉ !");
             
-            // Vérifier si on est après 7h55 ET si le résumé n'a pas été envoyé pour ce driver
             Calendar cal = Calendar.getInstance();
             int currentHour = cal.get(Calendar.HOUR_OF_DAY);
             int currentMinute = cal.get(Calendar.MINUTE);
@@ -292,9 +490,8 @@ public class NotificationService extends NotificationListenerService {
             
             if (isAfter755 && isDifferentFromLastSummary) {
                 if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("[AUTO-SUMMARY] Déclenchement résumé pour nouveau driver");
+                    MainActivity.instance.addLog("[AUTO-SUMMARY] Déclenchement résumé auto");
                 
-                // Attendre 30s pour collecter les infos puis envoyer le résumé
                 exec.submit(() -> {
                     try {
                         Thread.sleep(30000);
@@ -668,28 +865,41 @@ public class NotificationService extends NotificationListenerService {
         boolean isMajorEvent = 
             // Banques centrales
             (lower.contains("fed") && (lower.contains("rate") || lower.contains("powell") || lower.contains("fomc"))) ||
-            (lower.contains("boe") && lower.contains("rate")) ||
-            (lower.contains("boj") && lower.contains("intervention")) ||
-            (lower.contains("ecb") && lower.contains("rate")) ||
+            (lower.contains("boe") && (lower.contains("rate") || lower.contains("bailey"))) ||
+            (lower.contains("boj") && (lower.contains("intervention") || lower.contains("ueda"))) ||
+            (lower.contains("ecb") && (lower.contains("rate") || lower.contains("lagarde"))) ||
+            (lower.contains("rba") && lower.contains("rate")) ||
+            (lower.contains("boc") && lower.contains("rate")) ||
             
             // Données macro critiques
             lower.contains("nfp") ||
+            lower.contains("non-farm") ||
             (lower.contains("cpi") && event.actual != null) ||
             (lower.contains("gdp") && event.actual != null) ||
             (lower.contains("pmi") && event.actual != null) ||
+            lower.contains("fomc minutes") ||
+            lower.contains("beige book") ||
             
             // Pétrole majeur
             (lower.contains("opec") && (lower.contains("cut") || lower.contains("increase"))) ||
             (lower.contains("eia") && event.actual != null) ||
+            (lower.contains("api") && lower.contains("inventory")) ||
             
             // Géopolitique critique
-            ((lower.contains("war") || lower.contains("attack") || lower.contains("nuclear")) &&
+            ((lower.contains("war") || lower.contains("attack") || lower.contains("nuclear") || 
+              lower.contains("strike") || lower.contains("invasion")) &&
              (lower.contains("breaking") || lower.contains("urgent"))) ||
             
-            // Big Tech earnings
-            ((lower.contains("apple") || lower.contains("microsoft") || 
-              lower.contains("nvidia") || lower.contains("tesla") || 
-              lower.contains("amazon") || lower.contains("meta")) && 
+            // Big Tech earnings (Top 10)
+            ((lower.contains("apple") || lower.contains("aapl") ||
+              lower.contains("microsoft") || lower.contains("msft") ||
+              lower.contains("nvidia") || lower.contains("nvda") ||
+              lower.contains("tesla") || lower.contains("tsla") ||
+              lower.contains("amazon") || lower.contains("amzn") ||
+              lower.contains("meta") || lower.contains("alphabet") ||
+              lower.contains("google") || lower.contains("googl") ||
+              lower.contains("netflix") || lower.contains("nflx") ||
+              lower.contains("berkshire") || lower.contains("jpmorgan")) && 
              lower.contains("earnings"));
         
         if (!isMajorEvent) {
@@ -697,16 +907,13 @@ public class NotificationService extends NotificationListenerService {
         }
         
         String driverSignature = createDriverSignature(event, text);
-        
-        // Vérifier si déjà connu dans les dernières 8 heures
         Long lastSeen = knownDrivers.get(driverSignature);
         long now = System.currentTimeMillis();
         
         if (lastSeen != null && (now - lastSeen < 8 * 60 * 60 * 1000)) {
-            return false; // Driver déjà connu récemment
+            return false;
         }
         
-        // Nouveau driver détecté
         knownDrivers.put(driverSignature, now);
         cleanOldDrivers();
         
@@ -733,6 +940,8 @@ public class NotificationService extends NotificationListenerService {
         if (lower.contains("boe")) sig.append("boe_");
         if (lower.contains("boj")) sig.append("boj_");
         if (lower.contains("ecb")) sig.append("ecb_");
+        if (lower.contains("rba")) sig.append("rba_");
+        if (lower.contains("boc")) sig.append("boc_");
         if (lower.contains("opec")) sig.append("opec_");
         if (lower.contains("nfp")) sig.append("nfp_");
         if (lower.contains("cpi")) sig.append("cpi_");
@@ -898,7 +1107,6 @@ public class NotificationService extends NotificationListenerService {
         int currentHour = cal.get(Calendar.HOUR_OF_DAY);
         int currentMinute = cal.get(Calendar.MINUTE);
         
-        // Résumé programmé à 7h55
         if (currentHour == 7 && currentMinute == 55) {
             String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault())
                 .format(new Date());
