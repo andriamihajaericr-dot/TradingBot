@@ -40,8 +40,10 @@ public class NotificationService extends NotificationListenerService {
     // Cache pour détecter les nouveaux drivers
     private static final Map<String, Long> knownDrivers = 
         new ConcurrentHashMap<>();
-    private static long lastSummaryTime = 0;
-    private static final long MIN_SUMMARY_INTERVAL = 30 * 60 * 1000; // 2 heures minimum
+    
+    // Tracking du dernier résumé envoyé
+    private static String lastSummaryDriverSignature = "";
+    private static boolean dailySummaryAlreadySent = false;
     
     // Horaires des rapports (format 24h)
     private static final int[] REPORT_HOURS = {8, 12, 16, 17, 21};
@@ -179,7 +181,7 @@ public class NotificationService extends NotificationListenerService {
         );
         
         if (MainActivity.instance != null)
-            MainActivity.instance.addLog("[SERVICE] Démarré - Rapports: 8h55, 12h55, 16h30, 17h, 21h | Résumé: 7h55 + auto si nouveau driver");
+            MainActivity.instance.addLog("[SERVICE] Démarré - Résumé 7h55 + auto si nouveau driver post-7h55");
     }
 
     private static class DailyReportEntry {
@@ -273,20 +275,34 @@ public class NotificationService extends NotificationListenerService {
         final EconomicEventDetector.DetectedEvent fde = detectedEvent;
         final List<String> fAssets = assets;
         
-        // Vérifier si c'est un nouveau driver majeur
+        // NOUVEAU: Vérifier si c'est un nouveau driver majeur POST-7h55
         if (isNewMajorDriver(detectedEvent, combined)) {
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[DRIVER] Nouveau driver détecté ! Résumé sera re-généré");
+                MainActivity.instance.addLog("[DRIVER] ⚡ NOUVEAU DRIVER DÉTECTÉ !");
             
-            // Déclencher un résumé si > 2h depuis le dernier
-            long now = System.currentTimeMillis();
-            if (now - lastSummaryTime > MIN_SUMMARY_INTERVAL) {
+            // Vérifier si on est après 7h55 ET si le résumé n'a pas été envoyé pour ce driver
+            Calendar cal = Calendar.getInstance();
+            int currentHour = cal.get(Calendar.HOUR_OF_DAY);
+            int currentMinute = cal.get(Calendar.MINUTE);
+            
+            boolean isAfter755 = (currentHour > 7) || (currentHour == 7 && currentMinute >= 55);
+            
+            String newDriverSignature = createDriverSignature(detectedEvent, combined);
+            boolean isDifferentFromLastSummary = !newDriverSignature.equals(lastSummaryDriverSignature);
+            
+            if (isAfter755 && isDifferentFromLastSummary) {
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[AUTO-SUMMARY] Déclenchement résumé pour nouveau driver");
+                
+                // Attendre 30s pour collecter les infos puis envoyer le résumé
                 exec.submit(() -> {
                     try {
-                        Thread.sleep(30000); // Attendre 30s pour collecter les infos
+                        Thread.sleep(30000);
                         generateAndSendMarketSummary();
+                        lastSummaryDriverSignature = newDriverSignature;
                     } catch (Exception e) {
-                        // Ignore
+                        if (MainActivity.instance != null)
+                            MainActivity.instance.addLog("[AUTO-SUMMARY] Erreur: " + e.getMessage());
                     }
                 });
             }
@@ -660,6 +676,7 @@ public class NotificationService extends NotificationListenerService {
             lower.contains("nfp") ||
             (lower.contains("cpi") && event.actual != null) ||
             (lower.contains("gdp") && event.actual != null) ||
+            (lower.contains("pmi") && event.actual != null) ||
             
             // Pétrole majeur
             (lower.contains("opec") && (lower.contains("cut") || lower.contains("increase"))) ||
@@ -671,7 +688,9 @@ public class NotificationService extends NotificationListenerService {
             
             // Big Tech earnings
             ((lower.contains("apple") || lower.contains("microsoft") || 
-              lower.contains("nvidia") || lower.contains("tesla")) && lower.contains("earnings"));
+              lower.contains("nvidia") || lower.contains("tesla") || 
+              lower.contains("amazon") || lower.contains("meta")) && 
+             lower.contains("earnings"));
         
         if (!isMajorEvent) {
             return false;
@@ -687,13 +706,13 @@ public class NotificationService extends NotificationListenerService {
             return false; // Driver déjà connu récemment
         }
         
-        // Nouveau driver
+        // Nouveau driver détecté
         knownDrivers.put(driverSignature, now);
         cleanOldDrivers();
         
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("[DRIVER] ⚡ NOUVEAU: " + 
-                driverSignature.substring(0, Math.min(40, driverSignature.length())));
+                driverSignature.substring(0, Math.min(50, driverSignature.length())));
         
         return true;
     }
@@ -713,17 +732,23 @@ public class NotificationService extends NotificationListenerService {
         if (lower.contains("fed")) sig.append("fed_");
         if (lower.contains("boe")) sig.append("boe_");
         if (lower.contains("boj")) sig.append("boj_");
+        if (lower.contains("ecb")) sig.append("ecb_");
         if (lower.contains("opec")) sig.append("opec_");
         if (lower.contains("nfp")) sig.append("nfp_");
         if (lower.contains("cpi")) sig.append("cpi_");
+        if (lower.contains("gdp")) sig.append("gdp_");
         if (lower.contains("war")) sig.append("war_");
         if (lower.contains("nuclear")) sig.append("nuclear_");
+        if (lower.contains("apple")) sig.append("aapl_");
+        if (lower.contains("microsoft")) sig.append("msft_");
+        if (lower.contains("nvidia")) sig.append("nvda_");
+        if (lower.contains("tesla")) sig.append("tsla_");
         
         return sig.toString();
     }
     
     private static void cleanOldDrivers() {
-        long cutoff = System.currentTimeMillis() - (8 * 60 * 60 * 1000); // 8 heures
+        long cutoff = System.currentTimeMillis() - (8 * 60 * 60 * 1000);
         knownDrivers.entrySet().removeIf(entry -> entry.getValue() < cutoff);
     }
     
@@ -739,8 +764,10 @@ public class NotificationService extends NotificationListenerService {
         
         if (cal.getTimeInMillis() - todayStart.getTimeInMillis() < 60000) {
             sentReportsToday.clear();
+            dailySummaryAlreadySent = false;
+            lastSummaryDriverSignature = "";
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[REPORT] Nouveau jour - reset");
+                MainActivity.instance.addLog("[REPORT] Nouveau jour - reset complet");
         }
         
         for (int i = 0; i < REPORT_HOURS.length; i++) {
@@ -864,7 +891,7 @@ public class NotificationService extends NotificationListenerService {
         }
     }
     
-    // === RÉSUMÉ MARCHÉ QUOTIDIEN (7h55) + AUTO SI NOUVEAU DRIVER ===
+    // === RÉSUMÉ MARCHÉ QUOTIDIEN (7h55 + AUTO POST-7h55) ===
     
     private void checkAndSendDailySummary() {
         Calendar cal = Calendar.getInstance();
@@ -879,6 +906,10 @@ public class NotificationService extends NotificationListenerService {
             if (!sentReportsToday.contains("summary_" + today)) {
                 generateAndSendMarketSummary();
                 sentReportsToday.add("summary_" + today);
+                dailySummaryAlreadySent = true;
+                
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[SUMMARY] Résumé quotidien 7h55 envoyé");
             }
         }
     }
@@ -947,10 +978,8 @@ public class NotificationService extends NotificationListenerService {
             
             sendTelegram(telegramMsg);
             
-            lastSummaryTime = System.currentTimeMillis();
-            
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[SUMMARY] Résumé marché envoyé");
+                MainActivity.instance.addLog("[SUMMARY] Résumé marché envoyé avec succès");
 
         } catch (Exception e) {
             if (MainActivity.instance != null)
