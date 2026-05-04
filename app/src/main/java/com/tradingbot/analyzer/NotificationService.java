@@ -952,7 +952,7 @@ public class NotificationService extends NotificationListenerService {
         }
     }
 
-    punlic static void sendTelegram(String message) {
+    public static void sendTelegram(String message) {
         sendTelegramWithRetry(message, 0);
     }
     
