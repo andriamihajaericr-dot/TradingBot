@@ -1,18 +1,13 @@
 buildscript {
+    ext.kotlin_version = '1.9.22'  // ← Changez ici (au lieu de 1.8.20-RC2)
+    
     repositories {
         google()
         mavenCentral()
     }
+    
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath 'com.android.tools.build:gradle:8.1.0'  // ou votre version
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
-}
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-task clean(type: Delete) {
-    delete rootProject.buildDir
 }
