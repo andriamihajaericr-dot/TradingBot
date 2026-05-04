@@ -1,5 +1,5 @@
 package com.tradingbot.analyzer;
-
+import java.util.Calendar;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
