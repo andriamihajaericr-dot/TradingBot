@@ -102,14 +102,20 @@ public class EconomicCalendarAPI {
                 "&currentTab=today" +
                 "&limit_from=0";
             
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[INVESTING-API] Requête: " + dateFrom + " -> " + dateTo);
+            }
+            
             URL url = new URL(INVESTING_API);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
             conn.setRequestProperty("X-Requested-With", "XMLHttpRequest");
+            conn.setRequestProperty("User-Agent", 
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
             conn.setDoOutput(true);
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(10000);
+            conn.setConnectTimeout(15000); // 15 secondes
+            conn.setReadTimeout(15000);
             
             OutputStream os = conn.getOutputStream();
             os.write(postData.getBytes("UTF-8"));
@@ -117,6 +123,10 @@ public class EconomicCalendarAPI {
             os.close();
             
             int responseCode = conn.getResponseCode();
+            
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[INVESTING-API] Code réponse: " + responseCode);
+            }
             
             if (responseCode == 200) {
                 BufferedReader br = new BufferedReader(
@@ -128,14 +138,38 @@ public class EconomicCalendarAPI {
                 }
                 br.close();
                 
-                events = parseInvestingResponse(response.toString());
+                String jsonResponse = response.toString();
+                
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[INVESTING-API] Réponse reçue, longueur: " + jsonResponse.length()
+                    );
+                }
+                
+                events = parseInvestingResponse(jsonResponse);
+                
+            } else {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[INVESTING-API] Erreur HTTP " + responseCode
+                    );
+                }
             }
             
             conn.disconnect();
             
+        } catch (SocketTimeoutException e) {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[INVESTING-API] Timeout de connexion");
+            }
+        } catch (IOException e) {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[INVESTING-API] Erreur réseau: " + e.getMessage());
+            }
         } catch (Exception e) {
             if (MainActivity.instance != null) {
                 MainActivity.instance.addLog("[INVESTING-API] Erreur: " + e.getMessage());
+                e.printStackTrace();
             }
         }
         
@@ -146,65 +180,148 @@ public class EconomicCalendarAPI {
         List<CalendarEvent> events = new ArrayList<>();
         
         try {
+            // Vérification préliminaire
+            if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[PARSING] Réponse vide");
+                }
+                return events;
+            }
+            
+            // Log de la réponse brute (premiers 200 caractères)
+            if (MainActivity.instance != null) {
+                String preview = jsonResponse.length() > 200 ? 
+                    jsonResponse.substring(0, 200) + "..." : jsonResponse;
+                MainActivity.instance.addLog("[PARSING] Réponse: " + preview);
+            }
+            
             JSONObject root = new JSONObject(jsonResponse);
             
-            if (root.has("data")) {
-                JSONArray dataArray = root.getJSONArray("data");
-                
-                for (int i = 0; i < dataArray.length(); i++) {
+            // Vérifier si la réponse contient des données
+            if (!root.has("data")) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[PARSING] Pas de champ 'data' dans la réponse");
+                }
+                return events;
+            }
+            
+            JSONArray dataArray = root.getJSONArray("data");
+            
+            if (dataArray.length() == 0) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[PARSING] Aucun événement dans les données");
+                }
+                return events;
+            }
+            
+            for (int i = 0; i < dataArray.length(); i++) {
+                try {
                     JSONObject eventObj = dataArray.getJSONObject(i);
-                    
                     CalendarEvent event = new CalendarEvent();
                     
-                    // Timestamp
-                    if (eventObj.has("timestamp")) {
-                        event.timestamp = eventObj.getString("timestamp");
+                    // Timestamp (obligatoire)
+                    event.timestamp = getStringSafe(eventObj, "timestamp", "");
+                    if (event.timestamp.isEmpty()) {
+                        continue; // Skip si pas de timestamp
                     }
                     
                     // Pays
-                    if (eventObj.has("country")) {
-                        event.country = eventObj.getString("country");
-                    }
+                    event.country = getStringSafe(eventObj, "country", "Unknown");
                     
-                    // Indicateur
-                    if (eventObj.has("event")) {
-                        event.indicator = eventObj.getString("event");
+                    // Indicateur (obligatoire)
+                    event.indicator = getStringSafe(eventObj, "event", "");
+                    if (event.indicator.isEmpty()) {
+                        continue; // Skip si pas d'indicateur
                     }
                     
                     // Importance (1=Low, 2=Medium, 3=High)
-                    if (eventObj.has("importance")) {
-                        int imp = eventObj.getInt("importance");
-                        event.importance = imp == 3 ? "High" : (imp == 2 ? "Medium" : "Low");
-                    }
+                    int importance = getIntSafe(eventObj, "importance", 1);
+                    event.importance = importance == 3 ? "High" : 
+                                      (importance == 2 ? "Medium" : "Low");
                     
-                    // Forecast, Previous, Actual
-                    if (eventObj.has("forecast")) {
-                        event.forecast = eventObj.getString("forecast");
-                    }
-                    if (eventObj.has("previous")) {
-                        event.previous = eventObj.getString("previous");
-                    }
-                    if (eventObj.has("actual")) {
-                        event.actual = eventObj.getString("actual");
-                    }
+                    // Forecast, Previous, Actual (peuvent être vides)
+                    event.forecast = getStringSafe(eventObj, "forecast", "N/A");
+                    event.previous = getStringSafe(eventObj, "previous", "N/A");
+                    event.actual = getStringSafe(eventObj, "actual", "N/A");
                     
                     // Filtrer uniquement High importance
                     if ("High".equals(event.importance)) {
                         // Mapper actifs affectés
-                        event.affectedAssets = mapIndicatorToAssets(event.indicator, event.country);
+                        event.affectedAssets = mapIndicatorToAssets(
+                            event.indicator, 
+                            event.country
+                        );
+                        
                         events.add(event);
+                        
+                        if (MainActivity.instance != null) {
+                            MainActivity.instance.addLog(
+                                "[PARSING] Événement ajouté: " + event.indicator + 
+                                " (" + event.country + ")"
+                            );
+                        }
                     }
+                    
+                } catch (Exception e) {
+                    // Erreur sur un événement spécifique, continuer avec les autres
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(
+                            "[PARSING] Erreur événement " + i + ": " + e.getMessage()
+                        );
+                    }
+                    continue;
                 }
             }
             
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[PARSING] " + events.size() + " événements HIGH importance extraits"
+                );
+            }
+            
+        } catch (org.json.JSONException e) {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[PARSING] Erreur JSON: " + e.getMessage()
+                );
+                MainActivity.instance.addLog(
+                    "[PARSING] Vérifiez le format de la réponse API"
+                );
+            }
         } catch (Exception e) {
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[PARSING] Erreur parsing Investing: " + 
-                    e.getMessage());
+                MainActivity.instance.addLog(
+                    "[PARSING] Erreur parsing investing: " + e.getMessage()
+                );
+                e.printStackTrace();
             }
         }
         
         return events;
+    }
+    
+    // Méthodes utilitaires pour extraction sécurisée
+    private static String getStringSafe(JSONObject obj, String key, String defaultValue) {
+        try {
+            if (obj.has(key) && !obj.isNull(key)) {
+                String value = obj.getString(key);
+                return value != null && !value.trim().isEmpty() ? value.trim() : defaultValue;
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+        return defaultValue;
+    }
+    
+    private static int getIntSafe(JSONObject obj, String key, int defaultValue) {
+        try {
+            if (obj.has(key) && !obj.isNull(key)) {
+                return obj.getInt(key);
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+        return defaultValue;
     }
     
     private static List<CalendarEvent> scrapeForexFactory(int hoursAhead) {
