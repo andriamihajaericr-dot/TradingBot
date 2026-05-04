@@ -22,7 +22,7 @@ public class EconomicCalendarAPI {
         "https://www.forexfactory.com/calendar.php";
     
     // Mode test pour générer des données fictives
-    private static final boolean TEST_MODE = true;
+    private static final boolean TEST_MODE = false;
     
     public static class CalendarEvent {
         public String timestamp;
