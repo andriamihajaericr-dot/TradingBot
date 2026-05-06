@@ -18,7 +18,7 @@ public class EconomicCalendarAPI {
         "https://www.investing.com/economic-calendar/Service/getCalendarFilteredData";
     
     // ACTIVEZ POUR DEBUG
-    private static final boolean DEBUG_MODE = true;
+    private static final boolean DEBUG_MODE = false; // Mettre false en production
     
     // ACTIVEZ SI LE PARSING NE FONCTIONNE PAS
     private static final boolean USE_TEST_DATA = false;
@@ -31,7 +31,7 @@ public class EconomicCalendarAPI {
         public String forecast;
         public String previous;
         public String actual;
-        public List<String> affectedAssets;
+        public List<String> affectedAssets; // PRIORISÉS selon le pays
         
         public CalendarEvent() {
             this.affectedAssets = new ArrayList<>();
@@ -46,7 +46,20 @@ public class EconomicCalendarAPI {
                 dateStr = sdf.format(new Date(ts));
             } catch (Exception e) {}
             
-            return "[" + dateStr + "] " + indicator + " (" + country + ") - " + importance;
+            StringBuilder assetsStr = new StringBuilder();
+            if (!affectedAssets.isEmpty()) {
+                assetsStr.append(" → ");
+                for (int i = 0; i < Math.min(3, affectedAssets.size()); i++) {
+                    if (i > 0) assetsStr.append(", ");
+                    assetsStr.append(affectedAssets.get(i));
+                }
+                if (affectedAssets.size() > 3) {
+                    assetsStr.append("...");
+                }
+            }
+            
+            return "[" + dateStr + "] " + indicator + " (" + country + ") - " + 
+                   importance + assetsStr.toString();
         }
     }
     
@@ -59,10 +72,7 @@ public class EconomicCalendarAPI {
         
         try {
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[CALENDAR] ===== DÉMARRAGE =====");
-                MainActivity.instance.addLog("[CALENDAR] hoursAhead = " + hoursAhead);
-                MainActivity.instance.addLog("[CALENDAR] DEBUG_MODE = " + DEBUG_MODE);
-                MainActivity.instance.addLog("[CALENDAR] USE_TEST_DATA = " + USE_TEST_DATA);
+                MainActivity.instance.addLog("[CALENDAR] Démarrage...");
             }
             
             if (USE_TEST_DATA) {
@@ -76,7 +86,7 @@ public class EconomicCalendarAPI {
             
             if (events.isEmpty()) {
                 if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("[CALENDAR] ⚠ Aucun événement parsé, mode test");
+                    MainActivity.instance.addLog("[CALENDAR] ⚠ API vide, mode test");
                 }
                 events = generateTestEvents(hoursAhead);
             } else {
@@ -142,17 +152,13 @@ public class EconomicCalendarAPI {
             
             int responseCode = conn.getResponseCode();
             
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[INVESTING] ✓ Code: " + responseCode);
-            }
-            
             if (responseCode == 200) {
                 BufferedReader br = new BufferedReader(
                     new InputStreamReader(conn.getInputStream(), "UTF-8"));
                 StringBuilder response = new StringBuilder();
                 String line;
                 while ((line = br.readLine()) != null) {
-                    response.append(line).append("\n");
+                    response.append(line);
                 }
                 br.close();
                 
@@ -160,11 +166,11 @@ public class EconomicCalendarAPI {
                 
                 if (MainActivity.instance != null) {
                     MainActivity.instance.addLog(
-                        "[INVESTING] ✓ Données reçues: " + responseData.length() + " chars"
+                        "[INVESTING] ✓ Réponse: " + responseData.length() + " chars"
                     );
                 }
                 
-                // DEBUG : Sauvegarder la réponse complète
+                // DEBUG
                 if (DEBUG_MODE && MainActivity.instance != null) {
                     saveDebugFile(MainActivity.instance, responseData);
                 }
@@ -174,12 +180,12 @@ public class EconomicCalendarAPI {
                 
                 if (MainActivity.instance != null) {
                     MainActivity.instance.addLog(
-                        "[INVESTING] " + events.size() + " événements HIGH extraits"
+                        "[INVESTING] ✓ " + events.size() + " événements HIGH"
                     );
                 }
             } else {
                 if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("[INVESTING] ❌ Erreur HTTP " + responseCode);
+                    MainActivity.instance.addLog("[INVESTING] ❌ Code " + responseCode);
                 }
             }
             
@@ -187,7 +193,7 @@ public class EconomicCalendarAPI {
             if (MainActivity.instance != null) {
                 MainActivity.instance.addLog("[INVESTING] Erreur: " + e.getMessage());
             }
-            Log.e(TAG, "Erreur fetchFromInvestingAPI", e);
+            Log.e(TAG, "Erreur API", e);
         } finally {
             if (conn != null) conn.disconnect();
         }
@@ -196,94 +202,28 @@ public class EconomicCalendarAPI {
     }
     
     // =====================================================
-    // SAUVEGARDER POUR DEBUG (VOTRE MÉTHODE AMÉLIORÉE)
+    // SAUVEGARDER DEBUG
     // =====================================================
     
     private static void saveDebugFile(Context context, String data) {
-        FileWriter writer = null;
-        
         try {
-            // Créer le dossier Debug dans External Files
             File debugDir = new File(context.getExternalFilesDir(null), "Debug");
-            
-            if (!debugDir.exists()) {
-                boolean created = debugDir.mkdirs();
-                Log.d(TAG, "Dossier Debug créé: " + created);
-            }
+            debugDir.mkdirs();
             
             File debugFile = new File(debugDir, "investing_debug.txt");
             
-            Log.d(TAG, "Tentative sauvegarde: " + debugFile.getAbsolutePath());
-            
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[DEBUG] Sauvegarde dans: " + debugFile.getAbsolutePath());
-            }
-            
-            // Sauvegarder avec try-with-resources
-            writer = new FileWriter(debugFile);
-            writer.write("=== RÉPONSE INVESTING.COM ===\n");
+            FileWriter writer = new FileWriter(debugFile);
+            writer.write("=== INVESTING.COM ===\n");
             writer.write("Date: " + new Date().toString() + "\n");
-            writer.write("Longueur: " + data.length() + " chars\n");
-            writer.write("Chemin: " + debugFile.getAbsolutePath() + "\n\n");
+            writer.write("Longueur: " + data.length() + " chars\n\n");
             writer.write("=== DONNÉES BRUTES ===\n");
             writer.write(data);
-            writer.flush();
+            writer.close();
             
-            Log.d(TAG, "✓✓✓ Fichier sauvegardé: " + debugFile.getAbsolutePath());
-            
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[DEBUG] ✓✓✓ FICHIER SAUVEGARDÉ ✓✓✓");
-                MainActivity.instance.addLog("[DEBUG] Chemin: " + debugFile.getAbsolutePath());
-                MainActivity.instance.addLog("[DEBUG] Taille: " + debugFile.length() + " bytes");
-                
-                // BONUS: Aperçu dans les logs
-                String preview = data.length() > 800 ? data.substring(0, 800) + "\n... [TRONQUÉ]" : data;
-                MainActivity.instance.addLog("[DEBUG] === APERÇU (800 premiers chars) ===");
-                MainActivity.instance.addLog(preview);
-                MainActivity.instance.addLog("[DEBUG] === FIN APERÇU ===");
-            }
+            Log.d(TAG, "✓ Debug sauvegardé: " + debugFile.getAbsolutePath());
             
         } catch (Exception e) {
-            Log.e(TAG, "❌ Erreur sauvegarde fichier", e);
-            
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[DEBUG] ❌ Erreur sauvegarde: " + e.getMessage());
-                MainActivity.instance.addLog("[DEBUG] Type erreur: " + e.getClass().getSimpleName());
-                
-                // FALLBACK: Afficher dans les logs (découpé)
-                MainActivity.instance.addLog("[DEBUG] === FALLBACK: LOGS DÉCOUPÉS ===");
-                
-                try {
-                    int chunkSize = 1000;
-                    int chunks = (data.length() + chunkSize - 1) / chunkSize;
-                    
-                    MainActivity.instance.addLog("[DEBUG] Total: " + data.length() + " chars, " + chunks + " morceaux");
-                    
-                    for (int i = 0; i < Math.min(5, chunks); i++) { // Max 5 morceaux
-                        int start = i * chunkSize;
-                        int end = Math.min(start + chunkSize, data.length());
-                        String chunk = data.substring(start, end);
-                        MainActivity.instance.addLog("[CHUNK-" + (i + 1) + "] " + chunk);
-                    }
-                    
-                    if (chunks > 5) {
-                        MainActivity.instance.addLog("[DEBUG] ... (" + (chunks - 5) + " morceaux supplémentaires non affichés)");
-                    }
-                    
-                } catch (Exception e2) {
-                    MainActivity.instance.addLog("[DEBUG] Impossible d'afficher les chunks: " + e2.getMessage());
-                }
-                
-                MainActivity.instance.addLog("[DEBUG] === FIN FALLBACK ===");
-            }
-        } finally {
-            if (writer != null) {
-                try {
-                    writer.close();
-                } catch (IOException e) {
-                    Log.e(TAG, "Erreur fermeture writer", e);
-                }
-            }
+            Log.e(TAG, "Erreur sauvegarde debug", e);
         }
     }
     
@@ -291,65 +231,32 @@ public class EconomicCalendarAPI {
     // PARSER LA RÉPONSE
     // =====================================================
     
-    private static List<CalendarEvent> parseInvestingResponse(String data) {
+    private static List<CalendarEvent> parseInvestingResponse(String jsonResponse) {
         List<CalendarEvent> events = new ArrayList<>();
         
         try {
-            // Détecter le format
-            boolean isJson = data.trim().startsWith("{");
-            boolean isHtml = data.contains("<tr") || data.contains("<table");
+            JSONObject root = new JSONObject(jsonResponse);
+            
+            if (!root.has("data")) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[PARSE] Pas de champ 'data'");
+                }
+                return events;
+            }
+            
+            String htmlData = root.getString("data");
             
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[PARSE] Format détecté: " + 
-                    (isJson ? "JSON" : isHtml ? "HTML" : "INCONNU"));
+                MainActivity.instance.addLog("[PARSE] HTML data: " + htmlData.length() + " chars");
             }
             
-            if (isJson) {
-                // Tenter parsing JSON
-                try {
-                    JSONObject root = new JSONObject(data);
-                    
-                    if (MainActivity.instance != null) {
-                        MainActivity.instance.addLog("[PARSE] Clés JSON: " + 
-                            root.keys().toString());
-                    }
-                    
-                    if (root.has("data")) {
-                        String htmlData = root.getString("data");
-                        
-                        if (MainActivity.instance != null) {
-                            MainActivity.instance.addLog("[PARSE] Champ 'data' trouvé: " + 
-                                htmlData.length() + " chars");
-                        }
-                        
-                        events = parseHTMLRows(htmlData);
-                    }
-                    
-                } catch (Exception e) {
-                    if (MainActivity.instance != null) {
-                        MainActivity.instance.addLog("[PARSE] Erreur JSON: " + e.getMessage());
-                    }
-                    Log.e(TAG, "Erreur parsing JSON", e);
-                }
-            }
-            
-            if (events.isEmpty() && isHtml) {
-                // Parser directement HTML
-                events = parseHTMLRows(data);
-            }
-            
-            if (events.isEmpty()) {
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("[PARSE] ⚠ Aucun événement extrait");
-                    MainActivity.instance.addLog("[PARSE] Consultez le fichier debug pour analyser");
-                }
-            }
+            events = parseHTMLRows(htmlData);
             
         } catch (Exception e) {
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[PARSE] Erreur globale: " + e.getMessage());
+                MainActivity.instance.addLog("[PARSE] Erreur: " + e.getMessage());
             }
-            Log.e(TAG, "Erreur parseInvestingResponse", e);
+            Log.e(TAG, "Erreur parsing", e);
         }
         
         return events;
@@ -363,72 +270,73 @@ public class EconomicCalendarAPI {
         List<CalendarEvent> events = new ArrayList<>();
         
         try {
-            // Compter les <tr>
-            int trCount = countOccurrences(html, "<tr");
-            
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[HTML-PARSE] " + trCount + " balises <tr> détectées");
-            }
-            
-            // Pattern pour extraire les lignes
             Pattern rowPattern = Pattern.compile(
-                "<tr[^>]*>(.*?)</tr>",
+                "<tr[^>]*id=\"eventRowId_(\\d+)\"[^>]*data-event-datetime=\"([^\"]+)\"[^>]*>(.*?)</tr>",
                 Pattern.DOTALL
             );
             
             Matcher rowMatcher = rowPattern.matcher(html);
             
-            int rowCount = 0;
-            int highCount = 0;
+            int totalRows = 0;
+            int highEvents = 0;
             
             while (rowMatcher.find()) {
-                rowCount++;
-                String rowHtml = rowMatcher.group(1);
+                totalRows++;
                 
-                // Détecter importance (3 bulls = High)
-                int bulls = countOccurrences(rowHtml, "grayFullBullishIcon");
+                String eventId = rowMatcher.group(1);
+                String datetime = rowMatcher.group(2);
+                String rowContent = rowMatcher.group(3);
                 
-                if (bulls >= 3) {
-                    highCount++;
+                try {
+                    int bullCount = countOccurrences(rowContent, "grayFullBullishIcon");
                     
-                    CalendarEvent event = new CalendarEvent();
-                    event.importance = "High";
-                    event.timestamp = String.valueOf(System.currentTimeMillis() / 1000);
-                    
-                    // Extraire les données
-                    event.indicator = extractEventName(rowHtml);
-                    event.country = extractCountry(rowHtml);
-                    event.forecast = extractTdValue(rowHtml, "forecast");
-                    event.previous = extractTdValue(rowHtml, "previous");
-                    event.actual = extractTdValue(rowHtml, "actual");
-                    
-                    if (event.indicator != null && !event.indicator.isEmpty() && 
-                        event.indicator.length() > 3) {
+                    if (bullCount >= 3) {
+                        highEvents++;
                         
-                        event.affectedAssets = mapIndicatorToAssets(
-                            event.indicator, event.country);
-                        events.add(event);
+                        CalendarEvent event = new CalendarEvent();
+                        event.importance = "High";
+                        event.timestamp = convertDateTimeToTimestamp(datetime);
+                        event.country = extractCountryFromRow(rowContent);
+                        event.indicator = extractIndicatorFromRow(rowContent);
+                        event.forecast = extractValueByClass(rowContent, "fore");
+                        event.previous = extractValueByClass(rowContent, "prev");
+                        event.actual = extractValueByClass(rowContent, "act");
                         
-                        if (DEBUG_MODE && MainActivity.instance != null) {
-                            MainActivity.instance.addLog(
-                                "[HTML-PARSE] ✓ " + event.indicator + " (" + event.country + ")"
-                            );
+                        if (event.indicator != null && 
+                            event.indicator.length() > 3 && 
+                            !event.indicator.equalsIgnoreCase("Holiday")) {
+                            
+                            // PRIORISATION SELON LE PAYS
+                            event.affectedAssets = mapIndicatorToAssetsPrioritized(
+                                event.indicator, event.country);
+                            
+                            events.add(event);
+                            
+                            if (MainActivity.instance != null) {
+                                MainActivity.instance.addLog(
+                                    "[PARSE] ✓ " + event.country + ": " + event.indicator + 
+                                    " → " + event.affectedAssets.get(0)
+                                );
+                            }
                         }
                     }
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Erreur ligne " + eventId, e);
                 }
             }
             
             if (MainActivity.instance != null) {
                 MainActivity.instance.addLog(
-                    "[HTML-PARSE] Lignes: " + rowCount + 
-                    " | HIGH: " + highCount + 
-                    " | Extraits: " + events.size()
+                    "[PARSE] Lignes: " + totalRows + 
+                    " | HIGH: " + highEvents + 
+                    " | Valides: " + events.size()
                 );
             }
             
         } catch (Exception e) {
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[HTML-PARSE] Erreur: " + e.getMessage());
+                MainActivity.instance.addLog("[PARSE] Erreur HTML: " + e.getMessage());
             }
             Log.e(TAG, "Erreur parseHTMLRows", e);
         }
@@ -436,94 +344,66 @@ public class EconomicCalendarAPI {
         return events;
     }
     
-    // Extraire le nom de l'événement
-    private static String extractEventName(String html) {
+    private static String extractCountryFromRow(String rowHtml) {
         try {
-            // Pattern 1: Chercher dans les liens <a>
-            Pattern pattern = Pattern.compile(">([^<]{10,100})</a>");
-            Matcher matcher = pattern.matcher(html);
-            
-            while (matcher.find()) {
-                String text = matcher.group(1).trim();
-                // Filtrer les faux positifs
-                if (!text.matches(".*\\d{4}.*") && 
-                    text.length() > 5 && 
-                    !text.toLowerCase().contains("http")) {
-                    return text;
-                }
-            }
-            
-            // Pattern 2: Chercher texte commençant par majuscule
-            pattern = Pattern.compile(">([A-Z][^<]{10,100})<");
-            matcher = pattern.matcher(html);
-            if (matcher.find()) {
-                String text = matcher.group(1).trim();
-                if (!text.matches(".*\\d{4}.*")) {
-                    return text;
-                }
-            }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur extractEventName", e);
-        }
-        
-        return "Economic Event";
-    }
-    
-    // Extraire le pays
-    private static String extractCountry(String html) {
-        try {
-            // Pattern: title="Country" dans flag
-            Pattern pattern = Pattern.compile("title=\"([^\"]+)\"[^>]{0,50}flag");
-            Matcher matcher = pattern.matcher(html);
+            Pattern pattern = Pattern.compile("title=\"([^\"]+)\"[^>]*class=\"ceFlags");
+            Matcher matcher = pattern.matcher(rowHtml);
             if (matcher.find()) {
                 return matcher.group(1);
             }
-            
-            // Pattern alternatif
-            pattern = Pattern.compile("flag[^>]{0,50}title=\"([^\"]+)\"");
-            matcher = pattern.matcher(html);
-            if (matcher.find()) {
-                return matcher.group(1);
-            }
-            
         } catch (Exception e) {
             Log.e(TAG, "Erreur extractCountry", e);
         }
-        
         return "Unknown";
     }
     
-    // Extraire valeur d'un <td>
-    private static String extractTdValue(String html, String type) {
+    private static String extractIndicatorFromRow(String rowHtml) {
         try {
-            String classPattern = "";
-            if (type.equals("forecast")) {
-                classPattern = "bold|forecast";
-            } else if (type.equals("previous")) {
-                classPattern = "previous|blackFont";
-            } else if (type.equals("actual")) {
-                classPattern = "actual|act";
-            }
-            
             Pattern pattern = Pattern.compile(
-                "<td[^>]*class=['\"][^'\"]*(" + classPattern + ")[^'\"]*['\"][^>]*>([^<]*)</td>",
+                "<a[^>]*href=\"/economic-calendar/[^\"]+\"[^>]*>\\s*([^<]+)\\s*</a>",
+                Pattern.DOTALL
+            );
+            Matcher matcher = pattern.matcher(rowHtml);
+            if (matcher.find()) {
+                String indicator = matcher.group(1).trim();
+                indicator = indicator.replaceAll("\\s+", " ");
+                return indicator;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur extractIndicator", e);
+        }
+        return "Economic Event";
+    }
+    
+    private static String extractValueByClass(String rowHtml, String className) {
+        try {
+            Pattern pattern = Pattern.compile(
+                "<td[^>]*class=\"[^\"]*" + className + "[^\"]*\"[^>]*>([^<]*)</td>",
                 Pattern.CASE_INSENSITIVE
             );
-            Matcher matcher = pattern.matcher(html);
-            
+            Matcher matcher = pattern.matcher(rowHtml);
             if (matcher.find()) {
-                String value = matcher.group(2).trim();
+                String value = matcher.group(1).trim();
+                value = value.replace("&nbsp;", "").trim();
                 return value.isEmpty() ? "N/A" : value;
             }
         } catch (Exception e) {
-            Log.e(TAG, "Erreur extractTdValue", e);
+            Log.e(TAG, "Erreur extractValue", e);
         }
-        
         return "N/A";
     }
     
-    // Compter occurrences
+    private static String convertDateTimeToTimestamp(String datetime) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.US);
+            Date date = sdf.parse(datetime);
+            return String.valueOf(date.getTime() / 1000);
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur convert timestamp: " + datetime, e);
+            return String.valueOf(System.currentTimeMillis() / 1000);
+        }
+    }
+    
     private static int countOccurrences(String text, String pattern) {
         int count = 0;
         int index = 0;
@@ -532,6 +412,207 @@ public class EconomicCalendarAPI {
             index += pattern.length();
         }
         return count;
+    }
+    
+    // =====================================================
+    // MAPPER ACTIFS AVEC PRIORISATION PAR PAYS
+    // =====================================================
+    
+    private static List<String> mapIndicatorToAssetsPrioritized(String indicator, String country) {
+        List<String> assets = new ArrayList<>();
+        
+        if (indicator == null || country == null) {
+            // Fallback par défaut
+            assets.add("GOLD");
+            assets.add("BTCUSD");
+            return assets;
+        }
+        
+        String ind = indicator.toLowerCase();
+        String cty = country.toLowerCase();
+        
+        // ========================================
+        // PRIORISATION PAR PAYS
+        // ========================================
+        
+        // === ÉTATS-UNIS → SP500, NASDAQ en priorité ===
+        if (cty.contains("us") || cty.contains("united states") || cty.contains("u.s")) {
+            
+            // NFP - Impact maximal
+            if (ind.contains("nfp") || ind.contains("non-farm") || ind.contains("payroll")) {
+                assets.add("SP500");
+                assets.add("NASDAQ");
+                assets.add("GOLD");
+                assets.add("BTCUSD");
+                assets.add("EURUSD");
+                assets.add("GBPUSD");
+                assets.add("USDJPY");
+            }
+            // CPI - Inflation
+            else if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("pce")) {
+                assets.add("GOLD");
+                assets.add("BTCUSD");
+                assets.add("SP500");
+                assets.add("NASDAQ");
+                assets.add("EURUSD");
+                assets.add("USDJPY");
+            }
+            // GDP
+            else if (ind.contains("gdp")) {
+                assets.add("SP500");
+                assets.add("NASDAQ");
+                assets.add("GOLD");
+                assets.add("EURUSD");
+                assets.add("USDJPY");
+            }
+            // Fed / FOMC
+            else if (ind.contains("fed") || ind.contains("fomc") || ind.contains("rate decision")) {
+                assets.add("GOLD");
+                assets.add("SP500");
+                assets.add("NASDAQ");
+                assets.add("BTCUSD");
+                assets.add("EURUSD");
+                assets.add("GBPUSD");
+                assets.add("USDJPY");
+            }
+            // Retail Sales
+            else if (ind.contains("retail")) {
+                assets.add("SP500");
+                assets.add("NASDAQ");
+                assets.add("EURUSD");
+            }
+            // PMI / ISM
+            else if (ind.contains("pmi") || ind.contains("ism")) {
+                assets.add("SP500");
+                assets.add("NASDAQ");
+                assets.add("GOLD");
+            }
+            // Pétrole US (EIA)
+            else if (ind.contains("eia") || ind.contains("oil") || ind.contains("crude") || 
+                     ind.contains("inventory")) {
+                assets.add("OIL");
+                assets.add("SP500");
+            }
+            // Autres événements US
+            else {
+                assets.add("SP500");
+                assets.add("NASDAQ");
+                assets.add("GOLD");
+            }
+        }
+        
+        // === ROYAUME-UNI → GBPUSD en priorité ===
+        else if (cty.contains("uk") || cty.contains("united kingdom") || 
+                 cty.contains("britain") || cty.contains("england")) {
+            assets.add("GBPUSD");
+            
+            if (ind.contains("cpi") || ind.contains("inflation") || 
+                ind.contains("rate") || ind.contains("boe")) {
+                assets.add("GOLD");
+            }
+            if (ind.contains("gdp")) {
+                assets.add("GOLD");
+            }
+        }
+        
+        // === JAPON → USDJPY en priorité ===
+        else if (cty.contains("japan")) {
+            assets.add("USDJPY");
+            
+            if (ind.contains("cpi") || ind.contains("inflation") || 
+                ind.contains("boj") || ind.contains("rate")) {
+                assets.add("GOLD");
+            }
+            if (ind.contains("gdp")) {
+                assets.add("GOLD");
+            }
+        }
+        
+        // === EUROZONE → EURUSD en priorité ===
+        else if (cty.contains("euro") || cty.contains("germany") || cty.contains("german") ||
+                 cty.contains("france") || cty.contains("french") || 
+                 cty.contains("italy") || cty.contains("italian") ||
+                 cty.contains("spain") || cty.contains("spanish")) {
+            assets.add("EURUSD");
+            
+            if (ind.contains("cpi") || ind.contains("inflation") || 
+                ind.contains("ecb") || ind.contains("rate")) {
+                assets.add("GOLD");
+            }
+            if (ind.contains("gdp")) {
+                assets.add("GOLD");
+            }
+            if (ind.contains("pmi")) {
+                assets.add("GOLD");
+            }
+        }
+        
+        // === AUSTRALIE → AUDUSD en priorité ===
+        else if (cty.contains("australia") || cty.contains("aussie")) {
+            assets.add("AUDUSD");
+            
+            if (ind.contains("rba") || ind.contains("rate") || 
+                ind.contains("cpi") || ind.contains("employment")) {
+                assets.add("GOLD");
+            }
+        }
+        
+        // === CANADA → Pétrole prioritaire si indicateur pétrolier ===
+        else if (cty.contains("canada") || cty.contains("canadian")) {
+            
+            if (ind.contains("oil") || ind.contains("crude") || 
+                ind.contains("energy") || ind.contains("petroleum")) {
+                assets.add("OIL");
+                assets.add("GOLD");
+            } else {
+                assets.add("GOLD");
+                
+                if (ind.contains("boc") || ind.contains("rate")) {
+                    assets.add("OIL");
+                }
+            }
+        }
+        
+        // === CHINE → Impact global ===
+        else if (cty.contains("china") || cty.contains("chinese")) {
+            assets.add("GOLD");
+            assets.add("AUDUSD"); // Australie dépend de la Chine
+            
+            if (ind.contains("gdp") || ind.contains("pmi")) {
+                assets.add("SP500");
+            }
+        }
+        
+        // === AUTRES PAYS → GOLD par défaut ===
+        else {
+            assets.add("GOLD");
+            assets.add("BTCUSD");
+        }
+        
+        // ========================================
+        // COMPLÉMENTS SELON L'INDICATEUR
+        // ========================================
+        
+        // Pétrole (si pas déjà ajouté)
+        if ((ind.contains("oil") || ind.contains("crude") || ind.contains("opec") ||
+             ind.contains("eia") || ind.contains("api") || ind.contains("inventory")) &&
+            !assets.contains("OIL")) {
+            assets.add(0, "OIL"); // Mettre en premier
+        }
+        
+        // Crypto si mention Bitcoin/Crypto
+        if ((ind.contains("crypto") || ind.contains("bitcoin") || ind.contains("btc")) &&
+            !assets.contains("BTCUSD")) {
+            assets.add("BTCUSD");
+        }
+        
+        // Fallback si vide
+        if (assets.isEmpty()) {
+            assets.add("GOLD");
+            assets.add("BTCUSD");
+        }
+        
+        return assets;
     }
     
     // =====================================================
@@ -545,7 +626,7 @@ public class EconomicCalendarAPI {
             long now = System.currentTimeMillis();
             Calendar cal = Calendar.getInstance();
             
-            // NFP
+            // NFP US
             CalendarEvent nfp = new CalendarEvent();
             cal.setTimeInMillis(now);
             while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY) {
@@ -560,72 +641,42 @@ public class EconomicCalendarAPI {
             nfp.forecast = "185K";
             nfp.previous = "180K";
             nfp.actual = "N/A";
-            nfp.affectedAssets = Arrays.asList("GOLD", "BTCUSD", "EURUSD", "GBPUSD", "SP500", "NASDAQ");
+            nfp.affectedAssets = Arrays.asList("SP500", "NASDAQ", "GOLD", "BTCUSD", "EURUSD");
             events.add(nfp);
             
-            // CPI
-            CalendarEvent cpi = new CalendarEvent();
-            cal.setTimeInMillis(now + (2 * 24 * 60 * 60 * 1000));
+            // CPI Germany (EURUSD prioritaire)
+            CalendarEvent cpiGer = new CalendarEvent();
+            cal.setTimeInMillis(now + (1 * 24 * 60 * 60 * 1000));
             cal.set(Calendar.HOUR_OF_DAY, 8);
-            cal.set(Calendar.MINUTE, 30);
-            cpi.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
-            cpi.country = "United States";
-            cpi.indicator = "Consumer Price Index (CPI)";
-            cpi.importance = "High";
-            cpi.forecast = "3.3%";
-            cpi.previous = "3.1%";
-            cpi.actual = "N/A";
-            cpi.affectedAssets = Arrays.asList("GOLD", "BTCUSD", "EURUSD", "GBPUSD", "USDJPY");
-            events.add(cpi);
-            
-            // FOMC
-            CalendarEvent fomc = new CalendarEvent();
-            cal.setTimeInMillis(now + (3 * 24 * 60 * 60 * 1000));
-            cal.set(Calendar.HOUR_OF_DAY, 14);
             cal.set(Calendar.MINUTE, 0);
-            fomc.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
-            fomc.country = "United States";
-            fomc.indicator = "FOMC Rate Decision";
-            fomc.importance = "High";
-            fomc.forecast = "5.25%";
-            fomc.previous = "5.25%";
-            fomc.actual = "N/A";
-            fomc.affectedAssets = Arrays.asList("GOLD", "BTCUSD", "EURUSD", "GBPUSD", "SP500", "NASDAQ");
-            events.add(fomc);
+            cpiGer.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
+            cpiGer.country = "Germany";
+            cpiGer.indicator = "Consumer Price Index (CPI)";
+            cpiGer.importance = "High";
+            cpiGer.forecast = "2.5%";
+            cpiGer.previous = "2.4%";
+            cpiGer.actual = "N/A";
+            cpiGer.affectedAssets = Arrays.asList("EURUSD", "GOLD");
+            events.add(cpiGer);
             
-            // GDP
-            CalendarEvent gdp = new CalendarEvent();
-            cal.setTimeInMillis(now + (4 * 24 * 60 * 60 * 1000));
-            cal.set(Calendar.HOUR_OF_DAY, 8);
-            cal.set(Calendar.MINUTE, 30);
-            gdp.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
-            gdp.country = "United States";
-            gdp.indicator = "GDP Growth Rate";
-            gdp.importance = "High";
-            gdp.forecast = "2.8%";
-            gdp.previous = "2.5%";
-            gdp.actual = "N/A";
-            gdp.affectedAssets = Arrays.asList("GOLD", "EURUSD", "USDJPY", "SP500", "NASDAQ");
-            events.add(gdp);
+            // BOE Rate (GBPUSD prioritaire)
+            CalendarEvent boe = new CalendarEvent();
+            cal.setTimeInMillis(now + (2 * 24 * 60 * 60 * 1000));
+            cal.set(Calendar.HOUR_OF_DAY, 12);
+            cal.set(Calendar.MINUTE, 0);
+            boe.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
+            boe.country = "United Kingdom";
+            boe.indicator = "BOE Interest Rate Decision";
+            boe.importance = "High";
+            boe.forecast = "4.50%";
+            boe.previous = "4.50%";
+            boe.actual = "N/A";
+            boe.affectedAssets = Arrays.asList("GBPUSD", "GOLD");
+            events.add(boe);
             
-            // Retail Sales
-            CalendarEvent retail = new CalendarEvent();
-            cal.setTimeInMillis(now + (5 * 24 * 60 * 60 * 1000));
-            cal.set(Calendar.HOUR_OF_DAY, 8);
-            cal.set(Calendar.MINUTE, 30);
-            retail.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
-            retail.country = "United States";
-            retail.indicator = "Retail Sales";
-            retail.importance = "High";
-            retail.forecast = "0.5%";
-            retail.previous = "0.3%";
-            retail.actual = "N/A";
-            retail.affectedAssets = Arrays.asList("SP500", "NASDAQ", "EURUSD");
-            events.add(retail);
-            
-            // EIA Oil
+            // EIA Oil (OIL prioritaire)
             CalendarEvent oil = new CalendarEvent();
-            cal.setTimeInMillis(now + (6 * 24 * 60 * 60 * 1000));
+            cal.setTimeInMillis(now + (3 * 24 * 60 * 60 * 1000));
             cal.set(Calendar.HOUR_OF_DAY, 10);
             cal.set(Calendar.MINUTE, 30);
             oil.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
@@ -635,18 +686,18 @@ public class EconomicCalendarAPI {
             oil.forecast = "-2.5M";
             oil.previous = "-1.8M";
             oil.actual = "N/A";
-            oil.affectedAssets = Arrays.asList("OIL", "USDCAD");
+            oil.affectedAssets = Arrays.asList("OIL", "SP500");
             events.add(oil);
             
             if (MainActivity.instance != null) {
                 MainActivity.instance.addLog("[TEST] " + events.size() + " événements test générés");
                 for (CalendarEvent e : events) {
-                    MainActivity.instance.addLog("[TEST] • " + e.toString());
+                    MainActivity.instance.addLog("[TEST] " + e.toString());
                 }
             }
             
         } catch (Exception e) {
-            Log.e(TAG, "Erreur generateTestEvents", e);
+            Log.e(TAG, "Erreur test", e);
         }
         
         return events;
@@ -663,7 +714,7 @@ public class EconomicCalendarAPI {
             long now = System.currentTimeMillis();
             long windowStart = now - (minutesAgo * 60 * 1000);
             
-            List<CalendarEvent> allEvents = fetchUpcomingEvents(48);
+            List<CalendarEvent> allEvents = fetchUpcomingEvents(24);
             
             for (CalendarEvent event : allEvents) {
                 try {
@@ -672,141 +723,14 @@ public class EconomicCalendarAPI {
                         events.add(event);
                     }
                 } catch (Exception e) {
-                    // Skip cet événement
+                    // Skip
                 }
             }
             
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog(
-                    "[RECENT] " + events.size() + " événements dans les " + minutesAgo + " dernières min"
-                );
-            }
-            
         } catch (Exception e) {
-            Log.e(TAG, "Erreur fetchRecentEvents", e);
+            Log.e(TAG, "Erreur fetchRecent", e);
         }
         
         return events;
-    }
-    
-    // =====================================================
-    // MAPPER ACTIFS
-    // =====================================================
-    
-    private static List<String> mapIndicatorToAssets(String indicator, String country) {
-        List<String> assets = new ArrayList<>();
-        
-        if (indicator == null || country == null) {
-            assets.add("GOLD");
-            assets.add("BTCUSD");
-            return assets;
-        }
-        
-        String ind = indicator.toLowerCase();
-        String cty = country.toLowerCase();
-        
-        // US
-        if (cty.contains("us") || cty.contains("united states")) {
-            if (ind.contains("nfp") || ind.contains("payroll")) {
-                assets.add("GOLD");
-                assets.add("BTCUSD");
-                assets.add("EURUSD");
-                assets.add("GBPUSD");
-                assets.add("USDJPY");
-                assets.add("SP500");
-                assets.add("NASDAQ");
-            }
-            else if (ind.contains("cpi") || ind.contains("inflation")) {
-                assets.add("GOLD");
-                assets.add("BTCUSD");
-                assets.add("EURUSD");
-                assets.add("GBPUSD");
-                assets.add("USDJPY");
-            }
-            else if (ind.contains("gdp")) {
-                assets.add("GOLD");
-                assets.add("EURUSD");
-                assets.add("USDJPY");
-                assets.add("SP500");
-                assets.add("NASDAQ");
-            }
-            else if (ind.contains("fed") || ind.contains("fomc")) {
-                assets.add("GOLD");
-                assets.add("BTCUSD");
-                assets.add("EURUSD");
-                assets.add("GBPUSD");
-                assets.add("USDJPY");
-                assets.add("SP500");
-                assets.add("NASDAQ");
-            }
-            else if (ind.contains("retail")) {
-                assets.add("SP500");
-                assets.add("NASDAQ");
-                assets.add("EURUSD");
-            }
-            else if (ind.contains("pmi") || ind.contains("ism")) {
-                assets.add("SP500");
-                assets.add("NASDAQ");
-                assets.add("EURUSD");
-                assets.add("GOLD");
-            }
-            else {
-                assets.add("GOLD");
-                assets.add("EURUSD");
-            }
-        }
-        // UK
-        else if (cty.contains("uk") || cty.contains("britain") || cty.contains("kingdom")) {
-            assets.add("GBPUSD");
-            if (ind.contains("cpi") || ind.contains("boe") || ind.contains("rate")) {
-                assets.add("GOLD");
-            }
-        }
-        // Japan
-        else if (cty.contains("japan")) {
-            assets.add("USDJPY");
-            if (ind.contains("boj") || ind.contains("rate")) {
-                assets.add("GOLD");
-            }
-        }
-        // Eurozone
-        else if (cty.contains("euro") || cty.contains("germany") || 
-                 cty.contains("france") || cty.contains("italy")) {
-            assets.add("EURUSD");
-            if (ind.contains("ecb") || ind.contains("rate")) {
-                assets.add("GOLD");
-            }
-        }
-        // Australia
-        else if (cty.contains("australia")) {
-            assets.add("AUDUSD");
-            if (ind.contains("rba") || ind.contains("rate")) {
-                assets.add("GOLD");
-            }
-        }
-        // Canada
-        else if (cty.contains("canada")) {
-            assets.add("USDCAD");
-            if (ind.contains("boc") || ind.contains("rate")) {
-                assets.add("GOLD");
-            }
-        }
-        
-        // Oil
-        if (ind.contains("oil") || ind.contains("eia") || ind.contains("crude") || 
-            ind.contains("inventory")) {
-            assets.add("OIL");
-            if (!assets.contains("USDCAD")) {
-                assets.add("USDCAD");
-            }
-        }
-        
-        // Default
-        if (assets.isEmpty()) {
-            assets.add("GOLD");
-            assets.add("BTCUSD");
-        }
-        
-        return assets;
     }
 }
