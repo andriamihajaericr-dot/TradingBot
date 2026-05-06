@@ -77,7 +77,7 @@ public class EconomicCalendarAPI {
     }
     
     // =====================================================
-    // REQUÊTE INVESTING.COM
+    // REQUÊTE Sur INVESTING.COM
     // =====================================================
     
     private static List<CalendarEvent> fetchFromInvestingAPI(int hoursAhead) {
