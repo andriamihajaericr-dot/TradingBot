@@ -172,26 +172,23 @@ public class EconomicCalendarAPI {
     // SAUVEGARDER POUR DEBUG
     // =====================================================
     
-    private static void saveDebugFile(String data) {
-        try {
-            File debugFile = new File("/storage/emulated/0/DCIM/investing_debug.txt");
-            FileWriter writer = new FileWriter(debugFile);
-            writer.write("=== RÉPONSE INVESTING.COM ===\n");
-            writer.write("Longueur: " + data.length() + " chars\n");
-            writer.write("Date: " + new Date().toString() + "\n\n");
+    // Dans une Activity ou avec un Context disponible
+private static void saveDebugFile(Context context, String data) {
+    try {
+        File debugDir = new File(context.getExternalFilesDir(null), "Debug");
+        debugDir.mkdirs();
+
+        File debugFile = new File(debugDir, "investing_debug.txt");
+
+        try (FileWriter writer = new FileWriter(debugFile)) {
             writer.write(data);
-            writer.close();
-            
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[DEBUG] ✓ Fichier sauvegardé: " + debugFile.getAbsolutePath());
-                MainActivity.instance.addLog("[DEBUG] Ouvrez ce fichier pour voir la réponse exacte");
-            }
-        } catch (Exception e) {
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[DEBUG] Erreur sauvegarde: " + e.getMessage());
-            }
         }
+
+        Log.d("DEBUG", "Fichier sauvegardé : " + debugFile.getAbsolutePath());
+    } catch (Exception e) {
+        e.printStackTrace();
     }
+}
     
     // =====================================================
     // PARSER LA RÉPONSE
