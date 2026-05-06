@@ -1,6 +1,5 @@
 package com.tradingbot.analyzer;
 
-import android.os.Environment;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.*;
@@ -55,17 +54,7 @@ public class EconomicCalendarAPI {
         List<CalendarEvent> events = new ArrayList<>();
         
         try {
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[CALENDAR] ===== DÉMARRAGE =====");
-                MainActivity.instance.addLog("[CALENDAR] hoursAhead = " + hoursAhead);
-                MainActivity.instance.addLog("[CALENDAR] DEBUG_MODE = " + DEBUG_MODE);
-                MainActivity.instance.addLog("[CALENDAR] USE_TEST_DATA = " + USE_TEST_DATA);
-            }
-            
             if (USE_TEST_DATA) {
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("[CALENDAR] Mode TEST activé");
-                }
                 return generateTestEvents(hoursAhead);
             }
             
@@ -76,16 +65,11 @@ public class EconomicCalendarAPI {
                     MainActivity.instance.addLog("[CALENDAR] ⚠ Aucun événement parsé, mode test");
                 }
                 events = generateTestEvents(hoursAhead);
-            } else {
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("[CALENDAR] ✓ " + events.size() + " événements chargés");
-                }
             }
             
         } catch (Exception e) {
             if (MainActivity.instance != null) {
                 MainActivity.instance.addLog("[CALENDAR] Erreur: " + e.getMessage());
-                e.printStackTrace();
             }
         }
         
@@ -115,10 +99,6 @@ public class EconomicCalendarAPI {
                 "&currentTab=today" +
                 "&submitFilters=1" +
                 "&limit_from=0";
-            
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[INVESTING] Requête: " + dateFrom + " → " + dateTo);
-            }
             
             URL url = new URL(INVESTING_API_POST);
             conn = (HttpURLConnection) url.openConnection();
@@ -189,72 +169,26 @@ public class EconomicCalendarAPI {
     }
     
     // =====================================================
-    // SAUVEGARDER POUR DEBUG (MÉTHODE CORRIGÉE)
+    // SAUVEGARDER POUR DEBUG
     // =====================================================
     
     private static void saveDebugFile(String data) {
-        FileWriter writer = null;
-        
         try {
-            // MÉTHODE 1: Dossier de l'app (fonctionne toujours, pas besoin de permission)
-            File appDir = MainActivity.instance.getFilesDir();
-            File debugFile = new File(appDir, "investing_debug.txt");
-            
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[DEBUG] Tentative sauvegarde: " + debugFile.getAbsolutePath());
-            }
-            
-            writer = new FileWriter(debugFile);
+            File debugFile = new File("/storage/emulated/0/DCIM/investing_debug.txt");
+            FileWriter writer = new FileWriter(debugFile);
             writer.write("=== RÉPONSE INVESTING.COM ===\n");
             writer.write("Longueur: " + data.length() + " chars\n");
-            writer.write("Date: " + new Date().toString() + "\n");
-            writer.write("Chemin: " + debugFile.getAbsolutePath() + "\n\n");
-            writer.write("=== DONNÉES ===\n");
+            writer.write("Date: " + new Date().toString() + "\n\n");
             writer.write(data);
-            writer.flush();
             writer.close();
             
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[DEBUG] ✓✓✓ FICHIER SAUVEGARDÉ ✓✓✓");
-                MainActivity.instance.addLog("[DEBUG] Chemin: " + debugFile.getAbsolutePath());
-                MainActivity.instance.addLog("[DEBUG] Taille: " + debugFile.length() + " bytes");
-                
-                // BONUS: Afficher les 500 premiers caractères dans les logs
-                String preview = data.length() > 500 ? data.substring(0, 500) + "..." : data;
-                MainActivity.instance.addLog("[DEBUG] === APERÇU RÉPONSE ===");
-                MainActivity.instance.addLog(preview);
-                MainActivity.instance.addLog("[DEBUG] === FIN APERÇU ===");
+                MainActivity.instance.addLog("[DEBUG] ✓ Fichier sauvegardé: " + debugFile.getAbsolutePath());
+                MainActivity.instance.addLog("[DEBUG] Ouvrez ce fichier pour voir la réponse exacte");
             }
-            
         } catch (Exception e) {
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[DEBUG] ❌ Erreur sauvegarde fichier: " + e.getMessage());
-                MainActivity.instance.addLog("[DEBUG] StackTrace: " + android.util.Log.getStackTraceString(e));
-                
-                // FALLBACK: Afficher tout dans les logs (découpé)
-                MainActivity.instance.addLog("[DEBUG] === FALLBACK: AFFICHAGE DANS LOGS ===");
-                
-                int chunkSize = 1000;
-                int chunks = (data.length() + chunkSize - 1) / chunkSize;
-                
-                MainActivity.instance.addLog("[DEBUG] Total: " + data.length() + " chars en " + chunks + " morceaux");
-                
-                for (int i = 0; i < data.length(); i += chunkSize) {
-                    int end = Math.min(i + chunkSize, data.length());
-                    String chunk = data.substring(i, end);
-                    int chunkNum = (i / chunkSize) + 1;
-                    MainActivity.instance.addLog("[CHUNK-" + chunkNum + "/" + chunks + "] " + chunk);
-                }
-                
-                MainActivity.instance.addLog("[DEBUG] === FIN FALLBACK ===");
-            }
-        } finally {
-            if (writer != null) {
-                try {
-                    writer.close();
-                } catch (IOException e) {
-                    // Ignore
-                }
+                MainActivity.instance.addLog("[DEBUG] Erreur sauvegarde: " + e.getMessage());
             }
         }
     }
@@ -312,6 +246,7 @@ public class EconomicCalendarAPI {
             if (events.isEmpty()) {
                 if (MainActivity.instance != null) {
                     MainActivity.instance.addLog("[PARSE] ⚠ Aucun événement extrait");
+                    MainActivity.instance.addLog("[PARSE] Vérifiez /sdcard/investing_debug.txt");
                 }
             }
             
@@ -365,12 +300,12 @@ public class EconomicCalendarAPI {
                     event.importance = "High";
                     event.timestamp = String.valueOf(System.currentTimeMillis() / 1000);
                     
-                    // Extraire le texte de l'événement
+                    // Extraire le texte de l'événement (simplifié)
                     event.indicator = extractEventName(rowHtml);
                     event.country = extractCountry(rowHtml);
-                    event.forecast = extractTdValue(rowHtml, "forecast");
-                    event.previous = extractTdValue(rowHtml, "previous");
-                    event.actual = extractTdValue(rowHtml, "actual");
+                    event.forecast = "N/A";
+                    event.previous = "N/A";
+                    event.actual = "N/A";
                     
                     if (event.indicator != null && !event.indicator.isEmpty()) {
                         event.affectedAssets = mapIndicatorToAssets(
@@ -442,32 +377,6 @@ public class EconomicCalendarAPI {
         return "Unknown";
     }
     
-    // Extraire valeur d'un <td>
-    private static String extractTdValue(String html, String type) {
-        try {
-            String classPattern = "";
-            if (type.equals("forecast")) {
-                classPattern = "bold|forecast";
-            } else if (type.equals("previous")) {
-                classPattern = "previous|blackFont";
-            } else if (type.equals("actual")) {
-                classPattern = "actual|act";
-            }
-            
-            Pattern pattern = Pattern.compile(
-                "<td[^>]*class=['\"][^'\"]*(" + classPattern + ")[^'\"]*['\"][^>]*>([^<]*)</td>"
-            );
-            Matcher matcher = pattern.matcher(html);
-            
-            if (matcher.find()) {
-                String value = matcher.group(2).trim();
-                return value.isEmpty() ? "N/A" : value;
-            }
-        } catch (Exception e) {}
-        
-        return "N/A";
-    }
-    
     // Compter occurrences
     private static int countOccurrences(String text, String pattern) {
         int count = 0;
@@ -488,262 +397,73 @@ public class EconomicCalendarAPI {
         
         try {
             long now = System.currentTimeMillis();
-            Calendar cal = Calendar.getInstance();
             
             // NFP
             CalendarEvent nfp = new CalendarEvent();
-            cal.setTimeInMillis(now);
-            while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY) {
-                cal.add(Calendar.DAY_OF_MONTH, 1);
-            }
-            cal.set(Calendar.HOUR_OF_DAY, 8);
-            cal.set(Calendar.MINUTE, 30);
-            nfp.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
+            nfp.timestamp = String.valueOf((now + 2 * 60 * 60 * 1000) / 1000);
             nfp.country = "United States";
             nfp.indicator = "Non-Farm Payrolls (NFP)";
             nfp.importance = "High";
             nfp.forecast = "185K";
             nfp.previous = "180K";
             nfp.actual = "N/A";
-            nfp.affectedAssets = Arrays.asList("GOLD", "BTCUSD", "EURUSD", "GBPUSD", "SP500", "NASDAQ");
+            nfp.affectedAssets = Arrays.asList("GOLD", "BTCUSD", "EURUSD", "SP500");
             events.add(nfp);
             
             // CPI
             CalendarEvent cpi = new CalendarEvent();
-            cal.setTimeInMillis(now + (2 * 24 * 60 * 60 * 1000));
-            cal.set(Calendar.HOUR_OF_DAY, 8);
-            cal.set(Calendar.MINUTE, 30);
-            cpi.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
+            cpi.timestamp = String.valueOf((now + 4 * 60 * 60 * 1000) / 1000);
             cpi.country = "United States";
             cpi.indicator = "Consumer Price Index (CPI)";
             cpi.importance = "High";
             cpi.forecast = "3.3%";
             cpi.previous = "3.1%";
             cpi.actual = "N/A";
-            cpi.affectedAssets = Arrays.asList("GOLD", "BTCUSD", "EURUSD", "GBPUSD", "USDJPY");
+            cpi.affectedAssets = Arrays.asList("GOLD", "BTCUSD", "EURUSD");
             events.add(cpi);
             
             // FOMC
             CalendarEvent fomc = new CalendarEvent();
-            cal.setTimeInMillis(now + (3 * 24 * 60 * 60 * 1000));
-            cal.set(Calendar.HOUR_OF_DAY, 14);
-            cal.set(Calendar.MINUTE, 0);
-            fomc.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
+            fomc.timestamp = String.valueOf((now + 6 * 60 * 60 * 1000) / 1000);
             fomc.country = "United States";
             fomc.indicator = "FOMC Rate Decision";
             fomc.importance = "High";
             fomc.forecast = "5.25%";
             fomc.previous = "5.25%";
             fomc.actual = "N/A";
-            fomc.affectedAssets = Arrays.asList("GOLD", "BTCUSD", "EURUSD", "GBPUSD", "SP500", "NASDAQ");
+            fomc.affectedAssets = Arrays.asList("GOLD", "BTCUSD", "EURUSD", "SP500");
             events.add(fomc);
             
-            // GDP
-            CalendarEvent gdp = new CalendarEvent();
-            cal.setTimeInMillis(now + (4 * 24 * 60 * 60 * 1000));
-            cal.set(Calendar.HOUR_OF_DAY, 8);
-            cal.set(Calendar.MINUTE, 30);
-            gdp.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
-            gdp.country = "United States";
-            gdp.indicator = "GDP Growth Rate";
-            gdp.importance = "High";
-            gdp.forecast = "2.8%";
-            gdp.previous = "2.5%";
-            gdp.actual = "N/A";
-            gdp.affectedAssets = Arrays.asList("GOLD", "EURUSD", "USDJPY", "SP500", "NASDAQ");
-            events.add(gdp);
-            
-            // Retail Sales
-            CalendarEvent retail = new CalendarEvent();
-            cal.setTimeInMillis(now + (5 * 24 * 60 * 60 * 1000));
-            cal.set(Calendar.HOUR_OF_DAY, 8);
-            cal.set(Calendar.MINUTE, 30);
-            retail.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
-            retail.country = "United States";
-            retail.indicator = "Retail Sales";
-            retail.importance = "High";
-            retail.forecast = "0.5%";
-            retail.previous = "0.3%";
-            retail.actual = "N/A";
-            retail.affectedAssets = Arrays.asList("SP500", "NASDAQ", "EURUSD");
-            events.add(retail);
-            
-            // EIA Oil
-            CalendarEvent oil = new CalendarEvent();
-            cal.setTimeInMillis(now + (6 * 24 * 60 * 60 * 1000));
-            cal.set(Calendar.HOUR_OF_DAY, 10);
-            cal.set(Calendar.MINUTE, 30);
-            oil.timestamp = String.valueOf(cal.getTimeInMillis() / 1000);
-            oil.country = "United States";
-            oil.indicator = "EIA Crude Oil Inventories";
-            oil.importance = "High";
-            oil.forecast = "-2.5M";
-            oil.previous = "-1.8M";
-            oil.actual = "N/A";
-            oil.affectedAssets = Arrays.asList("OIL", "USDCAD");
-            events.add(oil);
-            
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[TEST] " + events.size() + " événements test générés");
-                for (CalendarEvent e : events) {
-                    MainActivity.instance.addLog("[TEST] • " + e.toString());
-                }
+                MainActivity.instance.addLog("[TEST] " + events.size() + " événements test");
             }
             
-        } catch (Exception e) {
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[TEST] Erreur: " + e.getMessage());
-            }
-        }
+        } catch (Exception e) {}
         
         return events;
     }
-    
-    // =====================================================
-    // ÉVÉNEMENTS RÉCENTS
-    // =====================================================
     
     public static List<CalendarEvent> fetchRecentEvents(int minutesAgo) {
-        List<CalendarEvent> events = new ArrayList<>();
-        
-        try {
-            long now = System.currentTimeMillis();
-            long windowStart = now - (minutesAgo * 60 * 1000);
-            
-            List<CalendarEvent> allEvents = fetchUpcomingEvents(48);
-            
-            for (CalendarEvent event : allEvents) {
-                try {
-                    long eventTime = Long.parseLong(event.timestamp) * 1000;
-                    if (eventTime >= windowStart && eventTime <= now) {
-                        events.add(event);
-                    }
-                } catch (Exception e) {
-                    // Skip cet événement
-                }
-            }
-            
-        } catch (Exception e) {
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[RECENT] Erreur: " + e.getMessage());
-            }
-        }
-        
-        return events;
+        return new ArrayList<>();
     }
-    
-    // =====================================================
-    // MAPPER ACTIFS
-    // =====================================================
     
     private static List<String> mapIndicatorToAssets(String indicator, String country) {
         List<String> assets = new ArrayList<>();
         
-        if (indicator == null || country == null) {
-            assets.add("GOLD");
-            assets.add("BTCUSD");
-            return assets;
-        }
+        if (indicator == null) return assets;
         
         String ind = indicator.toLowerCase();
-        String cty = country.toLowerCase();
         
-        // US
-        if (cty.contains("us") || cty.contains("united states")) {
-            if (ind.contains("nfp") || ind.contains("payroll")) {
-                assets.add("GOLD");
-                assets.add("BTCUSD");
-                assets.add("EURUSD");
-                assets.add("GBPUSD");
-                assets.add("USDJPY");
-                assets.add("SP500");
-                assets.add("NASDAQ");
-            }
-            else if (ind.contains("cpi") || ind.contains("inflation")) {
-                assets.add("GOLD");
-                assets.add("BTCUSD");
-                assets.add("EURUSD");
-                assets.add("GBPUSD");
-                assets.add("USDJPY");
-            }
-            else if (ind.contains("gdp")) {
-                assets.add("GOLD");
-                assets.add("EURUSD");
-                assets.add("USDJPY");
-                assets.add("SP500");
-                assets.add("NASDAQ");
-            }
-            else if (ind.contains("fed") || ind.contains("fomc")) {
-                assets.add("GOLD");
-                assets.add("BTCUSD");
-                assets.add("EURUSD");
-                assets.add("GBPUSD");
-                assets.add("USDJPY");
-                assets.add("SP500");
-                assets.add("NASDAQ");
-            }
-            else if (ind.contains("retail")) {
-                assets.add("SP500");
-                assets.add("NASDAQ");
-                assets.add("EURUSD");
-            }
-            else if (ind.contains("pmi") || ind.contains("ism")) {
-                assets.add("SP500");
-                assets.add("NASDAQ");
-                assets.add("EURUSD");
-                assets.add("GOLD");
-            }
-            else {
-                assets.add("GOLD");
-                assets.add("EURUSD");
-            }
-        }
-        // UK
-        else if (cty.contains("uk") || cty.contains("britain")) {
-            assets.add("GBPUSD");
-            if (ind.contains("cpi") || ind.contains("boe")) {
-                assets.add("GOLD");
-            }
-        }
-        // Japan
-        else if (cty.contains("japan")) {
-            assets.add("USDJPY");
-            if (ind.contains("boj")) {
-                assets.add("GOLD");
-            }
-        }
-        // Eurozone
-        else if (cty.contains("euro") || cty.contains("germany")) {
-            assets.add("EURUSD");
-            if (ind.contains("ecb")) {
-                assets.add("GOLD");
-            }
-        }
-        // Australia
-        else if (cty.contains("australia")) {
-            assets.add("AUDUSD");
-            if (ind.contains("rba")) {
-                assets.add("GOLD");
-            }
-        }
-        // Canada
-        else if (cty.contains("canada")) {
-            assets.add("USDCAD");
-            if (ind.contains("boc")) {
-                assets.add("GOLD");
-            }
-        }
-        
-        // Oil
-        if (ind.contains("oil") || ind.contains("eia") || ind.contains("crude")) {
-            assets.add("OIL");
-            assets.add("USDCAD");
-        }
-        
-        // Default
-        if (assets.isEmpty()) {
-            assets.add("GOLD");
-            assets.add("BTCUSD");
+        if (ind.contains("nfp") || ind.contains("payroll")) {
+            assets.addAll(Arrays.asList("GOLD", "BTCUSD", "EURUSD", "GBPUSD", "SP500"));
+        } else if (ind.contains("cpi") || ind.contains("inflation")) {
+            assets.addAll(Arrays.asList("GOLD", "BTCUSD", "EURUSD"));
+        } else if (ind.contains("fomc") || ind.contains("fed")) {
+            assets.addAll(Arrays.asList("GOLD", "BTCUSD", "EURUSD", "SP500"));
+        } else if (ind.contains("gdp")) {
+            assets.addAll(Arrays.asList("GOLD", "EURUSD", "SP500"));
+        } else {
+            assets.addAll(Arrays.asList("GOLD", "BTCUSD"));
         }
         
         return assets;
