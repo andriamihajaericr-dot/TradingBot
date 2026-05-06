@@ -13,7 +13,7 @@
         android:requestLegacyExternalStorage="true"
         android:allowBackup="true"
         android:icon="@android:drawable/sym_def_app_icon"
-        android:label="Trading Bot"
+        android:label="Fondamental Bot"
         android:roundIcon="@android:drawable/sym_def_app_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.TradingBot">
