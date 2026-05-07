@@ -77,11 +77,11 @@ public class MainActivity extends AppCompatActivity {
         startCalendarMonitoring();
     }
      
-private void startCalendarMonitoring() {
-    calendarCheckTimer = new Timer();
+    private void startCalendarMonitoring() {
+        calendarCheckTimer = new Timer();
     
-    // Vérifier événements à venir toutes les 30 minutes
-    calendarCheckTimer.scheduleAtFixedRate(new TimerTask() {
+       // Vérifier événements à venir toutes les 30 minutes
+       calendarCheckTimer.scheduleAtFixedRate(new TimerTask() {
         @Override
         public void run() {
             eventDetector.checkUpcomingEvents();
@@ -97,16 +97,16 @@ private void startCalendarMonitoring() {
     }, 60 * 1000, 5 * 60 * 1000); // 1min délai, 5min intervalle
     
     addLog("[MAIN] Monitoring calendrier démarré");
-}
-    
-@Override
-protected void onDestroy() {
-    super.onDestroy();
-    
-    if (calendarCheckTimer != null) {
-        calendarCheckTimer.cancel();
     }
-}
+    
+    @Override
+    protected void onDestroy() {
+       super.onDestroy();
+    
+       if (calendarCheckTimer != null) {
+          calendarCheckTimer.cancel();
+       }
+    }
     @Override
     protected void onResume() {
         super.onResume();
