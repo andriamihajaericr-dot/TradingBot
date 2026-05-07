@@ -69,7 +69,28 @@ public class MainActivity extends AppCompatActivity {
 
         botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
     }
-
+     
+private void startCalendarMonitoring() {
+    calendarCheckTimer = new Timer();
+    
+    // Vérifier événements à venir toutes les 30 minutes
+    calendarCheckTimer.scheduleAtFixedRate(new TimerTask() {
+        @Override
+        public void run() {
+            eventDetector.checkUpcomingEvents();
+        }
+    }, 0, 30 * 60 * 1000); // 0 = immédiat, 30min intervalle
+    
+    // Vérifier événements récents toutes les 5 minutes
+    calendarCheckTimer.scheduleAtFixedRate(new TimerTask() {
+        @Override
+        public void run() {
+            eventDetector.checkRecentEvents();
+        }
+    }, 60 * 1000, 5 * 60 * 1000); // 1min délai, 5min intervalle
+    
+    addLog("[MAIN] Monitoring calendrier démarré");
+                   }
     @Override
     protected void onResume() {
         super.onResume();
