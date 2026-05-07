@@ -21,6 +21,7 @@ public class MainActivity extends AppCompatActivity {
     public static String TELEGRAM_CHAT_ID = "";
     public static MainActivity instance;
 
+    private EventDatabase eventDb;
     private TextView statusText, logText;
     private Switch botSwitch;
     private EditText apiKeyInput, telegramTokenInput, telegramChatIdInput;
