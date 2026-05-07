@@ -70,9 +70,11 @@ public class MainActivity extends AppCompatActivity {
         });
 
         botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
+
         // Initialiser le détecteur
         eventDb = new EventDatabase(this);
         eventDetector = new EconomicEventDetector(eventDb);
+        
         // Lancer vérification périodique du calendrier
         startCalendarMonitoring();
     }
@@ -80,33 +82,34 @@ public class MainActivity extends AppCompatActivity {
     private void startCalendarMonitoring() {
         calendarCheckTimer = new Timer();
     
-       // Vérifier événements à venir toutes les 30 minutes
-       calendarCheckTimer.scheduleAtFixedRate(new TimerTask() {
-        @Override
-        public void run() {
-            eventDetector.checkUpcomingEvents();
-        }
-    }, 0, 30 * 60 * 1000); // 0 = immédiat, 30min intervalle
+        // Vérifier événements à venir toutes les 30 minutes
+        calendarCheckTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                eventDetector.checkUpcomingEvents();
+            }
+        }, 0, 30 * 60 * 1000); // 0 = immédiat, 30min intervalle
     
-    // Vérifier événements récents toutes les 5 minutes
-    calendarCheckTimer.scheduleAtFixedRate(new TimerTask() {
-        @Override
-        public void run() {
-            eventDetector.checkRecentEvents();
-        }
-    }, 60 * 1000, 5 * 60 * 1000); // 1min délai, 5min intervalle
+        // Vérifier événements récents toutes les 5 minutes
+        calendarCheckTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                eventDetector.checkRecentEvents();
+            }
+        }, 60 * 1000, 5 * 60 * 1000); // 1min délai, 5min intervalle
     
-    addLog("[MAIN] Monitoring calendrier démarré");
+        addLog("[MAIN] Monitoring calendrier démarré");
     }
     
     @Override
     protected void onDestroy() {
-       super.onDestroy();
+        super.onDestroy();
     
-       if (calendarCheckTimer != null) {
-          calendarCheckTimer.cancel();
-       }
+        if (calendarCheckTimer != null) {
+            calendarCheckTimer.cancel();
+        }
     }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -122,6 +125,7 @@ public class MainActivity extends AppCompatActivity {
     private void updateStatus() {
         boolean active = getPrefs().getBoolean("bot_active", false);
         boolean perm   = isPermissionGranted();
+        
         if (!perm) {
             statusText.setText("⚠️ Permission notifications requise");
         } else if (active) {
@@ -135,12 +139,22 @@ public class MainActivity extends AppCompatActivity {
         String k = apiKeyInput.getText().toString().trim();
         String t = telegramTokenInput.getText().toString().trim();
         String c = telegramChatIdInput.getText().toString().trim();
+        
         if (k.isEmpty() || t.isEmpty() || c.isEmpty()) {
             Toast.makeText(this, "Remplis toutes les clés !", Toast.LENGTH_SHORT).show();
             return;
         }
-        getPrefs().edit().putString("claude_key", k).putString("tg_token", t).putString("tg_chat_id", c).apply();
-        CLAUDE_API_KEY = k; TELEGRAM_TOKEN = t; TELEGRAM_CHAT_ID = c;
+        
+        getPrefs().edit()
+                .putString("claude_key", k)
+                .putString("tg_token", t)
+                .putString("tg_chat_id", c)
+                .apply();
+        
+        CLAUDE_API_KEY = k;
+        TELEGRAM_TOKEN = t;
+        TELEGRAM_CHAT_ID = c;
+        
         Toast.makeText(this, "✅ Clés sauvegardées !", Toast.LENGTH_SHORT).show();
         addLog("✅ Clés API configurées");
     }
@@ -150,6 +164,7 @@ public class MainActivity extends AppCompatActivity {
         CLAUDE_API_KEY   = p.getString("claude_key", "");
         TELEGRAM_TOKEN   = p.getString("tg_token", "");
         TELEGRAM_CHAT_ID = p.getString("tg_chat_id", "");
+        
         apiKeyInput.setText(CLAUDE_API_KEY);
         telegramTokenInput.setText(TELEGRAM_TOKEN);
         telegramChatIdInput.setText(TELEGRAM_CHAT_ID);
