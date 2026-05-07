@@ -90,7 +90,16 @@ private void startCalendarMonitoring() {
     }, 60 * 1000, 5 * 60 * 1000); // 1min délai, 5min intervalle
     
     addLog("[MAIN] Monitoring calendrier démarré");
-                   }
+}
+    
+@Override
+protected void onDestroy() {
+    super.onDestroy();
+    
+    if (calendarCheckTimer != null) {
+        calendarCheckTimer.cancel();
+    }
+}
     @Override
     protected void onResume() {
         super.onResume();
