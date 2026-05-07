@@ -70,11 +70,11 @@ public class MainActivity extends AppCompatActivity {
         });
 
         botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
-       // Initialiser le détecteur
-     eventDb = new EventDatabase(this);
-    eventDetector = new EconomicEventDetector(eventDb);
-    // Lancer vérification périodique du calendrier
-    startCalendarMonitoring();
+        // Initialiser le détecteur
+        eventDb = new EventDatabase(this);
+        eventDetector = new EconomicEventDetector(eventDb);
+        // Lancer vérification périodique du calendrier
+        startCalendarMonitoring();
     }
      
 private void startCalendarMonitoring() {
