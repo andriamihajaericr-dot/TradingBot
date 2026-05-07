@@ -22,6 +22,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView statusText, logText;
     private Switch botSwitch;
     private EditText apiKeyInput, telegramTokenInput, telegramChatIdInput;
+    private EconomicEventDetector eventDetector;
+    private Timer calendarCheckTimer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
