@@ -1,284 +1,453 @@
-// EconomicEventDetector.java
 package com.tradingbot.analyzer;
 
-import org.json.JSONObject;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import android.util.Log;
+import java.util.*;
 
 public class EconomicEventDetector {
+
+    private static final String TAG = "EventDetector";
     
-    // Patterns pour événements économiques
-    private static final Pattern INDICATOR_PATTERN = Pattern.compile(
-        "(CPI|NFP|GDP|PMI|PPI|Retail Sales|Unemployment|Interest Rate|FOMC|" +
-        "Core CPI|PCE|Jobless Claims|Housing Starts|Trade Balance|" +
-        "Industrial Production|Consumer Confidence|ISM|ZEW|IFO)",
-        Pattern.CASE_INSENSITIVE
-    );
+    private EventDatabase eventDb;
     
-    private static final Pattern VALUE_PATTERN = Pattern.compile(
-        "(Forecast|Expected|Previous|Actual|Consensus)\\s*:?\\s*([+-]?[\\d.]+[%MBK]?)",
-        Pattern.CASE_INSENSITIVE
-    );
+    // Fenêtre de temps pour corréler événements (30 minutes avant/après)
+    private static final long CORRELATION_WINDOW_MS = 30 * 60 * 1000;
     
-    private static final Pattern COUNTRY_PATTERN = Pattern.compile(
-        "\\b(US|USA|United States|UK|Britain|EU|Europe|Japan|China|Canada|Australia|Germany|France)\\b",
-        Pattern.CASE_INSENSITIVE
-    );
-    
-    // Patterns pour événements pétroliers
-    private static final Pattern OIL_INVENTORY_PATTERN = Pattern.compile(
-        "(EIA|API)\\s+(?:Crude)?\\s*(?:Oil)?\\s*(?:Inventory|Stockpile)[:\\s]*([+-][\\d.]+)\\s*(M|million)?",
-        Pattern.CASE_INSENSITIVE
-    );
-    
-    private static final Pattern OPEC_PATTERN = Pattern.compile(
-        "OPEC\\+?\\s+(?:cut|increase|reduce|boost)\\s+(?:production)?[:\\s]*([\\d.]+)?\\s*(M|million)?",
-        Pattern.CASE_INSENSITIVE
-    );
-    
-    private static final Pattern OIL_PRICE_PATTERN = Pattern.compile(
-        "(WTI|Brent)[:\\s@]*\\$?([\\d.]+)",
-        Pattern.CASE_INSENSITIVE
-    );
-    
-    public static DetectedEvent detectEvent(String title, String content) {
-        String fullText = title + " " + content;
-        
-        DetectedEvent event = new DetectedEvent();
-        
-        // 1. Vérifier si c'est du pétrole
-        if (isOilEvent(fullText)) {
-            parseOilDetails(event, fullText);
-            event.eventType = "oil";
-        }
-        // 2. Sinon vérifier si c'est économique
-        else if (isEconomicEvent(fullText)) {
-            parseEconomicDetails(event, fullText);
-            event.eventType = "economic";
-        }
-        // 3. Sinon c'est une news générale
-        else {
-            event.eventType = "news";
-        }
-        
-        // Déterminer l'IMPACT (Haussier/Baissier/Neutre)
-        event.impact = determineImpact(event, fullText);
-        
-        return event;
+    public EconomicEventDetector(EventDatabase db) {
+        this.eventDb = db;
     }
     
-    private static void parseOilDetails(DetectedEvent event, String text) {
-        // Inventaires EIA/API
-        Matcher inventoryMatcher = OIL_INVENTORY_PATTERN.matcher(text);
-        if (inventoryMatcher.find()) {
-            event.indicator = inventoryMatcher.group(1) + " Inventory";
-            event.actual = inventoryMatcher.group(2);
-            event.country = "US";
-        }
-        
-        // OPEC
-        Matcher opecMatcher = OPEC_PATTERN.matcher(text);
-        if (opecMatcher.find()) {
-            event.indicator = "OPEC Production";
-            event.actual = opecMatcher.group(1);
-            event.country = "OPEC";
-        }
-        
-        // Prix
-        Matcher priceMatcher = OIL_PRICE_PATTERN.matcher(text);
-        if (priceMatcher.find()) {
-            event.indicator = priceMatcher.group(1) + " Crude";
-            event.actual = priceMatcher.group(2);
-        }
-    }
+    // =====================================================
+    // DÉTECTION PROACTIVE DES ÉVÉNEMENTS À VENIR
+    // =====================================================
     
-    private static void parseEconomicDetails(DetectedEvent event, String text) {
-        // Indicateur
-        Matcher indicatorMatcher = INDICATOR_PATTERN.matcher(text);
-        if (indicatorMatcher.find()) {
-            event.indicator = indicatorMatcher.group(1);
-        }
-        
-        // Pays
-        Matcher countryMatcher = COUNTRY_PATTERN.matcher(text);
-        if (countryMatcher.find()) {
-            event.country = countryMatcher.group(1);
-        }
-        
-        // Valeurs
-        Matcher valueMatcher = VALUE_PATTERN.matcher(text);
-        while (valueMatcher.find()) {
-            String type = valueMatcher.group(1).toLowerCase();
-            String value = valueMatcher.group(2);
+    public void checkUpcomingEvents() {
+        try {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[DETECTOR] Vérification événements à venir...");
+            }
             
-            if (type.contains("forecast") || type.contains("expected") || type.contains("consensus")) {
-                event.forecast = value;
-            } else if (type.contains("previous")) {
-                event.previous = value;
-            } else if (type.contains("actual")) {
-                event.actual = value;
+            // Récupérer événements des prochaines 24h depuis l'API
+            List<EconomicCalendarAPI.CalendarEvent> upcomingEvents = 
+                EconomicCalendarAPI.fetchUpcomingEvents(24);
+            
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[DETECTOR] " + upcomingEvents.size() + " événements trouvés"
+                );
+            }
+            
+            // Sauvegarder dans la DB et envoyer alertes
+            for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents) {
+                processCalendarEvent(event);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur checkUpcomingEvents", e);
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[DETECTOR] Erreur: " + e.getMessage());
             }
         }
     }
     
-    private static String determineImpact(DetectedEvent event, String text) {
-        String lower = text.toLowerCase();
-        
-        // === PÉTROLE ===
-        if (event.eventType.equals("oil")) {
-            // Inventaires EIA/API
-            if (event.indicator != null && event.indicator.contains("Inventory") && 
-                event.actual != null) {
-                try {
-                    double change = Double.parseDouble(event.actual.replace("+", ""));
-                    // Augmentation inventaires = baissier pour pétrole
-                    if (Math.abs(change) >= 2.0) { // >= 2M barils = significatif
-                        return change > 0 ? "Baissier" : "Haussier";
-                    }
-                } catch (Exception e) {}
+    // =====================================================
+    // DÉTECTION DES ÉVÉNEMENTS RÉCENTS (déjà passés)
+    // =====================================================
+    
+    public void checkRecentEvents() {
+        try {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[DETECTOR] Vérification événements récents...");
             }
             
-            // OPEC coupe production = haussier
-            if (lower.contains("opec") && (lower.contains("cut") || lower.contains("reduce"))) {
-                return "Haussier";
+            // Récupérer événements des 30 dernières minutes
+            List<EconomicCalendarAPI.CalendarEvent> recentEvents = 
+                EconomicCalendarAPI.fetchRecentEvents(30);
+            
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[DETECTOR] " + recentEvents.size() + " événements récents"
+                );
             }
             
-            // OPEC augmente production = baissier
-            if (lower.contains("opec") && (lower.contains("increase") || lower.contains("boost"))) {
-                return "Baissier";
+            // Corréler avec les notifications reçues
+            for (EconomicCalendarAPI.CalendarEvent event : recentEvents) {
+                correlateWithNotifications(event);
             }
             
-            // Géopolitique pétrolière
-            if (isOilGeopolitical(lower)) {
-                if (lower.contains("sanction") || lower.contains("attack") || 
-                    lower.contains("conflict")) {
-                    return "Haussier"; // Risque = hausse pétrole
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur checkRecentEvents", e);
+        }
+    }
+    
+    // =====================================================
+    // TRAITER UN ÉVÉNEMENT DU CALENDRIER
+    // =====================================================
+    
+    private void processCalendarEvent(EconomicCalendarAPI.CalendarEvent event) {
+        try {
+            long eventTime = Long.parseLong(event.timestamp) * 1000;
+            long now = System.currentTimeMillis();
+            long timeUntilEvent = eventTime - now;
+            
+            // Ignorer événements passés
+            if (timeUntilEvent < 0) {
+                return;
+            }
+            
+            // Générer un ID unique
+            String eventId = "calendar_" + event.timestamp + "_" + 
+                           event.country.hashCode() + "_" + 
+                           event.indicator.hashCode();
+            
+            // Vérifier si déjà en DB
+            if (eventDb.eventExists(eventId)) {
+                return;
+            }
+            
+            // Sauvegarder dans la DB
+            String assetsStr = String.join(", ", event.affectedAssets);
+            
+            boolean saved = eventDb.saveEvent(
+                eventId,
+                "economic.calendar",
+                "Economic Calendar API",
+                event.indicator,
+                event.indicator,
+                buildEventContent(event),
+                assetsStr,
+                event.importance,
+                calculateCalendarConfidence(event),
+                "calendar"
+            );
+            
+            if (saved && MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[CALENDAR] Sauvegardé: " + event.country + " - " + 
+                    event.indicator + " → " + event.affectedAssets.get(0)
+                );
+            }
+            
+            // ALERTE SI ÉVÉNEMENT IMMINENT (< 1h) ET HIGH
+            if ("High".equals(event.importance) && timeUntilEvent < 60 * 60 * 1000) {
+                sendUpcomingEventAlert(event, timeUntilEvent);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur processCalendarEvent", e);
+        }
+    }
+    
+    // =====================================================
+    // CORRÉLER ÉVÉNEMENT CALENDRIER AVEC NOTIFICATIONS
+    // =====================================================
+    
+    private void correlateWithNotifications(EconomicCalendarAPI.CalendarEvent calendarEvent) {
+        try {
+            long eventTime = Long.parseLong(calendarEvent.timestamp) * 1000;
+            
+            // Récupérer notifications dans fenêtre de temps
+            List<EventDatabase.StoredEvent> notifications = 
+                eventDb.getEventsInTimeWindow(eventTime, CORRELATION_WINDOW_MS);
+            
+            // Filtrer uniquement les notifications (pas calendrier)
+            List<EventDatabase.StoredEvent> relevantNotifs = new ArrayList<>();
+            for (EventDatabase.StoredEvent notif : notifications) {
+                if ("notification".equals(notif.sourceType)) {
+                    relevantNotifs.add(notif);
                 }
             }
-        }
-        
-        // === ÉCONOMIQUE ===
-        else if (event.eventType.equals("economic")) {
-            // Comparer actual vs forecast
-            if (event.actual != null && event.forecast != null) {
-                try {
-                    double actual = parseNumericValue(event.actual);
-                    double forecast = parseNumericValue(event.forecast);
-                    double diff = actual - forecast;
-                    
-                    // Seuil de significativité
-                    if (Math.abs(diff) < 0.1) {
-                        return "Neutre"; // Différence trop faible
-                    }
-                    
-                    // Analyser selon l'indicateur
-                    String indicator = event.indicator != null ? 
-                        event.indicator.toUpperCase() : "";
-                    
-                    // Inflation (CPI, PPI) supérieure = baissier (risque hausse taux)
-                    if (indicator.contains("CPI") || indicator.contains("PPI") || 
-                        indicator.contains("INFLATION")) {
-                        return diff > 0 ? "Baissier" : "Haussier";
-                    }
-                    
-                    // Emploi (NFP) supérieur = haussier
-                    if (indicator.contains("NFP") || indicator.contains("EMPLOYMENT")) {
-                        return diff > 0 ? "Haussier" : "Baissier";
-                    }
-                    
-                    // GDP supérieur = haussier
-                    if (indicator.contains("GDP")) {
-                        return diff > 0 ? "Haussier" : "Baissier";
-                    }
-                    
-                    // Chômage supérieur = baissier
-                    if (indicator.contains("UNEMPLOYMENT") || indicator.contains("JOBLESS")) {
-                        return diff > 0 ? "Baissier" : "Haussier";
-                    }
-                    
-                    // PMI/ISM supérieur = haussier
-                    if (indicator.contains("PMI") || indicator.contains("ISM")) {
-                        return diff > 0 ? "Haussier" : "Baissier";
-                    }
-                    
-                } catch (Exception e) {}
-            }
-        }
-        
-        // === NEWS GÉNÉRALES ===
-        else {
-            // Guerre / conflit = haussier pour or, baissier pour actions
-            if (lower.contains("war") || lower.contains("invasion") || 
-                lower.contains("nuclear") || lower.contains("missile")) {
-                return "Baissier"; // Général = risk-off
+            
+            if (relevantNotifs.isEmpty()) {
+                return;
             }
             
-            // Fed hawkish = baissier
-            if (lower.contains("fed") && (lower.contains("rate hike") || 
-                lower.contains("hawkish") || lower.contains("tighten"))) {
-                return "Baissier";
+            // Vérifier si les actifs correspondent
+            boolean hasMatch = false;
+            for (EventDatabase.StoredEvent notif : relevantNotifs) {
+                String[] notifAssets = notif.assets.split(",");
+                
+                for (String notifAsset : notifAssets) {
+                    String trimmedAsset = notifAsset.trim();
+                    
+                    if (calendarEvent.affectedAssets.contains(trimmedAsset)) {
+                        hasMatch = true;
+                        
+                        if (MainActivity.instance != null) {
+                            MainActivity.instance.addLog(
+                                "[CORRELATION] ✓ Match trouvé: " + trimmedAsset + 
+                                " | Calendar: " + calendarEvent.indicator + 
+                                " ↔ Notif: " + notif.title
+                            );
+                        }
+                        
+                        // Augmenter la confiance de la notification
+                        int newConfidence = Math.min(100, notif.confidence + 15);
+                        eventDb.updateConfidence(notif.eventId, newConfidence);
+                        
+                        break;
+                    }
+                }
+                
+                if (hasMatch) break;
             }
             
-            // Fed dovish = haussier
-            if (lower.contains("fed") && (lower.contains("rate cut") || 
-                lower.contains("dovish") || lower.contains("pause"))) {
-                return "Haussier";
+            // Si correspondance trouvée, envoyer alerte combinée
+            if (hasMatch) {
+                sendCorrelatedAlert(calendarEvent, relevantNotifs.get(0));
             }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur correlateWithNotifications", e);
         }
-        
-        return "Neutre";
     }
     
-    private static boolean isOilEvent(String text) {
-        String lower = text.toLowerCase();
-        return (lower.contains("oil") || lower.contains("crude") || 
-                lower.contains("wti") || lower.contains("brent") ||
-                lower.contains("opec") || lower.contains("eia") ||
-                lower.contains("petroleum") || lower.contains("barrel")) &&
-               !lower.contains("olive oil"); // Exclure huile d'olive !
-    }
+    // =====================================================
+    // ANALYSE PAR ACTIF
+    // =====================================================
     
-    private static boolean isEconomicEvent(String text) {
-        return text.matches("(?i).*(forecast|expected|actual|previous|consensus|release).*") &&
-               INDICATOR_PATTERN.matcher(text).find();
-    }
-    
-    private static boolean isOilGeopolitical(String lower) {
-        boolean hasProducer = lower.contains("russia") || lower.contains("saudi") ||
-                             lower.contains("iran") || lower.contains("iraq") ||
-                             lower.contains("venezuela");
-        
-        boolean hasEvent = lower.contains("sanction") || lower.contains("war") ||
-                          lower.contains("attack") || lower.contains("conflict");
-        
-        return hasProducer && hasEvent;
-    }
-    
-    private static double parseNumericValue(String value) {
-        // Retirer %, M, B, K et parser
-        String cleaned = value.replaceAll("[%MBK]", "").trim();
-        return Double.parseDouble(cleaned);
-    }
-    
-    public static class DetectedEvent {
-        public String eventType; // "economic", "oil", "news"
-        public String indicator;
-        public String country;
-        public String forecast;
-        public String previous;
-        public String actual;
-        public String impact; // "Haussier", "Baissier", "Neutre"
-        
-        public boolean shouldNotify() {
-            // RÈGLE STRICTE: notifier SEULEMENT si impact = Haussier ou Baissier
-            return "Haussier".equals(impact) || "Baissier".equals(impact);
-        }
-        
-        public String getDescription() {
-            if (indicator != null) {
-                return indicator + (country != null ? " (" + country + ")" : "");
+    public void analyzeAssetEvents(String asset) {
+        try {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[DETECTOR] Analyse actif: " + asset);
             }
-            return "Événement " + eventType;
+            
+            // Événements des dernières 24h
+            long since = System.currentTimeMillis() - (24 * 60 * 60 * 1000);
+            
+            List<EventDatabase.StoredEvent> assetEvents = 
+                eventDb.getEventsByAsset(asset, since);
+            
+            if (assetEvents.isEmpty()) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[DETECTOR] Aucun événement pour " + asset);
+                }
+                return;
+            }
+            
+            // Statistiques
+            int highCount = 0;
+            int mediumCount = 0;
+            int totalConfidence = 0;
+            
+            for (EventDatabase.StoredEvent event : assetEvents) {
+                if ("HIGH".equals(event.impact)) highCount++;
+                if ("MEDIUM".equals(event.impact)) mediumCount++;
+                totalConfidence += event.confidence;
+            }
+            
+            int avgConfidence = totalConfidence / assetEvents.size();
+            
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[DETECTOR] " + asset + " : " + assetEvents.size() + " événements | " +
+                    "HIGH: " + highCount + " | MEDIUM: " + mediumCount + 
+                    " | Conf. moy: " + avgConfidence + "%"
+                );
+            }
+            
+            // Alerte si beaucoup d'événements HIGH
+            if (highCount >= 3) {
+                sendAssetHighActivityAlert(asset, highCount, assetEvents);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur analyzeAssetEvents", e);
         }
+    }
+    
+    // =====================================================
+    // GÉNÉRATION DE RAPPORTS
+    // =====================================================
+    
+    public String generateDailyReport() {
+        StringBuilder report = new StringBuilder();
+        
+        try {
+            EventDatabase.DatabaseStats stats = eventDb.getStats();
+            
+            report.append("📊 RAPPORT QUOTIDIEN\n\n");
+            report.append("Total événements: ").append(stats.totalEvents).append("\n");
+            report.append("Traités: ").append(stats.processedEvents).append("\n");
+            report.append("Aujourd'hui: ").append(stats.eventsToday).append("\n");
+            report.append("Confiance moyenne: ").append(stats.avgConfidence).append("%\n\n");
+            
+            report.append("Par source:\n");
+            for (Map.Entry<String, Integer> entry : stats.bySource.entrySet()) {
+                report.append("  - ").append(entry.getKey()).append(": ")
+                      .append(entry.getValue()).append("\n");
+            }
+            
+            // Événements à venir dans les 4 prochaines heures
+            List<EconomicCalendarAPI.CalendarEvent> upcoming = 
+                EconomicCalendarAPI.fetchUpcomingEvents(4);
+            
+            if (!upcoming.isEmpty()) {
+                report.append("\n🔜 PROCHAINS ÉVÉNEMENTS (4h):\n");
+                for (int i = 0; i < Math.min(5, upcoming.size()); i++) {
+                    EconomicCalendarAPI.CalendarEvent evt = upcoming.get(i);
+                    report.append("  • ").append(evt.country).append(" - ")
+                          .append(evt.indicator).append(" (")
+                          .append(evt.importance).append(")\n");
+                    report.append("    → ").append(evt.affectedAssets.get(0)).append("\n");
+                }
+            }
+            
+            // Actifs les plus actifs
+            report.append("\n📈 ACTIFS LES PLUS ACTIFS:\n");
+            String[] topAssets = {"SP500", "GOLD", "EURUSD", "BTCUSD"};
+            long since = System.currentTimeMillis() - (24 * 60 * 60 * 1000);
+            
+            for (String asset : topAssets) {
+                int count = eventDb.getEventCountByAsset(asset, since);
+                if (count > 0) {
+                    report.append("  • ").append(asset).append(": ")
+                          .append(count).append(" événements\n");
+                }
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur generateDailyReport", e);
+            report.append("\nErreur génération rapport: ").append(e.getMessage());
+        }
+        
+        return report.toString();
+    }
+    
+    // =====================================================
+    // ALERTES
+    // =====================================================
+    
+    private void sendUpcomingEventAlert(EconomicCalendarAPI.CalendarEvent event, 
+                                        long timeUntilEvent) {
+        try {
+            int minutesUntil = (int) (timeUntilEvent / (60 * 1000));
+            
+            StringBuilder message = new StringBuilder();
+            message.append("⏰ **ÉVÉNEMENT IMMINENT**\n\n");
+            message.append("**Dans ").append(minutesUntil).append(" minutes**\n\n");
+            message.append("**Pays:** ").append(event.country).append("\n");
+            message.append("**Événement:** ").append(event.indicator).append("\n");
+            message.append("**Importance:** ").append(event.importance).append("\n");
+            message.append("**Forecast:** ").append(event.forecast).append("\n");
+            message.append("**Previous:** ").append(event.previous).append("\n\n");
+            message.append("**Actifs impactés:**\n");
+            
+            for (int i = 0; i < Math.min(4, event.affectedAssets.size()); i++) {
+                message.append("  ").append(i + 1).append(". ")
+                       .append(event.affectedAssets.get(i)).append("\n");
+            }
+            
+            NotificationService.sendTelegramAlert(
+                event.country,
+                event.affectedAssets,
+                "⏰ " + event.indicator + " dans " + minutesUntil + "min",
+                message.toString(),
+                event.importance,
+                95
+            );
+            
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[ALERT] Événement imminent envoyé: " + event.indicator
+                );
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur sendUpcomingEventAlert", e);
+        }
+    }
+    
+    private void sendCorrelatedAlert(EconomicCalendarAPI.CalendarEvent calendarEvent, 
+                                     EventDatabase.StoredEvent notification) {
+        try {
+            StringBuilder message = new StringBuilder();
+            message.append("🔗 **CORRÉLATION DÉTECTÉE**\n\n");
+            message.append("**Calendrier économique:**\n");
+            message.append(calendarEvent.country).append(" - ")
+                   .append(calendarEvent.indicator).append("\n\n");
+            message.append("**Notification reçue:**\n");
+            message.append(notification.appName).append(" - ")
+                   .append(notification.title).append("\n\n");
+            message.append("**Actifs communs:**\n");
+            message.append(notification.assets).append("\n\n");
+            message.append("**Confiance augmentée:** ")
+                   .append(notification.confidence).append("% → ")
+                   .append(Math.min(100, notification.confidence + 15)).append("%");
+            
+            NotificationService.sendTelegramAlert(
+                calendarEvent.country,
+                calendarEvent.affectedAssets,
+                "🔗 Corrélation: " + calendarEvent.indicator,
+                message.toString(),
+                "HIGH",
+                90
+            );
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur sendCorrelatedAlert", e);
+        }
+    }
+    
+    private void sendAssetHighActivityAlert(String asset, int highCount, 
+                                            List<EventDatabase.StoredEvent> events) {
+        try {
+            StringBuilder message = new StringBuilder();
+            message.append("⚠️ **FORTE ACTIVITÉ DÉTECTÉE**\n\n");
+            message.append("**Actif:** ").append(asset).append("\n");
+            message.append("**Événements HIGH:** ").append(highCount).append("\n\n");
+            message.append("**Derniers événements:**\n");
+            
+            for (int i = 0; i < Math.min(3, events.size()); i++) {
+                EventDatabase.StoredEvent evt = events.get(i);
+                message.append("  • ").append(evt.title).append("\n");
+            }
+            
+            NotificationService.sendTelegramAlert(
+                "Multiple",
+                Arrays.asList(asset),
+                "⚠️ Forte activité sur " + asset,
+                message.toString(),
+                "HIGH",
+                85
+            );
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur sendAssetHighActivityAlert", e);
+        }
+    }
+    
+    // =====================================================
+    // UTILITAIRES
+    // =====================================================
+    
+    private String buildEventContent(EconomicCalendarAPI.CalendarEvent event) {
+        StringBuilder content = new StringBuilder();
+        content.append(event.country).append(" - ").append(event.indicator).append("\n");
+        content.append("Forecast: ").append(event.forecast).append("\n");
+        content.append("Previous: ").append(event.previous);
+        
+        if (!"N/A".equals(event.actual)) {
+            content.append("\nActual: ").append(event.actual);
+        }
+        
+        return content.toString();
+    }
+    
+    private int calculateCalendarConfidence(EconomicCalendarAPI.CalendarEvent event) {
+        int confidence = 80; // Base élevée car source officielle
+        
+        // Bonus importance
+        if ("High".equals(event.importance)) {
+            confidence += 15;
+        } else if ("Medium".equals(event.importance)) {
+            confidence += 5;
+        }
+        
+        // Bonus si forecast disponible
+        if (!"N/A".equals(event.forecast)) {
+            confidence += 5;
+        }
+        
+        return Math.min(100, confidence);
     }
 }
