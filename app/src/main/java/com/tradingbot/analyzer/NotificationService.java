@@ -638,8 +638,8 @@ public class NotificationService extends NotificationListenerService {
                                           String importance, int confidence) {
         new Thread(() -> {
             try {
-                String botToken = "7922022330:AAFlkd8Hy4BSCYC6vjy4z_DmEbA8J2RWySs";
-                String chatId = "1166473965";
+                String botToken = "8490515683:AAEgirnvoEXhkw0OyW5DF_dDAa_Kk49wjDw";
+                String chatId = "6166133421";
                 
                 String icon = "HIGH".equals(importance) ? "🔴" : 
                              "MEDIUM".equals(importance) ? "🟡" : "🟢";
