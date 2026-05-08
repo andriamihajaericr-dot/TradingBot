@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.os.Build;
+import android.os.Bundle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
@@ -31,7 +32,7 @@ public class NotificationService extends NotificationListenerService {
         "net.metaquotes.metatrader5",
         "net.metaquotes.metatrader4",
         "com.tradingview.tradingviewapp",
-        "org.telegram.messenger",
+        "com.financialjuice.androidapp",
         "com.whatsapp",
         "com.fxcm.tradingstation.mobile",
         "com.ig.android",
@@ -155,9 +156,10 @@ public class NotificationService extends NotificationListenerService {
             String text = "";
             
             try {
-                if (notification.extras != null) {
-                    CharSequence titleSeq = notification.extras.getCharSequence(Notification.EXTRA_TITLE);
-                    CharSequence textSeq = notification.extras.getCharSequence(Notification.EXTRA_TEXT);
+                Bundle extras = notification.extras;
+                if (extras != null) {
+                    CharSequence titleSeq = extras.getCharSequence(Notification.EXTRA_TITLE);
+                    CharSequence textSeq = extras.getCharSequence(Notification.EXTRA_TEXT);
                     
                     if (titleSeq != null) title = titleSeq.toString();
                     if (textSeq != null) text = textSeq.toString();
@@ -246,7 +248,7 @@ public class NotificationService extends NotificationListenerService {
                 );
             }
             
-            // 7. ✨ NOUVELLE ÉTAPE : CORRÉLATION AVEC CALENDRIER ✨
+            // 7. CORRÉLATION AVEC CALENDRIER
             correlateWithCalendar(eventId, country, detectedAssets, importance, confidence);
             
             // 8. ENVOYER ALERTE SI HIGH
@@ -267,7 +269,7 @@ public class NotificationService extends NotificationListenerService {
     }
     
     // =====================================================
-    // ✨ NOUVELLE MÉTHODE : CORRÉLATION AVEC CALENDRIER ✨
+    // CORRÉLATION AVEC CALENDRIER
     // =====================================================
     
     private void correlateWithCalendar(String notificationEventId, String country, 
@@ -337,7 +339,6 @@ public class NotificationService extends NotificationListenerService {
                 
                 // Informer le détecteur
                 if (eventDetector != null) {
-                    // Le détecteur peut faire des analyses supplémentaires
                     eventDetector.checkRecentEvents();
                 }
             }
@@ -665,6 +666,7 @@ public class NotificationService extends NotificationListenerService {
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
                 
                 int responseCode = conn.getResponseCode();
                 
@@ -679,7 +681,81 @@ public class NotificationService extends NotificationListenerService {
                 conn.disconnect();
                 
             } catch (Exception e) {
-                Log.e(TAG, "Erreur Telegram", e);
+                Log.e(TAG, "Erreur sendTelegramAlert", e);
+            }
+        }).start();
+    }
+    
+    // =====================================================
+    // MÉTHODES POUR COMPATIBILITÉ (MainActivity, SystemMonitor)
+    // =====================================================
+    
+    /**
+     * Méthode pour traiter une notification depuis MainActivity (bouton test)
+     */
+    public static void processNotification(Context context, String title, String content) {
+        try {
+            String packageName = "com.investing.app"; // App par défaut pour test
+            
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[TEST] Traitement notification test...");
+                MainActivity.instance.addLog("[TEST] Titre: " + title);
+                MainActivity.instance.addLog("[TEST] Contenu: " + content);
+            }
+            
+            // Créer une instance temporaire pour l'analyse
+            NotificationService tempService = new NotificationService();
+            tempService.eventDb = new EventDatabase(context);
+            tempService.eventDetector = new EconomicEventDetector(tempService.eventDb);
+            
+            // Analyser la notification
+            tempService.analyzeNotification(packageName, title, content);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur processNotification", e);
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[TEST] Erreur: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Méthode simplifiée pour envoyer un message Telegram (SystemMonitor)
+     */
+    public static void sendTelegram(String message) {
+        new Thread(() -> {
+            try {
+                String botToken = "7922022330:AAFlkd8Hy4BSCYC6vjy4z_DmEbA8J2RWySs";
+                String chatId = "1166473965";
+                
+                String urlString = "https://api.telegram.org/bot" + botToken + 
+                                  "/sendMessage?chat_id=" + chatId + 
+                                  "&text=" + URLEncoder.encode(message, "UTF-8") +
+                                  "&parse_mode=Markdown";
+                
+                URL url = new URL(urlString);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                
+                int responseCode = conn.getResponseCode();
+                
+                if (MainActivity.instance != null) {
+                    if (responseCode == 200) {
+                        MainActivity.instance.addLog("[TELEGRAM] ✓ Message envoyé");
+                    } else {
+                        MainActivity.instance.addLog("[TELEGRAM] ✗ Erreur " + responseCode);
+                    }
+                }
+                
+                conn.disconnect();
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur sendTelegram", e);
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[TELEGRAM] Erreur: " + e.getMessage());
+                }
             }
         }).start();
     }
@@ -714,7 +790,9 @@ public class NotificationService extends NotificationListenerService {
             channel.setDescription("Alertes de trading importantes");
             
             NotificationManager manager = getSystemService(NotificationManager.class);
-            manager.createNotificationChannel(channel);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
         }
     }
     
