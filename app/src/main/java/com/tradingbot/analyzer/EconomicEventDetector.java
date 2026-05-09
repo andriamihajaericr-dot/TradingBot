@@ -454,168 +454,149 @@ public class EconomicEventDetector {
     // MÉTHODE DE DÉTECTION ULTIME - 35+ TYPES D'ÉVÉNEMENTS
     // =====================================================
     
+    // ... (tout le code existant d'EconomicEventDetector) ...
+    
     public static DetectedEvent detectEvent(String title, String content) {
-        String text = (title + " " + content).toLowerCase().trim();
-        String combined = text;
-
-        String impact = "Neutre";
-        String description = "Événement de marché";
-        String eventType = "News";
-        String indicator = "";
-        String country = "";
-
-        // === DÉTECTION IMPACT GLOBAL ===
-        if (containsAny(combined, "better than expected", "beat", "stronger", "higher than expected",
-                       "surprise à la hausse", "bullish", "risk-on", "soars", "jumps", "surge", "rally")) {
-            impact = "Haussier";
-        } 
-        else if (containsAny(combined, "worse than expected", "miss", "weaker", "lower than expected",
-                            "surprise à la baisse", "sell-off", "risk-off", "plunge", "drops", "tumbles", 
-                            "slump", "crash", "downgraded")) {
-            impact = "Baissier";
-        }
-
-        // ====================== BANQUES CENTRALES ======================
-        if (containsAny(combined, "fed", "fomc", "powell", "jerome powell")) {
-            eventType = "FED"; indicator = "Fed / FOMC"; country = "United States";
-            description = "Décision ou discours Fed";
-        }
-        else if (containsAny(combined, "boe", "bailey", "bank of england", "mpc")) {
-            eventType = "BOE"; country = "United Kingdom";
-            description = "Banque d'Angleterre";
-        }
-        else if (containsAny(combined, "ecb", "lagarde", "draghi")) {
-            eventType = "ECB"; country = "Eurozone";
-            description = "Banque Centrale Européenne";
-        }
-        else if (containsAny(combined, "boj", "ueda", "kuroda", "bank of japan")) {
-            eventType = "BOJ"; country = "Japan";
-            description = "Banque du Japon";
-        }
-        else if (containsAny(combined, "rba", "reserve bank australia", "lowe")) {
-            eventType = "RBA"; country = "Australia";
-            description = "Reserve Bank of Australia";
-        }
-        else if (containsAny(combined, "boc", "bank of canada", "macklem")) {
-            eventType = "BOC"; country = "Canada";
-            description = "Banque du Canada";
-        }
-        else if (containsAny(combined, "pboc", "china central bank", "xi jinping")) {
-            eventType = "PBOC"; country = "China";
-            description = "Banque Populaire de Chine";
-        }
-
-        // ====================== DONNÉES MACRO US ======================
-        else if (containsAny(combined, "nfp", "non-farm payroll", "jobs report", "employment report")) {
-            eventType = "NFP"; indicator = "Non-Farm Payrolls"; country = "United States";
-            description = "Rapport Emploi US";
-        }
-        else if (containsAny(combined, "cpi", "inflation", "core cpi")) {
-            eventType = "CPI"; country = "United States";
-            indicator = combined.contains("core") ? "Core CPI" : "CPI";
-            description = "Indice des Prix à la Consommation";
-        }
-        else if (containsAny(combined, "gdp", "gross domestic product")) {
-            eventType = "GDP"; indicator = "GDP"; country = "United States";
-            description = "Produit Intérieur Brut";
-        }
-        else if (containsAny(combined, "ppi", "producer price index")) {
-            eventType = "PPI"; country = "United States";
-            description = "Indice des Prix à la Production";
-        }
-        else if (containsAny(combined, "pmi", "ism", "purchasing managers")) {
-            eventType = "PMI"; indicator = "PMI/ISM";
-            description = "Indice des Directeurs d'Achat";
-        }
-        else if (containsAny(combined, "retail sales", "consumer spending", "personal spending")) {
-            eventType = "RETAIL"; description = "Ventes au Détail";
-        }
-        else if (containsAny(combined, "jobless claims", "initial claims", "unemployment claims")) {
-            eventType = "CLAIMS"; description = "Demandes d'Allocations Chômage";
-        }
-        else if (containsAny(combined, "housing starts", "building permits", "home sales")) {
-            eventType = "HOUSING"; description = "Données Immobilier";
-        }
-
-        // ====================== EUROPE & AUTRES ======================
-        else if (containsAny(combined, "uk cpi", "uk gdp", "uk pmi", "uk employment")) {
-            eventType = "UK_DATA"; country = "United Kingdom";
-            description = "Données Macro UK";
-        }
-        else if (containsAny(combined, "eurozone", "eu cpi", "eu gdp", "eu pmi", "ifo", "zew")) {
-            eventType = "EU_DATA"; country = "Eurozone";
-            description = "Données Macro Zone Euro";
-        }
-        else if (containsAny(combined, "japan cpi", "japan gdp", "tankan")) {
-            eventType = "JAPAN_DATA"; country = "Japan";
-            description = "Données Macro Japon";
-        }
-
-        // ====================== ÉNERGIE ======================
-        else if (containsAny(combined, "eia", "api", "oil inventory", "crude inventory", "stockpile")) {
-            eventType = "OIL"; indicator = "Stocks Pétroliers"; 
-            description = "Rapport EIA/API";
-        }
-        else if (containsAny(combined, "opec", "opec+")) {
-            eventType = "OPEC"; description = "Décision OPEP+";
-        }
-
-        // ====================== AUTRES ======================
-        else if (containsAny(combined, "beige book", "fomc minutes")) {
-            eventType = "FED"; description = "Beige Book / Minutes FOMC";
-        }
-        else if (containsAny(combined, "vix", "fear index", "volatility")) {
-            eventType = "VOLATILITY"; description = "Indice de Volatilité";
-        }
-        else if (containsAny(combined, "war", "attack", "missile", "strike", "invasion", "nuclear", 
-                            "terror", "conflict", "guerre", "iran", "israel", "ukraine", "russia")) {
-            eventType = "GEOPOLITICS";
-            impact = impact.equals("Neutre") ? "Baissier" : impact;
-            description = "Événement Géopolitique";
-        }
-        else if (containsAny(combined, "bitcoin", "btc", "ethereum", "eth", "crypto", "cryptocurrency")) {
-            eventType = "CRYPTO"; description = "Actualité Cryptomonnaies";
-        }
-        else if (containsAny(combined, "earnings", "eps", "revenue", "guidance", "resultats") &&
-                 containsAny(combined, "apple","microsoft","nvidia","tesla","amazon","meta","alphabet")) {
-            eventType = "EARNINGS"; description = "Résultats Big Tech";
-        }
-        else if (containsAny(combined, "treasury", "yields", "10-year", "30-year", "bond auction")) {
-            eventType = "BONDS"; description = "Marché Obligataire / Yields";
-        }
-
-        // ====================== DÉTECTION PAYS SECONDAIRE ======================
-        if (country.isEmpty()) {
-            if (containsAny(combined, "uk", "britain", "sterling", "pound", "cable", "ftse", "boe"))
-                country = "United Kingdom";
-            else if (containsAny(combined, "euro", "eur", "germany", "france", "italy", "spain", "eurozone", "lagarde"))
-                country = "Eurozone";
-            else if (containsAny(combined, "japan", "jpy", "yen", "boj", "nikkei"))
-                country = "Japan";
-            else if (containsAny(combined, "australia", "aussie", "aud", "rba"))
-                country = "Australia";
-            else if (containsAny(combined, "canada", "cad", "loonie", "boc"))
-                country = "Canada";
-            else if (containsAny(combined, "us", "usa", "america", "fed", "nfp", "cpi"))
-                country = "United States";
-            else if (containsAny(combined, "china", "pboc"))
-                country = "China";
-        }
-        // Création de l'objet
+        String combined = (title + " " + content).toLowerCase();
+        
+        // Détecter le type
+        String eventType = detectEventType(combined);
+        
+        // Détecter l'impact
+        String impact = detectImpact(combined);
+        
+        // Détecter la description
+        String description = title.isEmpty() ? 
+            content.substring(0, Math.min(100, content.length())) : title;
+        
         DetectedEvent event = new DetectedEvent(eventType, impact, description);
-        event.indicator = indicator;
-        event.country = country.isEmpty() ? "Global" : country;
-        event.forecast = "";
-        event.previous = "";
-        event.actual = "";
-
+        
+        // Enrichir avec pays et indicateur
+        event.country = detectCountry(combined);
+        event.indicator = detectIndicator(combined);
+        event.forecast = extractDataPoint(combined, "forecast", "expected", "estimate");
+        event.previous = extractDataPoint(combined, "previous", "prior", "last");
+        event.actual = extractDataPoint(combined, "actual", "came in at", "reported");
+        
         return event;
     }
-
-    private static boolean containsAny(String text, String... keywords) {
-        for (String kw : keywords) {
-            if (text.contains(kw)) return true;
+    
+    private static String detectEventType(String text) {
+        if (text.contains("nfp") || text.contains("payroll") || text.contains("employment")) {
+            return "EMPLOYMENT";
         }
-        return false;
+        if (text.contains("cpi") || text.contains("inflation") || text.contains("pce")) {
+            return "INFLATION";
+        }
+        if (text.contains("fed") || text.contains("fomc") || text.contains("ecb") || 
+            text.contains("boe") || text.contains("rate decision")) {
+            return "CENTRAL_BANK";
+        }
+        if (text.contains("gdp") || text.contains("pmi") || text.contains("retail")) {
+            return "GROWTH";
+        }
+        if (text.contains("oil") || text.contains("eia") || text.contains("crude")) {
+            return "COMMODITY";
+        }
+        return "ECONOMIC";
+    }
+    
+    private static String detectImpact(String text) {
+        int bullishScore = 0;
+        int bearishScore = 0;
+        
+        String[] bullishWords = {"rally", "surge", "gain", "up", "rise", "increase", 
+                                "better than expected", "beat", "positive", "strong"};
+        String[] bearishWords = {"fall", "drop", "decline", "down", "decrease", 
+                                "worse than expected", "miss", "negative", "weak"};
+        
+        for (String word : bullishWords) {
+            if (text.contains(word)) bullishScore++;
+        }
+        for (String word : bearishWords) {
+            if (text.contains(word)) bearishScore++;
+        }
+        
+        if (bullishScore > bearishScore) return "Haussier";
+        if (bearishScore > bullishScore) return "Baissier";
+        return "Neutre";
+    }
+    
+    private static String detectCountry(String text) {
+        if (text.contains("us ") || text.contains("usa") || text.contains("united states")) {
+            return "United States";
+        }
+        if (text.contains("uk ") || text.contains("britain") || text.contains("united kingdom")) {
+            return "United Kingdom";
+        }
+        if (text.contains("eurozone") || text.contains("euro area") || text.contains("germany")) {
+            return "Eurozone";
+        }
+        if (text.contains("japan")) return "Japan";
+        if (text.contains("australia")) return "Australia";
+        if (text.contains("canada")) return "Canada";
+        return null;
+    }
+    
+    private static String detectIndicator(String text) {
+        if (text.contains("nfp") || text.contains("non-farm payroll")) return "Non-Farm Payrolls";
+        if (text.contains("cpi")) return "Consumer Price Index";
+        if (text.contains("gdp")) return "Gross Domestic Product";
+        if (text.contains("pmi")) return "Purchasing Managers Index";
+        if (text.contains("fomc")) return "FOMC Meeting";
+        if (text.contains("retail sales")) return "Retail Sales";
+        return null;
+    }
+    
+    private static String extractDataPoint(String text, String... keywords) {
+        for (String keyword : keywords) {
+            int index = text.indexOf(keyword);
+            if (index != -1) {
+                String substr = text.substring(index);
+                Pattern pattern = Pattern.compile("[-+]?\\d+\\.?\\d*%?");
+                Matcher matcher = pattern.matcher(substr);
+                if (matcher.find()) {
+                    return matcher.group();
+                }
+            }
+        }
+        return null;
+    }
+    
+    // =====================================================
+    // ✨ CLASSE DÉTECTÉE EVENT
+    // =====================================================
+    
+    public static class DetectedEvent {
+        public String eventType;
+        public String impact;
+        public String description;
+        public String country;
+        public String indicator;
+        public String forecast;
+        public String previous;
+        public String actual;
+        
+        public DetectedEvent(String eventType, String impact, String description) {
+            this.eventType = eventType;
+            this.impact = impact;
+            this.description = description;
+            this.country = null;
+            this.indicator = null;
+            this.forecast = null;
+            this.previous = null;
+            this.actual = null;
+        }
+        
+        public String getDescription() {
+            if (indicator != null && country != null) {
+                return country + " " + indicator;
+            }
+            return description;
+        }
+        
+        public boolean shouldNotify() {
+            return "Haussier".equals(impact) || "Baissier".equals(impact);
+        }
     }
 }
