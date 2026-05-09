@@ -4,6 +4,9 @@ import android.util.Log;
 import java.util.*;
 import java.util.regex.Pattern;     // ← AJOUTE CETTE LIGNE
 import java.util.regex.Matcher;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
 
 public class EconomicEventDetector {
 
@@ -79,6 +82,24 @@ public class EconomicEventDetector {
             
         } catch (Exception e) {
             Log.e(TAG, "Erreur checkRecentEvents", e);
+        }
+    }
+    // =====================================================
+    // FORMATAGE HEURE PRÉCISE (EAT + ET)
+    // =====================================================
+    
+    private String formatEventTime(String timestampStr) {
+        try {
+            long timestamp = Long.parseLong(timestampStr) * 1000;
+            SimpleDateFormat sdfEAT = new SimpleDateFormat("dd/MM HH:mm 'EAT'", Locale.getDefault());
+            SimpleDateFormat sdfET = new SimpleDateFormat("HH:mm 'ET'", Locale.getDefault());
+            
+            sdfEAT.setTimeZone(TimeZone.getTimeZone("Africa/Nairobi")); // EAT
+            sdfET.setTimeZone(TimeZone.getTimeZone("America/New_York")); // ET
+            
+            return sdfEAT.format(new Date(timestamp)) + " (" + sdfET.format(new Date(timestamp)) + ")";
+        } catch (Exception e) {
+            return timestampStr + " (heure inconnue)";
         }
     }
     
