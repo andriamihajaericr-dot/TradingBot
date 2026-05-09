@@ -1124,6 +1124,24 @@ public class NotificationService extends NotificationListenerService {
     public static void sendTelegram(String message) {
         sendTelegramWithRetry(message, 0);
     }
+        // Méthode appelée par EconomicEventDetector
+    public static void sendTelegramAlert(String country,
+                                         List<String> assets,
+                                         String shortTitle,
+                                         String fullMessage,
+                                         String importance,
+                                         int confidence) {
+        
+        StringBuilder msg = new StringBuilder();
+        msg.append("🔔 **").append(shortTitle).append("**\n\n");
+        msg.append(fullMessage);
+        
+        if (confidence > 0) {
+            msg.append("\n\n**Confiance :** ").append(confidence).append("%");
+        }
+        
+        sendTelegram(msg.toString());
+    }  
     
     private static void sendTelegramWithRetry(String message, int attempt) {
         if (attempt >= 3) {
