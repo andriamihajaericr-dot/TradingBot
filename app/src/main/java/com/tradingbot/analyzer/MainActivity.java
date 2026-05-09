@@ -16,8 +16,8 @@ import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static String CLAUDE_API_KEY   = "";
-    public static String TELEGRAM_TOKEN   = "";
+    public static String CLAUDE_API_KEY = "";
+    public static String TELEGRAM_TOKEN = "";
     public static String TELEGRAM_CHAT_ID = "";
     public static MainActivity instance;
 
@@ -34,143 +34,159 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         instance = this;
 
-        statusText          = findViewById(R.id.statusText);
-        botSwitch           = findViewById(R.id.botSwitch);
-        logText             = findViewById(R.id.logText);
-        apiKeyInput         = findViewById(R.id.apiKeyInput);
-        telegramTokenInput  = findViewById(R.id.telegramTokenInput);
+        // Initialisation des vues
+        statusText = findViewById(R.id.statusText);
+        logText = findViewById(R.id.logText);
+        botSwitch = findViewById(R.id.botSwitch);
+        apiKeyInput = findViewById(R.id.apiKeyInput);
+        telegramTokenInput = findViewById(R.id.telegramTokenInput);
         telegramChatIdInput = findViewById(R.id.telegramChatIdInput);
-        Button saveBtn      = findViewById(R.id.saveBtn);
-        Button permBtn      = findViewById(R.id.permBtn);
-        Button testBtn      = findViewById(R.id.testBtn);
+
+        Button saveBtn = findViewById(R.id.saveBtn);
+        Button permBtn = findViewById(R.id.permBtn);
+        Button testBtn = findViewById(R.id.testBtn);
 
         loadSavedKeys();
         updateStatus();
 
+        // Listeners
         saveBtn.setOnClickListener(v -> saveKeys());
 
         permBtn.setOnClickListener(v ->
             startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         );
 
-        testBtn.setOnClickListener(v -> {
-            addLog("🧪 Test en cours...");
-            new Thread(() -> NotificationService.processNotification(
-                this, "Test",
-                "BREAKING: Federal Reserve raises interest rates by 50bps in emergency meeting. Gold surges."
-            )).start();
-        });
+        testBtn.setOnClickListener(v -> testNotification());
 
         botSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
             if (isChecked && !isPermissionGranted()) {
-                Toast.makeText(this, "Active d'abord la permission notifications !", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "❌ Active d'abord la permission Notification Listener !", Toast.LENGTH_LONG).show();
                 botSwitch.setChecked(false);
                 return;
             }
+
             getPrefs().edit().putBoolean("bot_active", isChecked).apply();
             updateStatus();
-            addLog(isChecked ? "✅ Bot démarré" : "⛔ Bot arrêté");
+            addLog(isChecked ? "✅ Bot démarré - Surveillance active" : "⛔ Bot arrêté");
+
+            if (isChecked) {
+                startNotificationService();
+            }
         });
 
-        botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
+        // Initialisation du détecteur
+        eventDb = new EventDatabase(this);
+        eventDetector = new EconomicEventDetector(eventDb);
 
-            // Initialiser le détecteur
-            eventDb = new EventDatabase(this);
-            eventDetector = new EconomicEventDetector(eventDb);
-        
-            // Lancer vérification périodique du calendrier
-            startCalendarMonitoring();
+        // Lancer le monitoring calendrier
+        startCalendarMonitoring();
+
+        addLog("🚀 TradingBot initialisé avec succès");
     }
-     
+
+    private void testNotification() {
+        addLog("🧪 Envoi d'un test...");
+        new Thread(() -> {
+            NotificationService.processNotification(
+                this, 
+                "Test System", 
+                "BREAKING: Federal Reserve raises interest rates by 50bps. Gold surges +1.8%, USDJPY drops."
+            );
+        }).start();
+    }
+
+    private void startNotificationService() {
+        Intent intent = new Intent(this, NotificationService.class);
+        startService(intent);
+    }
+
     private void startCalendarMonitoring() {
-        calendarCheckTimer = new Timer();
-    
-        // Vérifier événements à venir toutes les 30 minutes
+        if (calendarCheckTimer != null) calendarCheckTimer.cancel();
+
+        calendarCheckTimer = new Timer(true);
+
+        // Vérification événements à venir
         calendarCheckTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                eventDetector.checkUpcomingEvents();
+                if (eventDetector != null) {
+                    try {
+                        eventDetector.checkUpcomingEvents();
+                    } catch (Exception e) {
+                        addLog("[ERROR] checkUpcomingEvents: " + e.getMessage());
+                    }
+                }
             }
-        }, 0, 30 * 60 * 1000); // 0 = immédiat, 30min intervalle
-    
-        // Vérifier événements récents toutes les 5 minutes
+        }, 5000, 15 * 60 * 1000); // Toutes les 15 minutes
+
+        // Vérification événements récents
         calendarCheckTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                eventDetector.checkRecentEvents();
+                if (eventDetector != null) {
+                    try {
+                        eventDetector.checkRecentEvents();
+                    } catch (Exception e) {
+                        addLog("[ERROR] checkRecentEvents: " + e.getMessage());
+                    }
+                }
             }
-        }, 60 * 1000, 5 * 60 * 1000); // 1min délai, 5min intervalle
-    
-        addLog("[MAIN] Monitoring calendrier démarré");
-    }
-    
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-    
-        if (calendarCheckTimer != null) {
-            calendarCheckTimer.cancel();
-        }
+        }, 10000, 5 * 60 * 1000); // Toutes les 5 minutes
+
+        addLog("[MAIN] ✅ Monitoring calendrier démarré (15min + 5min)");
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        instance = this;
-        updateStatus();
-    }
+    private void loadSavedKeys() {
+        SharedPreferences p = getPrefs();
+        CLAUDE_API_KEY = p.getString("claude_key", "");
+        TELEGRAM_TOKEN = p.getString("tg_token", "");
+        TELEGRAM_CHAT_ID = p.getString("tg_chat_id", "");
 
-    private boolean isPermissionGranted() {
-        Set<String> pkgs = NotificationManagerCompat.getEnabledListenerPackages(this);
-        return pkgs.contains(getPackageName());
-    }
-
-    private void updateStatus() {
-        boolean active = getPrefs().getBoolean("bot_active", false);
-        boolean perm   = isPermissionGranted();
-        
-        if (!perm) {
-            statusText.setText("⚠️ Permission notifications requise");
-        } else if (active) {
-            statusText.setText("🟢 Bot actif — En écoute...");
-        } else {
-            statusText.setText("🔴 Bot inactif — Appuie sur le switch");
-        }
+        apiKeyInput.setText(CLAUDE_API_KEY);
+        telegramTokenInput.setText(TELEGRAM_TOKEN);
+        telegramChatIdInput.setText(TELEGRAM_CHAT_ID);
     }
 
     private void saveKeys() {
         String k = apiKeyInput.getText().toString().trim();
         String t = telegramTokenInput.getText().toString().trim();
         String c = telegramChatIdInput.getText().toString().trim();
-        
+
         if (k.isEmpty() || t.isEmpty() || c.isEmpty()) {
-            Toast.makeText(this, "Remplis toutes les clés !", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "❌ Remplis toutes les clés !", Toast.LENGTH_SHORT).show();
             return;
         }
-        
+
         getPrefs().edit()
                 .putString("claude_key", k)
                 .putString("tg_token", t)
                 .putString("tg_chat_id", c)
                 .apply();
-        
+
         CLAUDE_API_KEY = k;
         TELEGRAM_TOKEN = t;
         TELEGRAM_CHAT_ID = c;
-        
-        Toast.makeText(this, "✅ Clés sauvegardées !", Toast.LENGTH_SHORT).show();
-        addLog("✅ Clés API configurées");
+
+        Toast.makeText(this, "✅ Clés sauvegardées", Toast.LENGTH_SHORT).show();
+        addLog("💾 Clés API mises à jour");
     }
 
-    private void loadSavedKeys() {
-        SharedPreferences p = getPrefs();
-        CLAUDE_API_KEY   = p.getString("claude_key", "");
-        TELEGRAM_TOKEN   = p.getString("tg_token", "");
-        TELEGRAM_CHAT_ID = p.getString("tg_chat_id", "");
-        
-        apiKeyInput.setText(CLAUDE_API_KEY);
-        telegramTokenInput.setText(TELEGRAM_TOKEN);
-        telegramChatIdInput.setText(TELEGRAM_CHAT_ID);
+    private boolean isPermissionGranted() {
+        return NotificationManagerCompat.getEnabledListenerPackages(this)
+                .contains(getPackageName());
+    }
+
+    private void updateStatus() {
+        boolean active = getPrefs().getBoolean("bot_active", false);
+        boolean perm = isPermissionGranted();
+
+        if (!perm) {
+            statusText.setText("⚠️ Permission Notification Listener requise");
+        } else if (active) {
+            statusText.setText("🟢 Bot Actif - Surveillance en cours");
+        } else {
+            statusText.setText("🔴 Bot Inactif");
+        }
     }
 
     private SharedPreferences getPrefs() {
@@ -180,8 +196,22 @@ public class MainActivity extends AppCompatActivity {
     public void addLog(String message) {
         runOnUiThread(() -> {
             String ts = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-            String cur = logText.getText().toString();
-            logText.setText("[" + ts + "] " + message + "\n" + cur);
+            logText.append("[" + ts + "] " + message + "\n");
+
+            // Limiter le nombre de lignes
+            if (logText.getLineCount() > 300) {
+                String text = logText.getText().toString();
+                logText.setText(text.substring(text.indexOf("\n") + 1));
+            }
         });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (calendarCheckTimer != null) {
+            calendarCheckTimer.cancel();
+        }
+        instance = null;
     }
 }
