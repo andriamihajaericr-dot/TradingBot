@@ -1137,6 +1137,10 @@ public class NotificationService extends NotificationListenerService {
     // ENVOI TELEGRAM
     // =====================================================
     
+        // =====================================================
+    // ENVOI TELEGRAM (À METTRE À LA FIN DU FICHIER)
+    // =====================================================
+
     public static void sendTelegram(String message) {
         sendTelegramWithRetry(message, 0);
     }
@@ -1158,14 +1162,14 @@ public class NotificationService extends NotificationListenerService {
                 msg.append("\n\n**Confiance :** ").append(confidence).append("%");
             }
             
-            // Ajout d'un séparateur clair
+            // Horodatage clair
             msg.append("\n\n_").append(new SimpleDateFormat("dd/MM HH:mm").format(new Date())).append("_");
             
             sendTelegram(msg.toString());
             
         } catch (Exception e) {
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[TG ALERT] Erreur construction: " + e.getMessage());
+                MainActivity.instance.addLog("[TG ALERT] Erreur: " + e.getMessage());
         }
     }
 
@@ -1200,12 +1204,13 @@ public class NotificationService extends NotificationListenerService {
                 MainActivity.instance.addLog("[TG] Erreur (retry " + (attempt+1) + "): " + e.getMessage());
             
             try {
-                Thread.sleep(1500 * (long)Math.pow(2, attempt)); // Backoff exponentiel
+                Thread.sleep(2000 * (long)Math.pow(2, attempt));
             } catch (InterruptedException ie) {}
             
             sendTelegramWithRetry(message, attempt + 1);
         }
     }
+
     private static void showLocalNotif(Context ctx, String assets, 
                                       String analysis, String impact) {
         NotificationManager nm = (NotificationManager)
