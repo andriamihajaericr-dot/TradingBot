@@ -341,47 +341,11 @@ public class EconomicEventDetector {
     // ALERTES
     // =====================================================
     
-    private void sendUpcomingEventAlert(EconomicCalendarAPI.CalendarEvent event, 
-                                        long timeUntilEvent) {
-        try {
-            int minutesUntil = (int) (timeUntilEvent / (60 * 1000));
-            
-            StringBuilder message = new StringBuilder();
-            message.append("⏰ **ÉVÉNEMENT IMMINENT**\n\n");
-            message.append("**Dans ").append(minutesUntil).append(" minutes**\n\n");
-            message.append("**Pays:** ").append(event.country).append("\n");
-            message.append("**Événement:** ").append(event.indicator).append("\n");
-            message.append("**Importance:** ").append(event.importance).append("\n");
-            message.append("**Forecast:** ").append(event.forecast).append("\n");
-            message.append("**Previous:** ").append(event.previous).append("\n\n");
-            message.append("**Actifs impactés:**\n");
-            
-            for (int i = 0; i < Math.min(4, event.affectedAssets.size()); i++) {
-                message.append("  ").append(i + 1).append(". ")
-                       .append(event.affectedAssets.get(i)).append("\n");
-            }
-            
-            NotificationService.sendTelegramAlert(
-                event.country,
-                event.affectedAssets,
-                "⏰ " + event.indicator + " dans " + minutesUntil + "min",
-                message.toString(),
-                event.importance,
-                95
-            );
-            
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog(
-                    "[ALERT] Événement imminent envoyé: " + event.indicator
-                );
-            }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur sendUpcomingEventAlert", e);
-        }
-    }
+        // =====================================================
+    // ALERTES (Version corrigée - une seule version de chaque)
+    // =====================================================
     
-        private void sendUpcomingEventAlert(EconomicCalendarAPI.CalendarEvent event, 
+    private void sendUpcomingEventAlert(EconomicCalendarAPI.CalendarEvent event, 
                                         long timeUntilEvent) {
         try {
             int minutesUntil = (int) (timeUntilEvent / (60 * 1000));
@@ -414,7 +378,7 @@ public class EconomicEventDetector {
             );
 
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[ALERT] Événement imminent envoyé → " + event.indicator);
+                MainActivity.instance.addLog("[ALERT] Événement imminent → " + event.indicator);
             }
             
         } catch (Exception e) {
@@ -422,24 +386,50 @@ public class EconomicEventDetector {
         }
     }
     
+    private void sendCorrelatedAlert(EconomicCalendarAPI.CalendarEvent calendarEvent, 
+                                     EventDatabase.StoredEvent notification) {
+        try {
+            StringBuilder message = new StringBuilder();
+            message.append("🔗 **CORRÉLATION DÉTECTÉE**\n\n");
+            message.append("**Calendrier :** ").append(calendarEvent.country)
+                   .append(" - ").append(calendarEvent.indicator).append("\n\n");
+            message.append("**Notification :** ").append(notification.appName)
+                   .append(" - ").append(notification.title).append("\n\n");
+            message.append("**Actifs communs :** ").append(notification.assets).append("\n\n");
+            message.append("**Confiance :** ").append(notification.confidence)
+                   .append("% → ").append(Math.min(100, notification.confidence + 15)).append("%");
+
+            NotificationService.sendTelegramAlert(
+                calendarEvent.country,
+                calendarEvent.affectedAssets,
+                "🔗 Corrélation: " + calendarEvent.indicator,
+                message.toString(),
+                "HIGH",
+                90
+            );
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur sendCorrelatedAlert", e);
+        }
+    }
+    
     private void sendAssetHighActivityAlert(String asset, int highCount, 
                                             List<EventDatabase.StoredEvent> events) {
         try {
             StringBuilder message = new StringBuilder();
-            message.append("⚠️ **FORTE ACTIVITÉ DÉTECTÉE**\n\n");
-            message.append("**Actif:** ").append(asset).append("\n");
-            message.append("**Événements HIGH:** ").append(highCount).append("\n\n");
-            message.append("**Derniers événements:**\n");
+            message.append("⚠️ **FORTE ACTIVITÉ SUR ").append(asset).append("**\n\n");
+            message.append("**Événements HIGH :** ").append(highCount).append("\n\n");
+            message.append("**Derniers événements :**\n");
             
             for (int i = 0; i < Math.min(3, events.size()); i++) {
                 EventDatabase.StoredEvent evt = events.get(i);
-                message.append("  • ").append(evt.title).append("\n");
+                message.append("• ").append(evt.title).append("\n");
             }
-            
+
             NotificationService.sendTelegramAlert(
                 "Multiple",
                 Arrays.asList(asset),
-                "⚠️ Forte activité sur " + asset,
+                "⚠️ Forte activité " + asset,
                 message.toString(),
                 "HIGH",
                 85
