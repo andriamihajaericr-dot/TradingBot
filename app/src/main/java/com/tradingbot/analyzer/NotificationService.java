@@ -1141,62 +1141,38 @@ public class NotificationService extends NotificationListenerService {
     private static String analyzeWithGroq(String text, String assets, 
                                          EconomicEventDetector.DetectedEvent event,
                                          String combinedContext) {
+        return analyzeWithGroqEnhanced(text, assets, event, combinedContext, false);
+    }
+    
+    private static String analyzeWithGroqEnhanced(String text, String assets, 
+                                                  EconomicEventDetector.DetectedEvent event,
+                                                  String combinedContext,
+                                                  boolean isDriverChange) {
         try {
             if (MainActivity.CLAUDE_API_KEY == null || 
                 MainActivity.CLAUDE_API_KEY.trim().isEmpty()) {
                 return "Clé Groq API non configurée";
             }
 
-            StringBuilder prompt = new StringBuilder();
-            prompt.append("Tu es analyste financier expert en trading.\n\n");
-            
-            if (combinedContext != null) {
-                prompt.append(combinedContext).append("\n");
-            }
-            
-            prompt.append("ÉVÉNEMENT ").append(event.eventType.toUpperCase()).append(":\n");
-            if (event.indicator != null) {
-                prompt.append("Indicateur: ").append(event.indicator).append("\n");
-            }
-            if (event.country != null) {
-                prompt.append("Pays: ").append(event.country).append("\n");
-            }
-            if (event.forecast != null) {
-                prompt.append("Prévision: ").append(event.forecast).append("\n");
-            }
-            if (event.previous != null) {
-                prompt.append("Précédent: ").append(event.previous).append("\n");
-            }
-            if (event.actual != null) {
-                prompt.append("Actuel: ").append(event.actual).append("\n");
-            }
-            
-            prompt.append("\nIMPORTANT: Impact général détecté = ").append(event.impact);
-            prompt.append("\nCeci est l'impact MACRO. Analyse maintenant l'impact SPÉCIFIQUE par actif.\n");
-            prompt.append("Exemple: Si impact général = Baissier (risk-off), alors:\n");
-            prompt.append("- GOLD: HAUSSIER (valeur refuge)\n");
-            prompt.append("- NASDAQ: BAISSIER (aversion au risque)\n");
-            prompt.append("- USD: peut être HAUSSIER (dollar fort)\n\n");
-            
-            prompt.append("News: \"").append(text).append("\"\n");
-            prompt.append("Actifs à analyser: ").append(assets).append("\n\n");
-            
-            prompt.append("Donne une analyse TRÈS COURTE pour CHAQUE actif listé:\n");
-            prompt.append("Format strict par actif (max 2 lignes):\n");
-            prompt.append("[ACTIF]: IMPACT (Haussier/Baissier) → SIGNAL (BUY/SELL/WAIT) - Raison en 1 phrase\n\n");
-            prompt.append("Exemple:\n");
-            prompt.append("GOLD: Haussier → BUY - Valeur refuge en période de tensions\n");
-            prompt.append("NASDAQ: Baissier → SELL - Risk-off favorise sortie des tech\n\n");
-            prompt.append("RÉSUMÉ FINAL: Liste compacte [actif→signal]");
+            // ✨ NOUVEAU: Utiliser le prompt amélioré
+            String enhancedPrompt = buildEnhancedPrompt(
+                text, assets, event, combinedContext, isDriverChange
+            );
 
             JSONObject systemMsg = new JSONObject();
             systemMsg.put("role", "system");
-            systemMsg.put("content", "Analyste financier expert. Réponds en français, " +
-                "ultra concis (max 2 lignes par actif). Différencie impact MACRO vs SPÉCIFIQUE.");
+            systemMsg.put("content", 
+                "Tu es un analyste financier expert avec 15 ans d'expérience en trading institutionnel. " +
+                "Tu comprends parfaitement les corrélations entre actifs, les réactions de marché aux données macro, " +
+                "et la différence entre sentiment macro global et impacts spécifiques par actif. " +
+                "Réponds en français, de manière ultra concise mais précise. " +
+                "CRITIQUE: Différencie TOUJOURS l'impact macro global de l'impact spécifique par actif. " +
+                "Exemple: Un événement baissier macro (risk-off) peut être HAUSSIER pour GOLD et JPY (refuges)."
+            );
 
             JSONObject userMsg = new JSONObject();
             userMsg.put("role", "user");
-            userMsg.put("content", prompt.toString());
+            userMsg.put("content", enhancedPrompt);
 
             JSONArray messages = new JSONArray();
             messages.put(systemMsg);
@@ -1205,8 +1181,8 @@ public class NotificationService extends NotificationListenerService {
             JSONObject body = new JSONObject();
             body.put("model", GROQ_MODEL);
             body.put("messages", messages);
-            body.put("max_tokens", 1024);
-            body.put("temperature", 0.3);
+            body.put("max_tokens", 1500); // ✨ Augmenté pour plus de détails
+            body.put("temperature", 0.25); // ✨ Réduit pour plus de précision
 
             return callGroqAPI(body.toString());
 
