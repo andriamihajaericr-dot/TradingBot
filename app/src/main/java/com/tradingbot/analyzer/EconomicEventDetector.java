@@ -381,34 +381,44 @@ public class EconomicEventDetector {
         }
     }
     
-    private void sendCorrelatedAlert(EconomicCalendarAPI.CalendarEvent calendarEvent, 
-                                     EventDatabase.StoredEvent notification) {
+        private void sendUpcomingEventAlert(EconomicCalendarAPI.CalendarEvent event, 
+                                        long timeUntilEvent) {
         try {
+            int minutesUntil = (int) (timeUntilEvent / (60 * 1000));
+            String formattedTime = formatEventTime(event.timestamp);
+
             StringBuilder message = new StringBuilder();
-            message.append("🔗 **CORRÉLATION DÉTECTÉE**\n\n");
-            message.append("**Calendrier économique:**\n");
-            message.append(calendarEvent.country).append(" - ")
-                   .append(calendarEvent.indicator).append("\n\n");
-            message.append("**Notification reçue:**\n");
-            message.append(notification.appName).append(" - ")
-                   .append(notification.title).append("\n\n");
-            message.append("**Actifs communs:**\n");
-            message.append(notification.assets).append("\n\n");
-            message.append("**Confiance augmentée:** ")
-                   .append(notification.confidence).append("% → ")
-                   .append(Math.min(100, notification.confidence + 15)).append("%");
+            message.append("⏰ **ÉVÉNEMENT IMMINENT**\n\n");
+            message.append("**Heure :** ").append(formattedTime).append("\n");
+            message.append("**Dans :** ").append(minutesUntil).append(" minutes\n\n");
+            message.append("**Pays :** ").append(event.country).append("\n");
+            message.append("**Événement :** ").append(event.indicator).append("\n");
+            message.append("**Importance :** ").append(event.importance).append("\n");
             
+            if (event.forecast != null && !event.forecast.isEmpty() && !"N/A".equals(event.forecast)) {
+                message.append("**Prévision :** ").append(event.forecast).append("\n");
+            }
+            if (event.previous != null && !event.previous.isEmpty() && !"N/A".equals(event.previous)) {
+                message.append("**Précédent :** ").append(event.previous).append("\n");
+            }
+            
+            message.append("\n**Actifs impactés :** ").append(String.join(", ", event.affectedAssets));
+
             NotificationService.sendTelegramAlert(
-                calendarEvent.country,
-                calendarEvent.affectedAssets,
-                "🔗 Corrélation: " + calendarEvent.indicator,
+                event.country,
+                event.affectedAssets,
+                "⏰ " + event.indicator,
                 message.toString(),
-                "HIGH",
-                90
+                event.importance,
+                92
             );
+
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[ALERT] Événement imminent envoyé → " + event.indicator);
+            }
             
         } catch (Exception e) {
-            Log.e(TAG, "Erreur sendCorrelatedAlert", e);
+            Log.e(TAG, "Erreur sendUpcomingEventAlert", e);
         }
     }
     
