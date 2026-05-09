@@ -25,7 +25,8 @@ public class EconomicEventDetector {
     public void checkUpcomingEvents() {
         try {
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[DETECTOR] Vérification événements à venir...");
+                MainActivity.instance.addLog("[DETECTOR] Vérification événements à venir..."
+                );
             }
             
             // Récupérer événements des prochaines 24h depuis l'API
