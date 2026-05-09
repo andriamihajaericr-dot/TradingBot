@@ -1133,16 +1133,42 @@ public class NotificationService extends NotificationListenerService {
                                          int confidence) {
         
         StringBuilder msg = new StringBuilder();
-        msg.append("🔔 **").append(shortTitle).append("**\n\n");
-        msg.append(fullMessage);
-        
-        if (confidence > 0) {
-            msg.append("\n\n**Confiance :** ").append(confidence).append("%");
-        }
-        
-        sendTelegram(msg.toString());
-    }  
+    // =====================================================
+    // ENVOI TELEGRAM
+    // =====================================================
     
+    public static void sendTelegram(String message) {
+        sendTelegramWithRetry(message, 0);
+    }
+
+    // Méthode appelée par EconomicEventDetector
+    public static void sendTelegramAlert(String country,
+                                         List<String> assets,
+                                         String shortTitle,
+                                         String fullMessage,
+                                         String importance,
+                                         int confidence) {
+        
+        try {
+            StringBuilder msg = new StringBuilder();
+            msg.append("🔔 **").append(shortTitle).append("**\n\n");
+            msg.append(fullMessage);
+            
+            if (confidence > 0) {
+                msg.append("\n\n**Confiance :** ").append(confidence).append("%");
+            }
+            
+            // Ajout d'un séparateur clair
+            msg.append("\n\n_").append(new SimpleDateFormat("dd/MM HH:mm").format(new Date())).append("_");
+            
+            sendTelegram(msg.toString());
+            
+        } catch (Exception e) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[TG ALERT] Erreur construction: " + e.getMessage());
+        }
+    }
+
     private static void sendTelegramWithRetry(String message, int attempt) {
         if (attempt >= 3) {
             if (MainActivity.instance != null)
@@ -1158,30 +1184,28 @@ public class NotificationService extends NotificationListenerService {
                 "&parse_mode=Markdown");
             
             HttpURLConnection c = (HttpURLConnection) url.openConnection();
-            c.setConnectTimeout(10000);
-            c.setReadTimeout(10000);
+            c.setConnectTimeout(15000);
+            c.setReadTimeout(15000);
             int code = c.getResponseCode();
             c.disconnect();
             
             if (code == 200) {
                 if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("[TG] Envoyé OK");
+                    MainActivity.instance.addLog("[TG] ✅ Envoyé avec succès");
             } else {
                 throw new IOException("HTTP " + code);
             }
         } catch (Exception e) {
             if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[TG] Erreur (retry " + (attempt+1) + "): " + 
-                    e.getMessage());
+                MainActivity.instance.addLog("[TG] Erreur (retry " + (attempt+1) + "): " + e.getMessage());
             
             try {
-                Thread.sleep(1000 * (long)Math.pow(3, attempt));
+                Thread.sleep(1500 * (long)Math.pow(2, attempt)); // Backoff exponentiel
             } catch (InterruptedException ie) {}
             
             sendTelegramWithRetry(message, attempt + 1);
         }
     }
-
     private static void showLocalNotif(Context ctx, String assets, 
                                       String analysis, String impact) {
         NotificationManager nm = (NotificationManager)
