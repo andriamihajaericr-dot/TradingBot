@@ -57,7 +57,144 @@ public class NotificationService extends NotificationListenerService {
         "com.investing.app",
         "com.reuters.news"
     );
-
+    // =====================================================
+    // ✨ NOUVEAU : PROMPT AMÉLIORÉ AVEC CONTEXTE TEMPS RÉEL
+    // =====================================================
+    
+    private static String buildEnhancedPrompt(String text, String assets, 
+                                              EconomicEventDetector.DetectedEvent event,
+                                              String combinedContext,
+                                              boolean isDriverChange) {
+        StringBuilder prompt = new StringBuilder();
+        
+        // En-tête contexte
+        prompt.append("Tu es analyste financier expert en trading temps réel.\n\n");
+        
+        // NOUVEAU: Indication si changement de driver
+        if (isDriverChange) {
+            prompt.append("⚠️ NOUVEAU DRIVER MAJEUR DÉTECTÉ - Analyse URGENTE requise\n");
+            prompt.append("Ce driver peut CHANGER LA DIRECTION DU MARCHÉ.\n\n");
+        }
+        
+        // Contexte combiné si événements liés
+        if (combinedContext != null && !combinedContext.isEmpty()) {
+            prompt.append("CONTEXTE MULTI-ÉVÉNEMENTS:\n");
+            prompt.append(combinedContext).append("\n");
+        }
+        
+        // Détails de l'événement
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append("ÉVÉNEMENT ").append(event.eventType.toUpperCase()).append("\n");
+        prompt.append("═══════════════════════════════════════\n\n");
+        
+        if (event.country != null) {
+            prompt.append("🌍 Pays: ").append(event.country).append("\n");
+        }
+        if (event.indicator != null) {
+            prompt.append("📊 Indicateur: ").append(event.indicator).append("\n");
+        }
+        
+        // Données macro CRITIQUES
+        boolean hasData = false;
+        if (event.forecast != null && !event.forecast.isEmpty()) {
+            prompt.append("🎯 Prévision: ").append(event.forecast).append("\n");
+            hasData = true;
+        }
+        if (event.previous != null && !event.previous.isEmpty()) {
+            prompt.append("📋 Précédent: ").append(event.previous).append("\n");
+            hasData = true;
+        }
+        if (event.actual != null && !event.actual.isEmpty()) {
+            prompt.append("✅ Actuel: ").append(event.actual).append("\n");
+            hasData = true;
+            
+            // CALCUL AUTOMATIQUE DE LA SURPRISE
+            if (event.forecast != null && !event.forecast.isEmpty()) {
+                prompt.append("\n⚡ SURPRISE: Calculer l'écart entre Actuel et Prévision\n");
+                prompt.append("   → Si écart > 0.3%, c'est SIGNIFICATIF\n");
+                prompt.append("   → Si écart > 0.5%, c'est MAJEUR\n");
+            }
+        }
+        
+        if (hasData) {
+            prompt.append("\n");
+        }
+        
+        // Impact macro détecté
+        prompt.append("📈 Impact Général Détecté: ").append(event.impact).append("\n");
+        prompt.append("⚠️ IMPORTANT: Ceci est l'impact MACRO global.\n");
+        prompt.append("Tu dois maintenant analyser l'impact SPÉCIFIQUE par actif.\n\n");
+        
+        // Exemples de divergence macro vs actifs
+        prompt.append("RÈGLE CRITIQUE - Différenciation Macro vs Actifs:\n");
+        prompt.append("────────────────────────────────────────\n");
+        prompt.append("Si impact macro = Baissier (risk-off):\n");
+        prompt.append("  ✓ GOLD: HAUSSIER (refuge)\n");
+        prompt.append("  ✓ JPY: HAUSSIER (refuge)\n");
+        prompt.append("  ✓ NASDAQ/SP500: BAISSIER (fuite des actions)\n");
+        prompt.append("  ✓ USD: peut être HAUSSIER (dollar fort)\n\n");
+        
+        prompt.append("Si CPI > Prévision (inflation forte):\n");
+        prompt.append("  ✓ GOLD: HAUSSIER (couverture inflation)\n");
+        prompt.append("  ✓ USD: HAUSSIER (Fed hawkish)\n");
+        prompt.append("  ✓ EURUSD/GBPUSD: BAISSIER (USD fort)\n");
+        prompt.append("  ✓ Stocks: BAISSIER (crainte hausse taux)\n\n");
+        
+        prompt.append("Si NFP > Prévision (emploi fort):\n");
+        prompt.append("  ✓ USD: HAUSSIER (économie forte)\n");
+        prompt.append("  ✓ Stocks: peut être HAUSSIER (croissance)\n");
+        prompt.append("  ✓ GOLD: BAISSIER (moins de besoin refuge)\n\n");
+        
+        // Contenu de la news
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append("CONTENU COMPLET DE LA NEWS:\n");
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append(text).append("\n\n");
+        
+        // Actifs à analyser
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append("ACTIFS À ANALYSER:\n");
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append(assets).append("\n\n");
+        
+        // Instructions de format
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append("FORMAT DE RÉPONSE REQUIS:\n");
+        prompt.append("═══════════════════════════════════════\n\n");
+        
+        prompt.append("Pour CHAQUE actif listé, donne:\n\n");
+        
+        prompt.append("[NOM_ACTIF]: IMPACT (Haussier/Baissier) → SIGNAL (BUY/SELL/WAIT)\n");
+        prompt.append("Raison: [Explication concise en 1 phrase avec logique claire]\n");
+        prompt.append("Force: [Faible/Modérée/Forte] | Timing: [Court terme/Moyen terme]\n\n");
+        
+        prompt.append("Exemple parfait:\n");
+        prompt.append("─────────────────────────────────────\n");
+        prompt.append("GOLD: Haussier → BUY\n");
+        prompt.append("Raison: CPI supérieur aux attentes (+4.2% vs 4.0%) renforce la couverture inflation\n");
+        prompt.append("Force: Forte | Timing: Court terme\n\n");
+        
+        prompt.append("NASDAQ: Baissier → SELL\n");
+        prompt.append("Raison: Inflation élevée augmente probabilité hausse taux Fed, pèse sur valorisations tech\n");
+        prompt.append("Force: Modérée | Timing: Court terme\n\n");
+        
+        prompt.append("─────────────────────────────────────\n\n");
+        
+        // Résumé final
+        prompt.append("RÉSUMÉ FINAL REQUIS:\n");
+        prompt.append("Liste compacte des signaux: [ACTIF→SIGNAL], exemple:\n");
+        prompt.append("GOLD→BUY | NASDAQ→SELL | EURUSD→SELL | BTCUSD→WAIT\n\n");
+        
+        // Note sur la cohérence
+        prompt.append("⚠️ VALIDATION FINALE:\n");
+        prompt.append("Assure-toi que tes signaux sont COHÉRENTS avec:\n");
+        prompt.append("1. Les données macro (forecast vs actual)\n");
+        prompt.append("2. Le sentiment risk-on/risk-off\n");
+        prompt.append("3. Les corrélations inter-actifs (USD fort = EM faible, etc.)\n");
+        
+        return prompt.toString();
+    }
+ 
     // === MOTS-CLÉS ENRICHIS ===
     private static final List<String> KEYWORDS = Arrays.asList(
         // Géopolitique
