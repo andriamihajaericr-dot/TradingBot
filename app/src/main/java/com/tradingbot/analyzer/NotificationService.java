@@ -206,6 +206,7 @@ public class NotificationService extends NotificationListenerService {
          "magnificent 7,apple,microsoft,nvidia,tesla,amazon,meta," +
          "alphabet,google,netflix,semiconductor,chip stocks," +
          "tech rally,tech sell-off,nasdaq 100,nasdaq futures"},
+        
         {"OIL", 
          "oil,crude,wti,brent,petroleum,barrel,energy," +
          "opec,opec+,saudi,russia oil,iran oil,iraq oil," +
