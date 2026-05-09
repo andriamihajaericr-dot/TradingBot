@@ -2,6 +2,8 @@ package com.tradingbot.analyzer;
 
 import android.util.Log;
 import java.util.*;
+import java.util.regex.Pattern;     // ← AJOUTE CETTE LIGNE
+import java.util.regex.Matcher;
 
 public class EconomicEventDetector {
 
