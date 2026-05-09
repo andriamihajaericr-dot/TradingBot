@@ -601,7 +601,6 @@ public class EconomicEventDetector {
             else if (containsAny(combined, "china", "pboc"))
                 country = "China";
         }
-
         // Création de l'objet
         DetectedEvent event = new DetectedEvent(eventType, impact, description);
         event.indicator = indicator;
