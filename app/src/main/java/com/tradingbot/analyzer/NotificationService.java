@@ -1121,96 +1121,6 @@ public class NotificationService extends NotificationListenerService {
         }
     }
 
-    public static void sendTelegram(String message) {
-        sendTelegramWithRetry(message, 0);
-    }
-        // Méthode appelée par EconomicEventDetector
-    public static void sendTelegramAlert(String country,
-                                         List<String> assets,
-                                         String shortTitle,
-                                         String fullMessage,
-                                         String importance,
-                                         int confidence) {
-        
-        StringBuilder msg = new StringBuilder();
-    // =====================================================
-    // ENVOI TELEGRAM
-    // =====================================================
-    
-        // =====================================================
-    // ENVOI TELEGRAM (À METTRE À LA FIN DU FICHIER)
-    // =====================================================
-
-    public static void sendTelegram(String message) {
-        sendTelegramWithRetry(message, 0);
-    }
-
-    // Méthode appelée par EconomicEventDetector
-    public static void sendTelegramAlert(String country,
-                                         List<String> assets,
-                                         String shortTitle,
-                                         String fullMessage,
-                                         String importance,
-                                         int confidence) {
-        
-        try {
-            StringBuilder msg = new StringBuilder();
-            msg.append("🔔 **").append(shortTitle).append("**\n\n");
-            msg.append(fullMessage);
-            
-            if (confidence > 0) {
-                msg.append("\n\n**Confiance :** ").append(confidence).append("%");
-            }
-            
-            // Horodatage clair
-            msg.append("\n\n_").append(new SimpleDateFormat("dd/MM HH:mm").format(new Date())).append("_");
-            
-            sendTelegram(msg.toString());
-            
-        } catch (Exception e) {
-            if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[TG ALERT] Erreur: " + e.getMessage());
-        }
-    }
-
-    private static void sendTelegramWithRetry(String message, int attempt) {
-        if (attempt >= 3) {
-            if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[TG] Abandon après 3 tentatives");
-            return;
-        }
-        
-        try {
-            String enc = URLEncoder.encode(message, "UTF-8");
-            URL url = new URL("https://api.telegram.org/bot" + 
-                MainActivity.TELEGRAM_TOKEN + "/sendMessage?chat_id=" + 
-                MainActivity.TELEGRAM_CHAT_ID + "&text=" + enc + 
-                "&parse_mode=Markdown");
-            
-            HttpURLConnection c = (HttpURLConnection) url.openConnection();
-            c.setConnectTimeout(15000);
-            c.setReadTimeout(15000);
-            int code = c.getResponseCode();
-            c.disconnect();
-            
-            if (code == 200) {
-                if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("[TG] ✅ Envoyé avec succès");
-            } else {
-                throw new IOException("HTTP " + code);
-            }
-        } catch (Exception e) {
-            if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[TG] Erreur (retry " + (attempt+1) + "): " + e.getMessage());
-            
-            try {
-                Thread.sleep(2000 * (long)Math.pow(2, attempt));
-            } catch (InterruptedException ie) {}
-            
-            sendTelegramWithRetry(message, attempt + 1);
-        }
-    }
-
     private static void showLocalNotif(Context ctx, String assets, 
                                       String analysis, String impact) {
         NotificationManager nm = (NotificationManager)
@@ -1798,5 +1708,78 @@ public class NotificationService extends NotificationListenerService {
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("[SERVICE] NotificationService arrêté");
     }
+        // =====================================================
+    // ENVOI TELEGRAM (À METTRE À LA FIN DU FICHIER)
+    // =====================================================
+
+    public static void sendTelegram(String message) {
+        sendTelegramWithRetry(message, 0);
+    }
+
+    // Méthode appelée par EconomicEventDetector
+    public static void sendTelegramAlert(String country,
+                                         List<String> assets,
+                                         String shortTitle,
+                                         String fullMessage,
+                                         String importance,
+                                         int confidence) {
+        
+        try {
+            StringBuilder msg = new StringBuilder();
+            msg.append("🔔 **").append(shortTitle).append("**\n\n");
+            msg.append(fullMessage);
+            
+            if (confidence > 0) {
+                msg.append("\n\n**Confiance :** ").append(confidence).append("%");
+            }
+            
+            // Horodatage clair
+            msg.append("\n\n_").append(new SimpleDateFormat("dd/MM HH:mm").format(new Date())).append("_");
+            
+            sendTelegram(msg.toString());
+            
+        } catch (Exception e) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[TG ALERT] Erreur: " + e.getMessage());
+        }
+    }
+
+    private static void sendTelegramWithRetry(String message, int attempt) {
+        if (attempt >= 3) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[TG] Abandon après 3 tentatives");
+            return;
+        }
+        
+        try {
+            String enc = URLEncoder.encode(message, "UTF-8");
+            URL url = new URL("https://api.telegram.org/bot" + 
+                MainActivity.TELEGRAM_TOKEN + "/sendMessage?chat_id=" + 
+                MainActivity.TELEGRAM_CHAT_ID + "&text=" + enc + 
+                "&parse_mode=Markdown");
+            
+            HttpURLConnection c = (HttpURLConnection) url.openConnection();
+            c.setConnectTimeout(15000);
+            c.setReadTimeout(15000);
+            int code = c.getResponseCode();
+            c.disconnect();
+            
+            if (code == 200) {
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[TG] ✅ Envoyé avec succès");
+            } else {
+                throw new IOException("HTTP " + code);
+            }
+        } catch (Exception e) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[TG] Erreur (retry " + (attempt+1) + "): " + e.getMessage());
+            
+            try {
+                Thread.sleep(2000 * (long)Math.pow(2, attempt));
+            } catch (InterruptedException ie) {}
+            
+            sendTelegramWithRetry(message, attempt + 1);
+        }
+    } 
 }
         
