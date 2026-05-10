@@ -384,4 +384,541 @@ public class NotificationService extends NotificationListenerService {
         final boolean fIsDriver = isNewDriver;
         exec.submit(() -> processNotificationWithContextEnhanced(this, eventId, fa, ft, fde, assetsStr, fAssets, fIsDriver));
     }
+    // =====================================================
+    // CORRÉLATION AVEC CALENDRIER ÉCONOMIQUE
+    // =====================================================
+    
+    private void correlateWithCalendar(String notificationEventId, String country, 
+                                       List<String> assets, String importance, 
+                                       int confidence) {
+        try {
+            List<EconomicCalendarAPI.CalendarEvent> upcomingEvents = EconomicCalendarAPI.fetchUpcomingEvents(1);
+            
+            if (upcomingEvents.isEmpty()) {
+                return;
+            }
+            
+            long now = System.currentTimeMillis();
+            long correlationWindow = 30 * 60 * 1000;
+            
+            boolean matchFound = false;
+            EconomicCalendarAPI.CalendarEvent matchedEvent = null;
+            
+            for (EconomicCalendarAPI.CalendarEvent calEvent : upcomingEvents) {
+                long eventTime = Long.parseLong(calEvent.timestamp) * 1000;
+                long timeDiff = Math.abs(eventTime - now);
+                
+                if (timeDiff > correlationWindow) {
+                    continue;
+                }
+                
+                boolean countryMatch = calEvent.country.toLowerCase().contains(country.toLowerCase()) ||
+                                      country.toLowerCase().contains(calEvent.country.toLowerCase());
+                
+                if (!countryMatch && !country.equals("Unknown")) {
+                    continue;
+                }
+                
+                for (String asset : assets) {
+                    if (calEvent.affectedAssets.contains(asset)) {
+                        matchFound = true;
+                        matchedEvent = calEvent;
+                        break;
+                    }
+                }
+                
+                if (matchFound) break;
+            }
+            
+            if (matchFound && matchedEvent != null) {
+                int newConfidence = Math.min(100, confidence + 20);
+                eventDb.updateConfidence(notificationEventId, newConfidence);
+                
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[CORRELATION] ✓ Notification ↔ Calendrier: " + 
+                        matchedEvent.indicator + " | Confiance: " + 
+                        confidence + "% → " + newConfidence + "%"
+                    );
+                }
+                
+                sendCorrelationAlert(notificationEventId, matchedEvent, assets, newConfidence);
+                
+                if (eventDetector != null) {
+                    eventDetector.checkRecentEvents();
+                }
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur correlateWithCalendar", e);
+        }
+    }
+    
+    private void sendCorrelationAlert(String notifId, 
+                                      EconomicCalendarAPI.CalendarEvent calEvent,
+                                      List<String> assets, int confidence) {
+        try {
+            long eventTime = Long.parseLong(calEvent.timestamp) * 1000;
+            long now = System.currentTimeMillis();
+            long minutesUntil = (eventTime - now) / (60 * 1000);
+            
+            StringBuilder message = new StringBuilder();
+            message.append("🔗 **CORRÉLATION CONFIRMÉE**\n\n");
+            message.append("Notification ↔ Calendrier économique!\n\n");
+            message.append("**Événement programmé:**\n");
+            message.append(calEvent.country).append(" - ").append(calEvent.indicator).append("\n");
+            message.append("Dans ").append(minutesUntil).append(" minutes\n\n");
+            message.append("**Forecast:** ").append(calEvent.forecast).append("\n");
+            message.append("**Previous:** ").append(calEvent.previous).append("\n\n");
+            message.append("**Actifs impactés:**\n");
+            
+            for (String asset : assets) {
+                message.append("  • ").append(asset).append("\n");
+            }
+            
+            message.append("\n**Confiance:** ").append(confidence).append("%");
+            
+            sendTelegram(message.toString());
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur sendCorrelationAlert", e);
+        }
+    }
+
+    // =====================================================
+    // VÉRIFIER ÉVÉNEMENTS MANQUÉS DU CALENDRIER
+    // =====================================================
+    
+    private void checkMissedCalendarEvents() {
+        long now = System.currentTimeMillis();
+        long window = 15 * 60 * 1000;
+        
+        List<EconomicCalendarAPI.CalendarEvent> recent = EconomicCalendarAPI.fetchRecentEvents(15);
+        
+        for (EconomicCalendarAPI.CalendarEvent event : recent) {
+            long eventTime = parseTimestamp(event.timestamp);
+            
+            if (eventTime < now && eventTime > (now - window)) {
+                
+                String eventId = "calendar_" + event.indicator + "_" + event.timestamp;
+                
+                if (!eventDb.eventExists(eventId)) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog("[MISSED] ⚠️ Événement calendrier détecté: " + 
+                            event.indicator + " (" + event.country + ")");
+                    }
+                    
+                    createSyntheticEvent(event);
+                }
+            }
+        }
+    }
+    
+    private void createSyntheticEvent(EconomicCalendarAPI.CalendarEvent event) {
+        String title = event.country + " " + event.indicator;
+        StringBuilder content = new StringBuilder();
+        
+        content.append(event.indicator);
+        
+        if (event.forecast != null && !event.forecast.isEmpty()) {
+            content.append(" - Prévision: ").append(event.forecast);
+        }
+        if (event.previous != null && !event.previous.isEmpty()) {
+            content.append(", Précédent: ").append(event.previous);
+        }
+        if (event.actual != null && !event.actual.isEmpty()) {
+            content.append(", Actuel: ").append(event.actual);
+        }
+        
+        processNotification(this, "Calendrier Économique", content.toString());
+        
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog("[RECOVERY] Événement calendrier traité: " + title);
+        }
+    }
+    
+    private long parseTimestamp(String timestamp) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+            return sdf.parse(timestamp).getTime();
+        } catch (Exception e) {
+            return System.currentTimeMillis();
+        }
+    }
+
+    // =====================================================
+    // DÉTECTION DU PAYS
+    // =====================================================
+    
+    private String detectCountry(String contentLower) {
+        String lower = contentLower.toLowerCase();
+        
+        if (lower.contains("us ") || lower.contains("usa") || lower.contains("united states") ||
+            lower.contains("america") || lower.contains("american")) {
+            return "United States";
+        }
+        
+        if (lower.contains("euro") || lower.contains("germany") || lower.contains("german") ||
+            lower.contains("france") || lower.contains("french")) {
+            return "Eurozone";
+        }
+        
+        if (lower.contains("uk ") || lower.contains("britain") || lower.contains("british") ||
+            lower.contains("england") || lower.contains("united kingdom")) {
+            return "United Kingdom";
+        }
+        
+        if (lower.contains("japan") || lower.contains("japanese")) {
+            return "Japan";
+        }
+        
+        if (lower.contains("australia") || lower.contains("australian") || lower.contains("aussie")) {
+            return "Australia";
+        }
+        
+        if (lower.contains("canada") || lower.contains("canadian")) {
+            return "Canada";
+        }
+        
+        if (lower.contains("china") || lower.contains("chinese")) {
+            return "China";
+        }
+        
+        return "Unknown";
+    }
+
+    // =====================================================
+    // DÉTECTION ACTIFS AVEC SCORING INTELLIGENT
+    // =====================================================
+    
+    private static List<String> detectAssetsWithScoring(String text) {
+        String lower = text.toLowerCase();
+        Map<String, Integer> assetScores = new HashMap<>();
+        
+        for (String[] asset : ASSETS) {
+            assetScores.put(asset[0], 0);
+        }
+        
+        for (String[] asset : ASSETS) {
+            String assetName = asset[0];
+            String[] keywords = asset[1].split(",");
+            
+            for (String kw : keywords) {
+                if (lower.contains(kw.trim())) {
+                    assetScores.put(assetName, assetScores.get(assetName) + 10);
+                }
+            }
+            
+            String[] specificKw = ASSET_SPECIFIC_KEYWORDS.get(assetName);
+            if (specificKw != null) {
+                for (String kw : specificKw) {
+                    if (lower.contains(kw)) {
+                        assetScores.put(assetName, assetScores.get(assetName) + 20);
+                    }
+                }
+            }
+        }
+        
+        applyContextualRules(lower, assetScores);
+        
+        List<String> detected = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : assetScores.entrySet()) {
+            if (entry.getValue() >= 15) {
+                detected.add(entry.getKey());
+            }
+        }
+        
+        if (detected.isEmpty()) {
+            detected.add("GOLD");
+            detected.add("BTCUSD");
+        }
+        
+        return detected;
+    }
+    
+    private static void applyContextualRules(String text, Map<String, Integer> scores) {
+        if ((text.contains("fed") || text.contains("nfp") || text.contains("cpi")) && 
+            (text.contains("us") || text.contains("united states"))) {
+            scores.put("EURUSD", scores.get("EURUSD") + 15);
+            scores.put("GBPUSD", scores.get("GBPUSD") + 15);
+            scores.put("USDJPY", scores.get("USDJPY") + 15);
+            scores.put("GOLD", scores.get("GOLD") + 20);
+            scores.put("BTCUSD", scores.get("BTCUSD") + 15);
+        }
+        
+        if (text.contains("war") || text.contains("crisis") || text.contains("nuclear") ||
+            text.contains("attack") || text.contains("conflict")) {
+            scores.put("GOLD", scores.get("GOLD") + 30);
+            scores.put("USDJPY", scores.get("USDJPY") + 20);
+            scores.put("NASDAQ", scores.get("NASDAQ") + 25);
+            scores.put("SP500", scores.get("SP500") + 25);
+        }
+        
+        if (text.contains("oil") || text.contains("opec") || text.contains("eia") ||
+            text.contains("crude") || text.contains("brent") || text.contains("wti")) {
+            scores.put("USDCAD", scores.get("USDCAD") + 25);
+        }
+        
+        if (text.contains("china") || text.contains("pboc") || text.contains("xi jinping")) {
+            scores.put("AUDUSD", scores.get("AUDUSD") + 25);
+        }
+        
+        if ((text.contains("apple") || text.contains("microsoft") || text.contains("nvidia") ||
+             text.contains("tesla") || text.contains("amazon") || text.contains("meta")) &&
+            text.contains("earnings")) {
+            scores.put("NASDAQ", scores.get("NASDAQ") + 30);
+            scores.put("SP500", scores.get("SP500") + 20);
+        }
+        
+        if (text.contains("brexit") || text.contains("uk eu")) {
+            scores.put("GBPUSD", scores.get("GBPUSD") + 25);
+        }
+        
+        if (text.contains("intervention") && (text.contains("yen") || text.contains("boj"))) {
+            scores.put("USDJPY", scores.get("USDJPY") + 35);
+        }
+    }
+
+    private void processMissedEvents() {
+        List<EventDatabase.StoredEvent> missed = eventDb.getUnprocessedEvents();
+        
+        if (missed.isEmpty()) return;
+        
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("[RECOVERY] " + missed.size() + " événements à traiter");
+        
+        for (EventDatabase.StoredEvent event : missed) {
+            try {
+                if (!"Haussier".equals(event.impact) && !"Baissier".equals(event.impact)) {
+                    eventDb.markProcessed(event.id, "Ignoré (neutre)");
+                    continue;
+                }
+                
+                List<EventDatabase.StoredEvent> related = eventDb.getEventsInTimeWindow(event.timestamp, TIME_WINDOW_MS);
+                
+                if (related.size() > 1) {
+                    processCombinedEvents(this, related);
+                } else {
+                    processStoredEvent(this, event);
+                }
+                
+            } catch (Exception e) {
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[RECOVERY] Erreur: " + e.getMessage());
+            }
+        }
+    }
+
+    // =====================================================
+    // ✨ PROMPT AMÉLIORÉ AVEC CONTEXTE TEMPS RÉEL
+    // =====================================================
+    
+    private static String buildEnhancedPrompt(String text, String assets, 
+                                              EconomicEventDetector.DetectedEvent event,
+                                              String combinedContext,
+                                              boolean isDriverChange) {
+        StringBuilder prompt = new StringBuilder();
+        
+        prompt.append("Tu es analyste financier expert en trading temps réel.\n\n");
+        
+        if (isDriverChange) {
+            prompt.append("⚠️ NOUVEAU DRIVER MAJEUR DÉTECTÉ - Analyse URGENTE requise\n");
+            prompt.append("Ce driver peut CHANGER LA DIRECTION DU MARCHÉ.\n\n");
+        }
+        
+        if (combinedContext != null && !combinedContext.isEmpty()) {
+            prompt.append("CONTEXTE MULTI-ÉVÉNEMENTS:\n");
+            prompt.append(combinedContext).append("\n");
+        }
+        
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append("ÉVÉNEMENT ").append(event.eventType.toUpperCase()).append("\n");
+        prompt.append("═══════════════════════════════════════\n\n");
+        
+        if (event.country != null) {
+            prompt.append("🌍 Pays: ").append(event.country).append("\n");
+        }
+        if (event.indicator != null) {
+            prompt.append("📊 Indicateur: ").append(event.indicator).append("\n");
+        }
+        
+        boolean hasData = false;
+        if (event.forecast != null && !event.forecast.isEmpty()) {
+            prompt.append("🎯 Prévision: ").append(event.forecast).append("\n");
+            hasData = true;
+        }
+        if (event.previous != null && !event.previous.isEmpty()) {
+            prompt.append("📋 Précédent: ").append(event.previous).append("\n");
+            hasData = true;
+        }
+        if (event.actual != null && !event.actual.isEmpty()) {
+            prompt.append("✅ Actuel: ").append(event.actual).append("\n");
+            hasData = true;
+            
+            if (event.forecast != null && !event.forecast.isEmpty()) {
+                prompt.append("\n⚡ SURPRISE: Calculer l'écart entre Actuel et Prévision\n");
+                prompt.append("   → Si écart > 0.3%, c'est SIGNIFICATIF\n");
+                prompt.append("   → Si écart > 0.5%, c'est MAJEUR\n");
+            }
+        }
+        
+        if (hasData) {
+            prompt.append("\n");
+        }
+        
+        prompt.append("📈 Impact Général Détecté: ").append(event.impact).append("\n");
+        prompt.append("⚠️ IMPORTANT: Ceci est l'impact MACRO global.\n");
+        prompt.append("Tu dois maintenant analyser l'impact SPÉCIFIQUE par actif.\n\n");
+        
+        prompt.append("RÈGLE CRITIQUE - Différenciation Macro vs Actifs:\n");
+        prompt.append("────────────────────────────────────────\n");
+        prompt.append("Si impact macro = Baissier (risk-off):\n");
+        prompt.append("  ✓ GOLD: HAUSSIER (refuge)\n");
+        prompt.append("  ✓ JPY: HAUSSIER (refuge)\n");
+        prompt.append("  ✓ NASDAQ/SP500: BAISSIER (fuite des actions)\n");
+        prompt.append("  ✓ USD: peut être HAUSSIER (dollar fort)\n\n");
+        
+        prompt.append("Si CPI > Prévision (inflation forte):\n");
+        prompt.append("  ✓ GOLD: HAUSSIER (couverture inflation)\n");
+        prompt.append("  ✓ USD: HAUSSIER (Fed hawkish)\n");
+        prompt.append("  ✓ EURUSD/GBPUSD: BAISSIER (USD fort)\n");
+        prompt.append("  ✓ Stocks: BAISSIER (crainte hausse taux)\n\n");
+        
+        prompt.append("Si NFP > Prévision (emploi fort):\n");
+        prompt.append("  ✓ USD: HAUSSIER (économie forte)\n");
+        prompt.append("  ✓ Stocks: peut être HAUSSIER (croissance)\n");
+        prompt.append("  ✓ GOLD: BAISSIER (moins de besoin refuge)\n\n");
+        
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append("CONTENU COMPLET DE LA NEWS:\n");
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append(text).append("\n\n");
+        
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append("ACTIFS À ANALYSER:\n");
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append(assets).append("\n\n");
+        
+        prompt.append("═══════════════════════════════════════\n");
+        prompt.append("FORMAT DE RÉPONSE REQUIS:\n");
+        prompt.append("═══════════════════════════════════════\n\n");
+        
+        prompt.append("Pour CHAQUE actif listé, donne:\n\n");
+        
+        prompt.append("[NOM_ACTIF]: IMPACT (Haussier/Baissier) → SIGNAL (BUY/SELL/WAIT)\n");
+        prompt.append("Raison: [Explication concise en 1 phrase avec logique claire]\n");
+        prompt.append("Force: [Faible/Modérée/Forte] | Timing: [Court terme/Moyen terme]\n\n");
+        
+        prompt.append("Exemple parfait:\n");
+        prompt.append("─────────────────────────────────────\n");
+        prompt.append("GOLD: Haussier → BUY\n");
+        prompt.append("Raison: CPI supérieur aux attentes (+4.2% vs 4.0%) renforce la couverture inflation\n");
+        prompt.append("Force: Forte | Timing: Court terme\n\n");
+        
+        prompt.append("NASDAQ: Baissier → SELL\n");
+        prompt.append("Raison: Inflation élevée augmente probabilité hausse taux Fed, pèse sur valorisations tech\n");
+        prompt.append("Force: Modérée | Timing: Court terme\n\n");
+        
+        prompt.append("─────────────────────────────────────\n\n");
+        
+        prompt.append("RÉSUMÉ FINAL REQUIS:\n");
+        prompt.append("Liste compacte des signaux: [ACTIF→SIGNAL], exemple:\n");
+        prompt.append("GOLD→BUY | NASDAQ→SELL | EURUSD→SELL | BTCUSD→WAIT\n\n");
+        
+        prompt.append("⚠️ VALIDATION FINALE:\n");
+        prompt.append("Assure-toi que tes signaux sont COHÉRENTS avec:\n");
+        prompt.append("1. Les données macro (forecast vs actual)\n");
+        prompt.append("2. Le sentiment risk-on/risk-off\n");
+        prompt.append("3. Les corrélations inter-actifs (USD fort = EM faible, etc.)\n");
+        
+        return prompt.toString();
+    }
+
+    private static String analyzeWithGroq(String text, String assets, 
+                                         EconomicEventDetector.DetectedEvent event,
+                                         String combinedContext) {
+        return analyzeWithGroqEnhanced(text, assets, event, combinedContext, false);
+    }
+    
+    private static String analyzeWithGroqEnhanced(String text, String assets, 
+                                                  EconomicEventDetector.DetectedEvent event,
+                                                  String combinedContext,
+                                                  boolean isDriverChange) {
+        try {
+            if (MainActivity.CLAUDE_API_KEY == null || MainActivity.CLAUDE_API_KEY.trim().isEmpty()) {
+                return "Clé Groq API non configurée";
+            }
+
+            String enhancedPrompt = buildEnhancedPrompt(text, assets, event, combinedContext, isDriverChange);
+
+            JSONObject systemMsg = new JSONObject();
+            systemMsg.put("role", "system");
+            systemMsg.put("content", 
+                "Tu es un analyste financier expert avec 15 ans d'expérience en trading institutionnel. " +
+                "Tu comprends parfaitement les corrélations entre actifs, les réactions de marché aux données macro, " +
+                "et la différence entre sentiment macro global et impacts spécifiques par actif. " +
+                "Réponds en français, de manière ultra concise mais précise. " +
+                "CRITIQUE: Différencie TOUJOURS l'impact macro global de l'impact spécifique par actif. " +
+                "Exemple: Un événement baissier macro (risk-off) peut être HAUSSIER pour GOLD et JPY (refuges)."
+            );
+
+            JSONObject userMsg = new JSONObject();
+            userMsg.put("role", "user");
+            userMsg.put("content", enhancedPrompt);
+
+            JSONArray messages = new JSONArray();
+            messages.put(systemMsg);
+            messages.put(userMsg);
+
+            JSONObject body = new JSONObject();
+            body.put("model", GROQ_MODEL);
+            body.put("messages", messages);
+            body.put("max_tokens", 1500);
+            body.put("temperature", 0.25);
+
+            return callGroqAPI(body.toString());
+
+        } catch (Exception e) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[GROQ] Exception: " + e.getMessage());
+            return "Erreur: " + e.getMessage();
+        }
+    }
+
+    private static String callGroqAPI(String bodyStr) throws Exception {
+        URL url = new URL(GROQ_URL);
+        HttpURLConnection c = (HttpURLConnection) url.openConnection();
+        c.setRequestMethod("POST");
+        c.setRequestProperty("Content-Type", "application/json");
+        c.setRequestProperty("Authorization", "Bearer " + MainActivity.CLAUDE_API_KEY.trim());
+        c.setDoOutput(true);
+        c.setConnectTimeout(15000);
+        c.setReadTimeout(30000);
+
+        OutputStream os = c.getOutputStream();
+        os.write(bodyStr.getBytes("UTF-8"));
+        os.flush();
+        os.close();
+
+        int responseCode = c.getResponseCode();
+
+        InputStream is = (responseCode == 200) ? c.getInputStream() : c.getErrorStream();
+
+        BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+        StringBuilder sb = new StringBuilder();
+        String line;
+        while ((line = br.readLine()) != null) sb.append(line);
+        br.close();
+        c.disconnect();
+
+        if (responseCode == 200) {
+            JSONObject resp = new JSONObject(sb.toString());
+            return resp.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+        } else {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[GROQ] Erreur " + responseCode);
+            return "Erreur Groq " + responseCode;
+        }
+    }
+    
     
