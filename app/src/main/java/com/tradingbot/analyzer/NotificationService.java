@@ -1460,5 +1460,167 @@ public class NotificationService extends NotificationListenerService {
             "Contexte actuel :\n[ICI SERA INJECTÉ LE CONTEXTE DES ÉVÉNEMENTS DU JOUR]\n\n" +
             "Génère maintenant le résumé marché.";
     }
+    // =====================================================
+    // MÉTHODES UTILITAIRES
+    // =====================================================
     
+    private String getAssetEmoji(String asset) {
+        switch (asset) {
+            case "GOLD": return "🥇";
+            case "BTCUSD": return "₿";
+            case "GBPUSD": return "🇬🇧";
+            case "USDJPY": return "🇯🇵";
+            case "EURUSD": return "🇪🇺";
+            case "SP500": return "📊";
+            case "NASDAQ": return "💻";
+            case "OIL": return "🛢️";
+            case "USDCAD": return "🇨🇦";
+            case "AUDUSD": return "🇦🇺";
+            default: return "📈";
+        }
+    }
+    
+    private String getReportTitle(int hour, int minute) {
+        if (hour == 8 && minute == 55) return "RAPPORT PRÉ-OUVERTURE EUROPÉENNE";
+        else if (hour == 12 && minute == 55) return "RAPPORT MI-JOURNÉE";
+        else if (hour == 16 && minute == 30) return "RAPPORT PRÉ-CLÔTURE EUROPÉENNE";
+        else if (hour == 17 && minute == 0) return "RAPPORT CLÔTURE EUROPÉENNE";
+        else if (hour == 21 && minute == 0) return "RAPPORT FIN DE JOURNÉE";
+        return "RAPPORT TRADING";
+    }
+    
+    private String getNextReportTime(int currentHour, int currentMinute) {
+        for (int i = 0; i < REPORT_HOURS.length; i++) {
+            if (REPORT_HOURS[i] > currentHour || 
+                (REPORT_HOURS[i] == currentHour && REPORT_MINUTES[i] > currentMinute)) {
+                return REPORT_HOURS[i] + "h" + String.format("%02d", REPORT_MINUTES[i]);
+            }
+        }
+        return "8h55 (demain)";
+    }
+
+    private static int getAccountPriority(String text) {
+        String lower = text.toLowerCase();
+        for (Map.Entry<String, Integer> entry : PRIORITY_ACCOUNTS.entrySet()) {
+            String account = entry.getKey();
+            if (lower.contains(account) || lower.contains("@" + account)) {
+                return entry.getValue();
+            }
+        }
+        return 1;
+    }
+
+    private static boolean hasAssetSpecificKeywords(String text, List<String> assets) {
+        String lower = text.toLowerCase();
+        for (String asset : assets) {
+            String[] keywords = ASSET_SPECIFIC_KEYWORDS.get(asset);
+            if (keywords != null) {
+                for (String kw : keywords) {
+                    if (lower.contains(kw)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isAllowedApp(String packageName) {
+        for (String allowed : ALLOWED_APPS)
+            if (packageName.toLowerCase().contains(allowed.toLowerCase()))
+                return true;
+        return false;
+    }
+
+    private boolean isTradingRelevant(String text) {
+        String lower = text.toLowerCase();
+        for (String kw : KEYWORDS) 
+            if (lower.contains(kw)) return true;
+        return false;
+    }
+
+    private String getAppName(String pkg) {
+        if (pkg.contains("twitter") || pkg.contains(".x")) return "X/Twitter";
+        if (pkg.contains("financial")) return "FinancialJuice";
+        if (pkg.contains("investing")) return "Investing.com";
+        if (pkg.contains("reuters")) return "Reuters";
+        return pkg;
+    }
+
+    private static String generateEventId(String app, String title, String content) {
+        try {
+            String data = app + title + content.substring(0, Math.min(100, content.length()));
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(data.getBytes("UTF-8"));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString().substring(0, 16);
+        } catch (Exception e) {
+            return UUID.randomUUID().toString().substring(0, 16);
+        }
+    }
+
+    private static void processStoredEvent(Context ctx, EventDatabase.StoredEvent event) {
+        processNotification(ctx, event.appName, event.content);
+    }
+
+    private static void processCombinedEvents(Context ctx, List<EventDatabase.StoredEvent> events) {
+        if (events.isEmpty()) return;
+        EventDatabase.StoredEvent first = events.get(0);
+        processNotification(ctx, first.appName, first.content);
+    }
+
+    public static void processNotification(Context ctx, String appName, String text) {
+        List<String> assets = detectAssetsWithScoring(text);
+        String assetsStr = String.join(", ", assets);
+        EconomicEventDetector.DetectedEvent event = EconomicEventDetector.detectEvent("", text);
+        
+        if (!event.shouldNotify()) return;
+
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("[BOT] Analyse " + assetsStr + "...");
+
+        String analysis = analyzeWithGroq(text, assetsStr, event, null);
+        String ts = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
+        String emoji = event.impact.equals("Haussier") ? "📈" : "📉";
+        String tgMsg = "*" + emoji + " ALERTE TRADING* - " + ts + "\n" +
+            "Source: " + appName + "\n\nImpact Général: " + event.impact + "\n\n" +
+            "NEWS:\n" + text.substring(0, Math.min(300, text.length())) + "\n\n" +
+            "*ANALYSE PAR ACTIF:*\n" + analysis;
+
+        sendTelegram(tgMsg);
+        showLocalNotif(ctx, assetsStr, analysis, event.impact);
+        saveToDailyReport(event, text, analysis, assets);
+
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("[OK] Envoyé - " + assetsStr);
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID, 
+                "Trading Alerts", 
+                NotificationManager.IMPORTANCE_HIGH
+            );
+            channel.setDescription("Alertes de trading importantes");
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        exec.shutdown();
+        scheduler.shutdown();
+        if (eventDb != null) eventDb.close();
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("[SERVICE] NotificationService arrêté");
+    }
+}
     
