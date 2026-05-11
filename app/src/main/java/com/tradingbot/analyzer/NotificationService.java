@@ -920,5 +920,545 @@ public class NotificationService extends NotificationListenerService {
             return "Erreur Groq " + responseCode;
         }
     }
+    // =====================================================
+    // ✨ TRAITEMENT AVEC INDICATION DE DRIVER
+    // =====================================================
+    
+    private static void processNotificationWithContextEnhanced(
+        Context ctx, String eventId, String appName, String text, 
+        EconomicEventDetector.DetectedEvent detectedEvent, String assetsStr,
+        List<String> assetsList, boolean isDriverChange) {
+        
+        EventDatabase db = new EventDatabase(ctx);
+        List<EventDatabase.StoredEvent> relatedEvents = 
+            db.getEventsInTimeWindow(System.currentTimeMillis(), TIME_WINDOW_MS);
+        
+        boolean hasCombination = relatedEvents.size() > 1;
+        StringBuilder contextBuilder = new StringBuilder();
+        
+        if (hasCombination) {
+            contextBuilder.append("CONTEXTE COMBINÉ - ÉVÉNEMENTS LIÉS:\n\n");
+            
+            for (EventDatabase.StoredEvent event : relatedEvents) {
+                contextBuilder.append("[").append(event.impact).append(" - ")
+                    .append(event.eventType.toUpperCase()).append("] ")
+                    .append(event.title).append("\n");
+            }
+        }
+        
+        if (MainActivity.instance != null) {
+            String combo = hasCombination ? " COMBINÉE" : "";
+            String driver = isDriverChange ? " [DRIVER]" : "";
+            MainActivity.instance.addLog("[BOT] Analyse" + combo + driver + " " + assetsStr + "...");
+        }
+
+        String analysis = analyzeWithGroqEnhanced(
+            text, assetsStr, detectedEvent, 
+            hasCombination ? contextBuilder.toString() : null,
+            isDriverChange
+        );
+
+        String ts = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
+
+        StringBuilder tgMsg = new StringBuilder();
+        
+        String emoji;
+        if (isDriverChange) {
+            emoji = "⚡🔴";
+        } else {
+            emoji = detectedEvent.impact.equals("Haussier") ? "📈" : "📉";
+        }
+        
+        tgMsg.append("*").append(emoji).append(" ");
+        
+        if (isDriverChange) {
+            tgMsg.append("NOUVEAU DRIVER MAJEUR");
+        } else if (hasCombination) {
+            tgMsg.append("ALERTE COMBINÉE");
+        } else {
+            tgMsg.append("ALERTE TRADING");
+        }
+        
+        tgMsg.append("* - ").append(ts).append("\n");
+        tgMsg.append("Source: ").append(appName);
+        tgMsg.append(" [").append(detectedEvent.eventType.toUpperCase()).append("]\n\n");
+        
+        tgMsg.append("*").append(detectedEvent.getDescription()).append("*\n");
+        tgMsg.append("Impact Général: ").append(detectedEvent.impact).append("\n");
+        
+        if (detectedEvent.forecast != null && !detectedEvent.forecast.isEmpty()) {
+            tgMsg.append("🎯 Prévision: ").append(detectedEvent.forecast).append("\n");
+        }
+        if (detectedEvent.previous != null && !detectedEvent.previous.isEmpty()) {
+            tgMsg.append("📋 Précédent: ").append(detectedEvent.previous).append("\n");
+        }
+        if (detectedEvent.actual != null && !detectedEvent.actual.isEmpty()) {
+            tgMsg.append("✅ Actuel: ").append(detectedEvent.actual).append("\n");
+            
+            if (detectedEvent.forecast != null && !detectedEvent.forecast.isEmpty()) {
+                try {
+                    double actualVal = parseNumericValue(detectedEvent.actual);
+                    double forecastVal = parseNumericValue(detectedEvent.forecast);
+                    double diff = actualVal - forecastVal;
+                    double diffPct = (diff / forecastVal) * 100;
+                    
+                    String surpriseEmoji = Math.abs(diffPct) > 0.5 ? "⚠️ SURPRISE MAJEURE" : 
+                                          Math.abs(diffPct) > 0.3 ? "⚡ Surprise" : "";
+                    
+                    if (!surpriseEmoji.isEmpty()) {
+                        tgMsg.append(surpriseEmoji).append(": ")
+                             .append(String.format("%.2f%%", diffPct)).append("\n");
+                    }
+                } catch (Exception e) {
+                    // Ignore
+                }
+            }
+        }
+        
+        tgMsg.append("\nDÉTAILS:\n")
+            .append(text.substring(0, Math.min(300, text.length()))).append("\n\n");
+        
+        if (hasCombination) {
+            tgMsg.append("📌 ÉVÉNEMENTS LIÉS:\n");
+            for (EventDatabase.StoredEvent event : relatedEvents) {
+                if (!event.eventId.equals(eventId)) {
+                    tgMsg.append("• [").append(event.impact).append("] ")
+                        .append(event.title.substring(0, Math.min(50, event.title.length())))
+                        .append("\n");
+                }
+            }
+            tgMsg.append("\n");
+        }
+        
+        tgMsg.append("*ANALYSE PAR ACTIF:*\n").append(analysis);
+
+        sendTelegram(tgMsg.toString());
+        showLocalNotif(ctx, assetsStr, analysis, detectedEvent.impact);
+        
+        saveToDailyReport(detectedEvent, text, analysis, assetsList);
+        
+        EventDatabase eventDb = new EventDatabase(ctx);
+        try {
+            int dbId = Integer.parseInt(eventId.substring(eventId.length() - 8), 16);
+            eventDb.markProcessed(dbId, analysis);
+        } catch (Exception e) {
+            // Ignore
+        }
+
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("[OK] Envoyé - " + assetsStr);
+    }
+    
+    private static double parseNumericValue(String value) throws NumberFormatException {
+        String cleaned = value.replaceAll("[^0-9.-]", "");
+        return Double.parseDouble(cleaned);
+    }
+
+    // =====================================================
+    // TELEGRAM ET NOTIFICATIONS
+    // =====================================================
+
+    public static void sendTelegram(String message) {
+        sendTelegramWithRetry(message, 0);
+    }
+    
+    private static void sendTelegramWithRetry(String message, int attempt) {
+        if (attempt >= 3) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[TG] Abandon après 3 tentatives");
+            return;
+        }
+        
+        try {
+            String enc = URLEncoder.encode(message, "UTF-8");
+            URL url = new URL("https://api.telegram.org/bot" + 
+                MainActivity.TELEGRAM_TOKEN + "/sendMessage?chat_id=" + 
+                MainActivity.TELEGRAM_CHAT_ID + "&text=" + enc + 
+                "&parse_mode=Markdown");
+            
+            HttpURLConnection c = (HttpURLConnection) url.openConnection();
+            c.setConnectTimeout(10000);
+            c.setReadTimeout(10000);
+            int code = c.getResponseCode();
+            c.disconnect();
+            
+            if (code == 200) {
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[TG] Envoyé OK");
+            } else {
+                throw new IOException("HTTP " + code);
+            }
+        } catch (Exception e) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[TG] Erreur (retry " + (attempt+1) + "): " + e.getMessage());
+            
+            try {
+                Thread.sleep(1000 * (long)Math.pow(3, attempt));
+            } catch (InterruptedException ie) {}
+            
+            sendTelegramWithRetry(message, attempt + 1);
+        }
+    }
+
+    private static void showLocalNotif(Context ctx, String assets, String analysis, String impact) {
+        NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            nm.createNotificationChannel(new NotificationChannel(CHANNEL_ID, "Trading Alerts", NotificationManager.IMPORTANCE_HIGH));
+        
+        String emoji = impact.equals("Haussier") ? "📈" : "📉";
+        String title = emoji + " Impact " + impact + " - " + assets;
+        String summary = analysis.length() > 150 ? analysis.substring(0, 150) + "..." : analysis;
+        
+        nm.notify(NOTIF_ID, new NotificationCompat.Builder(ctx, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(summary)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(analysis))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setVibrate(new long[]{0, 300, 100, 300})
+            .build());
+    }
+
+    private static void saveToDailyReport(EconomicEventDetector.DetectedEvent event, 
+                                         String text, String analysis, List<String> assets) {
+        String timestamp = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+        String summary = text.substring(0, Math.min(120, text.length()));
+        String signal = extractSignalFromAnalysis(analysis);
+        
+        for (String asset : assets) {
+            List<DailyReportEntry> assetCache = dailyReportByAsset.get(asset);
+            if (assetCache != null) {
+                DailyReportEntry entry = new DailyReportEntry(timestamp, event.impact, event.eventType, event.getDescription(), summary, signal);
+                assetCache.add(entry);
+                if (assetCache.size() > 30) {
+                    assetCache.remove(0);
+                }
+            }
+        }
+    }
+    
+    private static String extractSignalFromAnalysis(String analysis) {
+        if (analysis.contains("BUY")) return "BUY";
+        if (analysis.contains("SELL")) return "SELL";
+        return "WAIT";
+    }
+
+    // =====================================================
+    // DÉTECTION DRIVERS ET GÉNÉRATION RAPPORTS
+    // =====================================================
+    
+    private static boolean isNewMajorDriver(EconomicEventDetector.DetectedEvent event, String text) {
+        String lower = text.toLowerCase();
+        
+        boolean isMajorEvent = 
+            (lower.contains("fed") && (lower.contains("rate") || lower.contains("powell") || lower.contains("fomc"))) ||
+            (lower.contains("boe") && (lower.contains("rate") || lower.contains("bailey"))) ||
+            (lower.contains("boj") && (lower.contains("intervention") || lower.contains("ueda"))) ||
+            (lower.contains("ecb") && (lower.contains("rate") || lower.contains("lagarde"))) ||
+            (lower.contains("rba") && lower.contains("rate")) ||
+            (lower.contains("boc") && lower.contains("rate")) ||
+            lower.contains("nfp") || lower.contains("non-farm") ||
+            (lower.contains("cpi") && event.actual != null) ||
+            (lower.contains("gdp") && event.actual != null) ||
+            (lower.contains("pmi") && event.actual != null) ||
+            lower.contains("fomc minutes") || lower.contains("beige book") ||
+            (lower.contains("opec") && (lower.contains("cut") || lower.contains("increase"))) ||
+            (lower.contains("eia") && event.actual != null) ||
+            (lower.contains("api") && lower.contains("inventory")) ||
+            ((lower.contains("war") || lower.contains("attack") || lower.contains("nuclear") || 
+              lower.contains("strike") || lower.contains("invasion")) &&
+             (lower.contains("breaking") || lower.contains("urgent"))) ||
+            ((lower.contains("apple") || lower.contains("microsoft") || lower.contains("nvidia") ||
+              lower.contains("tesla") || lower.contains("amazon") || lower.contains("meta") ||
+              lower.contains("alphabet") || lower.contains("google") || lower.contains("netflix")) && 
+             lower.contains("earnings"));
+        
+        if (!isMajorEvent) return false;
+        
+        String driverSignature = createDriverSignature(event, text);
+        Long lastSeen = knownDrivers.get(driverSignature);
+        long now = System.currentTimeMillis();
+        
+        if (lastSeen != null && (now - lastSeen < 8 * 60 * 60 * 1000)) {
+            return false;
+        }
+        
+        knownDrivers.put(driverSignature, now);
+        cleanOldDrivers();
+        
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("[DRIVER] ⚡ NOUVEAU: " + driverSignature.substring(0, Math.min(50, driverSignature.length())));
+        
+        return true;
+    }
+    
+    private static String createDriverSignature(EconomicEventDetector.DetectedEvent event, String text) {
+        String lower = text.toLowerCase();
+        StringBuilder sig = new StringBuilder();
+        
+        if (event.indicator != null) sig.append(event.indicator).append("_");
+        if (event.country != null) sig.append(event.country).append("_");
+        
+        if (lower.contains("fed")) sig.append("fed_");
+        if (lower.contains("boe")) sig.append("boe_");
+        if (lower.contains("boj")) sig.append("boj_");
+        if (lower.contains("ecb")) sig.append("ecb_");
+        if (lower.contains("rba")) sig.append("rba_");
+        if (lower.contains("boc")) sig.append("boc_");
+        if (lower.contains("opec")) sig.append("opec_");
+        if (lower.contains("nfp")) sig.append("nfp_");
+        if (lower.contains("cpi")) sig.append("cpi_");
+        if (lower.contains("gdp")) sig.append("gdp_");
+        if (lower.contains("war")) sig.append("war_");
+        if (lower.contains("nuclear")) sig.append("nuclear_");
+        
+        return sig.toString();
+    }
+    
+    private static void cleanOldDrivers() {
+        long cutoff = System.currentTimeMillis() - (8 * 60 * 60 * 1000);
+        knownDrivers.entrySet().removeIf(entry -> entry.getValue() < cutoff);
+    }
+
+    private void checkAndSendScheduledReports() {
+        Calendar cal = Calendar.getInstance();
+        int currentHour = cal.get(Calendar.HOUR_OF_DAY);
+        int currentMinute = cal.get(Calendar.MINUTE);
+        int currentDay = cal.get(Calendar.DAY_OF_YEAR);
+        
+        Calendar todayStart = Calendar.getInstance();
+        todayStart.set(Calendar.HOUR_OF_DAY, 0);
+        todayStart.set(Calendar.MINUTE, 0);
+        
+        if (cal.getTimeInMillis() - todayStart.getTimeInMillis() < 60000) {
+            sentReportsToday.clear();
+            dailySummaryAlreadySent = false;
+            lastSummaryDriverSignature = "";
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[REPORT] Nouveau jour - reset complet");
+        }
+        
+        for (int i = 0; i < REPORT_HOURS.length; i++) {
+            int reportHour = REPORT_HOURS[i];
+            int reportMinute = REPORT_MINUTES[i];
+            
+            String reportKey = currentDay + "_" + reportHour + "_" + reportMinute;
+            
+            if (currentHour == reportHour && 
+                currentMinute == reportMinute && 
+                !sentReportsToday.contains(reportKey)) {
+                
+                generateScheduledReport(reportHour, reportMinute);
+                sentReportsToday.add(reportKey);
+                
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[REPORT] Rapport " + reportHour + "h" + 
+                        String.format("%02d", reportMinute) + " envoyé");
+            }
+        }
+    }
+    
+    private void generateScheduledReport(int hour, int minute) {
+        boolean hasEvents = false;
+        for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
+            if (!cache.isEmpty()) {
+                hasEvents = true;
+                break;
+            }
+        }
+        
+        if (!hasEvents) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[REPORT] Aucun événement - rapport ignoré");
+            return;
+        }
+        
+        StringBuilder report = new StringBuilder();
+        
+        String reportTitle = getReportTitle(hour, minute);
+        report.append("📊 *").append(reportTitle).append("*\n");
+        report.append(new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date()));
+        report.append("\n\n");
+        
+        int totalEvents = 0;
+        int haussier = 0, baissier = 0;
+        
+        for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
+            totalEvents += cache.size();
+            for (DailyReportEntry entry : cache) {
+                if ("Haussier".equals(entry.impact)) haussier++;
+                if ("Baissier".equals(entry.impact)) baissier++;
+            }
+        }
+        
+        report.append("*Vue d'ensemble: ").append(totalEvents).append(" événements*\n");
+        report.append("📈 Haussiers: ").append(haussier).append(" | ");
+        report.append("📉 Baissiers: ").append(baissier).append("\n\n");
+        
+        report.append("*📌 RÉSUMÉ PAR ACTIF:*\n\n");
+        
+        for (String[] assetInfo : ASSETS) {
+            String assetName = assetInfo[0];
+            List<DailyReportEntry> assetCache = dailyReportByAsset.get(assetName);
+            
+            if (assetCache == null || assetCache.isEmpty()) continue;
+            
+            int buyCount = 0, sellCount = 0, waitCount = 0;
+            String dominantImpact = "";
+            int haussierCount = 0, baissierCount = 0;
+            
+            for (DailyReportEntry entry : assetCache) {
+                if ("BUY".equals(entry.signal)) buyCount++;
+                if ("SELL".equals(entry.signal)) sellCount++;
+                if ("WAIT".equals(entry.signal)) waitCount++;
+                if ("Haussier".equals(entry.impact)) haussierCount++;
+                if ("Baissier".equals(entry.impact)) baissierCount++;
+            }
+            
+            dominantImpact = haussierCount > baissierCount ? "📈 Haussier" : "📉 Baissier";
+            
+            String assetEmoji = getAssetEmoji(assetName);
+            
+            report.append(assetEmoji).append(" *").append(assetName).append("* - ");
+            report.append(assetCache.size()).append(" evt - ");
+            report.append(dominantImpact).append("\n");
+            
+            String dominantSignal = "";
+            if (buyCount > sellCount && buyCount > waitCount) {
+                dominantSignal = "🟢 BUY dominant (" + buyCount + ")";
+            } else if (sellCount > buyCount && sellCount > waitCount) {
+                dominantSignal = "🔴 SELL dominant (" + sellCount + ")";
+            } else {
+                dominantSignal = "⚪ Mixte (B:" + buyCount + " S:" + sellCount + ")";
+            }
+            
+            report.append("   Signal: ").append(dominantSignal).append("\n");
+            
+            int eventCount = Math.min(3, assetCache.size());
+            for (int i = assetCache.size() - eventCount; i < assetCache.size(); i++) {
+                DailyReportEntry entry = assetCache.get(i);
+                report.append("   • ").append(entry.timestamp).append(" - ");
+                report.append(entry.description.substring(0, Math.min(40, entry.description.length())));
+                report.append("\n");
+            }
+            
+            report.append("\n");
+        }
+        
+        report.append("_Prochain rapport: ").append(getNextReportTime(hour, minute)).append("_");
+        
+        sendTelegram(report.toString());
+        
+        if (hour == 21) {
+            for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
+                cache.clear();
+            }
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[REPORT] Cache nettoyé (fin de journée)");
+        }
+    }
+    
+    private void checkAndSendDailySummary() {
+        Calendar cal = Calendar.getInstance();
+        int currentHour = cal.get(Calendar.HOUR_OF_DAY);
+        int currentMinute = cal.get(Calendar.MINUTE);
+        
+        if (currentHour == 7 && currentMinute == 55) {
+            String today = new SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(new Date());
+            
+            if (!sentReportsToday.contains("summary_" + today)) {
+                generateAndSendMarketSummary();
+                sentReportsToday.add("summary_" + today);
+                dailySummaryAlreadySent = true;
+                
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[SUMMARY] Résumé quotidien 7h55 envoyé");
+            }
+        }
+    }
+    
+    private void generateAndSendMarketSummary() {
+        StringBuilder context = new StringBuilder();
+        
+        int totalEvents = 0;
+        for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
+            totalEvents += cache.size();
+            
+            int start = Math.max(0, cache.size() - 5);
+            for (int i = start; i < cache.size(); i++) {
+                DailyReportEntry entry = cache.get(i);
+                context.append("- ").append(entry.timestamp).append(" : ")
+                       .append(entry.description).append(" (Impact: ")
+                       .append(entry.impact).append(")\n");
+            }
+        }
+        
+        if (totalEvents == 0) {
+            context.append("Aucun événement majeur capté récemment.");
+        }
+        
+        String basePrompt = generateDailyMarketSummaryPrompt();
+        String fullPrompt = basePrompt.replace("[ICI SERA INJECTÉ LE CONTEXTE DES ÉVÉNEMENTS DU JOUR]", context.toString());
+        
+        try {
+            if (MainActivity.CLAUDE_API_KEY == null || MainActivity.CLAUDE_API_KEY.trim().isEmpty()) {
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("[SUMMARY] Clé API manquante");
+                return;
+            }
+
+            JSONObject systemMsg = new JSONObject();
+            systemMsg.put("role", "system");
+            systemMsg.put("content", 
+                "Tu es un analyste de marché expert. Génère un résumé professionnel, " +
+                "concis et orienté trading en français. Respecte STRICTEMENT la structure " +
+                "et la limite de 340 mots.");
+
+            JSONObject userMsg = new JSONObject();
+            userMsg.put("role", "user");
+            userMsg.put("content", fullPrompt);
+
+            JSONArray messages = new JSONArray();
+            messages.put(systemMsg);
+            messages.put(userMsg);
+
+            JSONObject body = new JSONObject();
+            body.put("model", GROQ_MODEL);
+            body.put("messages", messages);
+            body.put("max_tokens", 800);
+            body.put("temperature", 0.4);
+
+            String summary = callGroqAPI(body.toString());
+            
+            String telegramMsg = "📰 *RÉSUMÉ MARCHÉ QUOTIDIEN*\n" +
+                new SimpleDateFormat("EEEE dd MMMM yyyy", Locale.FRENCH).format(new Date()) + "\n\n" +
+                summary;
+            
+            sendTelegram(telegramMsg);
+            
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[SUMMARY] Résumé marché envoyé avec succès");
+
+        } catch (Exception e) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("[SUMMARY] Erreur: " + e.getMessage());
+        }
+    }
+    
+    private static String generateDailyMarketSummaryPrompt() {
+        return 
+            "Résumé marché ultra-court en français (max 340 mots).\n\n" +
+            "Actifs à analyser : Gold (XAUUSD), S&P500, Nasdaq, GBPUSD, USDJPY, BTCUSD, AUDUSD, Pétrole (Brent/WTI).\n\n" +
+            "Date et heure actuelles : " + 
+            new SimpleDateFormat("EEEE dd/MM/yyyy 'à' HH:mm 'EAT (UTC+3)'", Locale.FRENCH).format(new Date()) + "\n\n" +
+            "Structure OBLIGATOIRE :\n\n" +
+            "1. **TOP 3 DRIVERS DU JOUR** + heure de sortie\n" +
+            "2. **ANALYSE PAR ACTIF** (1 ligne maximum par actif)\n" +
+            "3. **THÈME DOMINANT** + sentiment global\n" +
+            "4. **ÉVÉNEMENTS MAJEURS À VENIR**\n\n" +
+            "Contexte actuel :\n[ICI SERA INJECTÉ LE CONTEXTE DES ÉVÉNEMENTS DU JOUR]\n\n" +
+            "Génère maintenant le résumé marché.";
+    }
     
     
