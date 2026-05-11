@@ -2,11 +2,7 @@ package com.tradingbot.analyzer;
 
 import android.util.Log;
 import java.util.*;
-import java.util.regex.Pattern;     // ← AJOUTE CETTE LIGNE
-import java.util.regex.Matcher;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.TimeZone;
+import java.util.regex.*;
 
 public class EconomicEventDetector {
 
@@ -14,7 +10,6 @@ public class EconomicEventDetector {
     
     private EventDatabase eventDb;
     
-    // Fenêtre de temps pour corréler événements (30 minutes avant/après)
     private static final long CORRELATION_WINDOW_MS = 30 * 60 * 1000;
     
     public EconomicEventDetector(EventDatabase db) {
@@ -28,11 +23,9 @@ public class EconomicEventDetector {
     public void checkUpcomingEvents() {
         try {
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[DETECTOR] Vérification événements à venir..."
-                );
+                MainActivity.instance.addLog("[DETECTOR] Vérification événements à venir...");
             }
             
-            // Récupérer événements des prochaines 24h depuis l'API
             List<EconomicCalendarAPI.CalendarEvent> upcomingEvents = 
                 EconomicCalendarAPI.fetchUpcomingEvents(24);
             
@@ -42,7 +35,6 @@ public class EconomicEventDetector {
                 );
             }
             
-            // Sauvegarder dans la DB et envoyer alertes
             for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents) {
                 processCalendarEvent(event);
             }
@@ -65,7 +57,6 @@ public class EconomicEventDetector {
                 MainActivity.instance.addLog("[DETECTOR] Vérification événements récents...");
             }
             
-            // Récupérer événements des 30 dernières minutes
             List<EconomicCalendarAPI.CalendarEvent> recentEvents = 
                 EconomicCalendarAPI.fetchRecentEvents(30);
             
@@ -75,31 +66,12 @@ public class EconomicEventDetector {
                 );
             }
             
-            // Corréler avec les notifications reçues
             for (EconomicCalendarAPI.CalendarEvent event : recentEvents) {
                 correlateWithNotifications(event);
             }
             
         } catch (Exception e) {
             Log.e(TAG, "Erreur checkRecentEvents", e);
-        }
-    }
-    // =====================================================
-    // FORMATAGE HEURE PRÉCISE (EAT + ET)
-    // =====================================================
-    
-    private String formatEventTime(String timestampStr) {
-        try {
-            long timestamp = Long.parseLong(timestampStr) * 1000;
-            SimpleDateFormat sdfEAT = new SimpleDateFormat("dd/MM HH:mm 'EAT'", Locale.getDefault());
-            SimpleDateFormat sdfET = new SimpleDateFormat("HH:mm 'ET'", Locale.getDefault());
-            
-            sdfEAT.setTimeZone(TimeZone.getTimeZone("Africa/Nairobi")); // EAT
-            sdfET.setTimeZone(TimeZone.getTimeZone("America/New_York")); // ET
-            
-            return sdfEAT.format(new Date(timestamp)) + " (" + sdfET.format(new Date(timestamp)) + ")";
-        } catch (Exception e) {
-            return timestampStr + " (heure inconnue)";
         }
     }
     
@@ -113,35 +85,29 @@ public class EconomicEventDetector {
             long now = System.currentTimeMillis();
             long timeUntilEvent = eventTime - now;
             
-            // Ignorer événements passés
             if (timeUntilEvent < 0) {
                 return;
             }
             
-            // Générer un ID unique
             String eventId = "calendar_" + event.timestamp + "_" + 
                            event.country.hashCode() + "_" + 
                            event.indicator.hashCode();
             
-            // Vérifier si déjà en DB
             if (eventDb.eventExists(eventId)) {
                 return;
             }
             
-            // Sauvegarder dans la DB
             String assetsStr = String.join(", ", event.affectedAssets);
             
             boolean saved = eventDb.saveEvent(
                 eventId,
                 "economic.calendar",
                 "Economic Calendar API",
-                event.indicator,
+                event.importance,
                 event.indicator,
                 buildEventContent(event),
                 assetsStr,
-                event.importance,
-                calculateCalendarConfidence(event),
-                "calendar"
+                "Neutre"
             );
             
             if (saved && MainActivity.instance != null) {
@@ -151,7 +117,6 @@ public class EconomicEventDetector {
                 );
             }
             
-            // ALERTE SI ÉVÉNEMENT IMMINENT (< 1h) ET HIGH
             if ("High".equals(event.importance) && timeUntilEvent < 60 * 60 * 1000) {
                 sendUpcomingEventAlert(event, timeUntilEvent);
             }
@@ -169,11 +134,9 @@ public class EconomicEventDetector {
         try {
             long eventTime = Long.parseLong(calendarEvent.timestamp) * 1000;
             
-            // Récupérer notifications dans fenêtre de temps
             List<EventDatabase.StoredEvent> notifications = 
                 eventDb.getEventsInTimeWindow(eventTime, CORRELATION_WINDOW_MS);
             
-            // Filtrer uniquement les notifications (pas calendrier)
             List<EventDatabase.StoredEvent> relevantNotifs = new ArrayList<>();
             for (EventDatabase.StoredEvent notif : notifications) {
                 if ("notification".equals(notif.sourceType)) {
@@ -185,7 +148,6 @@ public class EconomicEventDetector {
                 return;
             }
             
-            // Vérifier si les actifs correspondent
             boolean hasMatch = false;
             for (EventDatabase.StoredEvent notif : relevantNotifs) {
                 String[] notifAssets = notif.assets.split(",");
@@ -198,13 +160,12 @@ public class EconomicEventDetector {
                         
                         if (MainActivity.instance != null) {
                             MainActivity.instance.addLog(
-                                "[CORRELATION] ✓ Match trouvé: " + trimmedAsset + 
+                                "[CORRELATION] ✓ Match: " + trimmedAsset + 
                                 " | Calendar: " + calendarEvent.indicator + 
                                 " ↔ Notif: " + notif.title
                             );
                         }
                         
-                        // Augmenter la confiance de la notification
                         int newConfidence = Math.min(100, notif.confidence + 15);
                         eventDb.updateConfidence(notif.eventId, newConfidence);
                         
@@ -215,7 +176,6 @@ public class EconomicEventDetector {
                 if (hasMatch) break;
             }
             
-            // Si correspondance trouvée, envoyer alerte combinée
             if (hasMatch) {
                 sendCorrelatedAlert(calendarEvent, relevantNotifs.get(0));
             }
@@ -235,7 +195,6 @@ public class EconomicEventDetector {
                 MainActivity.instance.addLog("[DETECTOR] Analyse actif: " + asset);
             }
             
-            // Événements des dernières 24h
             long since = System.currentTimeMillis() - (24 * 60 * 60 * 1000);
             
             List<EventDatabase.StoredEvent> assetEvents = 
@@ -248,7 +207,6 @@ public class EconomicEventDetector {
                 return;
             }
             
-            // Statistiques
             int highCount = 0;
             int mediumCount = 0;
             int totalConfidence = 0;
@@ -269,7 +227,6 @@ public class EconomicEventDetector {
                 );
             }
             
-            // Alerte si beaucoup d'événements HIGH
             if (highCount >= 3) {
                 sendAssetHighActivityAlert(asset, highCount, assetEvents);
             }
@@ -301,7 +258,6 @@ public class EconomicEventDetector {
                       .append(entry.getValue()).append("\n");
             }
             
-            // Événements à venir dans les 4 prochaines heures
             List<EconomicCalendarAPI.CalendarEvent> upcoming = 
                 EconomicCalendarAPI.fetchUpcomingEvents(4);
             
@@ -316,7 +272,6 @@ public class EconomicEventDetector {
                 }
             }
             
-            // Actifs les plus actifs
             report.append("\n📈 ACTIFS LES PLUS ACTIFS:\n");
             String[] topAssets = {"SP500", "GOLD", "EURUSD", "BTCUSD"};
             long since = System.currentTimeMillis() - (24 * 60 * 60 * 1000);
@@ -341,44 +296,32 @@ public class EconomicEventDetector {
     // ALERTES
     // =====================================================
     
-        // =====================================================
-    // ALERTES (Version corrigée - une seule version de chaque)
-    // =====================================================
-    
     private void sendUpcomingEventAlert(EconomicCalendarAPI.CalendarEvent event, 
                                         long timeUntilEvent) {
         try {
             int minutesUntil = (int) (timeUntilEvent / (60 * 1000));
-            String formattedTime = formatEventTime(event.timestamp);
-
+            
             StringBuilder message = new StringBuilder();
             message.append("⏰ **ÉVÉNEMENT IMMINENT**\n\n");
-            message.append("**Heure :** ").append(formattedTime).append("\n");
-            message.append("**Dans :** ").append(minutesUntil).append(" minutes\n\n");
-            message.append("**Pays :** ").append(event.country).append("\n");
-            message.append("**Événement :** ").append(event.indicator).append("\n");
-            message.append("**Importance :** ").append(event.importance).append("\n");
+            message.append("**Dans ").append(minutesUntil).append(" minutes**\n\n");
+            message.append("**Pays:** ").append(event.country).append("\n");
+            message.append("**Événement:** ").append(event.indicator).append("\n");
+            message.append("**Importance:** ").append(event.importance).append("\n");
+            message.append("**Forecast:** ").append(event.forecast).append("\n");
+            message.append("**Previous:** ").append(event.previous).append("\n\n");
+            message.append("**Actifs impactés:**\n");
             
-            if (event.forecast != null && !event.forecast.isEmpty() && !"N/A".equals(event.forecast)) {
-                message.append("**Prévision :** ").append(event.forecast).append("\n");
-            }
-            if (event.previous != null && !event.previous.isEmpty() && !"N/A".equals(event.previous)) {
-                message.append("**Précédent :** ").append(event.previous).append("\n");
+            for (int i = 0; i < Math.min(4, event.affectedAssets.size()); i++) {
+                message.append("  ").append(i + 1).append(". ")
+                       .append(event.affectedAssets.get(i)).append("\n");
             }
             
-            message.append("\n**Actifs impactés :** ").append(String.join(", ", event.affectedAssets));
-
-            NotificationService.sendTelegramAlert(
-                event.country,
-                event.affectedAssets,
-                "⏰ " + event.indicator,
-                message.toString(),
-                event.importance,
-                92
-            );
-
+            NotificationService.sendTelegram(message.toString());
+            
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[ALERT] Événement imminent → " + event.indicator);
+                MainActivity.instance.addLog(
+                    "[ALERT] Événement imminent envoyé: " + event.indicator
+                );
             }
             
         } catch (Exception e) {
@@ -391,22 +334,19 @@ public class EconomicEventDetector {
         try {
             StringBuilder message = new StringBuilder();
             message.append("🔗 **CORRÉLATION DÉTECTÉE**\n\n");
-            message.append("**Calendrier :** ").append(calendarEvent.country)
-                   .append(" - ").append(calendarEvent.indicator).append("\n\n");
-            message.append("**Notification :** ").append(notification.appName)
-                   .append(" - ").append(notification.title).append("\n\n");
-            message.append("**Actifs communs :** ").append(notification.assets).append("\n\n");
-            message.append("**Confiance :** ").append(notification.confidence)
-                   .append("% → ").append(Math.min(100, notification.confidence + 15)).append("%");
-
-            NotificationService.sendTelegramAlert(
-                calendarEvent.country,
-                calendarEvent.affectedAssets,
-                "🔗 Corrélation: " + calendarEvent.indicator,
-                message.toString(),
-                "HIGH",
-                90
-            );
+            message.append("**Calendrier économique:**\n");
+            message.append(calendarEvent.country).append(" - ")
+                   .append(calendarEvent.indicator).append("\n\n");
+            message.append("**Notification reçue:**\n");
+            message.append(notification.appName).append(" - ")
+                   .append(notification.title).append("\n\n");
+            message.append("**Actifs communs:**\n");
+            message.append(notification.assets).append("\n\n");
+            message.append("**Confiance augmentée:** ")
+                   .append(notification.confidence).append("% → ")
+                   .append(Math.min(100, notification.confidence + 15)).append("%");
+            
+            NotificationService.sendTelegram(message.toString());
             
         } catch (Exception e) {
             Log.e(TAG, "Erreur sendCorrelatedAlert", e);
@@ -417,23 +357,17 @@ public class EconomicEventDetector {
                                             List<EventDatabase.StoredEvent> events) {
         try {
             StringBuilder message = new StringBuilder();
-            message.append("⚠️ **FORTE ACTIVITÉ SUR ").append(asset).append("**\n\n");
-            message.append("**Événements HIGH :** ").append(highCount).append("\n\n");
-            message.append("**Derniers événements :**\n");
+            message.append("⚠️ **FORTE ACTIVITÉ DÉTECTÉE**\n\n");
+            message.append("**Actif:** ").append(asset).append("\n");
+            message.append("**Événements HIGH:** ").append(highCount).append("\n\n");
+            message.append("**Derniers événements:**\n");
             
             for (int i = 0; i < Math.min(3, events.size()); i++) {
                 EventDatabase.StoredEvent evt = events.get(i);
-                message.append("• ").append(evt.title).append("\n");
+                message.append("  • ").append(evt.title).append("\n");
             }
-
-            NotificationService.sendTelegramAlert(
-                "Multiple",
-                Arrays.asList(asset),
-                "⚠️ Forte activité " + asset,
-                message.toString(),
-                "HIGH",
-                85
-            );
+            
+            NotificationService.sendTelegram(message.toString());
             
         } catch (Exception e) {
             Log.e(TAG, "Erreur sendAssetHighActivityAlert", e);
@@ -456,46 +390,21 @@ public class EconomicEventDetector {
         
         return content.toString();
     }
-    
-    private int calculateCalendarConfidence(EconomicCalendarAPI.CalendarEvent event) {
-        int confidence = 80; // Base élevée car source officielle
-        
-        // Bonus importance
-        if ("High".equals(event.importance)) {
-            confidence += 15;
-        } else if ("Medium".equals(event.importance)) {
-            confidence += 5;
-        }
-        
-        // Bonus si forecast disponible
-        if (!"N/A".equals(event.forecast)) {
-            confidence += 5;
-        }
-        
-        return Math.min(100, confidence);
-    }
-        // =====================================================
-    // MÉTHODE DE DÉTECTION ULTIME - 35+ TYPES D'ÉVÉNEMENTS
+
     // =====================================================
-    
-    // ... (tout le code existant d'EconomicEventDetector) ...
+    // ✨ DÉTECTION D'ÉVÉNEMENT (MÉTHODE PRINCIPALE)
+    // =====================================================
     
     public static DetectedEvent detectEvent(String title, String content) {
         String combined = (title + " " + content).toLowerCase();
         
-        // Détecter le type
         String eventType = detectEventType(combined);
-        
-        // Détecter l'impact
         String impact = detectImpact(combined);
-        
-        // Détecter la description
         String description = title.isEmpty() ? 
             content.substring(0, Math.min(100, content.length())) : title;
         
         DetectedEvent event = new DetectedEvent(eventType, impact, description);
         
-        // Enrichir avec pays et indicateur
         event.country = detectCountry(combined);
         event.indicator = detectIndicator(combined);
         event.forecast = extractDataPoint(combined, "forecast", "expected", "estimate");
