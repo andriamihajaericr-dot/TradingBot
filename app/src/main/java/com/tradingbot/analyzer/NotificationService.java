@@ -1082,12 +1082,14 @@ public class NotificationService extends NotificationListenerService {
             JSONObject systemMsg = new JSONObject();
             systemMsg.put("role", "system");
             systemMsg.put("content", 
-                "Tu es un analyste financier expert avec 15 ans d'expérience en trading institutionnel. " +
-                "Tu comprends parfaitement les corrélations entre actifs, les réactions de marché aux données macro, " +
-                "et la différence entre sentiment macro global et impacts spécifiques par actif. " +
-                "Réponds en français, de manière ultra concise mais précise. " +
-                "CRITIQUE: Différencie TOUJOURS l'impact macro global de l'impact spécifique par actif. " +
-                "Exemple: Un événement baissier macro (risk-off) peut être HAUSSIER pour GOLD et JPY (refuges)."
+                "Tu es un analyste quantitatif senior avec 20 ans d'expérience en trading institutionnel. " +
+                "Tu DOIS expliquer les MÉCANISMES économiques précis reliant l'événement à chaque actif. " +
+                "INTERDIT: phrases génériques comme 'positif pour l'actif', 'impact haussier'. " +
+                "OBLIGATOIRE: chaîne causale explicite (événement → mécanisme → impact actif). " +
+                "Exemples: 'CPI +5% → Fed hawkish anticipé → taux réels hausse → USD fort → EURUSD baisse' " +
+                "ou 'NFP fort → croissance solide → moins aversion risque → or baisse'. " +
+                "Différencie TOUJOURS l'impact par actif selon les corrélations (USD fort ≠ impact identique sur tous). " +
+                "Réponds en français, structure stricte imposée, timing précis (0-24h/24-48h/2-5j)."
             );
 
             JSONObject userMsg = new JSONObject();
@@ -1101,8 +1103,8 @@ public class NotificationService extends NotificationListenerService {
             JSONObject body = new JSONObject();
             body.put("model", GROQ_MODEL);
             body.put("messages", messages);
-            body.put("max_tokens", 1500);
-            body.put("temperature", 0.25);
+            body.put("max_tokens", 2000); // ✨ Augmenté pour analyses détaillées
+            body.put("temperature", 0.15); // ✨ Encore plus bas pour précision maximale
 
             return callGroqAPI(body.toString());
 
