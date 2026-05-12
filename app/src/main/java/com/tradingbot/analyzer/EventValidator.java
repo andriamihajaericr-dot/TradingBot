@@ -9,19 +9,74 @@ public class EventValidator {
     private static Map<String, EconomicCalendarAPI.CalendarEvent> upcomingEvents = 
         new ConcurrentHashMap<>();
     
-    public static class ValidationResult {
-        public boolean isConfirmed;
-        public int confidence; // 0-100
-        public String forecast;
-        public String previous;
-        public String actual;
-        public boolean assetsEnriched;
+    public static ValidationResult validate(
+        String title, 
+        String content, 
+        long timestamp,
+        List<String> detectedAssets
+    ) {
         
-        public ValidationResult() {
-            this.confidence = 50; // Base
-            this.isConfirmed = false;
-            this.assetsEnriched = false;
+        ValidationResult result = new ValidationResult();
+        
+        // ❌ Rejeter immédiatement si contenu politique/opinion
+        String combined = (title + " " + content).toLowerCase();
+        if (combined.contains("opinion") || combined.contains("democrat") ||
+            combined.contains("republican") || combined.contains("party") ||
+            combined.contains("politician") || combined.contains("editorial")) {
+            result.confidence = 0;
+            result.isConfirmed = false;
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[VALIDATOR] ❌ Rejeté - Contenu politique/opinion");
+            }
+            return result;
         }
+        
+        // 1. Chercher événement correspondant dans calendrier
+        EconomicCalendarAPI.CalendarEvent match = 
+            findMatchingEvent(title, content, timestamp);
+        
+        if (match != null) {
+            // ✅ Événement confirmé par calendrier
+            result.isConfirmed = true;
+            result.confidence = 95;
+            result.forecast = match.forecast;
+            result.previous = match.previous;
+            result.actual = match.actual;
+            
+            // Enrichir actifs avec calendrier
+            for (String asset : match.affectedAssets) {
+                if (!detectedAssets.contains(asset)) {
+                    detectedAssets.add(asset);
+                    result.assetsEnriched = true;
+                }
+            }
+            
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[VALIDATOR] ✓ Confirmé: " + match.indicator);
+            }
+            
+        } else {
+            // Événement non dans calendrier (breaking news)
+            result.confidence = calculateBreakingNewsConfidence(title, content);
+            
+            // ❌ Si confiance < 60%, rejeter
+            if (result.confidence < 60) {
+                result.confidence = 0;
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[VALIDATOR] ❌ Confiance insuffisante: " + result.confidence + "%"
+                    );
+                }
+            } else {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[VALIDATOR] Breaking news - Confiance: " + result.confidence + "%"
+                    );
+                }
+            }
+        }
+        
+        return result;
     }
     
     // Pré-charger les événements du calendrier économique
