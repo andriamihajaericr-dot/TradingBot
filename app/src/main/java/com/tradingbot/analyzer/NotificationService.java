@@ -799,7 +799,7 @@ public class NotificationService extends NotificationListenerService {
         prompt.append("═══════════════════════════════════════\n");
         prompt.append(assets).append("\n\n");
         
-// =====================================================
+    // =====================================================
     // ✨ PROMPT ULTRA-PRÉCIS - ANALYSES ACTIONNABLES
     // =====================================================
     
