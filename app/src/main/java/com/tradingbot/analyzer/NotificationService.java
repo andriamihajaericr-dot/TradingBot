@@ -206,6 +206,7 @@ public class NotificationService extends NotificationListenerService {
         ASSET_SPECIFIC_KEYWORDS.put("BTCUSD", new String[]{"bitcoin","btc","crypto","cryptocurrency","ethereum","sec crypto","spot etf","coinbase","binance","halving","microstrategy","grayscale","blockchain"});
         ASSET_SPECIFIC_KEYWORDS.put("USDCAD", new String[]{"cad","loonie","canada","canadian","boc","bank of canada","oil canada","wcs","tsx","canada employment","canada cpi"});
         ASSET_SPECIFIC_KEYWORDS.put("AUDUSD", new String[]{"aud","aussie","australia","australian","rba","reserve bank australia","iron ore","china australia","asx","mining","coal","bhp"});
+        ASSET_SPECIFIC_KEYWORDS.put("AUDUSD", new String[]{"aud","aussie","australia","australian","rba","reserve bank australia","lowe","bullock","iron ore","china australia","asx","mining","coal","bhp","rio tinto","china trade","china pmi","china gdp","commodity currency","aus employment","aus cpi","aus gdp","aus pmi","aus retail"});
     }
 
     @Override
