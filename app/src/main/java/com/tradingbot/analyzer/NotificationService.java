@@ -2243,7 +2243,7 @@ public class NotificationService extends NotificationListenerService {
     private static String generateDailyMarketSummaryPrompt() {
         return 
             "Résumé marché ultra-court en français (max 340 mots).\n\n" +
-            "Actifs à analyser : Gold (XAUUSD), S&P500, Nasdaq, GBPUSD, USDJPY, BTCUSD, AUDUSD, Pétrole (Brent/WTI).\n\n" +
+            "Actifs à analyser : Gold (XAUUSD), S&P500, Nasdaq, GBPUSD, USDJPY, BTCUSD, AUDUSD,USDCAD, Pétrole (Brent/WTI).\n\n" +
             "Date et heure actuelles : " + 
             new SimpleDateFormat("EEEE dd/MM/yyyy 'à' HH:mm 'EAT (UTC+3)'", Locale.FRENCH).format(new Date()) + "\n\n" +
             "Structure OBLIGATOIRE :\n\n" +
