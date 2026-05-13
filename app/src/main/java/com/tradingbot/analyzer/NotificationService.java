@@ -127,17 +127,27 @@ public class NotificationService extends NotificationListenerService {
     );
 
     // === ACTIFS ENRICHIS ===
+    // === ACTIFS ENRICHIS (AVEC AUDUSD) ===
     private static final String[][] ASSETS = {
         {"GOLD", "gold,xauusd,xau,bullion,precious metal,safe haven,gold price,gold rally,gold futures,gold etf,gld,spot gold,gold miners,barrick,newmont,fed gold,gold reserve"},
+        
         {"BTCUSD", "bitcoin,btc,crypto,cryptocurrency,satoshi,blockchain,coinbase,binance,ethereum,eth,altcoin,defi,nft,spot etf,grayscale,microstrategy,saylor,halving,crypto regulation,sec crypto,gbtc,btc etf"},
+        
         {"GBPUSD", "gbp,pound,sterling,cable,bank of england,boe,bailey,uk inflation,uk cpi,uk gdp,uk pmi,uk employment,uk retail,brexit,northern ireland,scotland,gilt,uk bonds,ftse,london,mpc meeting"},
+        
         {"USDJPY", "jpy,yen,usdjpy,bank of japan,boj,ueda,kuroda,yen intervention,carry trade,japan cpi,japan gdp,tankan,nikkei,topix,japanese yen,jgb,japan bonds,weak yen,strong yen,yen depreciation"},
+        
         {"EURUSD", "eur,euro,eurusd,ecb,lagarde,draghi,eurozone,euro area,eu cpi,eu gdp,eu pmi,single currency,germany,france,italy,spain,ifo,zew,euro strength,euro weakness,peripheral bonds"},
+        
         {"SP500", "sp500,s&p 500,s&p500,spx,spy,wall street,stock market,us stocks,equity,american stocks,500 index,large cap,blue chip,dow jones,dow,market rally,market sell-off,stock futures,equity index"},
+        
         {"NASDAQ", "nasdaq,ndx,qqq,tech stocks,technology,faang,magnificent 7,apple,microsoft,nvidia,tesla,amazon,meta,alphabet,google,netflix,semiconductor,chip stocks,tech rally,tech sell-off,nasdaq 100,nasdaq futures"},
+        
         {"OIL", "oil,crude,wti,brent,petroleum,barrel,energy,opec,opec+,saudi,russia oil,iran oil,iraq oil,eia,api,oil inventory,crude inventory,stockpile,oil production,oil demand,shale,fracking,drilling,gasoline,diesel,refinery,natural gas,lng,oil price,crude price,energy sector,exxon,chevron"},
+        
         {"USDCAD", "cad,loonie,canadian dollar,usdcad,boc,bank of canada,canada,canadian,macklem,oil canada,wcs,western canadian,tsx,toronto,canada employment,canada cpi,canada gdp"},
-        {"AUDUSD", "aud,aussie,australian dollar,audusd,rba,reserve bank australia,australia,lowe,iron ore,china australia,commodity currency,asx,sydney,australia employment,australia cpi,aus gdp,mining,bhp,rio tinto,coal australia"}
+        
+        {"AUDUSD", "aud,aussie,australian dollar,audusd,rba,reserve bank australia,australia,australian,lowe,bullock,iron ore,china australia,commodity currency,asx,sydney,australia employment,australia cpi,aus gdp,aus pmi,mining,bhp,rio tinto,coal australia,china trade,china demand"}
     };
 
     // === COMPTES X/TWITTER PRIORITAIRES ===
