@@ -1,4 +1,4 @@
-package com.tradingbot.analyzer;
+etpackage com.tradingbot.analyzer;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -149,6 +149,133 @@ public class NotificationService extends NotificationListenerService {
         
         {"AUDUSD", "aud,aussie,australian dollar,audusd,rba,reserve bank australia,australia,australian,lowe,bullock,iron ore,china australia,commodity currency,asx,sydney,australia employment,australia cpi,aus gdp,aus pmi,mining,bhp,rio tinto,coal australia,china trade,china demand"}
     };
+    // =====================================================
+    // ✨ DÉTECTION CALENDRIER FINANCIALJUICE - TOUS ÉVÉNEMENTS HIGH
+    // =====================================================
+    
+    /**
+     * Détecter si c'est une notification de calendrier économique HIGH importance
+     */
+    private boolean isEconomicCalendarNotification(String appName, String title, String content) {
+        String combined = (title + " " + content).toLowerCase();
+        
+        // ✅ FINANCIALJUICE - CAPTURER TOUS LES ÉVÉNEMENTS HIGH
+        if (appName.equals("FinancialJuice")) {
+            
+            // Pattern 1: Notification avec "High" importance
+            if (combined.contains("high") || combined.contains("🔴") || 
+                combined.contains("red dot") || combined.contains("high impact")) {
+                
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[FJ] 🔴 HIGH importance détecté");
+                }
+                return true;
+            }
+            
+            // Pattern 2: Indicateurs macro majeurs (toujours HIGH)
+            String[] highIndicators = {
+                "nfp", "non-farm payroll", "payrolls",
+                "cpi", "consumer price", "inflation",
+                "gdp", "gross domestic product",
+                "fomc", "fed rate", "federal reserve", "interest rate decision",
+                "boe rate", "bank of england", "mpc",
+                "boj", "bank of japan",
+                "ecb rate", "european central bank",
+                "rba rate", "reserve bank australia",
+                "boc rate", "bank of canada",
+                "eia", "crude oil inventory",
+                "retail sales",
+                "unemployment rate",
+                "pmi", "ism",
+                "trade balance"
+            };
+            
+            for (String indicator : highIndicators) {
+                if (combined.contains(indicator)) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(
+                            "[FJ] 📅 Indicateur HIGH: " + indicator
+                        );
+                    }
+                    return true;
+                }
+            }
+            
+            // Pattern 3: Contient des données économiques (Forecast/Previous/Actual)
+            if ((combined.contains("forecast") || combined.contains("expected")) &&
+                (combined.contains("previous") || combined.contains("prior"))) {
+                
+                // Vérifier qu'il y a des chiffres
+                if (combined.matches(".*\\d+[.,]?\\d*[%KMB]?.*")) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog("[FJ] 📊 Données économiques détectées");
+                    }
+                    return true;
+                }
+            }
+            
+            // Pattern 4: Format calendrier avec timing
+            if (combined.matches(".*\\d{1,2}:\\d{2}\\s*(am|pm|et|gmt).*") &&
+                (combined.contains("releasing") || combined.contains("scheduled") || 
+                 combined.contains("expected at"))) {
+                
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[FJ] ⏰ Publication programmée");
+                }
+                return true;
+            }
+        }
+        
+        // ✅ Patterns génériques pour TOUS les apps
+        
+        // Liste des pays pour nos actifs
+        String[] targetCountries = {
+            "united states", "us ", "usa", "u.s.",
+            "united kingdom", "uk ", "britain",
+            "japan", "japanese",
+            "eurozone", "euro area", "germany", "german",
+            "australia", "australian",
+            "canada", "canadian"
+        };
+        
+        boolean hasTargetCountry = false;
+        for (String country : targetCountries) {
+            if (combined.contains(country)) {
+                hasTargetCountry = true;
+                break;
+            }
+        }
+        
+        if (hasTargetCountry) {
+            // Vérifier si contient un indicateur macro majeur
+            String[] macroIndicators = {
+                "cpi", "inflation", "nfp", "payroll", "employment",
+                "gdp", "pmi", "retail sales", "interest rate",
+                "central bank", "fed", "boe", "boj", "ecb", "rba", "boc",
+                "eia", "oil inventory"
+            };
+            
+            for (String indicator : macroIndicators) {
+                if (combined.contains(indicator)) {
+                    // Vérifier présence de données chiffrées
+                    if (combined.matches(".*forecast.*\\d+.*") ||
+                        combined.matches(".*expected.*\\d+.*") ||
+                        combined.matches(".*previous.*\\d+.*") ||
+                        combined.matches(".*actual.*\\d+.*")) {
+                        
+                        if (MainActivity.instance != null) {
+                            MainActivity.instance.addLog(
+                                "[CALENDAR] 📅 " + indicator + " avec données - " + appName
+                            );
+                        }
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
 
     // === COMPTES X/TWITTER PRIORITAIRES ===
     private static final Map<String, Integer> PRIORITY_ACCOUNTS = new HashMap<>();
