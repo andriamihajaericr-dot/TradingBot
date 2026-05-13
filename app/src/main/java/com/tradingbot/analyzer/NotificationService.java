@@ -149,133 +149,6 @@ public class NotificationService extends NotificationListenerService {
         
         {"AUDUSD", "aud,aussie,australian dollar,audusd,rba,reserve bank australia,australia,australian,lowe,bullock,iron ore,china australia,commodity currency,asx,sydney,australia employment,australia cpi,aus gdp,aus pmi,mining,bhp,rio tinto,coal australia,china trade,china demand"}
     };
-    // =====================================================
-    // ✨ DÉTECTION CALENDRIER FINANCIALJUICE - TOUS ÉVÉNEMENTS HIGH
-    // =====================================================
-    
-    /**
-     * Détecter si c'est une notification de calendrier économique HIGH importance
-     */
-    private boolean isEconomicCalendarNotification(String appName, String title, String content) {
-        String combined = (title + " " + content).toLowerCase();
-        
-        // ✅ FINANCIALJUICE - CAPTURER TOUS LES ÉVÉNEMENTS HIGH
-        if (appName.equals("FinancialJuice")) {
-            
-            // Pattern 1: Notification avec "High" importance
-            if (combined.contains("high") || combined.contains("🔴") || 
-                combined.contains("red dot") || combined.contains("high impact")) {
-                
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("[FJ] 🔴 HIGH importance détecté");
-                }
-                return true;
-            }
-            
-            // Pattern 2: Indicateurs macro majeurs (toujours HIGH)
-            String[] highIndicators = {
-                "nfp", "non-farm payroll", "payrolls",
-                "cpi", "consumer price", "inflation",
-                "gdp", "gross domestic product",
-                "fomc", "fed rate", "federal reserve", "interest rate decision",
-                "boe rate", "bank of england", "mpc",
-                "boj", "bank of japan",
-                "ecb rate", "european central bank",
-                "rba rate", "reserve bank australia",
-                "boc rate", "bank of canada",
-                "eia", "crude oil inventory",
-                "retail sales",
-                "unemployment rate",
-                "pmi", "ism",
-                "trade balance"
-            };
-            
-            for (String indicator : highIndicators) {
-                if (combined.contains(indicator)) {
-                    if (MainActivity.instance != null) {
-                        MainActivity.instance.addLog(
-                            "[FJ] 📅 Indicateur HIGH: " + indicator
-                        );
-                    }
-                    return true;
-                }
-            }
-            
-            // Pattern 3: Contient des données économiques (Forecast/Previous/Actual)
-            if ((combined.contains("forecast") || combined.contains("expected")) &&
-                (combined.contains("previous") || combined.contains("prior"))) {
-                
-                // Vérifier qu'il y a des chiffres
-                if (combined.matches(".*\\d+[.,]?\\d*[%KMB]?.*")) {
-                    if (MainActivity.instance != null) {
-                        MainActivity.instance.addLog("[FJ] 📊 Données économiques détectées");
-                    }
-                    return true;
-                }
-            }
-            
-            // Pattern 4: Format calendrier avec timing
-            if (combined.matches(".*\\d{1,2}:\\d{2}\\s*(am|pm|et|gmt).*") &&
-                (combined.contains("releasing") || combined.contains("scheduled") || 
-                 combined.contains("expected at"))) {
-                
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("[FJ] ⏰ Publication programmée");
-                }
-                return true;
-            }
-        }
-        
-        // ✅ Patterns génériques pour TOUS les apps
-        
-        // Liste des pays pour nos actifs
-        String[] targetCountries = {
-            "united states", "us ", "usa", "u.s.",
-            "united kingdom", "uk ", "britain",
-            "japan", "japanese",
-            "eurozone", "euro area", "germany", "german",
-            "australia", "australian",
-            "canada", "canadian"
-        };
-        
-        boolean hasTargetCountry = false;
-        for (String country : targetCountries) {
-            if (combined.contains(country)) {
-                hasTargetCountry = true;
-                break;
-            }
-        }
-        
-        if (hasTargetCountry) {
-            // Vérifier si contient un indicateur macro majeur
-            String[] macroIndicators = {
-                "cpi", "inflation", "nfp", "payroll", "employment",
-                "gdp", "pmi", "retail sales", "interest rate",
-                "central bank", "fed", "boe", "boj", "ecb", "rba", "boc",
-                "eia", "oil inventory"
-            };
-            
-            for (String indicator : macroIndicators) {
-                if (combined.contains(indicator)) {
-                    // Vérifier présence de données chiffrées
-                    if (combined.matches(".*forecast.*\\d+.*") ||
-                        combined.matches(".*expected.*\\d+.*") ||
-                        combined.matches(".*previous.*\\d+.*") ||
-                        combined.matches(".*actual.*\\d+.*")) {
-                        
-                        if (MainActivity.instance != null) {
-                            MainActivity.instance.addLog(
-                                "[CALENDAR] 📅 " + indicator + " avec données - " + appName
-                            );
-                        }
-                        return true;
-                    }
-                }
-            }
-        }
-        
-        return false;
-    }
 
     // === COMPTES X/TWITTER PRIORITAIRES ===
     private static final Map<String, Integer> PRIORITY_ACCOUNTS = new HashMap<>();
@@ -520,6 +393,650 @@ public class NotificationService extends NotificationListenerService {
         
         final boolean fIsDriver = isNewDriver;
         exec.submit(() -> processNotificationWithContextEnhanced(this, eventId, fa, ft, fde, assetsStr, fAssets, fIsDriver));
+    }
+    // =====================================================
+    // ✨ DÉTECTION CALENDRIER FINANCIALJUICE - TOUS ÉVÉNEMENTS HIGH
+    // =====================================================
+    
+    /**
+     * Détecter si c'est une notification de calendrier économique HIGH importance
+     */
+    private boolean isEconomicCalendarNotification(String appName, String title, String content) {
+        String combined = (title + " " + content).toLowerCase();
+        
+        // ✅ FINANCIALJUICE - CAPTURER TOUS LES ÉVÉNEMENTS HIGH
+        if (appName.equals("FinancialJuice")) {
+            
+            // Pattern 1: Notification avec "High" importance
+            if (combined.contains("high") || combined.contains("🔴") || 
+                combined.contains("red dot") || combined.contains("high impact")) {
+                
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[FJ] 🔴 HIGH importance détecté");
+                }
+                return true;
+            }
+            
+            // Pattern 2: Indicateurs macro majeurs (toujours HIGH)
+            String[] highIndicators = {
+                "nfp", "non-farm payroll", "payrolls",
+                "cpi", "consumer price", "inflation",
+                "gdp", "gross domestic product",
+                "fomc", "fed rate", "federal reserve", "interest rate decision",
+                "boe rate", "bank of england", "mpc",
+                "boj", "bank of japan",
+                "ecb rate", "european central bank",
+                "rba rate", "reserve bank australia",
+                "boc rate", "bank of canada",
+                "eia", "crude oil inventory",
+                "retail sales",
+                "unemployment rate",
+                "pmi", "ism",
+                "trade balance"
+            };
+            
+            for (String indicator : highIndicators) {
+                if (combined.contains(indicator)) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(
+                            "[FJ] 📅 Indicateur HIGH: " + indicator
+                        );
+                    }
+                    return true;
+                }
+            }
+            
+            // Pattern 3: Contient des données économiques (Forecast/Previous/Actual)
+            if ((combined.contains("forecast") || combined.contains("expected")) &&
+                (combined.contains("previous") || combined.contains("prior"))) {
+                
+                // Vérifier qu'il y a des chiffres
+                if (combined.matches(".*\\d+[.,]?\\d*[%KMB]?.*")) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog("[FJ] 📊 Données économiques détectées");
+                    }
+                    return true;
+                }
+            }
+            
+            // Pattern 4: Format calendrier avec timing
+            if (combined.matches(".*\\d{1,2}:\\d{2}\\s*(am|pm|et|gmt).*") &&
+                (combined.contains("releasing") || combined.contains("scheduled") || 
+                 combined.contains("expected at"))) {
+                
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[FJ] ⏰ Publication programmée");
+                }
+                return true;
+            }
+        }
+        
+        // ✅ Patterns génériques pour TOUS les apps
+        
+        // Liste des pays pour nos actifs
+        String[] targetCountries = {
+            "united states", "us ", "usa", "u.s.",
+            "united kingdom", "uk ", "britain",
+            "japan", "japanese",
+            "eurozone", "euro area", "germany", "german",
+            "australia", "australian",
+            "canada", "canadian"
+        };
+        
+        boolean hasTargetCountry = false;
+        for (String country : targetCountries) {
+            if (combined.contains(country)) {
+                hasTargetCountry = true;
+                break;
+            }
+        }
+        
+        if (hasTargetCountry) {
+            // Vérifier si contient un indicateur macro majeur
+            String[] macroIndicators = {
+                "cpi", "inflation", "nfp", "payroll", "employment",
+                "gdp", "pmi", "retail sales", "interest rate",
+                "central bank", "fed", "boe", "boj", "ecb", "rba", "boc",
+                "eia", "oil inventory"
+            };
+            
+            for (String indicator : macroIndicators) {
+                if (combined.contains(indicator)) {
+                    // Vérifier présence de données chiffrées
+                    if (combined.matches(".*forecast.*\\d+.*") ||
+                        combined.matches(".*expected.*\\d+.*") ||
+                        combined.matches(".*previous.*\\d+.*") ||
+                        combined.matches(".*actual.*\\d+.*")) {
+                        
+                        if (MainActivity.instance != null) {
+                            MainActivity.instance.addLog(
+                                "[CALENDAR] 📅 " + indicator + " avec données - " + appName
+                            );
+                        }
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    // =====================================================
+    // CLASSE POUR STOCKER LES DONNÉES DU CALENDRIER
+    // =====================================================
+    
+    private static class CalendarData {
+        String indicator;
+        String forecast;
+        String previous;
+        String actual;
+        String country;
+        String releaseTime;
+        
+        CalendarData() {
+            this.indicator = "Unknown";
+            this.forecast = "N/A";
+            this.previous = "N/A";
+            this.actual = "N/A";
+            this.country = "Unknown";
+            this.releaseTime = "Now";
+        }
+        
+        boolean hasActual() {
+            return actual != null && !actual.equals("N/A") && !actual.isEmpty();
+        }
+    }
+    
+    // =====================================================
+    // EXTRACTION DES DONNÉES DU CALENDRIER
+    // =====================================================
+    
+    /**
+     * ✨ EXTRACTION AMÉLIORÉE - Tous formats FinancialJuice
+     */
+    private CalendarData extractCalendarData(String title, String content) {
+        CalendarData data = new CalendarData();
+        String combined = title + " " + content;
+        String lower = combined.toLowerCase();
+        
+        // ========================================
+        // 1. EXTRAIRE L'INDICATEUR
+        // ========================================
+        
+        // Indicateurs US
+        if (lower.contains("nfp") || lower.contains("non-farm")) {
+            data.indicator = "Non-Farm Payrolls (NFP)";
+            data.country = "United States";
+        } else if (lower.contains("cpi") && !lower.contains("core")) {
+            data.indicator = "Consumer Price Index (CPI)";
+            data.country = detectCountry(combined);
+        } else if (lower.contains("core cpi")) {
+            data.indicator = "Core CPI";
+            data.country = detectCountry(combined);
+        } else if (lower.contains("pce")) {
+            data.indicator = "Personal Consumption Expenditures (PCE)";
+            data.country = "United States";
+        } else if (lower.contains("gdp") && lower.contains("prelim")) {
+            data.indicator = "GDP Preliminary";
+            data.country = detectCountry(combined);
+        } else if (lower.contains("gdp")) {
+            data.indicator = "Gross Domestic Product (GDP)";
+            data.country = detectCountry(combined);
+        } else if (lower.contains("retail sales")) {
+            data.indicator = "Retail Sales";
+            data.country = detectCountry(combined);
+        } else if (lower.contains("unemployment")) {
+            data.indicator = "Unemployment Rate";
+            data.country = detectCountry(combined);
+        } else if (lower.contains("jobless claims") || lower.contains("initial claims")) {
+            data.indicator = "Initial Jobless Claims";
+            data.country = "United States";
+        } else if (lower.contains("pmi") && lower.contains("manufactur")) {
+            data.indicator = "Manufacturing PMI";
+            data.country = detectCountry(combined);
+        } else if (lower.contains("pmi") && lower.contains("service")) {
+            data.indicator = "Services PMI";
+            data.country = detectCountry(combined);
+        } else if (lower.contains("pmi")) {
+            data.indicator = "PMI";
+            data.country = detectCountry(combined);
+        } else if (lower.contains("ism")) {
+            data.indicator = "ISM Manufacturing";
+            data.country = "United States";
+        }
+        
+        // Banques centrales
+        else if (lower.contains("fomc") || (lower.contains("fed") && lower.contains("rate"))) {
+            data.indicator = "FOMC Rate Decision";
+            data.country = "United States";
+        } else if (lower.contains("fed") && lower.contains("minute")) {
+            data.indicator = "FOMC Minutes";
+            data.country = "United States";
+        } else if (lower.contains("boe") || (lower.contains("bank of england") && lower.contains("rate"))) {
+            data.indicator = "BoE Rate Decision";
+            data.country = "United Kingdom";
+        } else if (lower.contains("boj")) {
+            data.indicator = "BoJ Policy Decision";
+            data.country = "Japan";
+        } else if (lower.contains("ecb") && lower.contains("rate")) {
+            data.indicator = "ECB Rate Decision";
+            data.country = "Eurozone";
+        } else if (lower.contains("rba") && lower.contains("rate")) {
+            data.indicator = "RBA Rate Decision";
+            data.country = "Australia";
+        } else if (lower.contains("boc") && lower.contains("rate")) {
+            data.indicator = "BoC Rate Decision";
+            data.country = "Canada";
+        }
+        
+        // Pétrole
+        else if (lower.contains("eia") || lower.contains("crude oil inventor")) {
+            data.indicator = "EIA Crude Oil Inventories";
+            data.country = "United States";
+        } else if (lower.contains("api") && lower.contains("inventor")) {
+            data.indicator = "API Crude Oil Inventories";
+            data.country = "United States";
+        } else if (lower.contains("opec")) {
+            data.indicator = "OPEC Meeting";
+            data.country = "Global";
+        }
+        
+        // UK
+        else if (lower.contains("uk") && lower.contains("cpi")) {
+            data.indicator = "UK Consumer Price Index";
+            data.country = "United Kingdom";
+        } else if (lower.contains("uk") && lower.contains("gdp")) {
+            data.indicator = "UK GDP";
+            data.country = "United Kingdom";
+        } else if (lower.contains("uk") && lower.contains("employment")) {
+            data.indicator = "UK Employment";
+            data.country = "United Kingdom";
+        }
+        
+        // Australie
+        else if (lower.contains("australia") && lower.contains("employment")) {
+            data.indicator = "Australia Employment Change";
+            data.country = "Australia";
+        } else if (lower.contains("australia") && lower.contains("cpi")) {
+            data.indicator = "Australia CPI";
+            data.country = "Australia";
+        } else if (lower.contains("australia") && lower.contains("gdp")) {
+            data.indicator = "Australia GDP";
+            data.country = "Australia";
+        } else if (lower.contains("australia") && lower.contains("retail")) {
+            data.indicator = "Australia Retail Sales";
+            data.country = "Australia";
+        }
+        
+        // Canada
+        else if (lower.contains("canada") && lower.contains("employment")) {
+            data.indicator = "Canada Employment Change";
+            data.country = "Canada";
+        } else if (lower.contains("canada") && lower.contains("cpi")) {
+            data.indicator = "Canada CPI";
+            data.country = "Canada";
+        } else if (lower.contains("canada") && lower.contains("gdp")) {
+            data.indicator = "Canada GDP";
+            data.country = "Canada";
+        }
+        
+        // Fallback: extraire du titre
+        else {
+            // Nettoyer le titre des emojis et caractères spéciaux
+            String cleanTitle = title.replaceAll("[🔴⏰📅📊]", "").trim();
+            data.indicator = cleanTitle.isEmpty() ? "Economic Event" : cleanTitle;
+            data.country = detectCountry(combined);
+        }
+        
+        // ========================================
+        // 2. EXTRAIRE LES DONNÉES NUMÉRIQUES
+        // ========================================
+        
+        data.forecast = extractValue(combined, "forecast", "expected", "exp", "f:", "fcst");
+        data.previous = extractValue(combined, "previous", "prev", "prior", "last", "p:");
+        data.actual = extractValue(combined, "actual", "a:", "released", "came in", "reported");
+        
+        // ========================================
+        // 3. EXTRAIRE LE TIMING
+        // ========================================
+        
+        data.releaseTime = extractReleaseTime(combined);
+        
+        // Si pas de pays détecté, essayer de déduire de l'indicateur
+        if (data.country.equals("Unknown")) {
+            if (data.indicator.contains("US") || data.indicator.contains("Fed") || 
+                data.indicator.contains("NFP") || data.indicator.contains("EIA")) {
+                data.country = "United States";
+            } else if (data.indicator.contains("UK") || data.indicator.contains("BoE")) {
+                data.country = "United Kingdom";
+            } else if (data.indicator.contains("Japan") || data.indicator.contains("BoJ")) {
+                data.country = "Japan";
+            } else if (data.indicator.contains("Australia") || data.indicator.contains("RBA")) {
+                data.country = "Australia";
+            } else if (data.indicator.contains("Canada") || data.indicator.contains("BoC")) {
+                data.country = "Canada";
+            } else if (data.indicator.contains("Euro") || data.indicator.contains("ECB")) {
+                data.country = "Eurozone";
+            }
+        }
+        
+        return data;
+    }
+    
+    /**
+     * Extraire une valeur numérique depuis le texte
+     */
+    private String extractValue(String text, String... keywords) {
+        String lower = text.toLowerCase();
+        
+        for (String keyword : keywords) {
+            int index = lower.indexOf(keyword);
+            if (index != -1) {
+                // Chercher un nombre après le keyword (dans les 30 chars)
+                String substr = text.substring(index, Math.min(text.length(), index + 30));
+                
+                // Pattern pour capturer les nombres
+                Pattern pattern = Pattern.compile(
+                    "([-+]?\\d+[.,]?\\d*\\s*[%KMB]?)",
+                    Pattern.CASE_INSENSITIVE
+                );
+                Matcher matcher = pattern.matcher(substr);
+                
+                if (matcher.find()) {
+                    return matcher.group(1).trim();
+                }
+            }
+        }
+        
+        return "N/A";
+    }
+    
+    /**
+     * Extraire l'heure de publication
+     */
+    private String extractReleaseTime(String text) {
+        // Pattern pour capturer l'heure (ex: 8:30 AM, 14:30, 2:30pm ET)
+        Pattern timePattern = Pattern.compile(
+            "(\\d{1,2}:\\d{2}\\s*(?:AM|PM|am|pm)?(?:\\s*(?:ET|EST|GMT|UTC))?)",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher matcher = timePattern.matcher(text);
+        
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        
+        // Chercher "in X minutes"
+        Pattern minutesPattern = Pattern.compile("(\\d+)\\s*minutes?\\s*(?:until|till)", Pattern.CASE_INSENSITIVE);
+        Matcher minutesMatcher = minutesPattern.matcher(text);
+        
+        if (minutesMatcher.find()) {
+            return "Dans " + minutesMatcher.group(1) + " minutes";
+        }
+        
+        return "Maintenant";
+    }
+    
+    // =====================================================
+    // ✨ TRAITEMENT PRIORITAIRE CALENDRIER ÉCONOMIQUE
+    // =====================================================
+    
+    private void processCalendarEventWithPriority(String appName, String title, 
+                                                   String content, CalendarData calData) {
+        try {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[PRIORITY] 🚨 TRAITEMENT IMMÉDIAT: " + calData.indicator
+                );
+            }
+            
+            // Créer un DetectedEvent enrichi avec les données du calendrier
+            EconomicEventDetector.DetectedEvent detectedEvent = 
+                EconomicEventDetector.detectEvent(title, content);
+            
+            // ✅ Enrichir avec les données extraites
+            detectedEvent.indicator = calData.indicator;
+            detectedEvent.forecast = calData.forecast;
+            detectedEvent.previous = calData.previous;
+            detectedEvent.actual = calData.actual;
+            detectedEvent.country = calData.country;
+            
+            // Forcer l'importance à HIGH si Actual publié
+            if (calData.hasActual()) {
+                detectedEvent.eventType = "ECONOMIC_RELEASE";
+            }
+            
+            // Détecter les actifs impactés
+            List<String> assets = detectAssetsWithScoring(title + " " + content);
+            
+            // Si peu d'actifs détectés, enrichir selon l'indicateur
+            if (assets.size() < 2) {
+                assets = enrichAssetsFromIndicator(calData.indicator, calData.country);
+            }
+            
+            String assetsStr = String.join(", ", assets);
+            String eventId = generateEventId(appName, title, content);
+            
+            // Sauvegarder en DB avec confiance maximale
+            boolean saved = eventDb.saveEvent(
+                eventId, 
+                appName, 
+                appName, 
+                detectedEvent.eventType, 
+                calData.indicator, 
+                content, 
+                assetsStr, 
+                detectedEvent.impact
+            );
+            
+            if (!saved) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[PRIORITY] ⚠️ Déjà traité - ignoré");
+                }
+                return;
+            }
+            
+            // ✅ ANALYSE IMMÉDIATE AVEC FLAG PRIORITAIRE
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[PRIORITY] 🔥 ANALYSE EN COURS: " + assetsStr
+                );
+            }
+            
+            // Construire un contexte enrichi
+            StringBuilder enrichedContent = new StringBuilder();
+            enrichedContent.append("📅 PUBLICATION CALENDRIER ÉCONOMIQUE\n\n");
+            enrichedContent.append("Indicateur: ").append(calData.indicator).append("\n");
+            enrichedContent.append("Pays: ").append(calData.country).append("\n");
+            enrichedContent.append("Heure: ").append(calData.releaseTime).append("\n\n");
+            enrichedContent.append("🎯 Prévision: ").append(calData.forecast).append("\n");
+            enrichedContent.append("📋 Précédent: ").append(calData.previous).append("\n");
+            enrichedContent.append("✅ ACTUEL: ").append(calData.actual).append("\n\n");
+            
+            // Calculer la surprise
+            try {
+                double actualVal = parseNumericValue(calData.actual);
+                double forecastVal = parseNumericValue(calData.forecast);
+                double diff = actualVal - forecastVal;
+                double diffPct = (diff / Math.abs(forecastVal)) * 100;
+                
+                String surpriseLevel;
+                if (Math.abs(diffPct) > 1.0) {
+                    surpriseLevel = "⚠️ SURPRISE MAJEURE";
+                } else if (Math.abs(diffPct) > 0.5) {
+                    surpriseLevel = "⚡ Surprise significative";
+                } else if (Math.abs(diffPct) > 0.2) {
+                    surpriseLevel = "📊 Léger écart";
+                } else {
+                    surpriseLevel = "✓ Conforme aux attentes";
+                }
+                
+                enrichedContent.append("Écart: ").append(String.format("%.2f%%", diffPct))
+                              .append(" - ").append(surpriseLevel).append("\n\n");
+            } catch (Exception e) {
+                // Ignore si parsing impossible
+            }
+            
+            enrichedContent.append("Détails:\n").append(content);
+            
+            // ✅ ANALYSE GROQ AVEC PRIORITÉ MAX
+            String analysis = analyzeWithGroqEnhanced(
+                enrichedContent.toString(),
+                assetsStr,
+                detectedEvent,
+                null,
+                true  // ✅ Flag DRIVER = true pour priorité max
+            );
+            
+            // ✅ ENVOI TELEGRAM IMMÉDIAT
+            String ts = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+                .format(new Date());
+            
+            StringBuilder tgMsg = new StringBuilder();
+            tgMsg.append("🔴 **PUBLICATION OFFICIELLE** 🔴\n");
+            tgMsg.append("Source: ").append(appName).append(" | ").append(ts).append("\n\n");
+            tgMsg.append("**").append(calData.indicator).append("**\n");
+            tgMsg.append(calData.country).append(" - ").append(calData.releaseTime).append("\n\n");
+            
+            tgMsg.append("🎯 Prévision: ").append(calData.forecast).append("\n");
+            tgMsg.append("📋 Précédent: ").append(calData.previous).append("\n");
+            tgMsg.append("✅ **ACTUEL: ").append(calData.actual).append("**\n\n");
+            
+            // Ajouter surprise si calculée
+            try {
+                double actualVal = parseNumericValue(calData.actual);
+                double forecastVal = parseNumericValue(calData.forecast);
+                double diffPct = ((actualVal - forecastVal) / Math.abs(forecastVal)) * 100;
+                
+                if (Math.abs(diffPct) > 0.2) {
+                    String emoji = Math.abs(diffPct) > 1.0 ? "⚠️" : 
+                                  Math.abs(diffPct) > 0.5 ? "⚡" : "📊";
+                    tgMsg.append(emoji).append(" Écart: ")
+                         .append(String.format("%.2f%%", diffPct)).append("\n\n");
+                }
+            } catch (Exception e) {}
+            
+            tgMsg.append("**ANALYSE PAR ACTIF:**\n");
+            tgMsg.append(analysis);
+            
+            sendTelegram(tgMsg.toString());
+            
+            // Notification locale
+            showLocalNotif(this, assetsStr, analysis, detectedEvent.impact);
+            
+            // Sauvegarder dans rapport quotidien
+            saveToDailyReport(detectedEvent, content, analysis, assets);
+            
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[PRIORITY] ✅ ENVOYÉ AVEC SUCCÈS - " + assetsStr
+                );
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur processCalendarEventWithPriority", e);
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[PRIORITY] ❌ Erreur: " + e.getMessage()
+                );
+            }
+        }
+    }
+    
+    /**
+     * Enrichir les actifs selon l'indicateur
+     */
+    private List<String> enrichAssetsFromIndicator(String indicator, String country) {
+        List<String> assets = new ArrayList<>();
+        String lower = indicator.toLowerCase();
+        String countryLower = country.toLowerCase();
+        
+        // ÉTATS-UNIS
+        if (countryLower.contains("united states") || countryLower.contains("us")) {
+            if (lower.contains("nfp") || lower.contains("non-farm") || lower.contains("payroll")) {
+                assets.add("EURUSD");
+                assets.add("GBPUSD");
+                assets.add("USDJPY");
+                assets.add("AUDUSD");
+                assets.add("USDCAD");
+                assets.add("GOLD");
+                assets.add("BTCUSD");
+                assets.add("SP500");
+                assets.add("NASDAQ");
+            } else if (lower.contains("cpi") || lower.contains("inflation")) {
+                assets.add("GOLD");
+                assets.add("BTCUSD");
+                assets.add("EURUSD");
+                assets.add("GBPUSD");
+                assets.add("USDJPY");
+                assets.add("AUDUSD");
+                assets.add("SP500");
+                assets.add("NASDAQ");
+            } else if (lower.contains("fed") || lower.contains("fomc")) {
+                assets.add("EURUSD");
+                assets.add("GBPUSD");
+                assets.add("USDJPY");
+                assets.add("AUDUSD");
+                assets.add("USDCAD");
+                assets.add("GOLD");
+                assets.add("BTCUSD");
+                assets.add("SP500");
+                assets.add("NASDAQ");
+            } else if (lower.contains("eia") || lower.contains("oil")) {
+                assets.add("OIL");
+                assets.add("USDCAD");
+            } else {
+                assets.add("EURUSD");
+                assets.add("GOLD");
+                assets.add("SP500");
+            }
+        }
+        // ROYAUME-UNI
+        else if (countryLower.contains("uk") || countryLower.contains("britain")) {
+            assets.add("GBPUSD");
+            if (lower.contains("boe") || lower.contains("rate") || lower.contains("cpi")) {
+                assets.add("GOLD");
+                assets.add("EURUSD");
+            }
+        }
+        // JAPON
+        else if (countryLower.contains("japan")) {
+            assets.add("USDJPY");
+            if (lower.contains("boj") || lower.contains("rate")) {
+                assets.add("GOLD");
+            }
+        }
+        // EUROZONE
+        else if (countryLower.contains("euro") || countryLower.contains("germany")) {
+            assets.add("EURUSD");
+            if (lower.contains("ecb") || lower.contains("rate")) {
+                assets.add("GOLD");
+            }
+        }
+        // AUSTRALIE
+        else if (countryLower.contains("australia")) {
+            assets.add("AUDUSD");
+            if (lower.contains("rba") || lower.contains("rate") || lower.contains("cpi")) {
+                assets.add("GOLD");
+            }
+        }
+        // CANADA
+        else if (countryLower.contains("canada")) {
+            assets.add("USDCAD");
+            if (lower.contains("boc") || lower.contains("rate")) {
+                assets.add("OIL");
+                assets.add("GOLD");
+            }
+        }
+        
+        // Fallback
+        if (assets.isEmpty()) {
+            assets.add("GOLD");
+            assets.add("EURUSD");
+        }
+        
+        return assets;
     }
     // =====================================================
     // CORRÉLATION AVEC CALENDRIER ÉCONOMIQUE
