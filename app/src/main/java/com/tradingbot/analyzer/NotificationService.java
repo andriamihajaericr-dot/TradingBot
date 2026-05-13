@@ -1,4 +1,4 @@
-etpackage com.tradingbot.analyzer;
+package com.tradingbot.analyzer;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
