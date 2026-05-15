@@ -593,4 +593,348 @@ public class EventDatabase extends SQLiteOpenHelper {
                    " | Confiance moy: " + avgConfidence + "%";
         }
     }
+    // =====================================================
+    // ✨ MÉTHODES POUR ANALYSE TEMPORELLE ET RAPPORTS
+    // =====================================================
+    
+    /**
+     * Obtenir tous les événements dans une fenêtre de temps
+     * @param startTime Timestamp de début (millisecondes)
+     * @param duration Durée de la fenêtre (millisecondes)
+     * @return Liste des événements dans cette fenêtre
+     */
+    public List<StoredEvent> getEventsInTimeWindow(long startTime, long duration) {
+        List<StoredEvent> events = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        
+        try {
+            long endTime = startTime + duration;
+            
+            cursor = db.rawQuery(
+                "SELECT * FROM events WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC",
+                new String[]{String.valueOf(startTime), String.valueOf(endTime)}
+            );
+            
+            while (cursor.moveToNext()) {
+                StoredEvent event = new StoredEvent();
+                event.id = cursor.getInt(cursor.getColumnIndexOrThrow("id"));
+                event.eventId = cursor.getString(cursor.getColumnIndexOrThrow("event_id"));
+                event.packageName = cursor.getString(cursor.getColumnIndexOrThrow("package_name"));
+                event.appName = cursor.getString(cursor.getColumnIndexOrThrow("app_name"));
+                event.eventType = cursor.getString(cursor.getColumnIndexOrThrow("event_type"));
+                event.title = cursor.getString(cursor.getColumnIndexOrThrow("title"));
+                event.content = cursor.getString(cursor.getColumnIndexOrThrow("content"));
+                event.assets = cursor.getString(cursor.getColumnIndexOrThrow("assets"));
+                event.impact = cursor.getString(cursor.getColumnIndexOrThrow("impact"));
+                event.timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+                event.processed = cursor.getInt(cursor.getColumnIndexOrThrow("processed")) == 1;
+                event.analysis = cursor.getString(cursor.getColumnIndexOrThrow("analysis"));
+                event.confidence = cursor.getInt(cursor.getColumnIndexOrThrow("confidence"));
+                event.sourceType = cursor.getString(cursor.getColumnIndexOrThrow("source_type"));
+                
+                events.add(event);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur getEventsInTimeWindow", e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        
+        return events;
+    }
+    
+    /**
+     * Obtenir les événements pour un actif spécifique depuis une date
+     * @param asset Nom de l'actif (ex: "GOLD", "EURUSD")
+     * @param since Timestamp depuis quand chercher
+     * @return Liste des événements pour cet actif
+     */
+    public List<StoredEvent> getEventsByAsset(String asset, long since) {
+        List<StoredEvent> events = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        
+        try {
+            cursor = db.rawQuery(
+                "SELECT * FROM events WHERE assets LIKE ? AND timestamp >= ? ORDER BY timestamp DESC",
+                new String[]{"%" + asset + "%", String.valueOf(since)}
+            );
+            
+            while (cursor.moveToNext()) {
+                StoredEvent event = new StoredEvent();
+                event.id = cursor.getInt(cursor.getColumnIndexOrThrow("id"));
+                event.eventId = cursor.getString(cursor.getColumnIndexOrThrow("event_id"));
+                event.packageName = cursor.getString(cursor.getColumnIndexOrThrow("package_name"));
+                event.appName = cursor.getString(cursor.getColumnIndexOrThrow("app_name"));
+                event.eventType = cursor.getString(cursor.getColumnIndexOrThrow("event_type"));
+                event.title = cursor.getString(cursor.getColumnIndexOrThrow("title"));
+                event.content = cursor.getString(cursor.getColumnIndexOrThrow("content"));
+                event.assets = cursor.getString(cursor.getColumnIndexOrThrow("assets"));
+                event.impact = cursor.getString(cursor.getColumnIndexOrThrow("impact"));
+                event.timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+                event.processed = cursor.getInt(cursor.getColumnIndexOrThrow("processed")) == 1;
+                event.analysis = cursor.getString(cursor.getColumnIndexOrThrow("analysis"));
+                event.confidence = cursor.getInt(cursor.getColumnIndexOrThrow("confidence"));
+                event.sourceType = cursor.getString(cursor.getColumnIndexOrThrow("source_type"));
+                
+                events.add(event);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur getEventsByAsset", e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        
+        return events;
+    }
+    
+    /**
+     * Compter les événements pour un actif depuis une date
+     * @param asset Nom de l'actif
+     * @param since Timestamp depuis quand compter
+     * @return Nombre d'événements
+     */
+    public int getEventCountByAsset(String asset, long since) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                "SELECT COUNT(*) FROM events WHERE assets LIKE ? AND timestamp >= ?",
+                new String[]{"%" + asset + "%", String.valueOf(since)}
+            );
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0);
+            }
+            return 0;
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur getEventCountByAsset", e);
+            return 0;
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+    
+    /**
+     * Vérifier si un événement existe par son ID
+     * @param eventId ID de l'événement
+     * @return true si existe, false sinon
+     */
+    public boolean eventExists(String eventId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                "SELECT COUNT(*) FROM events WHERE event_id = ?",
+                new String[]{eventId}
+            );
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0) > 0;
+            }
+            return false;
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur eventExists", e);
+            return false;
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+    
+    /**
+     * Mettre à jour la confiance d'un événement
+     * @param eventId ID de l'événement
+     * @param newConfidence Nouvelle valeur de confiance (0-100)
+     */
+    public void updateConfidence(String eventId, int newConfidence) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            ContentValues values = new ContentValues();
+            values.put("confidence", newConfidence);
+            
+            int rows = db.update(
+                "events",
+                values,
+                "event_id = ?",
+                new String[]{eventId}
+            );
+            
+            if (rows > 0 && MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[DB] Confiance mise à jour: " + eventId.substring(0, 8) + "... → " + newConfidence + "%"
+                );
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur updateConfidence", e);
+        }
+    }
+    
+    /**
+     * Marquer un événement comme traité
+     * @param id ID interne de l'événement
+     * @param analysis Résultat de l'analyse
+     */
+    public void markProcessed(int id, String analysis) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            ContentValues values = new ContentValues();
+            values.put("processed", 1);
+            values.put("analysis", analysis);
+            
+            db.update(
+                "events",
+                values,
+                "id = ?",
+                new String[]{String.valueOf(id)}
+            );
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur markProcessed", e);
+        }
+    }
+    
+    /**
+     * Obtenir les événements non traités
+     * @return Liste des événements non traités
+     */
+    public List<StoredEvent> getUnprocessedEvents() {
+        List<StoredEvent> events = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        
+        try {
+            cursor = db.rawQuery(
+                "SELECT * FROM events WHERE processed = 0 ORDER BY timestamp DESC LIMIT 20",
+                null
+            );
+            
+            while (cursor.moveToNext()) {
+                StoredEvent event = new StoredEvent();
+                event.id = cursor.getInt(cursor.getColumnIndexOrThrow("id"));
+                event.eventId = cursor.getString(cursor.getColumnIndexOrThrow("event_id"));
+                event.packageName = cursor.getString(cursor.getColumnIndexOrThrow("package_name"));
+                event.appName = cursor.getString(cursor.getColumnIndexOrThrow("app_name"));
+                event.eventType = cursor.getString(cursor.getColumnIndexOrThrow("event_type"));
+                event.title = cursor.getString(cursor.getColumnIndexOrThrow("title"));
+                event.content = cursor.getString(cursor.getColumnIndexOrThrow("content"));
+                event.assets = cursor.getString(cursor.getColumnIndexOrThrow("assets"));
+                event.impact = cursor.getString(cursor.getColumnIndexOrThrow("impact"));
+                event.timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+                event.processed = false;
+                event.confidence = cursor.getInt(cursor.getColumnIndexOrThrow("confidence"));
+                event.sourceType = cursor.getString(cursor.getColumnIndexOrThrow("source_type"));
+                
+                events.add(event);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur getUnprocessedEvents", e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        
+        return events;
+    }
+    
+    /**
+     * Nettoyer les anciens événements (> 7 jours)
+     */
+    public void cleanOldEvents() {
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            long cutoff = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000);
+            
+            int deleted = db.delete(
+                "events",
+                "timestamp < ?",
+                new String[]{String.valueOf(cutoff)}
+            );
+            
+            if (deleted > 0 && MainActivity.instance != null) {
+                MainActivity.instance.addLog("[DB] Nettoyage: " + deleted + " événements supprimés (> 7j)");
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur cleanOldEvents", e);
+        }
+    }
+    
+    /**
+     * Obtenir les statistiques de la base de données
+     */
+    public static class DatabaseStats {
+        public int totalEvents;
+        public int processedEvents;
+        public int eventsToday;
+        public int avgConfidence;
+        public Map<String, Integer> bySource;
+        
+        public DatabaseStats() {
+            this.bySource = new HashMap<>();
+        }
+    }
+    
+    public DatabaseStats getStats() {
+        DatabaseStats stats = new DatabaseStats();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        
+        try {
+            // Total événements
+            cursor = db.rawQuery("SELECT COUNT(*) FROM events", null);
+            if (cursor.moveToFirst()) {
+                stats.totalEvents = cursor.getInt(0);
+            }
+            cursor.close();
+            
+            // Événements traités
+            cursor = db.rawQuery("SELECT COUNT(*) FROM events WHERE processed = 1", null);
+            if (cursor.moveToFirst()) {
+                stats.processedEvents = cursor.getInt(0);
+            }
+            cursor.close();
+            
+            // Événements aujourd'hui
+            Calendar todayStart = Calendar.getInstance();
+            todayStart.set(Calendar.HOUR_OF_DAY, 0);
+            todayStart.set(Calendar.MINUTE, 0);
+            todayStart.set(Calendar.SECOND, 0);
+            long todayMs = todayStart.getTimeInMillis();
+            
+            cursor = db.rawQuery(
+                "SELECT COUNT(*) FROM events WHERE timestamp >= ?",
+                new String[]{String.valueOf(todayMs)}
+            );
+            if (cursor.moveToFirst()) {
+                stats.eventsToday = cursor.getInt(0);
+            }
+            cursor.close();
+            
+            // Confiance moyenne
+            cursor = db.rawQuery("SELECT AVG(confidence) FROM events", null);
+            if (cursor.moveToFirst()) {
+                stats.avgConfidence = cursor.getInt(0);
+            }
+            cursor.close();
+            
+            // Par source
+            cursor = db.rawQuery(
+                "SELECT app_name, COUNT(*) as count FROM events GROUP BY app_name",
+                null
+            );
+            while (cursor.moveToNext()) {
+                String source = cursor.getString(0);
+                int count = cursor.getInt(1);
+                stats.bySource.put(source, count);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur getStats", e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        
+        return stats;
+    }
 }
