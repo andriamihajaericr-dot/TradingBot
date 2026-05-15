@@ -297,7 +297,57 @@ public class NotificationService extends NotificationListenerService {
         
         String appName = getAppName(packageName);
         List<String> assets = detectAssetsWithScoring(combined);
-        
+        // ✨ PRIORITÉ ABSOLUE: FINANCIALJUICE CALENDRIER
+        if (isEconomicCalendarNotification(appName, title, full)) {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[PRIORITY] 🔴 CALENDRIER ÉCONOMIQUE - " + appName
+                );
+            }
+            
+            CalendarData calData = extractCalendarData(title, full);
+            
+            // ✅ NOUVEAU: Traiter IMMÉDIATEMENT (avec ou sans actual)
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[PRIORITY] 📅 Événement détecté: " + calData.indicator
+                );
+            }
+            
+            // ✅ Déterminer le type de traitement
+            if (calData.hasActual()) {
+                // Cas 1: ACTUAL PUBLIÉ (ex: NFP = 250K)
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[PRIORITY] ✅ ACTUAL publié: " + calData.indicator + 
+                        " = " + calData.actual
+                    );
+                }
+                processCalendarEventWithPriority(appName, title, full, calData);
+                return; // ✅ Traité avec priorité absolue
+            } else {
+                // Cas 2: FORECAST/PREVIOUS SEULEMENT (ex: Initial Jobless Claims)
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[PRIORITY] 📊 Données forecast/previous détectées"
+                    );
+                }
+                
+                // ✅ NOUVEAU: Traiter quand même si c'est FinancialJuice HIGH
+                if (appName.equals("FinancialJuice")) {
+                    processCalendarEventWithPriority(appName, title, full, calData);
+                    return; // ✅ Traité avec priorité
+                } else {
+                    // Pour autres apps, continuer traitement normal
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(
+                            "[CALENDAR] 📅 Événement à venir: " + calData.indicator + 
+                            " (" + calData.releaseTime + ")"
+                        );
+                    }
+                }
+            }
+        }
         if (appName.equals("X/Twitter")) {
             int accountPriority = getAccountPriority(combined);
             if (accountPriority < 3) {
