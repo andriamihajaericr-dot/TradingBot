@@ -2992,9 +2992,6 @@ public class NotificationService extends NotificationListenerService {
                 int count = 0;
                 for (EventDatabase.StoredEvent event : validEvents) {
                     if (count >= 10) break;
-                }
-            
-                
                 String time = new SimpleDateFormat("HH:mm", Locale.FRENCH)
                     .format(new Date(event.timestamp));
                 
@@ -3012,6 +3009,7 @@ public class NotificationService extends NotificationListenerService {
                 
                 realContext.append("\n");
                 count++;
+                }
             }
         }
         
