@@ -2200,21 +2200,95 @@ public class NotificationService extends NotificationListenerService {
             }
         }
     }
+    // =====================================================
+    // ✨ GÉNÉRATION RAPPORT AVEC DONNÉES RÉELLES DE LA DB
+    // =====================================================
+    
     private void generateScheduledReport(int hour, int minute) {
-        boolean hasEvents = false;
-        for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
-            if (!cache.isEmpty()) {
-                hasEvents = true;
-                break;
+        // ✅ Calculer le début de la journée
+        Calendar todayStart = Calendar.getInstance();
+        todayStart.set(Calendar.HOUR_OF_DAY, 0);
+        todayStart.set(Calendar.MINUTE, 0);
+        todayStart.set(Calendar.SECOND, 0);
+        todayStart.set(Calendar.MILLISECOND, 0);
+        long todayStartMs = todayStart.getTimeInMillis();
+        
+        // ✅ Requête SQL pour compter VRAIMENT les événements d'aujourd'hui
+        Map<String, Integer> realCountsByAsset = new HashMap<>();
+        Map<String, String> dominantSignalByAsset = new HashMap<>();
+        Map<String, List<String>> recentEventsByAsset = new HashMap<>();
+        
+        for (String[] assetInfo : ASSETS) {
+            String assetName = assetInfo[0];
+            
+            // Compter depuis la DB (pas depuis la RAM)
+            int count = eventDb.getEventCountByAsset(assetName, todayStartMs);
+            realCountsByAsset.put(assetName, count);
+            
+            // Récupérer les événements de cet actif
+            List<EventDatabase.StoredEvent> assetEvents = 
+                eventDb.getEventsByAsset(assetName, todayStartMs);
+            
+            // Analyser le signal dominant
+            int buyCount = 0, sellCount = 0, waitCount = 0;
+            List<String> recentDescs = new ArrayList<>();
+            
+            for (EventDatabase.StoredEvent event : assetEvents) {
+                // Extraire le signal de l'analyse
+                if (event.analysis != null && !event.analysis.isEmpty()) {
+                    String signal = extractSignalFromAnalysis(event.analysis);
+                    if ("BUY".equals(signal)) buyCount++;
+                    if ("SELL".equals(signal)) sellCount++;
+                    if ("WAIT".equals(signal)) waitCount++;
+                }
+                
+                // Garder les 3 derniers événements
+                if (recentDescs.size() < 3) {
+                    String desc = event.title.substring(0, Math.min(40, event.title.length()));
+                    String time = new SimpleDateFormat("HH:mm", Locale.getDefault())
+                        .format(new Date(event.timestamp));
+                    recentDescs.add(time + " - " + desc);
+                }
             }
+            
+            // Déterminer le signal DOMINANT
+            String dominantSignal;
+            if (buyCount > sellCount && buyCount > waitCount) {
+                dominantSignal = "🟢 BUY (" + buyCount + "/" + count + ")";
+            } else if (sellCount > buyCount && sellCount > waitCount) {
+                dominantSignal = "🔴 SELL (" + sellCount + "/" + count + ")";
+            } else if (buyCount == sellCount && buyCount > 0) {
+                dominantSignal = "⚠️ MIXTE (B:" + buyCount + " S:" + sellCount + ")";
+            } else {
+                dominantSignal = "⚪ NEUTRE (" + waitCount + " WAIT)";
+            }
+            
+            dominantSignalByAsset.put(assetName, dominantSignal);
+            recentEventsByAsset.put(assetName, recentDescs);
         }
         
-        if (!hasEvents) {
+        // ✅ Calculer totaux RÉELS
+        int totalEvents = 0;
+        int totalHaussier = 0;
+        int totalBaissier = 0;
+        
+        List<EventDatabase.StoredEvent> allTodayEvents = 
+            eventDb.getEventsInTimeWindow(todayStartMs, System.currentTimeMillis() - todayStartMs);
+        
+        for (EventDatabase.StoredEvent event : allTodayEvents) {
+            totalEvents++;
+            if ("Haussier".equals(event.impact)) totalHaussier++;
+            if ("Baissier".equals(event.impact)) totalBaissier++;
+        }
+        
+        // ✅ Vérifier si assez d'événements
+        if (totalEvents == 0) {
             if (MainActivity.instance != null)
                 MainActivity.instance.addLog("[REPORT] Aucun événement - rapport ignoré");
             return;
         }
         
+        // ✅ CONSTRUIRE LE RAPPORT
         StringBuilder report = new StringBuilder();
         
         String reportTitle = getReportTitle(hour, minute);
@@ -2222,66 +2296,41 @@ public class NotificationService extends NotificationListenerService {
         report.append(new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date()));
         report.append("\n\n");
         
-        int totalEvents = 0;
-        int haussier = 0, baissier = 0;
-        
-        for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
-            totalEvents += cache.size();
-            for (DailyReportEntry entry : cache) {
-                if ("Haussier".equals(entry.impact)) haussier++;
-                if ("Baissier".equals(entry.impact)) baissier++;
-            }
-        }
-        
         report.append("*Vue d'ensemble: ").append(totalEvents).append(" événements*\n");
-        report.append("📈 Haussiers: ").append(haussier).append(" | ");
-        report.append("📉 Baissiers: ").append(baissier).append("\n\n");
+        report.append("📈 Haussiers: ").append(totalHaussier).append(" | ");
+        report.append("📉 Baissiers: ").append(totalBaissier).append("\n\n");
         
-        report.append("*📌 RÉSUMÉ PAR ACTIF:*\n\n");
+        report.append("*📌 ANALYSE PAR ACTIF:*\n\n");
         
-        for (String[] assetInfo : ASSETS) {
-            String assetName = assetInfo[0];
-            List<DailyReportEntry> assetCache = dailyReportByAsset.get(assetName);
+        // ✅ Trier par nombre d'événements (plus actifs en premier)
+        List<Map.Entry<String, Integer>> sortedAssets = 
+            new ArrayList<>(realCountsByAsset.entrySet());
+        sortedAssets.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+        
+        for (Map.Entry<String, Integer> entry : sortedAssets) {
+            String assetName = entry.getKey();
+            int count = entry.getValue();
             
-            if (assetCache == null || assetCache.isEmpty()) continue;
+            if (count == 0) continue; // Ignorer les actifs sans événements
             
-            int buyCount = 0, sellCount = 0, waitCount = 0;
-            String dominantImpact = "";
-            int haussierCount = 0, baissierCount = 0;
+            String emoji = getAssetEmoji(assetName);
+            String dominantSignal = dominantSignalByAsset.get(assetName);
             
-            for (DailyReportEntry entry : assetCache) {
-                if ("BUY".equals(entry.signal)) buyCount++;
-                if ("SELL".equals(entry.signal)) sellCount++;
-                if ("WAIT".equals(entry.signal)) waitCount++;
-                if ("Haussier".equals(entry.impact)) haussierCount++;
-                if ("Baissier".equals(entry.impact)) baissierCount++;
-            }
-            
-            dominantImpact = haussierCount > baissierCount ? "📈 Haussier" : "📉 Baissier";
-            
-            String assetEmoji = getAssetEmoji(assetName);
-            
-            report.append(assetEmoji).append(" *").append(assetName).append("* - ");
-            report.append(assetCache.size()).append(" evt - ");
-            report.append(dominantImpact).append("\n");
-            
-            String dominantSignal = "";
-            if (buyCount > sellCount && buyCount > waitCount) {
-                dominantSignal = "🟢 BUY dominant (" + buyCount + ")";
-            } else if (sellCount > buyCount && sellCount > waitCount) {
-                dominantSignal = "🔴 SELL dominant (" + sellCount + ")";
-            } else {
-                dominantSignal = "⚪ Mixte (B:" + buyCount + " S:" + sellCount + ")";
-            }
-            
+            report.append(emoji).append(" *").append(assetName).append("* - ");
+            report.append(count).append(" evt\n");
             report.append("   Signal: ").append(dominantSignal).append("\n");
             
-            int eventCount = Math.min(3, assetCache.size());
-            for (int i = assetCache.size() - eventCount; i < assetCache.size(); i++) {
-                DailyReportEntry entry = assetCache.get(i);
-                report.append("   • ").append(entry.timestamp).append(" - ");
-                report.append(entry.description.substring(0, Math.min(40, entry.description.length())));
-                report.append("\n");
+            // ✅ Ajouter ALERTE si couverture faible (< 2 événements)
+            if (count < 2) {
+                report.append("   ⚠️ COUVERTURE FAIBLE (peu de données)\n");
+            }
+            
+            // Derniers événements
+            List<String> recentEvents = recentEventsByAsset.get(assetName);
+            if (recentEvents != null && !recentEvents.isEmpty()) {
+                for (String eventDesc : recentEvents) {
+                    report.append("   • ").append(eventDesc).append("\n");
+                }
             }
             
             report.append("\n");
@@ -2291,6 +2340,7 @@ public class NotificationService extends NotificationListenerService {
         
         sendTelegram(report.toString());
         
+        // Nettoyage en fin de journée
         if (hour == 21) {
             for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
                 cache.clear();
