@@ -2315,37 +2315,18 @@ public class NotificationService extends NotificationListenerService {
                 eventDb.getEventsByAsset(assetName, todayStartMs);
             
             // Analyser le signal dominant
-            int buyCount = 0, sellCount = 0, waitCount = 0;
-            List<String> recentDescs = new ArrayList<>();
+            // ✅ NOUVEAU: Calculer signal PONDÉRÉ
+            String dominantSignal = calculateDominantSignalWeighted(assetEvents);
             
+            // Garder les 3 derniers événements
+            List<String> recentDescs = new ArrayList<>();
             for (EventDatabase.StoredEvent event : assetEvents) {
-                // Extraire le signal de l'analyse
-                if (event.analysis != null && !event.analysis.isEmpty()) {
-                    String signal = extractSignalFromAnalysis(event.analysis);
-                    if ("BUY".equals(signal)) buyCount++;
-                    if ("SELL".equals(signal)) sellCount++;
-                    if ("WAIT".equals(signal)) waitCount++;
-                }
-                
-                // Garder les 3 derniers événements
                 if (recentDescs.size() < 3) {
                     String desc = event.title.substring(0, Math.min(40, event.title.length()));
                     String time = new SimpleDateFormat("HH:mm", Locale.getDefault())
                         .format(new Date(event.timestamp));
                     recentDescs.add(time + " - " + desc);
                 }
-            }
-            
-            // Déterminer le signal DOMINANT
-            String dominantSignal;
-            if (buyCount > sellCount && buyCount > waitCount) {
-                dominantSignal = "🟢 BUY (" + buyCount + "/" + count + ")";
-            } else if (sellCount > buyCount && sellCount > waitCount) {
-                dominantSignal = "🔴 SELL (" + sellCount + "/" + count + ")";
-            } else if (buyCount == sellCount && buyCount > 0) {
-                dominantSignal = "⚠️ MIXTE (B:" + buyCount + " S:" + sellCount + ")";
-            } else {
-                dominantSignal = "⚪ NEUTRE (" + waitCount + " WAIT)";
             }
             
             dominantSignalByAsset.put(assetName, dominantSignal);
