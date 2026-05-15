@@ -2417,6 +2417,21 @@ public class NotificationService extends NotificationListenerService {
             if ("Haussier".equals(event.impact)) totalHaussier++;
             if ("Baissier".equals(event.impact)) totalBaissier++;
         }
+                // =============================================
+        // ✅ DRIVER PRINCIPAL DU JOUR
+        // =============================================
+        EventDatabase.StoredEvent mainDriver = identifyMainMarketDriver(todayStartMs);
+        
+        if (mainDriver != null) {
+            report.append("*🎯 DRIVER PRINCIPAL DU JOUR:*\n");
+            report.append("```\n");
+            report.append(mainDriver.title).append("\n");
+            report.append("Type: ").append(mainDriver.eventType).append("\n");
+            report.append("Impact: ").append(mainDriver.impact).append("\n");
+            report.append("Actifs: ").append(mainDriver.assets).append("\n");
+            report.append("Confiance: ").append(mainDriver.confidence).append("%\n");
+            report.append("```\n\n");
+        }
         
         // ✅ Vérifier si assez d'événements
         if (totalEvents == 0) {
