@@ -2586,18 +2586,75 @@ public class NotificationService extends NotificationListenerService {
     }
     
     private static String generateDailyMarketSummaryPrompt() {
+        // ✅ Obtenir les VRAIS événements du jour depuis la DB
+        Calendar todayStart = Calendar.getInstance();
+        todayStart.set(Calendar.HOUR_OF_DAY, 0);
+        todayStart.set(Calendar.MINUTE, 0);
+        todayStart.set(Calendar.SECOND, 0);
+        long todayMs = todayStart.getTimeInMillis();
+        
+        EventDatabase db = new EventDatabase(MainActivity.instance);
+        List<EventDatabase.StoredEvent> todayEvents = 
+            db.getEventsInTimeWindow(todayMs, System.currentTimeMillis() - todayMs);
+        
+        // ✅ Construire le contexte RÉEL
+        StringBuilder realContext = new StringBuilder();
+        
+        if (todayEvents.isEmpty()) {
+            realContext.append("Aucun événement majeur capté aujourd'hui.\n");
+        } else {
+            realContext.append("ÉVÉNEMENTS CAPTÉS AUJOURD'HUI (" + todayEvents.size() + " au total):\n\n");
+            
+            // Limiter à 10 événements les plus importants
+            int count = 0;
+            for (EventDatabase.StoredEvent event : todayEvents) {
+                if (count >= 10) break;
+                
+                String time = new SimpleDateFormat("HH:mm", Locale.FRENCH)
+                    .format(new Date(event.timestamp));
+                
+                realContext.append(count + 1).append(". [").append(time).append("] ")
+                          .append(event.title)
+                          .append(" (").append(event.impact).append(")\n");
+                realContext.append("   Source: ").append(event.appName)
+                          .append(" | Actifs: ").append(event.assets).append("\n");
+                
+                if (event.analysis != null && !event.analysis.isEmpty()) {
+                    String shortAnalysis = event.analysis.length() > 100 ? 
+                        event.analysis.substring(0, 100) + "..." : event.analysis;
+                    realContext.append("   → ").append(shortAnalysis).append("\n");
+                }
+                
+                realContext.append("\n");
+                count++;
+            }
+        }
+        
         return 
-            "Résumé marché ultra-court en français (max 340 mots).\n\n" +
-            "Actifs à analyser : Gold (XAUUSD), S&P500, Nasdaq, GBPUSD, USDJPY, BTCUSD, AUDUSD,USDCAD, Pétrole (Brent/WTI).\n\n" +
-            "Date et heure actuelles : " + 
-            new SimpleDateFormat("EEEE dd/MM/yyyy 'à' HH:mm 'EAT (UTC+3)'", Locale.FRENCH).format(new Date()) + "\n\n" +
-            "Structure OBLIGATOIRE :\n\n" +
-            "1. **TOP 3 DRIVERS DU JOUR** + heure de sortie\n" +
-            "2. **ANALYSE PAR ACTIF** (1 ligne maximum par actif)\n" +
-            "3. **THÈME DOMINANT** + sentiment global\n" +
-            "4. **ÉVÉNEMENTS MAJEURS À VENIR**\n\n" +
-            "Contexte actuel :\n[ICI SERA INJECTÉ LE CONTEXTE DES ÉVÉNEMENTS DU JOUR]\n\n" +
-            "Génère maintenant le résumé marché.";
+            "Tu es analyste de marché senior. Génère un résumé marché professionnel en français (MAX 340 mots).\n\n" +
+            "**ACTIFS À ANALYSER:** Gold (XAUUSD), S&P500, Nasdaq, EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, BTCUSD, Pétrole.\n\n" +
+            "**DATE ACTUELLE:** " + 
+            new SimpleDateFormat("EEEE dd MMMM yyyy 'à' HH:mm 'EAT (UTC+3)'", Locale.FRENCH).format(new Date()) + "\n\n" +
+            "**STRUCTURE OBLIGATOIRE:**\n\n" +
+            "**1. TOP 3 DRIVERS DU JOUR** (avec heure ET détails précis)\n" +
+            "   Format: HH:MM - [Événement précis] → Impact: [Mécanisme économique]\n" +
+            "   Exemple: 14:30 - NFP US +250K (vs 180K prévu) → USD fort via anticipation Fed hawkish\n\n" +
+            "**2. ANALYSE PAR ACTIF** (1 ligne MAX par actif, MÉCANISME obligatoire)\n" +
+            "   Format: [ACTIF]: Direction (±X%) → Raison économique\n" +
+            "   Exemple: GOLD: Baisse (-0.8%) → USD fort + yields hausse réduisent attrait refuge\n\n" +
+            "**3. THÈME DOMINANT** (1 phrase + sentiment général)\n" +
+            "   Exemple: Risk-on dominant via données US solides, rotation actions > refuges\n\n" +
+            "**4. ÉVÉNEMENTS MAJEURS À VENIR** (concrets avec date/heure)\n" +
+            "   Exemple: Demain 8:30 ET - CPI US (prévu 3.2%), Lundi - Décision BOE\n\n" +
+            "**RÈGLES CRITIQUES:**\n" +
+            "- INTERDIT: phrases vagues ('suite aux annonces', 'en variation')\n" +
+            "- OBLIGATOIRE: mécanismes économiques précis\n" +
+            "- OBLIGATOIRE: chiffres/pourcentages quand disponibles\n" +
+            "- Ne JAMAIS inventer de données si absentes du contexte\n" +
+            "- Si peu d'événements: le dire honnêtement\n\n" +
+            "**CONTEXTE RÉEL DU JOUR:**\n" +
+            realContext.toString() + "\n\n" +
+            "Génère le résumé maintenant. Sois FACTUEL, PRÉCIS, et base-toi UNIQUEMENT sur les événements ci-dessus.";
     }
     // =====================================================
     // MÉTHODES UTILITAIRES
