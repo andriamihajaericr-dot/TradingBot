@@ -2550,9 +2550,18 @@ public class NotificationService extends NotificationListenerService {
             JSONObject systemMsg = new JSONObject();
             systemMsg.put("role", "system");
             systemMsg.put("content", 
-                "Tu es un analyste de marché expert. Génère un résumé professionnel, " +
-                "concis et orienté trading en français. Respecte STRICTEMENT la structure " +
-                "et la limite de 340 mots.");
+                "Tu es analyste de marché professionnel avec 15 ans d'expérience. " +
+                "Tu génères des résumés FACTUELS basés uniquement sur les événements fournis. " +
+                "INTERDICTIONS ABSOLUES: " +
+                "- Inventer des événements ou données " +
+                "- Utiliser des phrases vagues ('en variation', 'suite aux annonces') " +
+                "- Mentionner des sources sans détails précis " +
+                "OBLIGATIONS: " +
+                "- Mécanismes économiques explicites " +
+                "- Chiffres et pourcentages réels " +
+                "- Honnêteté si peu d'événements captés " +
+                "Réponds en français, max 340 mots, structure stricte imposée."
+            );
 
             JSONObject userMsg = new JSONObject();
             userMsg.put("role", "user");
