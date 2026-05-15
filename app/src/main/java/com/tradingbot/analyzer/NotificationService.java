@@ -2359,8 +2359,7 @@ public class NotificationService extends NotificationListenerService {
     // =====================================================
     // ✨ GÉNÉRATION RAPPORT AVEC DONNÉES RÉELLES DE LA DB
     // =====================================================
-    
-    private void generateScheduledReport(int hour, int minute) {
+        private void generateScheduledReport(int hour, int minute) {
         // ✅ Calculer le début de la journée
         Calendar todayStart = Calendar.getInstance();
         todayStart.set(Calendar.HOUR_OF_DAY, 0);
@@ -2369,27 +2368,77 @@ public class NotificationService extends NotificationListenerService {
         todayStart.set(Calendar.MILLISECOND, 0);
         long todayStartMs = todayStart.getTimeInMillis();
         
-        // ✅ Requête SQL pour compter VRAIMENT les événements d'aujourd'hui
+        // =============================================
+        // CALCUL DES TOTAUX RÉELS
+        // =============================================
+        int totalEvents = 0;
+        int totalHaussier = 0;
+        int totalBaissier = 0;
+        
+        List<EventDatabase.StoredEvent> allTodayEvents = 
+            eventDb.getEventsInTimeWindow(todayStartMs, System.currentTimeMillis() - todayStartMs);
+
+        for (EventDatabase.StoredEvent event : allTodayEvents) {
+            totalEvents++;
+            if ("Haussier".equals(event.impact)) totalHaussier++;
+            if ("Baissier".equals(event.impact)) totalBaissier++;
+        }
+
+        // =============================================
+        // ✅ IDENTIFICATION DU DRIVER PRINCIPAL
+        // =============================================
+        EventDatabase.StoredEvent mainDriver = identifyMainMarketDriver(todayStartMs);
+
+        // =============================================
+        // CONSTRUCTION DU RAPPORT
+        // =============================================
+        StringBuilder report = new StringBuilder();
+        
+        String reportTitle = getReportTitle(hour, minute);
+        report.append("📊 *").append(reportTitle).append("*\n");
+        report.append(new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date()));
+        report.append("\n\n");
+
+        report.append("*Vue d'ensemble: ").append(totalEvents).append(" événements*\n");
+        report.append("📈 Haussiers: ").append(totalHaussier).append(" | ");
+        report.append("📉 Baissiers: ").append(totalBaissier).append("\n\n");
+
+        // ==================== DRIVER PRINCIPAL ====================
+        if (mainDriver != null) {
+            report.append("*🎯 DRIVER PRINCIPAL DU JOUR:*\n");
+            report.append("```\n");
+            report.append(mainDriver.title).append("\n");
+            report.append("Type: ").append(mainDriver.eventType).append("\n");
+            report.append("Impact: ").append(mainDriver.impact).append("\n");
+            report.append("Actifs: ").append(mainDriver.assets).append("\n");
+            report.append("Confiance: ").append(mainDriver.confidence).append("%\n");
+            report.append("```\n\n");
+        } else {
+            report.append("*🎯 Aucun driver majeur détecté aujourd'hui*\n\n");
+        }
+
+        // =============================================
+        // ANALYSE PAR ACTIF
+        // =============================================
+        report.append("*📌 ANALYSE PAR ACTIF:*\n\n");
+
+        // Trier par nombre d'événements (les plus actifs en premier)
         Map<String, Integer> realCountsByAsset = new HashMap<>();
         Map<String, String> dominantSignalByAsset = new HashMap<>();
         Map<String, List<String>> recentEventsByAsset = new HashMap<>();
-        
+
         for (String[] assetInfo : ASSETS) {
             String assetName = assetInfo[0];
             
-            // Compter depuis la DB (pas depuis la RAM)
             int count = eventDb.getEventCountByAsset(assetName, todayStartMs);
             realCountsByAsset.put(assetName, count);
             
-            // Récupérer les événements de cet actif
             List<EventDatabase.StoredEvent> assetEvents = 
                 eventDb.getEventsByAsset(assetName, todayStartMs);
             
-            // Analyser le signal dominant
-            // ✅ NOUVEAU: Calculer signal PONDÉRÉ
             String dominantSignal = calculateDominantSignalWeighted(assetEvents);
             
-            // Garder les 3 derniers événements
+            // Derniers événements
             List<String> recentDescs = new ArrayList<>();
             for (EventDatabase.StoredEvent event : assetEvents) {
                 if (recentDescs.size() < 3) {
@@ -2403,67 +2452,17 @@ public class NotificationService extends NotificationListenerService {
             dominantSignalByAsset.put(assetName, dominantSignal);
             recentEventsByAsset.put(assetName, recentDescs);
         }
-        
-        // ✅ Calculer totaux RÉELS
-        int totalEvents = 0;
-        int totalHaussier = 0;
-        int totalBaissier = 0;
-        
-        List<EventDatabase.StoredEvent> allTodayEvents = 
-            eventDb.getEventsInTimeWindow(todayStartMs, System.currentTimeMillis() - todayStartMs);
-        
-        for (EventDatabase.StoredEvent event : allTodayEvents) {
-            totalEvents++;
-            if ("Haussier".equals(event.impact)) totalHaussier++;
-            if ("Baissier".equals(event.impact)) totalBaissier++;
-        }
-                // =============================================
-        // ✅ DRIVER PRINCIPAL DU JOUR
-        // =============================================
-        EventDatabase.StoredEvent mainDriver = identifyMainMarketDriver(todayStartMs);
-        
-        if (mainDriver != null) {
-            report.append("*🎯 DRIVER PRINCIPAL DU JOUR:*\n");
-            report.append("```\n");
-            report.append(mainDriver.title).append("\n");
-            report.append("Type: ").append(mainDriver.eventType).append("\n");
-            report.append("Impact: ").append(mainDriver.impact).append("\n");
-            report.append("Actifs: ").append(mainDriver.assets).append("\n");
-            report.append("Confiance: ").append(mainDriver.confidence).append("%\n");
-            report.append("```\n\n");
-        }
-        
-        // ✅ Vérifier si assez d'événements
-        if (totalEvents == 0) {
-            if (MainActivity.instance != null)
-                MainActivity.instance.addLog("[REPORT] Aucun événement - rapport ignoré");
-            return;
-        }
-        
-        // ✅ CONSTRUIRE LE RAPPORT
-        StringBuilder report = new StringBuilder();
-        
-        String reportTitle = getReportTitle(hour, minute);
-        report.append("📊 *").append(reportTitle).append("*\n");
-        report.append(new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date()));
-        report.append("\n\n");
-        
-        report.append("*Vue d'ensemble: ").append(totalEvents).append(" événements*\n");
-        report.append("📈 Haussiers: ").append(totalHaussier).append(" | ");
-        report.append("📉 Baissiers: ").append(totalBaissier).append("\n\n");
-        
-        report.append("*📌 ANALYSE PAR ACTIF:*\n\n");
-        
-        // ✅ Trier par nombre d'événements (plus actifs en premier)
+
+        // Affichage des actifs triés
         List<Map.Entry<String, Integer>> sortedAssets = 
             new ArrayList<>(realCountsByAsset.entrySet());
         sortedAssets.sort((a, b) -> b.getValue().compareTo(a.getValue()));
-        
+
         for (Map.Entry<String, Integer> entry : sortedAssets) {
             String assetName = entry.getKey();
             int count = entry.getValue();
             
-            if (count == 0) continue; // Ignorer les actifs sans événements
+            if (count == 0) continue;
             
             String emoji = getAssetEmoji(assetName);
             String dominantSignal = dominantSignalByAsset.get(assetName);
@@ -2472,26 +2471,23 @@ public class NotificationService extends NotificationListenerService {
             report.append(count).append(" evt\n");
             report.append("   Signal: ").append(dominantSignal).append("\n");
             
-            // ✅ Ajouter ALERTE si couverture faible (< 2 événements)
             if (count < 2) {
-                report.append("   ⚠️ COUVERTURE FAIBLE (peu de données)\n");
+                report.append("   ⚠️ COUVERTURE FAIBLE\n");
             }
             
-            // Derniers événements
             List<String> recentEvents = recentEventsByAsset.get(assetName);
             if (recentEvents != null && !recentEvents.isEmpty()) {
                 for (String eventDesc : recentEvents) {
                     report.append("   • ").append(eventDesc).append("\n");
                 }
             }
-            
             report.append("\n");
         }
         
         report.append("_Prochain rapport: ").append(getNextReportTime(hour, minute)).append("_");
-        
+
         sendTelegram(report.toString());
-        
+
         // Nettoyage en fin de journée
         if (hour == 21) {
             for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
