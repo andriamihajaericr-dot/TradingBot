@@ -530,6 +530,371 @@ public class NotificationService extends NotificationListenerService {
         exec.submit(() -> processNotificationWithContextEnhanced(this, eventId, fa, ft, fde, assetsStr, fAssets, fIsDriver));
     }
     // =====================================================
+    // ✨ VALIDATION COMPLÈTE DES DRIVERS ÉCONOMIQUES
+    // =====================================================
+    
+    /**
+     * Vérifier si un événement est un VRAI driver économique
+     * Couvre TOUS les événements macro pour nos 10 actifs
+     */
+    private static boolean isValidEconomicDriver(EventDatabase.StoredEvent event) {
+        String lower = event.title.toLowerCase();
+        String content = event.content != null ? event.content.toLowerCase() : "";
+        String combined = lower + " " + content;
+        
+        // ========================================
+        // ❌ BLACKLIST : REJETS ABSOLUS
+        // ========================================
+        
+        // Sources sans contenu économique concret
+        if (combined.contains("walter bloomberg") && 
+            !containsAnyMacroKeyword(combined)) {
+            return false; // Walter Bloomberg sans contexte macro = pas un driver
+        }
+        
+        if (combined.contains("zerohedge") && 
+            !containsAnyMacroKeyword(combined)) {
+            return false; // ZeroHedge sans contexte = pas un driver
+        }
+        
+        // Opinions/éditoriaux
+        if (combined.contains("opinion") || combined.contains("editorial") ||
+            combined.contains("commentary") || combined.contains("op-ed")) {
+            return false;
+        }
+        
+        // Politique domestique sans impact macro
+        if ((combined.contains("democrat") || combined.contains("republican") ||
+             combined.contains("election campaign")) && 
+            !combined.contains("fed") && !combined.contains("fiscal policy")) {
+            return false;
+        }
+        
+        // ========================================
+        // ✅ WHITELIST : VRAIS DRIVERS PAR ACTIF
+        // ========================================
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 🇺🇸 ÉTATS-UNIS (Impact: USD pairs, Gold, Stocks)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        // EMPLOI
+        String[] employmentIndicators = {
+            "nfp", "non-farm payroll", "payrolls", "non farm",
+            "unemployment rate", "jobless claims", "initial claims",
+            "continuing claims", "adp employment", "employment change",
+            "job openings", "jolts", "average hourly earnings"
+        };
+        if (containsAny(combined, employmentIndicators) && 
+            (combined.contains("us") || combined.contains("united states"))) {
+            return true; // ✅ EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, GOLD, SP500, NASDAQ
+        }
+        
+        // INFLATION
+        String[] inflationIndicators = {
+            "cpi", "consumer price index", "core cpi",
+            "pce", "core pce", "personal consumption",
+            "ppi", "producer price", "import prices",
+            "export prices", "inflation"
+        };
+        if (containsAny(combined, inflationIndicators) && 
+            (combined.contains("us") || combined.contains("united states") || 
+             combined.contains("america"))) {
+            return true; // ✅ GOLD, BTCUSD, EURUSD, USDJPY, SP500, NASDAQ
+        }
+        
+        // FED / FOMC
+        String[] fedIndicators = {
+            "fomc", "federal reserve", "fed rate", "interest rate decision",
+            "fed minutes", "fomc minutes", "beige book",
+            "powell", "jerome powell", "fed chair",
+            "fed funds", "fed dot plot", "fed statement",
+            "federal open market committee"
+        };
+        if (containsAny(combined, fedIndicators)) {
+            return true; // ✅ TOUS LES ACTIFS
+        }
+        
+        // CROISSANCE / ACTIVITÉ
+        String[] growthIndicators = {
+            "gdp", "gross domestic product", "gdp preliminary", "gdp final",
+            "retail sales", "advance retail", "core retail",
+            "personal spending", "consumer spending",
+            "durable goods", "factory orders", "core orders",
+            "industrial production", "capacity utilization",
+            "business inventories", "wholesale inventories"
+        };
+        if (containsAny(combined, growthIndicators) && 
+            (combined.contains("us") || combined.contains("united states"))) {
+            return true; // ✅ SP500, NASDAQ, EURUSD, GOLD
+        }
+        
+        // SENTIMENT / CONFIANCE
+        String[] sentimentIndicators = {
+            "pmi", "ism manufacturing", "ism services", "ism non-manufacturing",
+            "purchasing managers", "markit pmi",
+            "consumer confidence", "cb consumer confidence",
+            "michigan sentiment", "university of michigan",
+            "business confidence", "small business optimism", "nfib"
+        };
+        if (containsAny(combined, sentimentIndicators) && 
+            (combined.contains("us") || combined.contains("united states"))) {
+            return true; // ✅ SP500, NASDAQ, GOLD
+        }
+        
+        // IMMOBILIER
+        String[] housingIndicators = {
+            "housing starts", "building permits",
+            "existing home sales", "new home sales", "pending home sales",
+            "s&p case-shiller", "case shiller", "home price index",
+            "mortgage applications", "refinance index"
+        };
+        if (containsAny(combined, housingIndicators) && 
+            combined.contains("us")) {
+            return true; // ✅ EURUSD, GOLD, SP500
+        }
+        
+        // BALANCE COMMERCIALE
+        String[] tradeIndicators = {
+            "trade balance", "trade deficit", "trade surplus",
+            "exports", "imports", "goods trade balance"
+        };
+        if (containsAny(combined, tradeIndicators) && 
+            combined.contains("us")) {
+            return true; // ✅ EURUSD, USDJPY, USDCAD
+        }
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 🇬🇧 ROYAUME-UNI (Impact: GBPUSD, GOLD)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String[] ukIndicators = {
+            "boe", "bank of england", "boe rate", "mpc", "mpc meeting",
+            "bailey", "andrew bailey", "boe minutes",
+            "uk cpi", "uk inflation", "uk core cpi",
+            "uk gdp", "uk employment", "uk unemployment", "claimant count",
+            "uk retail sales", "uk pmi", "uk manufacturing pmi", "uk services pmi",
+            "uk wages", "average earnings", "uk trade balance"
+        };
+        if (containsAny(combined, ukIndicators)) {
+            return true; // ✅ GBPUSD, GOLD, EURUSD
+        }
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 🇯🇵 JAPON (Impact: USDJPY, GOLD)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String[] japanIndicators = {
+            "boj", "bank of japan", "boj rate", "boj policy",
+            "ueda", "kazuo ueda", "kuroda", "boj governor",
+            "yen intervention", "currency intervention", "mof intervention",
+            "japan cpi", "japan core cpi", "tokyo cpi",
+            "japan gdp", "japan pmi", "tankan survey", "tankan",
+            "japan trade balance", "japan exports", "japan imports",
+            "japan industrial production", "japan retail sales",
+            "japan employment", "japan unemployment"
+        };
+        if (containsAny(combined, japanIndicators)) {
+            return true; // ✅ USDJPY, GOLD, EURUSD
+        }
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 🇪🇺 ZONE EURO (Impact: EURUSD, GOLD)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String[] euroIndicators = {
+            "ecb", "european central bank", "ecb rate", "ecb policy",
+            "lagarde", "christine lagarde", "ecb president", "ecb minutes",
+            "eurozone cpi", "euro area cpi", "eurozone inflation",
+            "eurozone gdp", "euro area gdp",
+            "eurozone pmi", "euro area pmi", "eurozone manufacturing",
+            "eurozone unemployment", "eurozone trade balance",
+            // Allemagne (locomotive européenne)
+            "german", "germany", "ifo", "ifo business climate",
+            "zew", "zew sentiment", "german cpi", "german gdp",
+            "german pmi", "german factory orders", "german industrial production",
+            "bundesbank",
+            // France
+            "french cpi", "france gdp", "france pmi",
+            // Italie / Espagne
+            "italy cpi", "italy gdp", "spain cpi", "spain gdp"
+        };
+        if (containsAny(combined, euroIndicators)) {
+            return true; // ✅ EURUSD, GOLD, GBPUSD
+        }
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 🇦🇺 AUSTRALIE (Impact: AUDUSD, GOLD)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String[] australiaIndicators = {
+            "rba", "reserve bank australia", "rba rate", "rba minutes",
+            "lowe", "philip lowe", "bullock", "michele bullock",
+            "australia cpi", "aus cpi", "australia inflation",
+            "australia gdp", "aus gdp",
+            "australia employment", "aus employment", "australia unemployment",
+            "australia retail sales", "aus retail",
+            "australia trade balance", "australia pmi",
+            "westpac consumer confidence", "nab business confidence",
+            // Commodités impactant AUD
+            "iron ore", "iron ore price", "mining output",
+            "china pmi", "china gdp", "china trade" // Impact indirect via Chine
+        };
+        if (containsAny(combined, australiaIndicators)) {
+            return true; // ✅ AUDUSD, GOLD
+        }
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 🇨🇦 CANADA (Impact: USDCAD, OIL)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String[] canadaIndicators = {
+            "boc", "bank of canada", "boc rate", "boc minutes",
+            "macklem", "tiff macklem",
+            "canada cpi", "canada inflation", "canada core cpi",
+            "canada gdp", "canada employment", "canada unemployment",
+            "canada retail sales", "canada trade balance",
+            "canada pmi", "ivey pmi", "canada housing starts"
+        };
+        if (containsAny(combined, canadaIndicators)) {
+            return true; // ✅ USDCAD, OIL, GOLD
+        }
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 🛢️ PÉTROLE (Impact: OIL, USDCAD)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String[] oilIndicators = {
+            "eia", "eia report", "crude oil inventories", "eia crude",
+            "api", "api inventories", "api crude",
+            "opec", "opec+", "opec meeting", "opec production",
+            "saudi", "saudi arabia", "saudi aramco",
+            "russia oil", "russia production", "russian oil",
+            "iran oil", "iran sanctions", "iran exports",
+            "oil production", "crude production", "shale production",
+            "baker hughes", "rig count", "oil rigs",
+            "iea", "international energy agency", "iea report",
+            "spr", "strategic petroleum reserve"
+        };
+        if (containsAny(combined, oilIndicators)) {
+            return true; // ✅ OIL, USDCAD
+        }
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 🥇 GOLD (Événements spécifiques or)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String[] goldIndicators = {
+            "gold", "xauusd", "gold price", "gold demand",
+            "central bank gold", "gold reserves",
+            "real yields", "tips", "breakeven inflation"
+        };
+        if (containsAny(combined, goldIndicators) && 
+            (combined.contains("demand") || combined.contains("reserve") || 
+             combined.contains("central bank"))) {
+            return true; // ✅ GOLD
+        }
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // ₿ CRYPTO (Impact: BTCUSD)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String[] cryptoIndicators = {
+            "sec crypto", "sec bitcoin", "sec ethereum",
+            "spot etf", "bitcoin etf", "crypto etf",
+            "gbtc", "grayscale", "blackrock bitcoin",
+            "coinbase", "binance", "crypto exchange",
+            "bitcoin halving", "btc halving",
+            "crypto regulation", "crypto ban", "crypto law",
+            "el salvador bitcoin", "microstrategy bitcoin",
+            "mining difficulty", "hash rate"
+        };
+        if (containsAny(combined, cryptoIndicators)) {
+            return true; // ✅ BTCUSD
+        }
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 📈 ACTIONS US (Impact: SP500, NASDAQ)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String[] stockIndicators = {
+            "earnings", "quarterly earnings", "q1 earnings", "q2 earnings",
+            "revenue", "eps", "guidance",
+            // Big Tech (impact NASDAQ)
+            "apple earnings", "aapl", "microsoft earnings", "msft",
+            "nvidia earnings", "nvda", "tesla earnings", "tsla",
+            "amazon earnings", "amzn", "meta earnings", "meta",
+            "alphabet earnings", "googl", "google earnings",
+            "netflix earnings", "nflx",
+            // Indices
+            "s&p rebalance", "nasdaq rebalance", "index addition",
+            "vix", "vix spike", "volatility index"
+        };
+        if (containsAny(combined, stockIndicators)) {
+            return true; // ✅ SP500, NASDAQ
+        }
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 🌍 GÉOPOLITIQUE (Impact: tous actifs)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String[] geopoliticalIndicators = {
+            "war", "military action", "invasion", "attack",
+            "missile strike", "drone attack", "bombing",
+            "sanctions", "economic sanctions", "trade sanctions",
+            "nuclear", "nuclear threat", "nuclear test",
+            "conflict", "military conflict", "armed conflict",
+            "middle east crisis", "taiwan strait", "ukraine war",
+            "iran israel", "north korea missile",
+            "trade war", "tariffs", "import duties"
+        };
+        if (containsAny(combined, geopoliticalIndicators) && 
+            (combined.contains("breaking") || combined.contains("urgent") || 
+             combined.contains("alert"))) {
+            return true; // ✅ GOLD, USDJPY, OIL, tous actifs en risk-off
+        }
+        
+        // ========================================
+        // ✅ VALIDATION PAR CONFIANCE
+        // ========================================
+        
+        // Si aucun keyword macro mais confiance très haute (>90%) et impact fort
+        if (event.confidence >= 90 && 
+            ("Haussier".equals(event.impact) || "Baissier".equals(event.impact))) {
+            return true;
+        }
+        
+        // ========================================
+        // ❌ REJET PAR DÉFAUT
+        // ========================================
+        
+        return false;
+    }
+    
+    /**
+     * Vérifier si le texte contient au moins un keyword d'une liste
+     */
+    private static boolean containsAny(String text, String[] keywords) {
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Vérifier si le texte contient au moins un mot-clé macro
+     */
+    private static boolean containsAnyMacroKeyword(String text) {
+        String[] macroKeywords = {
+            "fed", "fomc", "powell", "boe", "boj", "ecb", "rba", "boc",
+            "nfp", "cpi", "gdp", "pmi", "inflation", "employment",
+            "retail sales", "trade balance", "eia", "opec"
+        };
+        return containsAny(text, macroKeywords);
+    }
+    // =====================================================
     // ✨ DÉTECTION CALENDRIER FINANCIALJUICE - TOUS ÉVÉNEMENTS HIGH
     // =====================================================
     
