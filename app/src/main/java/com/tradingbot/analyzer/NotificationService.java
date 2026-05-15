@@ -277,7 +277,92 @@ public class NotificationService extends NotificationListenerService {
             this.signal = signal;
         }
     }
-
+    // =====================================================
+    // ✨ CALCUL DU SIGNAL DOMINANT PONDÉRÉ PAR TEMPS
+    // =====================================================
+    
+    /**
+     * Calculer le signal dominant pour un actif avec pondération temporelle
+     * Les événements récents comptent plus que les anciens
+     */
+    private static String calculateDominantSignalWeighted(List<EventDatabase.StoredEvent> events) {
+        if (events.isEmpty()) {
+            return "⚪ NEUTRE (aucun événement)";
+        }
+        
+        long now = System.currentTimeMillis();
+        double buyScore = 0;
+        double sellScore = 0;
+        double waitScore = 0;
+        
+        for (EventDatabase.StoredEvent event : events) {
+            // ✅ PONDÉRATION TEMPORELLE
+            long age = now - event.timestamp;
+            double weight = 1.0;
+            
+            if (age < 1 * 60 * 60 * 1000) {
+                // < 1h : poids 3x (très récent)
+                weight = 3.0;
+            } else if (age < 3 * 60 * 60 * 1000) {
+                // 1-3h : poids 2x (récent)
+                weight = 2.0;
+            } else if (age < 6 * 60 * 60 * 1000) {
+                // 3-6h : poids 1.5x (moyen)
+                weight = 1.5;
+            }
+            // > 6h : poids 1x (ancien)
+            
+            // ✅ PONDÉRATION PAR CONFIANCE
+            double confidenceWeight = event.confidence / 100.0;
+            
+            // ✅ PONDÉRATION PAR IMPORTANCE
+            double importanceWeight = 1.0;
+            if (event.eventType.contains("CENTRAL_BANK") || 
+                event.eventType.contains("EMPLOYMENT") ||
+                event.eventType.contains("INFLATION")) {
+                importanceWeight = 1.5;
+            }
+            
+            // ✅ SCORE FINAL
+            double finalWeight = weight * confidenceWeight * importanceWeight;
+            
+            // Extraire le signal
+            String signal = extractSignalFromAnalysis(event.analysis);
+            
+            if ("BUY".equals(signal)) {
+                buyScore += finalWeight;
+            } else if ("SELL".equals(signal)) {
+                sellScore += finalWeight;
+            } else {
+                waitScore += finalWeight;
+            }
+        }
+        
+        // ✅ DÉTERMINER LE SIGNAL DOMINANT
+        double total = buyScore + sellScore + waitScore;
+        
+        if (total == 0) {
+            return "⚪ NEUTRE (aucun signal)";
+        }
+        
+        double buyPct = (buyScore / total) * 100;
+        double sellPct = (sellScore / total) * 100;
+        double waitPct = (waitScore / total) * 100;
+        
+        // ✅ SEUIL DE DOMINANCE : 50%
+        if (buyPct > 50) {
+            return String.format("🟢 BUY DOMINANT (%.0f%%)", buyPct);
+        } else if (sellPct > 50) {
+            return String.format("🔴 SELL DOMINANT (%.0f%%)", sellPct);
+        } else if (Math.abs(buyPct - sellPct) < 15) {
+            return String.format("⚠️ SIGNAUX CONTRADICTOIRES (B:%.0f%% S:%.0f%%)", buyPct, sellPct);
+        } else if (buyPct > sellPct) {
+            return String.format("🟡 TENDANCE BUY (%.0f%% vs %.0f%%)", buyPct, sellPct);
+        } else {
+            return String.format("🟠 TENDANCE SELL (%.0f%% vs %.0f%%)", sellPct, buyPct);
+        }
+    }
+    
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         boolean botActive = getSharedPreferences("TradingBot", MODE_PRIVATE).getBoolean("bot_active", false);
