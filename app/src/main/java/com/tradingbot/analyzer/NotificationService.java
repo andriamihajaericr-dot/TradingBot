@@ -2977,22 +2977,13 @@ public class NotificationService extends NotificationListenerService {
         if (todayEvents.isEmpty()) {
             realContext.append("Aucun événement majeur capté aujourd'hui.\n");
         } else {
-            // ✅ FILTRER les événements valides seulement
-            List<EventDatabase.StoredEvent> validEvents = new ArrayList<>();
-            for (EventDatabase.StoredEvent event : todayEvents) {
-                if (isValidEconomicDriver(event)) {
-                    validEvents.add(event);
-                }
-            }
+            realContext.append("ÉVÉNEMENTS CAPTÉS AUJOURD'HUI (" + todayEvents.size() + " au total):\n\n");
             
-            if (validEvents.isEmpty()) {
-                realContext.append("Événements captés mais aucun driver majeur confirmé.\n");
-            } else {
-                realContext.append("ÉVÉNEMENTS MACRO CONFIRMÉS (" + validEvents.size() + " au total):\n\n");
+            // Limiter à 10 événements les plus importants
+            int count = 0;
+            for (EventDatabase.StoredEvent event : todayEvents) {
+                if (count >= 10) break;
                 
-                int count = 0;
-                for (EventDatabase.StoredEvent event : validEvents) {
-                    if (count >= 10) break;
                 String time = new SimpleDateFormat("HH:mm", Locale.FRENCH)
                     .format(new Date(event.timestamp));
                 
