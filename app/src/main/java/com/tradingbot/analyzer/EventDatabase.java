@@ -273,6 +273,79 @@ public class EventDatabase extends SQLiteOpenHelper {
         public int avgConfidence = 0;
         public Map<String, Integer> bySource = new HashMap<>();
     }
+        // ====================== STATISTIQUES ======================
+    
+    public DatabaseStats getStats() {
+        DatabaseStats stats = new DatabaseStats();
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = null;
+        
+        try {
+            // Total événements
+            cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_EVENTS, null);
+            if (cursor.moveToFirst()) {
+                stats.totalEvents = cursor.getInt(0);
+            }
+            cursor.close();
+            
+            // Événements traités
+            cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_EVENTS + 
+                " WHERE " + COLUMN_PROCESSED + " = 1", null);
+            if (cursor.moveToFirst()) {
+                stats.processedEvents = cursor.getInt(0);
+            }
+            cursor.close();
+            
+            // Événements aujourd'hui
+            long todayStart = getTodayStartTimestamp();
+            cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_EVENTS + 
+                " WHERE " + COLUMN_TIMESTAMP + " >= ?", 
+                new String[]{String.valueOf(todayStart)});
+            if (cursor.moveToFirst()) {
+                stats.eventsToday = cursor.getInt(0);
+            }
+            cursor.close();
+            
+            // Confiance moyenne
+            cursor = db.rawQuery("SELECT AVG(" + COLUMN_CONFIDENCE + ") FROM " + 
+                TABLE_EVENTS + " WHERE " + COLUMN_TIMESTAMP + " >= ?", 
+                new String[]{String.valueOf(todayStart)});
+            if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                stats.avgConfidence = (int) cursor.getDouble(0);
+            }
+            cursor.close();
+            
+            // Par source
+            cursor = db.rawQuery(
+                "SELECT " + COLUMN_SOURCE_TYPE + ", COUNT(*) FROM " + TABLE_EVENTS +
+                " WHERE " + COLUMN_TIMESTAMP + " >= ? GROUP BY " + COLUMN_SOURCE_TYPE,
+                new String[]{String.valueOf(todayStart)}
+            );
+            while (cursor.moveToNext()) {
+                String source = cursor.getString(0);
+                int count = cursor.getInt(1);
+                if (source != null) {
+                    stats.bySource.put(source, count);
+                }
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur getStats", e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        
+        return stats;
+    }
+
+    private long getTodayStartTimestamp() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
+    }
 
     private StoredEvent cursorToEvent(Cursor cursor) {
         StoredEvent event = new StoredEvent();
