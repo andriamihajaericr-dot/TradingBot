@@ -2200,7 +2200,6 @@ public class NotificationService extends NotificationListenerService {
             }
         }
     }
-    
     private void generateScheduledReport(int hour, int minute) {
         boolean hasEvents = false;
         for (List<DailyReportEntry> cache : dailyReportByAsset.values()) {
