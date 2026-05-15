@@ -1373,6 +1373,77 @@ public class NotificationService extends NotificationListenerService {
     }
 
     // =====================================================
+    // ✨ IDENTIFIER LE DRIVER PRINCIPAL DU MARCHÉ
+    // =====================================================
+    
+    /**
+     * Identifier l'événement DRIVER qui dirige vraiment le marché
+     */
+    private EventDatabase.StoredEvent identifyMainMarketDriver(long since) {
+        List<EventDatabase.StoredEvent> allEvents = 
+            eventDb.getEventsInTimeWindow(since, System.currentTimeMillis() - since);
+        
+        if (allEvents.isEmpty()) {
+            return null;
+        }
+        
+        EventDatabase.StoredEvent mainDriver = null;
+        double maxScore = 0;
+        
+        for (EventDatabase.StoredEvent event : allEvents) {
+            double score = 0;
+            
+            // ✅ CRITÈRE 1: Type d'événement (poids max)
+            if (event.eventType.contains("CENTRAL_BANK")) {
+                score += 100; // Fed, BOE, BOJ = drivers absolus
+            } else if (event.eventType.contains("EMPLOYMENT")) {
+                score += 80; // NFP, Jobs
+            } else if (event.eventType.contains("INFLATION")) {
+                score += 75; // CPI, PCE
+            } else if (event.eventType.contains("GROWTH")) {
+                score += 60; // GDP, PMI
+            } else if (event.eventType.contains("COMMODITY")) {
+                score += 50; // EIA, OPEC
+            }
+            
+            // ✅ CRITÈRE 2: Confiance (0-30 points)
+            score += (event.confidence / 100.0) * 30;
+            
+            // ✅ CRITÈRE 3: Nombre d'actifs impactés (0-20 points)
+            int assetCount = event.assets.split(",").length;
+            score += Math.min(assetCount * 3, 20);
+            
+            // ✅ CRITÈRE 4: Fraîcheur (0-25 points)
+            long age = System.currentTimeMillis() - event.timestamp;
+            if (age < 1 * 60 * 60 * 1000) {
+                score += 25; // < 1h
+            } else if (age < 3 * 60 * 60 * 1000) {
+                score += 15; // 1-3h
+            } else if (age < 6 * 60 * 60 * 1000) {
+                score += 5; // 3-6h
+            }
+            
+            // ✅ CRITÈRE 5: Impact (0-15 points)
+            if ("Haussier".equals(event.impact) || "Baissier".equals(event.impact)) {
+                score += 15;
+            }
+            
+            // ✅ CRITÈRE 6: Boost si données actual présentes
+            if (event.title.toLowerCase().contains("actual") || 
+                event.content.toLowerCase().contains("came in at")) {
+                score += 10;
+            }
+            
+            if (score > maxScore) {
+                maxScore = score;
+                mainDriver = event;
+            }
+        }
+        
+        return mainDriver;
+    }
+    
+    // =====================================================
     // VÉRIFIER ÉVÉNEMENTS MANQUÉS DU CALENDRIER
     // =====================================================
     
