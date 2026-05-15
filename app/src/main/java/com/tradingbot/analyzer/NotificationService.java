@@ -832,6 +832,10 @@ public class NotificationService extends NotificationListenerService {
     // ✨ TRAITEMENT PRIORITAIRE CALENDRIER ÉCONOMIQUE
     // =====================================================
     
+    // =====================================================
+    // ✨ TRAITEMENT PRIORITAIRE CALENDRIER ÉCONOMIQUE
+    // =====================================================
+    
     private void processCalendarEventWithPriority(String appName, String title, 
                                                    String content, CalendarData calData) {
         try {
@@ -855,6 +859,8 @@ public class NotificationService extends NotificationListenerService {
             // Forcer l'importance à HIGH si Actual publié
             if (calData.hasActual()) {
                 detectedEvent.eventType = "ECONOMIC_RELEASE";
+            } else {
+                detectedEvent.eventType = "ECONOMIC_CALENDAR";
             }
             
             // Détecter les actifs impactés
@@ -869,6 +875,8 @@ public class NotificationService extends NotificationListenerService {
             String eventId = generateEventId(appName, title, content);
             
             // Sauvegarder en DB avec confiance maximale
+            int confidence = calData.hasActual() ? 95 : 85;
+            
             boolean saved = eventDb.saveEvent(
                 eventId, 
                 appName, 
@@ -894,43 +902,76 @@ public class NotificationService extends NotificationListenerService {
                 );
             }
             
+            // =====================================================
             // Construire un contexte enrichi
+            // =====================================================
             StringBuilder enrichedContent = new StringBuilder();
-            enrichedContent.append("📅 PUBLICATION CALENDRIER ÉCONOMIQUE\n\n");
+            
+            // ✅ Adapter le header selon type de données
+            if (calData.hasActual()) {
+                enrichedContent.append("📅 PUBLICATION CALENDRIER ÉCONOMIQUE - ACTUAL PUBLIÉ\n\n");
+            } else {
+                enrichedContent.append("📅 CALENDRIER ÉCONOMIQUE HIGH IMPORTANCE\n\n");
+            }
+            
             enrichedContent.append("Indicateur: ").append(calData.indicator).append("\n");
             enrichedContent.append("Pays: ").append(calData.country).append("\n");
             enrichedContent.append("Heure: ").append(calData.releaseTime).append("\n\n");
-            enrichedContent.append("🎯 Prévision: ").append(calData.forecast).append("\n");
-            enrichedContent.append("📋 Précédent: ").append(calData.previous).append("\n");
-            enrichedContent.append("✅ ACTUEL: ").append(calData.actual).append("\n\n");
             
-            // Calculer la surprise
-            try {
-                double actualVal = parseNumericValue(calData.actual);
-                double forecastVal = parseNumericValue(calData.forecast);
-                double diff = actualVal - forecastVal;
-                double diffPct = (diff / Math.abs(forecastVal)) * 100;
-                
-                String surpriseLevel;
-                if (Math.abs(diffPct) > 1.0) {
-                    surpriseLevel = "⚠️ SURPRISE MAJEURE";
-                } else if (Math.abs(diffPct) > 0.5) {
-                    surpriseLevel = "⚡ Surprise significative";
-                } else if (Math.abs(diffPct) > 0.2) {
-                    surpriseLevel = "📊 Léger écart";
-                } else {
-                    surpriseLevel = "✓ Conforme aux attentes";
+            // ✅ Afficher TOUTES les données disponibles
+            boolean hasData = false;
+            if (!calData.forecast.equals("N/A")) {
+                enrichedContent.append("🎯 Prévision: ").append(calData.forecast).append("\n");
+                hasData = true;
+            }
+            if (!calData.previous.equals("N/A")) {
+                enrichedContent.append("📋 Précédent: ").append(calData.previous).append("\n");
+                hasData = true;
+            }
+            if (calData.hasActual()) {
+                enrichedContent.append("✅ ACTUEL: ").append(calData.actual).append("\n");
+                hasData = true;
+            }
+            
+            if (hasData) {
+                enrichedContent.append("\n");
+            }
+            
+            // ✅ Calculer la surprise SEULEMENT si possible
+            if (calData.hasActual() && !calData.forecast.equals("N/A")) {
+                try {
+                    double actualVal = parseNumericValue(calData.actual);
+                    double forecastVal = parseNumericValue(calData.forecast);
+                    double diff = actualVal - forecastVal;
+                    double diffPct = (diff / Math.abs(forecastVal)) * 100;
+                    
+                    String surpriseLevel;
+                    if (Math.abs(diffPct) > 1.0) {
+                        surpriseLevel = "⚠️ SURPRISE MAJEURE";
+                    } else if (Math.abs(diffPct) > 0.5) {
+                        surpriseLevel = "⚡ Surprise significative";
+                    } else if (Math.abs(diffPct) > 0.2) {
+                        surpriseLevel = "📊 Léger écart";
+                    } else {
+                        surpriseLevel = "✓ Conforme aux attentes";
+                    }
+                    
+                    enrichedContent.append("Écart: ").append(String.format("%.2f%%", diffPct))
+                                  .append(" - ").append(surpriseLevel).append("\n\n");
+                } catch (Exception e) {
+                    // Ignore si parsing impossible
                 }
-                
-                enrichedContent.append("Écart: ").append(String.format("%.2f%%", diffPct))
-                              .append(" - ").append(surpriseLevel).append("\n\n");
-            } catch (Exception e) {
-                // Ignore si parsing impossible
+            } else if (!calData.hasActual()) {
+                // ✅ Instruction spéciale si pas d'actual
+                enrichedContent.append("⚠️ NOTE: Actual pas encore publié. ");
+                enrichedContent.append("Analyser l'impact POTENTIEL basé sur forecast vs previous.\n\n");
             }
             
             enrichedContent.append("Détails:\n").append(content);
             
+            // =====================================================
             // ✅ ANALYSE GROQ AVEC PRIORITÉ MAX
+            // =====================================================
             String analysis = analyzeWithGroqEnhanced(
                 enrichedContent.toString(),
                 assetsStr,
@@ -939,44 +980,102 @@ public class NotificationService extends NotificationListenerService {
                 true  // ✅ Flag DRIVER = true pour priorité max
             );
             
+            // =====================================================
             // ✅ ENVOI TELEGRAM IMMÉDIAT
+            // =====================================================
             String ts = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
                 .format(new Date());
             
             StringBuilder tgMsg = new StringBuilder();
-            tgMsg.append("🔴 **PUBLICATION OFFICIELLE** 🔴\n");
+            
+            // ✅ ADAPTER LE TITRE selon les données disponibles
+            if (calData.hasActual()) {
+                tgMsg.append("🔴 **PUBLICATION OFFICIELLE** 🔴\n");
+            } else {
+                tgMsg.append("📅 **ÉVÉNEMENT ÉCONOMIQUE HIGH** 📅\n");
+            }
+            
             tgMsg.append("Source: ").append(appName).append(" | ").append(ts).append("\n\n");
             tgMsg.append("**").append(calData.indicator).append("**\n");
             tgMsg.append(calData.country).append(" - ").append(calData.releaseTime).append("\n\n");
             
-            tgMsg.append("🎯 Prévision: ").append(calData.forecast).append("\n");
-            tgMsg.append("📋 Précédent: ").append(calData.previous).append("\n");
-            tgMsg.append("✅ **ACTUEL: ").append(calData.actual).append("**\n\n");
+            // ✅ Afficher les données disponibles
+            boolean hasTelegramData = false;
             
-            // Ajouter surprise si calculée
-            try {
-                double actualVal = parseNumericValue(calData.actual);
-                double forecastVal = parseNumericValue(calData.forecast);
-                double diffPct = ((actualVal - forecastVal) / Math.abs(forecastVal)) * 100;
-                
-                if (Math.abs(diffPct) > 0.2) {
-                    String emoji = Math.abs(diffPct) > 1.0 ? "⚠️" : 
-                                  Math.abs(diffPct) > 0.5 ? "⚡" : "📊";
-                    tgMsg.append(emoji).append(" Écart: ")
-                         .append(String.format("%.2f%%", diffPct)).append("\n\n");
+            if (!calData.forecast.equals("N/A")) {
+                tgMsg.append("🎯 Prévision: ").append(calData.forecast).append("\n");
+                hasTelegramData = true;
+            }
+            if (!calData.previous.equals("N/A")) {
+                tgMsg.append("📋 Précédent: ").append(calData.previous).append("\n");
+                hasTelegramData = true;
+            }
+            if (calData.hasActual()) {
+                tgMsg.append("✅ **ACTUEL: ").append(calData.actual).append("**\n");
+                hasTelegramData = true;
+            }
+            
+            // ✅ Calculer surprise SEULEMENT si actual présent
+            if (calData.hasActual() && !calData.forecast.equals("N/A")) {
+                try {
+                    double actualVal = parseNumericValue(calData.actual);
+                    double forecastVal = parseNumericValue(calData.forecast);
+                    double diff = actualVal - forecastVal;
+                    double diffPct = (diff / Math.abs(forecastVal)) * 100;
+                    
+                    if (Math.abs(diffPct) > 0.2) {
+                        String emoji = Math.abs(diffPct) > 1.0 ? "⚠️" : 
+                                      Math.abs(diffPct) > 0.5 ? "⚡" : "📊";
+                        tgMsg.append(emoji).append(" Écart: ")
+                             .append(String.format("%.2f%%", diffPct)).append("\n");
+                    }
+                } catch (Exception e) {
+                    // Ignore si parsing impossible
                 }
-            } catch (Exception e) {}
+            }
             
+            if (hasTelegramData) {
+                tgMsg.append("\n");
+            }
+            
+            // ✅ Détails de la notification (seulement si contenu utile)
+            if (content.length() > 50) {
+                tgMsg.append("**Détails:**\n");
+                String shortContent = content.length() > 200 ? 
+                    content.substring(0, 200) + "..." : content;
+                tgMsg.append(shortContent);
+                tgMsg.append("\n\n");
+            }
+            
+            // ✅ Analyse PAR ACTIF (toujours présente)
             tgMsg.append("**ANALYSE PAR ACTIF:**\n");
             tgMsg.append(analysis);
             
+            // =====================================================
+            // Envoyer sur Telegram
+            // =====================================================
             sendTelegram(tgMsg.toString());
             
-            // Notification locale
+            // =====================================================
+            // Notification locale Android
+            // =====================================================
             showLocalNotif(this, assetsStr, analysis, detectedEvent.impact);
             
+            // =====================================================
             // Sauvegarder dans rapport quotidien
+            // =====================================================
             saveToDailyReport(detectedEvent, content, analysis, assets);
+            
+            // =====================================================
+            // Marquer comme traité dans la DB
+            // =====================================================
+            EventDatabase eventDatabase = new EventDatabase(this);
+            try {
+                int dbId = Integer.parseInt(eventId.substring(Math.max(0, eventId.length() - 8)), 16);
+                eventDatabase.markProcessed(dbId, analysis);
+            } catch (Exception e) {
+                // Ignore si impossible de parser l'ID
+            }
             
             if (MainActivity.instance != null) {
                 MainActivity.instance.addLog(
@@ -993,7 +1092,6 @@ public class NotificationService extends NotificationListenerService {
             }
         }
     }
-    
     /**
      * Enrichir les actifs selon l'indicateur
      */
