@@ -382,6 +382,24 @@ public class NotificationService extends NotificationListenerService {
         
         String appName = getAppName(packageName);
         List<String> assets = detectAssetsWithScoring(combined);
+        // ✅ FILTRAGE SPÉCIAL POUR WSJ
+        if (appName.equals("X/Twitter") && combined.toLowerCase().contains("wall street journal")) {
+            // Vérifier si c'est un article de fond (feature)
+            String lower = combined.toLowerCase();
+            
+            if (lower.contains("hasn't been") || 
+                lower.contains("more than a year") ||
+                lower.contains("changed the face") ||
+                lower.contains("special forces") && !lower.contains("breaking")) {
+                
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[FILTRE] ❌ WSJ article de fond - Ignoré"
+                    );
+                }
+                return; // ✅ STOP - Ne pas traiter
+            }
+        }
         // ✨ PRIORITÉ ABSOLUE: FINANCIALJUICE CALENDRIER
         if (isEconomicCalendarNotification(appName, title, full)) {
             if (MainActivity.instance != null) {
