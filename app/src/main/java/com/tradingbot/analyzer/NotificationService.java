@@ -3232,7 +3232,9 @@ public class NotificationService extends NotificationListenerService {
             }
             return false;
         }
-        
+            // ... à la toute fin de isTradingRelevant
+    return true;   // ✅ Ajouter ceci
+
     }
 
     private String getAppName(String pkg) {
