@@ -2417,29 +2417,27 @@ public class NotificationService extends NotificationListenerService {
         boolean hasCombination = relatedEvents.size() > 1;
         StringBuilder contextBuilder = new StringBuilder();
         if (hasCombination) {
-            tgMsg.append("📌 ÉVÉNEMENTS LIÉS:\n");
-            
-            // ✅ NOUVEAU: Utiliser un Set pour éviter les doublons
-            Set<String> seenEvents = new HashSet<>();
-            
-            for (EventDatabase.StoredEvent event : relatedEvents) {
-                if (!event.eventId.equals(eventId)) {
-                    // Créer une signature unique pour l'événement
-                    String eventSignature = event.impact + "|" + 
-                        event.title.substring(0, Math.min(50, event.title.length()));
+        contextBuilder.append("📌 ÉVÉNEMENTS LIÉS:\n");
+        
+        // ✅ NOUVEAU: Utiliser un Set pour éviter les doublons
+        Set<String> seenEvents = new HashSet<>();
+        
+        for (EventDatabase.StoredEvent event : relatedEvents) {
+            if (!event.eventId.equals(eventId)) {
+                String eventSignature = event.impact + "|" + 
+                    event.title.substring(0, Math.min(50, event.title.length()));
+                
+                if (!seenEvents.contains(eventSignature)) {
+                    seenEvents.add(eventSignature);
                     
-                    // ✅ N'ajouter que si pas encore vu
-                    if (!seenEvents.contains(eventSignature)) {
-                        seenEvents.add(eventSignature);
-                        
-                        tgMsg.append("• [").append(event.impact).append("] ")
-                            .append(event.title.substring(0, Math.min(50, event.title.length())))
-                            .append("\n");
-                    }
+                    contextBuilder.append("• [").append(event.impact).append("] ")
+                        .append(event.title.substring(0, Math.min(50, event.title.length())))
+                        .append("\n");
                 }
             }
-            tgMsg.append("\n");
         }
+        contextBuilder.append("\n");
+    }
         
         if (MainActivity.instance != null) {
             String combo = hasCombination ? " COMBINÉE" : "";
