@@ -3224,7 +3224,7 @@ public class NotificationService extends NotificationListenerService {
         }
         
         // ❌ Si source Twitter et contient "wall street" mais pas de keywords macro
-        if (lower.contains("wall street") && !containsMacroKeywords(lower)) {
+        if (lower.contains("wall street") && !containsAnyMacroKeyword(lower)) {
             if (MainActivity.instance != null) {
                 MainActivity.instance.addLog(
                     "[FILTRE] ❌ 'Wall Street' sans contexte macro"
