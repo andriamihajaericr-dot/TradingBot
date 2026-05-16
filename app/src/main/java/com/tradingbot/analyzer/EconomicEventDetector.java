@@ -435,24 +435,40 @@ public class EconomicEventDetector {
     }
     
     private static String detectImpact(String text) {
+        String lower = text.toLowerCase();
+        
+        // ❌ REJETER si contexte politique/opinion
+        if (lower.contains("democrat") || lower.contains("republican") ||
+            lower.contains("party") || lower.contains("politician") ||
+            lower.contains("opinion") || lower.contains("editorial")) {
+            return "Neutre";
+        }
+        
+        // ❌ REJETER si article de fond non-urgent
+        if (lower.contains("hasn't been") || lower.contains("more than a year") ||
+            lower.contains("changed the face of") || lower.contains("profile of")) {
+            return "Neutre";
+        }
+        
         int bullishScore = 0;
         int bearishScore = 0;
         
-        String[] bullishWords = {"rally", "surge", "gain", "up", "rise", "increase", 
-                                "better than expected", "beat", "positive", "strong"};
-        String[] bearishWords = {"fall", "drop", "decline", "down", "decrease", 
-                                "worse than expected", "miss", "negative", "weak"};
-        
-        for (String word : bullishWords) {
-            if (text.contains(word)) bullishScore++;
+        // ✅ NOUVEAU: Géopolitique = Baissier SEULEMENT si urgent/nouveau
+        if (lower.contains("war") || lower.contains("ukraine") || lower.contains("russia")) {
+            boolean isUrgent = lower.contains("breaking") || 
+                              lower.contains("strike") || 
+                              lower.contains("attack") ||
+                              lower.contains("missile") ||
+                              lower.contains("urgent");
+            
+            if (isUrgent) {
+                bearishScore += 3; // Risk-off confirmé
+            } else {
+                return "Neutre"; // Article de fond = neutre
+            }
         }
-        for (String word : bearishWords) {
-            if (text.contains(word)) bearishScore++;
-        }
         
-        if (bullishScore > bearishScore) return "Haussier";
-        if (bearishScore > bullishScore) return "Baissier";
-        return "Neutre";
+        // ... reste du code existant
     }
     
     private static String detectCountry(String text) {
