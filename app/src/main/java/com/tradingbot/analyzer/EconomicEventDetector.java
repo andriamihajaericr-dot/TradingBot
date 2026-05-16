@@ -435,40 +435,103 @@ public class EconomicEventDetector {
     }
     
     private static String detectImpact(String text) {
-        String lower = text.toLowerCase();
+        String lower = text.toLowerCase().trim();
         
-        // ❌ REJETER si contexte politique/opinion
+        // ❌ Filtres de rejet
         if (lower.contains("democrat") || lower.contains("republican") ||
             lower.contains("party") || lower.contains("politician") ||
-            lower.contains("opinion") || lower.contains("editorial")) {
+            lower.contains("opinion") || lower.contains("editorial") ||
+            lower.contains("op-ed") || lower.contains("commentary")) {
             return "Neutre";
         }
         
-        // ❌ REJETER si article de fond non-urgent
         if (lower.contains("hasn't been") || lower.contains("more than a year") ||
-            lower.contains("changed the face of") || lower.contains("profile of")) {
+            lower.contains("changed the face of") || lower.contains("profile of") ||
+            lower.contains("historical") || lower.contains("retrospective")) {
             return "Neutre";
         }
-        
+
         int bullishScore = 0;
         int bearishScore = 0;
-        
-        // ✅ NOUVEAU: Géopolitique = Baissier SEULEMENT si urgent/nouveau
-        if (lower.contains("war") || lower.contains("ukraine") || lower.contains("russia")) {
-            boolean isUrgent = lower.contains("breaking") || 
-                              lower.contains("strike") || 
-                              lower.contains("attack") ||
-                              lower.contains("missile") ||
-                              lower.contains("urgent");
-            
+
+        // === GÉOPOLITIQUE (Risk-Off) ===
+        if (lower.contains("war") || lower.contains("attack") || lower.contains("missile") ||
+            lower.contains("invasion") || lower.contains("strike") || lower.contains("conflict") ||
+            lower.contains("nuclear")) {
+            boolean isUrgent = lower.contains("breaking") || lower.contains("urgent") ||
+                              lower.contains("alert") || lower.contains("just in");
             if (isUrgent) {
-                bearishScore += 3; // Risk-off confirmé
+                bearishScore += 5;   // Très fort pour GOLD, JPY, Actions
             } else {
-                return "Neutre"; // Article de fond = neutre
+                return "Neutre";
             }
         }
-        
-        // ... reste du code existant
+
+        // === EMPLOI US (NFP, etc.) ===
+        if (lower.contains("nfp") || lower.contains("non-farm") || lower.contains("payroll") ||
+            lower.contains("employment") || lower.contains("jobless claims")) {
+            if (lower.contains("beat") || lower.contains("better than") || 
+                lower.contains("strong") || lower.contains("above")) {
+                bullishScore += 5;   // USD fort → bon pour USD pairs
+            } else if (lower.contains("miss") || lower.contains("weaker") || 
+                       lower.contains("below")) {
+                bearishScore += 5;
+            }
+        }
+
+        // === INFLATION ===
+        if (lower.contains("cpi") || lower.contains("inflation") || lower.contains("pce") ||
+            lower.contains("ppi")) {
+            if (lower.contains("higher") || lower.contains("hot") || lower.contains("above") ||
+                lower.contains("beat")) {
+                bearishScore += 4;   // USD fort + GOLD souvent haussier
+            } else if (lower.contains("cool") || lower.contains("below") || 
+                       lower.contains("miss")) {
+                bullishScore += 4;
+            }
+        }
+
+        // === BANQUES CENTRALES ===
+        if (lower.contains("fed") || lower.contains("fomc") || lower.contains("powell")) {
+            if (lower.contains("dovish") || lower.contains("cut") || lower.contains("pause")) {
+                bullishScore += 5;
+            } else if (lower.contains("hawkish") || lower.contains("hike")) {
+                bearishScore += 5;
+            }
+        }
+
+        // === PÉTROLE ===
+        if (lower.contains("eia") || lower.contains("api") || lower.contains("opec") ||
+            lower.contains("crude inventory") || lower.contains("oil inventory")) {
+            if (lower.contains("draw") || lower.contains("lower than") || 
+                lower.contains("tight")) {
+                bullishScore += 4;   // Bon pour OIL et CAD
+            } else if (lower.contains("build") || lower.contains("higher than")) {
+                bearishScore += 4;
+            }
+        }
+
+        // === EARNINGS TECH (fort impact NASDAQ/SP500) ===
+        if ((lower.contains("apple") || lower.contains("nvidia") || lower.contains("tesla") ||
+             lower.contains("microsoft") || lower.contains("meta") || lower.contains("amazon")) &&
+             lower.contains("earning")) {
+            if (lower.contains("beat") || lower.contains("strong")) {
+                bullishScore += 4;
+            } else {
+                bearishScore += 3;
+            }
+        }
+
+        // === DÉCISION FINALE ===
+        if (bullishScore > bearishScore + 2) {
+            return "Haussier";
+        } else if (bearishScore > bullishScore + 2) {
+            return "Baissier";
+        } else if (bullishScore >= 3 || bearishScore >= 3) {
+            return bullishScore > bearishScore ? "Haussier" : "Baissier";
+        } else {
+            return "Neutre";
+        }
     }
     
     private static String detectCountry(String text) {
