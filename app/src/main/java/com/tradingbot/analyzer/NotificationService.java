@@ -3108,12 +3108,101 @@ public class NotificationService extends NotificationListenerService {
                 return true;
         return false;
     }
-
     private boolean isTradingRelevant(String text) {
         String lower = text.toLowerCase();
-        for (String kw : KEYWORDS) 
-            if (lower.contains(kw)) return true;
-        return false;
+        
+        // ❌ BLACKLIST - REJETER IMMÉDIATEMENT
+        String[] blacklist = {
+            "opinion", "editorial", "op-ed", "commentary",
+            "democrat", "republican", "party", "election campaign",
+            "domestic politics", "political party", "politician",
+            "california politics", "state politics", "governor race",
+            "senate race", "house race", "primary election",
+            "sports", "entertainment", "celebrity", "fashion",
+            "recipe", "weather forecast", "horoscope", "lifestyle",
+            // ✨ NOUVEAU: Articles de fond non-urgents
+            "hasn't been", "more than a year ago", "years ago",
+            "historical", "archive", "retrospective",
+            "feature story", "in-depth look", "special report on",
+            "profile of", "portrait of", "the story of"
+        };
+        
+        for (String banned : blacklist) {
+            if (lower.contains(banned)) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[FILTRE] ❌ Rejeté - Contient: " + banned
+                    );
+                }
+                return false;
+            }
+        }
+        
+        // ❌ Filtrage spécial GUERRE/GÉOPOLITIQUE
+        // Accepter SEULEMENT si événement RÉCENT et URGENT
+        if (lower.contains("war") || lower.contains("ukraine") || 
+            lower.contains("russia") || lower.contains("conflict")) {
+            
+            // ✅ Accepter SI urgent/breaking/nouveau
+            boolean isUrgent = lower.contains("breaking") || 
+                              lower.contains("urgent") || 
+                              lower.contains("alert") ||
+                              lower.contains("just in") ||
+                              lower.contains("developing") ||
+                              lower.contains("happening now");
+            
+            // ✅ Accepter SI événement concret nouveau
+            boolean isConcreteEvent = lower.contains("strike") || 
+                                     lower.contains("attack") || 
+                                     lower.contains("missile") ||
+                                     lower.contains("drone strike") ||
+                                     lower.contains("invasion") ||
+                                     lower.contains("sanctions announced");
+            
+            // ❌ Rejeter SI article de fond
+            boolean isFeatureArticle = lower.contains("hasn't been") ||
+                                      lower.contains("more than a year") ||
+                                      lower.contains("changed the face of") ||
+                                      lower.contains("special report") ||
+                                      lower.contains("in-depth");
+            
+            if (isFeatureArticle) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[FILTRE] ❌ Article géopolitique de fond - Ignoré"
+                    );
+                }
+                return false;
+            }
+            
+            if (!isUrgent && !isConcreteEvent) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(
+                        "[FILTRE] ❌ Événement géopolitique non-urgent - Ignoré"
+                    );
+                }
+                return false;
+            }
+        }
+        
+        // ❌ Si c'est une opinion de WSJ, ignorer
+        if (lower.contains("wsj") && lower.contains("opinion")) {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[FILTRE] ❌ Opinion WSJ - Ignoré");
+            }
+            return false;
+        }
+        
+        // ❌ Si source Twitter et contient "wall street" mais pas de keywords macro
+        if (lower.contains("wall street") && !containsMacroKeywords(lower)) {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(
+                    "[FILTRE] ❌ 'Wall Street' sans contexte macro"
+                );
+            }
+            return false;
+        }
+        
     }
 
     private String getAppName(String pkg) {
