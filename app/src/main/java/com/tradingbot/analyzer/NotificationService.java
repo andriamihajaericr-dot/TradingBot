@@ -1361,6 +1361,9 @@ public class NotificationService extends NotificationListenerService {
     // =====================================================
     // ✨ TRAITEMENT PRIORITAIRE CALENDRIER ÉCONOMIQUE
     // =====================================================
+   // =====================================================
+    // ✨ TRAITEMENT PRIORITAIRE CALENDRIER ÉCONOMIQUE
+    // =====================================================
     
     private void processCalendarEventWithPriority(String appName, String title, 
                                                    String content, CalendarData calData) {
@@ -1463,29 +1466,59 @@ public class NotificationService extends NotificationListenerService {
                 enrichedContent.append("\n");
             }
             
-            // ✅ Calculer la surprise SEULEMENT si possible
+            // ✅ Calculer la surprise SEULEMENT si possible (AVEC PROTECTION)
             if (calData.hasActual() && !calData.forecast.equals("N/A")) {
                 try {
                     double actualVal = parseNumericValue(calData.actual);
                     double forecastVal = parseNumericValue(calData.forecast);
-                    double diff = actualVal - forecastVal;
-                    double diffPct = (diff / Math.abs(forecastVal)) * 100;
                     
-                    String surpriseLevel;
-                    if (Math.abs(diffPct) > 1.0) {
-                        surpriseLevel = "⚠️ SURPRISE MAJEURE";
-                    } else if (Math.abs(diffPct) > 0.5) {
-                        surpriseLevel = "⚡ Surprise significative";
-                    } else if (Math.abs(diffPct) > 0.2) {
-                        surpriseLevel = "📊 Léger écart";
-                    } else {
-                        surpriseLevel = "✓ Conforme aux attentes";
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(
+                            "[PRIORITY] Parsing: Actual=" + calData.actual + " → " + actualVal +
+                            ", Forecast=" + calData.forecast + " → " + forecastVal
+                        );
                     }
                     
-                    enrichedContent.append("Écart: ").append(String.format("%.2f%%", diffPct))
-                                  .append(" - ").append(surpriseLevel).append("\n\n");
-                } catch (Exception e) {
-                    // Ignore si parsing impossible
+                    // ✅ PROTECTION: Vérifier que forecast n'est pas zéro
+                    if (Math.abs(forecastVal) < 0.0001) {
+                        if (MainActivity.instance != null) {
+                            MainActivity.instance.addLog(
+                                "[PRIORITY] ⚠️ Forecast ≈ 0, calcul surprise impossible"
+                            );
+                        }
+                    } else {
+                        double diff = actualVal - forecastVal;
+                        double diffPct = (diff / Math.abs(forecastVal)) * 100;
+                        
+                        String surpriseLevel;
+                        if (Math.abs(diffPct) > 1.0) {
+                            surpriseLevel = "⚠️ SURPRISE MAJEURE";
+                        } else if (Math.abs(diffPct) > 0.5) {
+                            surpriseLevel = "⚡ Surprise significative";
+                        } else if (Math.abs(diffPct) > 0.2) {
+                            surpriseLevel = "📊 Léger écart";
+                        } else {
+                            surpriseLevel = "✓ Conforme aux attentes";
+                        }
+                        
+                        enrichedContent.append("Écart: ").append(String.format("%.2f%%", diffPct))
+                                      .append(" - ").append(surpriseLevel).append("\n\n");
+                        
+                        if (MainActivity.instance != null) {
+                            MainActivity.instance.addLog(
+                                "[PRIORITY] Surprise calculée: " + String.format("%.2f%%", diffPct)
+                            );
+                        }
+                    }
+                    
+                } catch (NumberFormatException e) {
+                    // ✅ PROTECTION: Logger l'erreur sans crasher
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(
+                            "[PRIORITY] ⚠️ Erreur parsing surprise: " + e.getMessage() +
+                            " | Actual=" + calData.actual + ", Forecast=" + calData.forecast
+                        );
+                    }
                 }
             } else if (!calData.hasActual()) {
                 // ✅ Instruction spéciale si pas d'actual
@@ -1541,22 +1574,26 @@ public class NotificationService extends NotificationListenerService {
                 hasTelegramData = true;
             }
             
-            // ✅ Calculer surprise SEULEMENT si actual présent
+            // ✅ Calculer surprise SEULEMENT si actual présent (AVEC PROTECTION)
             if (calData.hasActual() && !calData.forecast.equals("N/A")) {
                 try {
                     double actualVal = parseNumericValue(calData.actual);
                     double forecastVal = parseNumericValue(calData.forecast);
-                    double diff = actualVal - forecastVal;
-                    double diffPct = (diff / Math.abs(forecastVal)) * 100;
                     
-                    if (Math.abs(diffPct) > 0.2) {
-                        String emoji = Math.abs(diffPct) > 1.0 ? "⚠️" : 
-                                      Math.abs(diffPct) > 0.5 ? "⚡" : "📊";
-                        tgMsg.append(emoji).append(" Écart: ")
-                             .append(String.format("%.2f%%", diffPct)).append("\n");
+                    // ✅ PROTECTION: Vérifier que forecast n'est pas zéro
+                    if (Math.abs(forecastVal) >= 0.0001) {
+                        double diff = actualVal - forecastVal;
+                        double diffPct = (diff / Math.abs(forecastVal)) * 100;
+                        
+                        if (Math.abs(diffPct) > 0.2) {
+                            String emoji = Math.abs(diffPct) > 1.0 ? "⚠️" : 
+                                          Math.abs(diffPct) > 0.5 ? "⚡" : "📊";
+                            tgMsg.append(emoji).append(" Écart: ")
+                                 .append(String.format("%.2f%%", diffPct)).append("\n");
+                        }
                     }
-                } catch (Exception e) {
-                    // Ignore si parsing impossible
+                } catch (NumberFormatException e) {
+                    // Ignorer silencieusement pour Telegram
                 }
             }
             
@@ -1613,11 +1650,14 @@ public class NotificationService extends NotificationListenerService {
             Log.e(TAG, "Erreur processCalendarEventWithPriority", e);
             if (MainActivity.instance != null) {
                 MainActivity.instance.addLog(
-                    "[PRIORITY] ❌ Erreur: " + e.getMessage()
+                    "[PRIORITY] ❌ Erreur globale: " + e.getMessage()
                 );
             }
         }
-    }
+    }   
+            
+            
+            
     /**
      * Enrichir les actifs selon l'indicateur
      */
