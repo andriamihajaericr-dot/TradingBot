@@ -1,5 +1,6 @@
 package com.tradingbot.analyzer;
 
+import java.util.Locale; 
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
