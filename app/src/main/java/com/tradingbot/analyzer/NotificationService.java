@@ -1241,7 +1241,56 @@ public class NotificationService extends NotificationListenerService {
         
         return data;
     }
-    
+
+    /**
+     * ✨ Parser les valeurs numériques avec gestion des négatifs
+     */
+    private static double parseNumericValue(String value) throws NumberFormatException {
+        if (value == null || value.trim().isEmpty() || value.equals("N/A")) {
+            throw new NumberFormatException("Valeur vide ou N/A");
+        }
+        
+        String cleaned = value.trim();
+        
+        // ✅ Extraire le nombre avec regex précise
+        // Pattern: optionnel(-/+) + chiffres + optionnel(. ou ,) + chiffres + optionnel(K/M/B/%)
+        Pattern pattern = Pattern.compile("([-+]?\\d+[.,]?\\d*)\\s*([KMB%])?", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(cleaned);
+        
+        if (matcher.find()) {
+            String numberStr = matcher.group(1).replace(',', '.'); // Remplacer virgule par point
+            String suffix = matcher.group(2);
+            
+            try {
+                double number = Double.parseDouble(numberStr);
+                
+                // ✅ Appliquer multiplicateur si présent
+                if (suffix != null) {
+                    switch (suffix.toUpperCase()) {
+                        case "K":
+                            number *= 1000;
+                            break;
+                        case "M":
+                            number *= 1000000;
+                            break;
+                        case "B":
+                            number *= 1000000000;
+                            break;
+                        case "%":
+                            // Garder tel quel pour les pourcentages
+                            break;
+                    }
+                }
+                
+                return number;
+                
+            } catch (NumberFormatException e) {
+                throw new NumberFormatException("Impossible de parser: " + value);
+            }
+        }
+        
+        throw new NumberFormatException("Aucun nombre trouvé dans: " + value);
+    }
     /**
      * Extraire une valeur numérique depuis le texte
      */
