@@ -1291,7 +1291,13 @@ public class NotificationService extends NotificationListenerService {
         
         throw new NumberFormatException("Aucun nombre trouvé dans: " + value);
     }
-    
+
+    /**
+    * Formatage FORCÉ avec POINT décimal (indépendant de la locale française)
+    */
+    private static String formatPct(double value) {
+         return String.format(Locale.US, "%.2f", value) + "%";
+    }
     /**
      * ✨ Extraire une valeur numérique depuis le texte (avec négatifs)
      */
