@@ -1386,11 +1386,55 @@ public class NotificationService extends NotificationListenerService {
             detectedEvent.country = calData.country;
             
             // Forcer l'importance à HIGH si Actual publié
-            if (calData.hasActual()) {
-                detectedEvent.eventType = "ECONOMIC_RELEASE";
+            if (calData.hasActual() && !calData.forecast.equals("N/A")) {
+                 try {
+                 double actualVal = parseNumericValue(calData.actual);
+                 double forecastVal = parseNumericValue(calData.forecast);
+        
+            if (Math.abs(forecastVal) < 0.0001) {
+            // forecast ≈ 0 → on skip
             } else {
-                detectedEvent.eventType = "ECONOMIC_CALENDAR";
+                 double diff = actualVal - forecastVal;
+                 double diffPct = (diff / Math.abs(forecastVal)) * 100;
+            
+                 String surpriseStr = formatWithDot(diffPct, 2);
+            
+                 String surpriseLevel;
+                 if (Math.abs(diffPct) > 1.0) {
+                     surpriseLevel = "⚠️ SURPRISE MAJEURE";
+                 } else if (Math.abs(diffPct) > 0.5) {
+                     surpriseLevel = "⚡ Surprise significative";
+                 } else if (Math.abs(diffPct) > 0.2) {
+                     surpriseLevel = "📊 Léger écart";
+                 } else {
+                     surpriseLevel = "✓ Conforme aux attentes";
+                 }
+            
+                 // Pour le prompt Groq / enrichedContent
+                 enrichedContent.append("Écart: ").append(surpriseStr)
+                          .append("% - ").append(surpriseLevel).append("\n\n");
+            
+                 // Pour Telegram
+                 if (Math.abs(diffPct) > 0.2) {
+                     String emoji = Math.abs(diffPct) > 1.0 ? "⚠️" : "⚡";
+                     tgMsg.append(emoji).append(" Écart: ")
+                           .append(surpriseStr).append("%\n");
+                 }
+            
+                 if (MainActivity.instance != null) {
+                      MainActivity.instance.addLog(
+                      "[PRIORITY] Surprise calculée: " + surpriseStr + "%"
+                      );
+                 }
+                 }
+                 } catch (Exception e) {
+                 if (MainActivity.instance != null) {
+                 MainActivity.instance.addLog(
+                       "[PRIORITY] ⚠️ Erreur parsing surprise: " + e.getMessage()
+                 );
+                 }
             }
+            
             
             // Détecter les actifs impactés
             List<String> assets = detectAssetsWithScoring(title + " " + content);
