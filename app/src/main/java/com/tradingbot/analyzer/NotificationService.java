@@ -2640,10 +2640,6 @@ public class NotificationService extends NotificationListenerService {
             MainActivity.instance.addLog("[OK] Envoyé - " + assetsStr);
     }
     
-    private static double parseNumericValue(String value) throws NumberFormatException {
-        String cleaned = value.replaceAll("[^0-9.-]", "");
-        return Double.parseDouble(cleaned);
-    }
 
     // =====================================================
     // TELEGRAM ET NOTIFICATIONS
