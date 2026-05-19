@@ -1291,8 +1291,9 @@ public class NotificationService extends NotificationListenerService {
         
         throw new NumberFormatException("Aucun nombre trouvé dans: " + value);
     }
+    
     /**
-     * Extraire une valeur numérique depuis le texte
+     * ✨ Extraire une valeur numérique depuis le texte (avec négatifs)
      */
     private String extractValue(String text, String... keywords) {
         String lower = text.toLowerCase();
@@ -1303,7 +1304,7 @@ public class NotificationService extends NotificationListenerService {
                 // Chercher un nombre après le keyword (dans les 30 chars)
                 String substr = text.substring(index, Math.min(text.length(), index + 30));
                 
-                // Pattern pour capturer les nombres
+                // ✅ Pattern amélioré pour capturer les négatifs
                 Pattern pattern = Pattern.compile(
                     "([-+]?\\d+[.,]?\\d*\\s*[%KMB]?)",
                     Pattern.CASE_INSENSITIVE
@@ -1311,7 +1312,15 @@ public class NotificationService extends NotificationListenerService {
                 Matcher matcher = pattern.matcher(substr);
                 
                 if (matcher.find()) {
-                    return matcher.group(1).trim();
+                    String value = matcher.group(1).trim();
+                    
+                    // ✅ Valider que c'est bien un nombre
+                    try {
+                        parseNumericValue(value); // Test de parsing
+                        return value;
+                    } catch (NumberFormatException e) {
+                        // Continuer la recherche
+                    }
                 }
             }
         }
