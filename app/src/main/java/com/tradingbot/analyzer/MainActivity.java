@@ -1,10 +1,10 @@
 package com.tradingbot.analyzer;
 
-import android.util.Log;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.content.Intent;
+import android.util.Log; 
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
@@ -12,11 +12,10 @@ import androidx.core.app.NotificationManagerCompat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
-import java.util.Set; // ✨ RECORRIGÉ : Importation indispensable pour la détection des permissions
+import java.util.Set; 
 
 public class MainActivity extends AppCompatActivity {
 
-    // Harmonisation des clés institutionnelles d'accès
     public static String CLAUDE_API_KEY   = ""; 
     public static String TELEGRAM_TOKEN   = "";
     public static String TELEGRAM_CHAT_ID = "";
@@ -69,9 +68,7 @@ public class MainActivity extends AppCompatActivity {
             NotificationService.sendTelegramSecure("🧪 **TEST LIAISON INFRASTRUCTURE**\nStatut : Opérationnel.\nModèle : Llama-3.3-70B\nDestination : Flux Sécurisé.");
         });
 
-        // ✨ RECORRIGÉ : Nettoyage de la base de données via un test de sécurité.
-        // Si le bouton n'existe pas dans votre fichier layout XML actuel (activity_main.xml),
-        // le code ne plantera plus à la compilation et s'adaptera de façon autonome.
+        // Liaison de maintenance découplée (évite les plantages de compilation)
         try {
             int clearBtnId = getResources().getIdentifier("clearDbBtn", "id", getPackageName());
             if (clearBtnId != 0) {
@@ -95,10 +92,10 @@ public class MainActivity extends AppCompatActivity {
     private void updateStatusText(boolean active) {
         if (active) {
             statusText.setText("STATUT : BOT OPÉRATIONNEL (RUNNING)");
-            statusText.setTextColor(0xFF00FF00); // Vert de marché financier
+            statusText.setTextColor(0xFF00FF00); 
         } else {
             statusText.setText("STATUT : ENGINE ARRÊTÉ (STANDBY)");
-            statusText.setTextColor(0xFFFF0000); // Rouge Alerte
+            statusText.setTextColor(0xFFFF0000); 
         }
     }
 
