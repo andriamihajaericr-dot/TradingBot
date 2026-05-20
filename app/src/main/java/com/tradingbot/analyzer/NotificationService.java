@@ -59,7 +59,6 @@ public class NotificationService extends NotificationListenerService {
 
         if (unifiedFeed.length() < 10) return;
 
-        // Validation des plateformes majeures d'actualités
         boolean isInstitutionalSource = packageName.contains("financialjuice") 
                 || packageName.contains("twitter") 
                 || packageName.contains("periscope")
@@ -76,7 +75,7 @@ public class NotificationService extends NotificationListenerService {
             inputEvent.impact = "Alerte Flash Marché"; 
         }
 
-        // ADAPTATION GEOGRAPHIQUE : Recalcul dynamique de l'horaire pour Madagascar (Fixe UTC+3)
+        // Horodatage précis (long) pour notre pipeline d'analyse à Madagascar
         long exactTimestamp = parseTimeFromText(unifiedFeed, sbn.getPostTime());
 
         String fingerPrint = generateSecureHash(title + text);
@@ -85,16 +84,19 @@ public class NotificationService extends NotificationListenerService {
         String sourceName = packageName.contains("financialjuice") ? "FinancialJuice" :
                            packageName.contains("investing") ? "Investing.com" : "X/Twitter";
 
+        // ✨ FIX COMPILATION : Conversion sécurisée du long vers le format attendu par la BDD (secondes UNIX)
+        long unixSeconds = exactTimestamp / 1000;
+
         boolean logged = eventDb.saveEvent(fingerPrint, packageName, sourceName, 
                 inputEvent.eventType, title, unifiedFeed, String.join(", ", targetAssets), 
-                inputEvent.impact, exactTimestamp, "notification");
+                inputEvent.impact, unixSeconds, "notification"); // Envoi du timestamp au format compatible
         
         if (logged) {
-            // Notification immédiate au tableau de bord système de contrôle
             SystemMonitor.registerEvent(sourceName, targetAssets);
             exec.submit(() -> runSeniorAnalystPipeline(fingerPrint, unifiedFeed, inputEvent, targetAssets, exactTimestamp));
         }
     }
+
 
     /**
      * Moteur de normalisation temporelle mondiale.
