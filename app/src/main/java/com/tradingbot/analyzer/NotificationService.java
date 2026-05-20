@@ -75,7 +75,7 @@ public class NotificationService extends NotificationListenerService {
             inputEvent.impact = "Alerte Flash Marché"; 
         }
 
-        // Horodatage précis (long) pour notre pipeline d'analyse à Madagascar
+        // Horodatage à la milliseconde pour l'analyse IA (UTC+3 Madagascar)
         long exactTimestamp = parseTimeFromText(unifiedFeed, sbn.getPostTime());
 
         String fingerPrint = generateSecureHash(title + text);
@@ -84,12 +84,13 @@ public class NotificationService extends NotificationListenerService {
         String sourceName = packageName.contains("financialjuice") ? "FinancialJuice" :
                            packageName.contains("investing") ? "Investing.com" : "X/Twitter";
 
-        // ✨ FIX COMPILATION : Conversion sécurisée du long vers le format attendu par la BDD (secondes UNIX)
+        // Conversion en secondes Unix
         long unixSeconds = exactTimestamp / 1000;
 
+        // ✨ RE-FIX COMPILATION : Forçage explicite (int) pour correspondre à la signature de votre BDD
         boolean logged = eventDb.saveEvent(fingerPrint, packageName, sourceName, 
                 inputEvent.eventType, title, unifiedFeed, String.join(", ", targetAssets), 
-                inputEvent.impact, unixSeconds, "notification"); // Envoi du timestamp au format compatible
+                inputEvent.impact, (int) unixSeconds, "notification"); 
         
         if (logged) {
             SystemMonitor.registerEvent(sourceName, targetAssets);
