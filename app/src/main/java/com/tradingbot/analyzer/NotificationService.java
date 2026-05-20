@@ -29,6 +29,7 @@ public class NotificationService extends NotificationListenerService {
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private EventDatabase eventDb;
 
     public static void sendTelegramSecure(String message) {
@@ -54,6 +55,7 @@ public class NotificationService extends NotificationListenerService {
         super.onCreate();
         eventDb = new EventDatabase(this);
         createNotificationChannel();
+        startDailyBriefScheduler(); // 🌅 Lancement du planificateur de résumé automatique
     }
 
     @Override
@@ -68,36 +70,34 @@ public class NotificationService extends NotificationListenerService {
 
         if (unifiedFeed.length() < 10) return;
 
-        // 1. Détection dynamique de l'origine de l'information
         String sourceName = "Source Institutionnelle";
         if (packageName.contains("financialjuice")) sourceName = "FinancialJuice";
         else if (packageName.contains("investing")) sourceName = "Investing.com";
         else if (packageName.contains("twitter") || packageName.contains("periscope")) sourceName = "X / Twitter";
-        else return; // 🛑 On IGNORE immédiatement toutes les applications non-financières pour couper le bruit
+        else return; 
 
         List<String> targetAssets = filterActiveAssets(unifiedFeed);
         EconomicEventDetector.DetectedEvent inputEvent = EconomicEventDetector.detectEvent(title, text);
         
-        // 2. FILTRAGE ANTI-BRUIT STRICT (Écart fondamental mathématique)
         boolean isDriverChanged = detectDriverDeviation(unifiedFeed);
-        
-        // 📉 Révolution : Si l'info est conforme (pas d'écart), on l'enregistre en BDD pour l'historique mais on N'ENVOIE PAS sur Telegram
-        if (!isDriverChanged) {
-            long exactTimestamp = parseTimeFromText(unifiedFeed, sbn.getPostTime());
-            String fingerPrint = generateSecureHash(title + text);
-            eventDb.saveEvent(fingerPrint, packageName, sourceName, inputEvent.eventType, title, unifiedFeed, 
-                    String.join(", ", targetAssets), "Conforme (Ignoré)", (int)(exactTimestamp / 1000), "database_only");
-            return; 
-        }
+        boolean isFomcPivot = unifiedFeed.toUpperCase().contains("FOMC") || unifiedFeed.toUpperCase().contains("FED ");
 
-        // Si on arrive ici, c'est qu'il y a une déviation ou un choc réel de marché
-        inputEvent.impact = "CHANGEMENT DE DRIVER MACRO";
         long exactTimestamp = parseTimeFromText(unifiedFeed, sbn.getPostTime());
         String fingerPrint = generateSecureHash(title + text);
-        
         if (eventDb.eventExists(fingerPrint)) return;
 
         long unixSeconds = exactTimestamp / 1000;
+
+        // 📉 CAS 1 : La news est conforme ET ce n'est pas un événement majeur (FOMC) -> On filtre pour couper le bruit
+        if (!isDriverChanged && !isFomcPivot) {
+            eventDb.saveEvent(fingerPrint, packageName, sourceName, inputEvent.eventType, title, unifiedFeed, 
+                    String.join(", ", targetAssets), "Conforme (Ignoré)", (int) unixSeconds, "database_only");
+            return; 
+        }
+
+        // ⚡ CAS 2 : Événement Pivot Majeur (FOMC) ou Déviation Fondamentale Réelle
+        inputEvent.impact = isFomcPivot ? "PIVOT CRITIQUE FOMC" : "CHANGEMENT DE DRIVER MACRO";
+        
         boolean logged = eventDb.saveEvent(fingerPrint, packageName, sourceName, 
                 inputEvent.eventType, title, unifiedFeed, String.join(", ", targetAssets), 
                 inputEvent.impact, (int) unixSeconds, "telegram"); 
@@ -106,10 +106,10 @@ public class NotificationService extends NotificationListenerService {
             SystemMonitor.registerEvent(sourceName, targetAssets);
             final String finalSource = sourceName;
             
-            // 3. Récupération de l'historique récent pour cet actif (Pour la conclusion globale)
-            String historyContext = eventDb.getRecentEventsForAssets(targetAssets, 3);
+            // On extrait l'historique complet (y compris les news CPI/NFP conformes stockées en tâche de fond)
+            String historyContext = eventDb.getRecentEventsForAssets(targetAssets, 6);
             
-            exec.submit(() -> runSeniorAnalystPipeline(finalSource, unifiedFeed, historyContext, targetAssets, exactTimestamp));
+            exec.submit(() -> runSeniorAnalystPipeline(finalSource, unifiedFeed, historyContext, targetAssets, exactTimestamp, isFomcPivot));
         }
     }
 
@@ -122,7 +122,6 @@ public class NotificationService extends NotificationListenerService {
             upper.contains("BREAKING") || upper.contains("REVISE")) {
             return true;
         }
-        
         Pattern pattern = Pattern.compile("(ACTUAL|ACT):?\\s*([\\d\\.\\-%]+).*?(FORECAST|EST|EXP):?\\s*([\\d\\.\\-%]+)");
         Matcher matcher = pattern.matcher(upper);
         if (matcher.find()) {
@@ -135,7 +134,10 @@ public class NotificationService extends NotificationListenerService {
         return false;
     }
 
-    private void runSeniorAnalystPipeline(String source, String feed, String history, List<String> assets, long eventTimestamp) {
+    /**
+     * Pipeline d'Analyse IA : Gère les déviations standards ET la modélisation prédictive FOMC
+     */
+    private void runSeniorAnalystPipeline(String source, String feed, String history, List<String> assets, long eventTimestamp, boolean isFomcPivot) {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
             sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
@@ -143,28 +145,38 @@ public class NotificationService extends NotificationListenerService {
 
             JSONObject payload = new JSONObject();
             payload.put("model", GROQ_MODEL);
-            payload.put("temperature", 0.05); // Légèrement augmenté pour une meilleure synthèse globale
+            payload.put("temperature", isFomcPivot ? 0.15 : 0.02); // Plus de créativité de synthèse si c'est le FOMC
 
             JSONArray messages = new JSONArray();
             
-            // 🎯 LE PROMPT OPTIMISÉ (Analyse d'Impact + Conclusion Globale Cumulative)
-            String systemPrompt = "Tu es un Macro-Strategist de premier plan dans un Hedge Fund. " +
-                    "Ton rôle est d'analyser les chocs macroéconomiques et d'en formuler la SYNTHÈSE GLOBALE CUMULATIVE. " +
-                    "Ne commente que les actifs spécifiés. Sois direct, froid et analytique. Pas d'introduction, pas de salutations.";
+            String systemPrompt = "Tu es le Chef de la Stratégie Macroéconomique d'un fonds quantitatif. " +
+                    "Ton travail est d'analyser les ruptures de flux et d'interpréter les implications des banques centrales (FED/FOMC) en croisant les données historiques reçues (CPI, NFP). " +
+                    "Sois ultra-précis, froid, mathématique. Pas de blabla.";
             messages.put(new JSONObject().put("role", "system").put("content", systemPrompt));
             
-            String userPrompt = "--- DERNIÈRE ALERTE EN DIRECT ---\n" +
-                    "Source : " + source + "\n" +
-                    "Flux : " + feed + "\n\n" +
-                    "--- HISTORIQUE RÉCENT DE CES ACTIFS (CONTEXTE GLOBAL) ---\n" +
-                    (history.isEmpty() ? "Aucun événement récent en mémoire." : history) + "\n\n" +
-                    "--- CONSIGNES DE RÉDACTION ---\n" +
-                    "Pour chaque actif cible (" + String.join(", ", assets) + ") :\n" +
-                    "1) Donne l'impact de la news actuelle.\n" +
-                    "2) Fais une CONCLUSION GLOBALE synthétisant la news actuelle avec l'historique récent pour cet actif.\n" +
-                    "3) Termine STRICTEMENT par ton biais d'exécution direct : [ACHAT CHOC], [VENTE CHOC] ou [NEUTRE/ATTENTE].";
+            StringBuilder userPrompt = new StringBuilder();
+            if (isFomcPivot) {
+                userPrompt.append("🚨 !!! ALERTE MAJEURE BANQUE CENTRALE : COMPLEXE FOMC !!!\n");
+            }
+            userPrompt.append("Flux actuel : ").append(feed).append("\n Source : ").append(source).append("\n\n")
+                      .append("--- MÉMOIRE MACRO DE LA BASE DE DONNÉES (CONTEXTE RECENT) ---\n")
+                      .append(history.isEmpty() ? "Aucune donnée macro mémorisée récemment.\n" : history).append("\n")
+                      .append("--- INSTRUCTIONS DE PROTOCOLE D'EXÉCUTION ---\n");
+
+            if (isFomcPivot) {
+                userPrompt.append("Tu dois obligatoirement croiser ce flash FOMC avec les données CPI (Inflation) et NFP (Emploi) présentes dans la mémoire ci-dessus.\n")
+                          .append("Rédige ton analyse sous cette forme exacte :\n")
+                          .append("1) CORRÉLATION HISTORIQUE : (Ex: 'Le CPI en hausse de mardi combiné à ce FOMC implique...')\n")
+                          .append("2) RÉSULTAT DU DRIVER DES TAUX D'INTÉRÊT : [HAUSSIER], [BAISSIER] ou [STABLE]\n")
+                          .append("3) IMPACT PAR ACTIF (").append(String.join(", ", assets)).append(") : Conclus chaque actif par [ACHAT CHOC], [VENTE CHOC] ou [NEUTRE].");
+            } else {
+                userPrompt.append("Pour chaque actif cible (").append(String.join(", ", assets)).append(") :\n")
+                          .append("1) Impact direct du flux.\n")
+                          .append("2) Bilan de la dynamique cumulative par rapport à l'historique.\n")
+                          .append("3) Tag de décision technique : [BIAIS HAUSSIER], [BIAIS BAISSIER] ou [STABLE/NEUTRE].");
+            }
             
-            messages.put(new JSONObject().put("role", "user").put("content", userPrompt));
+            messages.put(new JSONObject().put("role", "user").put("content", userPrompt.toString()));
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
@@ -188,15 +200,95 @@ public class NotificationService extends NotificationListenerService {
                 JSONObject json = new JSONObject(response.toString());
                 String aiAnalysis = json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 
-                // ✨ Titre dynamique intégrant la vraie source
-                String tgMsg = "*⚡ DEVIATION CRITIQUE | " + source.toUpperCase() + "*\n" +
-                               "🕒 Heure : " + timeString + "\n" +
-                               "📋 Actifs : " + String.join(", ", assets) + "\n\n" +
-                               aiAnalysis;
+                String header = isFomcPivot ? "*🔥 DECISION BANQUE CENTRALE | INTERPRÉTATION AUTOMATIQUE FOMC*" : "*⚡ DEVIATION CRITIQUE | " + source.toUpperCase() + "*";
+                String tgMsg = header + "\n🕒 " + timeString + "\n\n" + aiAnalysis;
                 
                 sendTelegramSecure(tgMsg);
             }
-        } catch (Exception e) { Log.e(TAG, "Échec Pipeline", e); }
+        } catch (Exception e) { Log.e(TAG, "Échec Pipeline Analyste", e); }
+    }
+
+    /**
+     * 🌅 PLANIFICATEUR DU RÉSUMÉ JOURNALIER (DAILY BRIEF)
+     * Calcule le temps restant jusqu'au prochain matin à 07h00 (Heure Madagascar UTC+3)
+     */
+    private void startDailyBriefScheduler() {
+        Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+        nextRun.set(Calendar.HOUR_OF_DAY, 7);
+        nextRun.set(Calendar.MINUTE, 0);
+        nextRun.set(Calendar.SECOND, 0);
+
+        if (nextRun.getTimeInMillis() <= System.currentTimeMillis()) {
+            nextRun.add(Calendar.DAY_OF_YEAR, 1);
+        }
+
+        long initialDelay = nextRun.getTimeInMillis() - System.currentTimeMillis();
+        long period = 24 * 60 * 60 * 1000; // Exécution toutes les 24 heures
+
+        scheduler.scheduleAtFixedRate(this::generateAndSendDailyBrief, initialDelay, period, TimeUnit.MILLISECONDS);
+        Log.d(TAG, "Planificateur Daily Brief armé. Premier déclenchement dans : " + (initialDelay / 1000 / 60) + " minutes.");
+    }
+
+    /**
+     * Génère la synthèse globale matinale basée sur les données de la veille stockées en BDD
+     */
+    private void generateAndSendDailyBrief() {
+        try {
+            long now = System.currentTimeMillis();
+            String dailyDrivers = eventDb.getDailyMacroDrivers(now);
+            
+            if (dailyDrivers.isEmpty()) {
+                sendTelegramSecure("🌅 *DAILY BRIEF MACRO — ANTANANARIVO*\n\n" +
+                        "📊 *Statut :* Marché calme. Aucun changement de driver macroéconomique majeur enregistré au cours des dernières 24 heures.\n" +
+                        "💡 *Biais général :* Préservation des tendances de fond antérieures.");
+                return;
+            }
+
+            // Sollicitation de Groq pour condenser l'historique des dernières 24 heures en une matrice décisionnelle
+            JSONObject payload = new JSONObject();
+            payload.put("model", GROQ_MODEL);
+            payload.put("temperature", 0.1);
+
+            JSONArray messages = new JSONArray();
+            messages.put(new JSONObject().put("role", "system").put("content", 
+                "Tu es un Analyste Inter-Marchés. Rédige un briefing matinal synthétique, clair et exploitable pour un trader à partir de la liste des chocs macro survenus hier. Indique s'il y a eu un changement de driver structurel. No chit-chat."));
+            
+            messages.put(new JSONObject().put("role", "user").put("content", 
+                "DONNÉES BRUTES DES CHOCS MACRO DES DERNIÈRES 24 HEURES :\n" + dailyDrivers + 
+                "\n\nFournis : 1) La synthèse du sentiment global de marché. 2) La matrice des biais par actif pour la session à venir."));
+            
+            payload.put("messages", messages);
+
+            URL url = new URL(GROQ_URL);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Authorization", "Bearer " + MainActivity.CLAUDE_API_KEY);
+            conn.setDoOutput(true);
+
+            OutputStream os = conn.getOutputStream();
+            os.write(payload.toString().getBytes("UTF-8"));
+            os.flush(); os.close();
+
+            if (conn.getResponseCode() == 200) {
+                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) response.append(line);
+                br.close();
+
+                JSONObject json = new JSONObject(response.toString());
+                String dailySummary = json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+
+                String tgBrief = "🌅 *DAILY BRIEF MACRO — TERMINAL DE TRADING*\n" +
+                                 "📅 Date : " + new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(new Date()) + " (07:00 Mada)\n\n" +
+                                 dailySummary;
+                
+                sendTelegramSecure(tgBrief);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Échec de la génération du Daily Brief matinal", e);
+        }
     }
 
     private long parseTimeFromText(String text, long defaultPostTime) {
@@ -244,5 +336,11 @@ public class NotificationService extends NotificationListenerService {
             }
             return hexString.toString();
         } catch (Exception e) { return String.valueOf(System.currentTimeMillis()); }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        scheduler.shutdown(); // Fermeture propre du planificateur si le service s'arrête
     }
 }
