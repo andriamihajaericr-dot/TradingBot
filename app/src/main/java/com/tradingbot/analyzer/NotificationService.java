@@ -271,12 +271,12 @@ public class NotificationService extends NotificationListenerService {
                    "- Un biais DOVISH (Fed souple, baisse des taux, injection de liquidités) = USD faible, US10Y en [VENTE CHOC] | GOLD, NASDAQ, SP500, BITCOIN en [ACHAT CHOC].\n" +
                    "- Actif Énergie (USOIL) = Hausse si tensions géopolitiques concrètes au Moyen-Orient ou baisse des stocks. Baisse si résolution diplomatique.\n\n" +
     
-                   "GUIDE DES PAIRES FOREX SPÉCIFIQUES DU PORTEFEUILLE :\n" +
-                   "1. AUDUSD (Aussie) : Aligné sur le GOLD et l'appétit pour le risque (Hausse si Dovish / Hausse du Gold).\n" +
-                   "2. USDCAD (Loonie) : Inversement corrélé au pétrole (Baisse si USOIL monte, Hausse si USD fort).\n" +
-                   "3. USDJPY (Yen) : Réagit massivement aux taux américains. Si les taux US grimpent (US10Y en ACHAT), l'USDJPY explose en [ACHAT CHOC].\n" +
-                   "4. EURUSD & GBPUSD : Inversement corrélés au Dollar (Hausse si Fed Dovish, Baisse si Fed Hawkish).\n\n" +
-    
+                   "GUIDE DES PAIRES FOREX SPÉCIFIQUES (TRÈS STRICT) :\n" +
+                   "1. AUDUSD : Si l'USD est fort (Hawkish), le graphique BAISSE [VENTE CHOC]. Si l'USD est faible, il MONTE.\n" +
+                   "2. EURUSD & GBPUSD : Si l'USD est fort (Hawkish), les graphiques BAISSENT [VENTE CHOC].\n" +
+                   "3. USDCAD : Si l'USD est fort (Hawkish), le graphique MONTE [ACHAT CHOC] (Le Dollar US écrase le Dollar Canadien).\n" +
+                   "4. USDJPY : Si les taux US montent (US10Y en ACHAT), le graphique MONTE en flèche [ACHAT CHOC] (Le Dollar US écrase le Yen Japonais).\n\n"
+                                                                    
                    "CONSIGNES DE SÉCURITÉ :\n" +
                    "- N'invente aucune donnée historique. Ignore les figures politiques obsolètes du passé.\n" +
                    "- Ne réponds JAMAIS par des termes génériques comme 'Marchés boursiers' ou 'Actions'.\n\n" +
