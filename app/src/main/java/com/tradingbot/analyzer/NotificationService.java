@@ -246,7 +246,6 @@ public class NotificationService extends NotificationListenerService {
             Log.e(TAG, "Échec exécution Pipeline Groq", e);
         }
     }
-
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Trading Core Alerts", NotificationManager.IMPORTANCE_HIGH);
@@ -265,4 +264,11 @@ public class NotificationService extends NotificationListenerService {
                 if (hex.length() == 1) hexString.append('0');
                 hexString.append(hex);
             }
-            return hexString.toString
+            return hexString.toString();
+        } catch (Exception e) {
+            return String.valueOf(System.currentTimeMillis());
+        }
+    }
+} // 🌟 Cette accolade ferme la classe NotificationService. Elle est indispensable !
+
+    
