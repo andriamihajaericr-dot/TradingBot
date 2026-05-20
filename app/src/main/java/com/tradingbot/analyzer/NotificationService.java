@@ -261,7 +261,40 @@ public class NotificationService extends NotificationListenerService {
 
             JSONObject payload = new JSONObject(); payload.put("model", GROQ_MODEL); payload.put("temperature", 0.02);
             JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", "Tu es un algorithme de trading macro-fondamental. Analyse la news par rapport au contexte historique fourni. Conclus pour chaque actif cible par [ACHAT CHOC], [VENTE CHOC] ou [NEUTRE]."));
+            // 🔥 PROMPT SYSTÈME ULTIME INTER-MARCHÉS BLINDÉ POUR VOS 11 ACTIFS
+            messages.put(new JSONObject().put("role", "system").put("content", 
+                   "Tu es un algorithme de trading macro-quantitatif institutionnel. " +
+                   "Ton rôle est d'analyser l'impact du flux d'actualités en direct par rapport au contexte historique.\n\n" +
+    
+                   "CHARTE DE CORRÉLATION MACRO STRICTE :\n" +
+                   "- Un biais HAWKISH (Fed agressive, inflation forte, taux élevés) = USD fort, US10Y en [ACHAT CHOC] | GOLD, NASDAQ, SP500, BITCOIN en [VENTE CHOC].\n" +
+                   "- Un biais DOVISH (Fed souple, baisse des taux, injection de liquidités) = USD faible, US10Y en [VENTE CHOC] | GOLD, NASDAQ, SP500, BITCOIN en [ACHAT CHOC].\n" +
+                   "- Actif Énergie (USOIL) = Hausse si tensions géopolitiques concrètes au Moyen-Orient ou baisse des stocks. Baisse si résolution diplomatique.\n\n" +
+    
+                   "GUIDE DES PAIRES FOREX SPÉCIFIQUES DU PORTEFEUILLE :\n" +
+                   "1. AUDUSD (Aussie) : Aligné sur le GOLD et l'appétit pour le risque (Hausse si Dovish / Hausse du Gold).\n" +
+                   "2. USDCAD (Loonie) : Inversement corrélé au pétrole (Baisse si USOIL monte, Hausse si USD fort).\n" +
+                   "3. USDJPY (Yen) : Réagit massivement aux taux américains. Si les taux US grimpent (US10Y en ACHAT), l'USDJPY explose en [ACHAT CHOC].\n" +
+                   "4. EURUSD & GBPUSD : Inversement corrélés au Dollar (Hausse si Fed Dovish, Baisse si Fed Hawkish).\n\n" +
+    
+                   "CONSIGNES DE SÉCURITÉ :\n" +
+                   "- N'invente aucune donnée historique. Ignore les figures politiques obsolètes du passé.\n" +
+                   "- Ne réponds JAMAIS par des termes génériques comme 'Marchés boursiers' ou 'Actions'.\n\n" +
+    
+                   "FORMAT DE RÉPONSE IMPÉRATIF (Génère STRICTEMENT cette liste pour les actifs cibles, aucun autre texte) :\n" +
+                   "• GOLD : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
+                   "• NASDAQ : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
+                   "• SP500 : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
+                   "• USOIL : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
+                   "• US10Y : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
+                   "• BITCOIN : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
+                   "• EURUSD : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
+                   "• GBPUSD : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
+                   "• AUDUSD : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
+                   "• USDCAD : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
+                   "• USDJPY : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n\n" +
+                   "CONCLUSION : 'VECTEUR DE MOMENTUM DÉFINITIF : [HAUSSIER / BAISSIER / NEUTRE]'"
+            ));
             messages.put(new JSONObject().put("role", "user").put("content", "Flux : " + feed + "\nMémoire :\n" + history));
             payload.put("messages", messages);
 
