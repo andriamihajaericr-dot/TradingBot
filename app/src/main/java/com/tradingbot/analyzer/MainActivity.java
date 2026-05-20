@@ -32,8 +32,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         instance = this;
-        
-        // ✨ INITIALISATION CRITIQUE : Ouverture de la BDD locale pour éviter les conflits de verrous
         eventDb = new EventDatabase(this);
 
         statusText          = findViewById(R.id.statusText);
@@ -56,7 +54,6 @@ public class MainActivity extends AppCompatActivity {
             startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
         });
 
-        // ✨ ALIGNEMENT TEST SÉCURISÉ : Déclenche le canal réseau Telegram valide sans planter le Listener
         testBtn.setOnClickListener(v -> {
             addLog("🧪 [TEST] Vérification de la liaison réseau descendante...");
             new Thread(() -> {
@@ -64,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
                     NotificationService.sendTelegramSecure(
                         "🧪 **TEST LIAISON TRANSMISSION**\n" +
                         "Statut : Opérationnel (UTC+3 Madagascar)\n" +
-                        "Flux simulé : *Eurozone CPI Flash Alert*"
+                        "Flux simulé : *Moteur d'acquisition actif*"
                     );
                 } catch (Exception e) {
                     Log.e(TAG, "Échec du bouton de test", e);
@@ -80,10 +77,9 @@ public class MainActivity extends AppCompatActivity {
             }
             getPrefs().edit().putBoolean("bot_active", isChecked).apply();
             updateStatus();
-            addLog(isChecked ? "🚀 MOTEUR MACRO ACTIVÉ (RUNNING)" : "🛑 MOTEUR EN VEILLE (STANDBY)");
+            addLog(isChecked ? "🚀 MOTEUR MACRO ACTIVÉ" : "🛑 MOTEUR EN VEILLE");
         });
 
-        // Application de l'état sauvegardé au démarrage
         botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
         addLog("📱 Terminal prêt pour l'acquisition.");
     }
@@ -105,13 +101,13 @@ public class MainActivity extends AppCompatActivity {
         boolean perm   = isPermissionGranted();
         if (!perm) {
             statusText.setText("⚠️ PERMISSION NOTIFICATIONS REQUISE");
-            statusText.setTextColor(0xFFFF9800); // Orange
+            statusText.setTextColor(0xFFFF9800);
         } else if (active) {
             statusText.setText("🟢 BOT ACTIF — EN ÉCOUTE DES DRIVERS...");
-            statusText.setTextColor(0xFF00FF00); // Vert
+            statusText.setTextColor(0xFF00FF00);
         } else {
             statusText.setText("🔴 BOT INACTIF — COUPE FLUX ENGAGÉ");
-            statusText.setTextColor(0xFFFF0000); // Rouge
+            statusText.setTextColor(0xFFFF0000);
         }
     }
 
@@ -149,7 +145,6 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(() -> {
             String ts = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
             String cur = logText.getText().toString();
-            // Nettoyage automatique pour éviter la saturation graphique si le log devient trop lourd
             if (cur.length() > 5000) {
                 cur = cur.substring(0, 2000);
             }
