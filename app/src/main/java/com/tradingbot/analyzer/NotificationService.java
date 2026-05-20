@@ -275,7 +275,7 @@ public class NotificationService extends NotificationListenerService {
                    "1. AUDUSD : Si l'USD est fort (Hawkish), le graphique BAISSE [VENTE CHOC]. Si l'USD est faible, il MONTE.\n" +
                    "2. EURUSD & GBPUSD : Si l'USD est fort (Hawkish), les graphiques BAISSENT [VENTE CHOC].\n" +
                    "3. USDCAD : Si l'USD est fort (Hawkish), le graphique MONTE [ACHAT CHOC] (Le Dollar US écrase le Dollar Canadien).\n" +
-                   "4. USDJPY : Si les taux US montent (US10Y en ACHAT), le graphique MONTE en flèche [ACHAT CHOC] (Le Dollar US écrase le Yen Japonais).\n\n"
+                   "4. USDJPY : Si les taux US montent (US10Y en ACHAT), le graphique MONTE en flèche [ACHAT CHOC] (Le Dollar US écrase le Yen Japonais).\n\n" +
                                                                     
                    "CONSIGNES DE SÉCURITÉ :\n" +
                    "- N'invente aucune donnée historique. Ignore les figures politiques obsolètes du passé.\n" +
