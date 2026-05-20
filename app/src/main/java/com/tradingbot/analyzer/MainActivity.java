@@ -38,7 +38,7 @@ public class MainActivity extends AppCompatActivity {
         eventDb = new EventDatabase(this);
 
         // Liaison des composants avec le fichier XML activity_main
-        mainScrollView      = (ScrollView) findViewById(android.R.id.content).getChildAt(0);
+        mainScrollView = (ScrollView) ((android.view.ViewGroup) findViewById(android.R.id.content)).getChildAt(0);
         statusText          = findViewById(R.id.statusText);
         botSwitch           = findViewById(R.id.botSwitch);
         logText             = findViewById(R.id.logText);
