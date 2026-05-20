@@ -16,8 +16,8 @@
     <application
         android:allowBackup="false"
         android:hasFragileUserData="true"
-        android:icon="@android:drawable/sym_def_app_icon"
-        android:label="Moteur Macro Analytique"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Moteur Macro Analysis"
         android:roundIcon="@android:drawable/sym_def_app_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.TradingBot">
