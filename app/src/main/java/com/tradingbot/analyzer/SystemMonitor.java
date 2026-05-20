@@ -1,6 +1,5 @@
 package com.tradingbot.analyzer;
 
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,31 +27,35 @@ public class SystemMonitor {
         long now = System.currentTimeMillis();
         long timeSinceLastEvent = now - lastEventTime;
         
-        // Alerte : Rupture du flux d'informations pendant la session de trading active (1 heure sans news)
+        // Alerte : Flux interrompu pendant les sessions actives (1 heure max)
         if (timeSinceLastEvent > 1 * 60 * 60 * 1000 && isTradingHours()) {
             long minutesSince = timeSinceLastEvent / 60000;
-            sendSystemAlert("⚠️ RISK-WARN: Rupture potentielle du flux d'alimentation macro. Aucune donnée captée depuis " + minutesSince + " minutes.");
+            sendSystemAlert("⚠️ RISK-WARN: Rupture du flux. Aucun flux reçu de FinancialJuice/Investing/X depuis " + minutesSince + " minutes.");
         }
         
-        // Surveillance de la couverture de vos actifs institutionnels spécifiques
+        // Surveillance de vos 10 actifs cibles
         if (isTradingDay()) {
             String[] coreAssets = {"US10Y", "GOLD", "SP500", "NASDAQ", "GBPUSD", "USOIL", "AUDUSD", "USDCAD", "USDJPY", "BITCOIN"};
             for (String asset : coreAssets) {
-                int count = eventCountByAsset.getOrDefault(asset, 0);
-                if (count == 0) {
-                    sendSystemAlert("📊 COUVERTURE FAIBLE: L'actif " + getAssetEmoji(asset) + " " + asset + " n'a reçu aucune mise à jour de flux aujourd'hui.");
+                if (eventCountByAsset.getOrDefault(asset, 0) == 0) {
+                    sendSystemAlert("📊 COUVERTURE ACQUISITION : L'actif " + getAssetEmoji(asset) + " " + asset + " est aveugle (0 analyses aujourd'hui).");
                 }
             }
         }
     }
     
     public static void generateDailyHealthReport() {
-        StringBuilder sb = new StringBuilder("⚙️ **RAPPORT METRIQUES DE SANTE DU MOTEUR**\n\n");
-        sb.append("Total alertes traitées aujourd'hui: `").append(totalEventsToday).append("`\n\n");
-        sb.append("📈 **VOLUME PAR ACTIF :**\n");
+        StringBuilder sb = new StringBuilder("⚙️ **RAPPORT QUALITÉ ACQUISITION MACRO**\n\n");
+        sb.append("Alertes totales absorbées : `").append(totalEventsToday).append("`\n\n");
         
+        sb.append("📡 **RÉPARTITION PAR SOURCE FLUX :**\n");
+        eventCountBySource.forEach((src, count) -> 
+            sb.append("• ").append(src).append(" : ").append(count).append(" pushs reçus\n")
+        );
+        
+        sb.append("\n📈 **VOLUME TOTAL PAR ACTIF CIBLE :**\n");
         eventCountByAsset.forEach((asset, count) -> 
-            sb.append("• ").append(getAssetEmoji(asset)).append(" ").append(asset).append(": ").append(count).append(" analyses\n")
+            sb.append("• ").append(getAssetEmoji(asset)).append(" ").append(asset).append(" : ").append(count).append(" analyses générées\n")
         );
         
         NotificationService.sendTelegramSecure(sb.toString());
@@ -69,8 +72,6 @@ public class SystemMonitor {
         Calendar cal = Calendar.getInstance();
         int hour = cal.get(Calendar.HOUR_OF_DAY);
         int day = cal.get(Calendar.DAY_OF_WEEK);
-        
-        // Session macro mondiale active: Lundi au Vendredi, de 07h00 à 23h00 (Heures d'Europe/US)
         return day >= Calendar.MONDAY && day <= Calendar.FRIDAY && hour >= 7 && hour <= 23;
     }
     
@@ -81,26 +82,24 @@ public class SystemMonitor {
     }
     
     private static void sendSystemAlert(String message) {
-        // Redirection vers le point d'entrée réseau crypté et sécurisé de votre infrastructure
         NotificationService.sendTelegramSecure("🔧 " + message);
-        
         if (MainActivity.instance != null) {
-            MainActivity.instance.addLog("[MONITOR-SYS] " + message);
+            MainActivity.instance.addLog("[MONITOR] " + message);
         }
     }
     
     private static String getAssetEmoji(String asset) {
         switch (asset) {
-            case "US10Y":   return "🏛️"; // Obligations d'État / Pivot
-            case "GOLD":    return "🥇"; // Valeur refuge
-            case "SP500":   return "📊"; // Indice large US
-            case "NASDAQ":  return "💻"; // Indice technologique
-            case "GBPUSD":  return "🇬🇧"; // Cable
-            case "USOIL":   return "🛢️"; // West Texas Intermediate
-            case "AUDUSD":  return "🇦🇺"; // Devise matières premières
-            case "USDCAD":  return "🇨🇦"; // Devise corrélée pétrole
-            case "USDJPY":  return "🇯🇵"; // Devise carry trade
-            case "BITCOIN": return "₿";  // Or numérique
+            case "US10Y":   return "🏛️";
+            case "GOLD":    return "🥇";
+            case "SP500":   return "📊";
+            case "NASDAQ":  return "💻";
+            case "GBPUSD":  return "🇬🇧";
+            case "USOIL":   return "🛢️";
+            case "AUDUSD":  return "🇦🇺";
+            case "USDCAD":  return "🇨🇦";
+            case "USDJPY":  return "🇯🇵";
+            case "BITCOIN": return "₿";
             default:        return "📈";
         }
     }
