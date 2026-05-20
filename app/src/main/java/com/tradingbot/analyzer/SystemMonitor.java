@@ -27,13 +27,11 @@ public class SystemMonitor {
         long now = System.currentTimeMillis();
         long timeSinceLastEvent = now - lastEventTime;
         
-        // Alerte : Flux interrompu pendant les sessions actives (1 heure max)
         if (timeSinceLastEvent > 1 * 60 * 60 * 1000 && isTradingHours()) {
             long minutesSince = timeSinceLastEvent / 60000;
             sendSystemAlert("⚠️ RISK-WARN: Rupture du flux. Aucun flux reçu de FinancialJuice/Investing/X depuis " + minutesSince + " minutes.");
         }
         
-        // Surveillance de vos 10 actifs cibles
         if (isTradingDay()) {
             String[] coreAssets = {"US10Y", "GOLD", "SP500", "NASDAQ", "GBPUSD", "USOIL", "AUDUSD", "USDCAD", "USDJPY", "BITCOIN"};
             for (String asset : coreAssets) {
