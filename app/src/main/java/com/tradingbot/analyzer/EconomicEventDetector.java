@@ -1,120 +1,70 @@
 package com.tradingbot.analyzer;
 
-import java.util.*;
-import java.util.regex.*;
+import java.util.Locale;
 
 public class EconomicEventDetector {
 
     public static class DetectedEvent {
         public String eventType;
-        public String impact;
         public String description;
-        public String country;
-        public String indicator;
-        public String forecast;
-        public String previous;
-        public String actual;
-        public int tier = 3;
-        
-        public DetectedEvent(String eventType, String impact, String description) {
+        public String impact;
+
+        public DetectedEvent(String eventType, String description, String impact) {
             this.eventType = eventType;
-            this.impact = impact;
             this.description = description;
-        }
-        
-        public String getDescription() {
-            return (country != null && indicator != null) ? country + " " + indicator + " [Tier " + tier + "]" : description;
+            this.impact = impact;
         }
     }
 
-    public static DetectedEvent detectEvent(String title, String content) {
-        String combined = ((title != null ? title : "") + " " + (content != null ? content : "")).toLowerCase();
+    /**
+     * Analyse le titre et le texte pour classifier l'événement macroéconomique majeur.
+     */
+    public static DetectedEvent detectEvent(String title, String text) {
+        String unified = (title + " " + text).toUpperCase(Locale.ROOT);
         
-        String eventType = "ECONOMIC";
-        if (combined.contains("nfp") || combined.contains("payroll") || combined.contains("employment")) eventType = "EMPLOYMENT";
-        else if (combined.contains("cpi") || combined.contains("inflation") || combined.contains("pce")) eventType = "INFLATION";
-        else if (combined.contains("fed") || combined.contains("fomc") || combined.contains("rate decision")) eventType = "CENTRAL_BANK";
-        else if (combined.contains("crude oil") || combined.contains("inventories") || combined.contains("eia")) eventType = "COMMODITY_STOCKS";
+        String eventType = "CORE-MACRO";
+        String description = "Analyse Flash Institutionnelle";
+        String impact = "Neutre";
 
-        String forecast = extractDataPoint(combined, "forecast", "expected", "estimate", "exp");
-        String previous = extractDataPoint(combined, "previous", "prior", "last");
-        String actual = extractDataPoint(combined, "actual", "reported", "came in at");
+        // 1. Identification de la nature de l'événement
+        if (unified.contains("FOMC") || unified.contains("FED ") || unified.contains("POWELL")) {
+            eventType = "FED-MONETARY-POLICY";
+            description = "Décision / Discours de la Réserve Fédérale (USA)";
+            impact = "Haute Volatilité";
+        } else if (unified.contains("CPI ") || unified.contains("INFLATION") || unified.contains("CORE CPI")) {
+            eventType = "INFLATION-DATA";
+            description = "Indice des Prix à la Consommation (CPI)";
+            impact = "Haute Volatilité";
+        } else if (unified.contains("NFP") || unified.contains("NON-FARM PAYROLLS") || unified.contains("UNEMPLOYMENT")) {
+            eventType = "EMPLOYMENT-REPORT";
+            description = "Rapport Mensuel de l'Emploi US (NFP)";
+            impact = "Haute Volatilité";
+        } else if (unified.contains("INTEREST RATE") || unified.contains("TAUX D'INTÉRÊT") || unified.contains("ECB") || unified.contains("BCE")) {
+            eventType = "CENTRAL-BANK-RATE";
+            description = "Taux d'intérêt de la Banque Centrale";
+            impact = "Haute Volatilité";
+        } else if (unified.contains("PMI") || unified.contains("MANUFACTURING PMI") || unified.contains("SERVICES PMI")) {
+            eventType = "ECONOMIC-GROWTH-PMI";
+            description = "Indice des Directeurs d'Achat (PMI)";
+            impact = "Moyenne Volatilité";
+        } else if (unified.contains("CRUDE") || unified.contains("EIA") || unified.contains("STOCKS D'ESSENCE")) {
+            eventType = "ENERGY-RESERVES";
+            description = "Rapport Hebdomadaire des Stocks de Pétrole EIA";
+            impact = "Moyenne Volatilité";
+        }
 
-        int tier = 3;
-        if (combined.contains("fomc") || combined.contains("fed rate") || combined.contains("nfp") || combined.contains("cpi ") || combined.contains("pce ")) tier = 1;
-        else if (combined.contains("gdp") || combined.contains("pmi") || combined.contains("retail sales") || combined.contains("inventories")) tier = 2;
-
-        String country = "Global";
-        if (combined.contains("us ") || combined.contains("fed") || combined.contains("fomc") || combined.contains("washington")) country = "United States";
-        else if (combined.contains("uk") || combined.contains("gbp") || combined.contains("london")) country = "United Kingdom";
-        else if (combined.contains("japan") || combined.contains("boj") || combined.contains("tokyo")) country = "Japan";
-        else if (combined.contains("canada") || combined.contains("cad")) country = "Canada";
-        else if (combined.contains("australia") || combined.contains("aud")) country = "Australia";
-
-        String impact = calculateInstitutionalImpact(combined, actual, forecast, previous);
-
-        DetectedEvent event = new DetectedEvent(eventType, impact, title != null && !title.isEmpty() ? title : "Macro Wave Input");
-        event.forecast = forecast;
-        event.previous = previous;
-        event.actual = actual;
-        event.tier = tier;
-        event.country = country;
-        event.indicator = eventType;
-
-        return event;
-    }
-
-    private static String calculateInstitutionalImpact(String text, String actual, String forecast, String previous) {
-        if (text.contains("opinion") || text.contains("editorial") || text.contains("political commentary")) return "Neutre";
-
-        try {
-            if (!"N/A".equals(actual) && !"N/A".equals(forecast)) {
-                double actVal = parseNumericValue(actual);
-                double fctVal = parseNumericValue(forecast);
-                double surprise = actVal - fctVal;
-
-                // Modulateur Professionnel : Ajustement du biais de révision historique
-                if (!"N/A".equals(previous)) {
-                    double prevVal = parseNumericValue(previous);
-                    // Si l'actual bat l'attente mais que le mois passé subit une lourde révision baissière, l'impact est neutralisé
-                }
-
-                if (text.contains("cpi") || text.contains("inflation") || text.contains("pce")) {
-                    // Inflation élevée = Hausse de l'US10Y / Baisse des indices mondiaux et de l'Or
-                    return surprise > 0 ? "Baissier" : "Haussier";
-                }
-                if (text.contains("nfp") || text.contains("payroll") || text.contains("gdp") || text.contains("retail sales")) {
-                    // Forte croissance / fort emploi = Haussier pour l'économie mais potentiellement restrictif pour la Fed
-                    return surprise > 0 ? "Haussier" : "Baissier";
-                }
-                if (text.contains("crude") || text.contains("inventories")) {
-                    // Des stocks de pétrole plus élevés que prévu signifient une baisse de la demande = Baissier pour le pétrole WTI
-                    return surprise > 0 ? "Baissier" : "Haussier";
-                }
-            }
-        } catch (Exception e) {}
-
-        if (text.contains("dovish") || text.contains("rate cut") || text.contains("monetary easing")) return "Haussier";
-        if (text.contains("hawkish") || text.contains("rate hike") || text.contains("monetary tightening")) return "Baissier";
-
-        return "Neutre";
-    }
-
-    private static double parseNumericValue(String val) {
-        Pattern p = Pattern.compile("([-+]?\\d+[.,]?\\d*)");
-        Matcher m = p.matcher(val.replace("%", "").replace("k", "").replace("k", ""));
-        if (m.find()) return Double.parseDouble(m.group(1).replace(',', '.'));
-        return 0;
-    }
-
-    private static String extractDataPoint(String text, String... keys) {
-        for (String key : keys) {
-            int idx = text.indexOf(key);
-            if (idx != -1) {
-                Matcher m = Pattern.compile("[-+]?\\d+\\.?\\d*%?[kKmM]?").matcher(text.substring(idx));
-                if (m.find()) return m.group();
+        // 2. Détection linguistique du biais directionnel brut (Filtre algorithmique rapide)
+        // Ce filtre est complété et sublimé ensuite en arrière-plan par l'intelligence artificielle Groq Llama 3.3
+        if (unified.contains("HIGHER THAN EXPECTED") || unified.contains("ABOVE FORECAST") || unified.contains("BEATS ESTIMATES") || unified.contains("HAUSSIER")) {
+            impact = "Biais Haussier Détecté";
+        } else if (unified.contains("LOWER THAN EXPECTED") || unified.contains("BELOW FORECAST") || unified.contains("MISSES ESTIMATES") || unified.contains("BAISSIER")) {
+            impact = "Biais Baissier Détecté";
+        } else if (unified.contains("SHOCK") || unified.contains("SURPRISE") || unified.contains("BREAKING")) {
+            if ("Neutre".equals(impact)) {
+                impact = "Forte Impulsion Neutre";
             }
         }
-        return "N/A";
+
+        return new DetectedEvent(eventType, description, impact);
     }
 }
