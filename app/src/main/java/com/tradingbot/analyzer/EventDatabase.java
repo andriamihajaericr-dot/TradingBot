@@ -6,7 +6,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
-
+import java.util.List;
 public class EventDatabase extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "TradingBotEvents.db";
