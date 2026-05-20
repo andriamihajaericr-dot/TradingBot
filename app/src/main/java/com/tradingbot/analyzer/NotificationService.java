@@ -32,7 +32,7 @@ public class NotificationService extends NotificationListenerService {
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     
     // API Rest Macroéconomique de Secours (FMP ou Alpha Vantage)
-    private static final String MACRO_API_KEY = "VOTRE_CLE_API_MACRO_GRATUITE";
+    private static final String MACRO_API_KEY = "ykVnU2LFYM8nT6qj6aJlZZSWaMsciVJj";
     private static final String ECONOMIC_CALENDAR_URL = "https://financialmodelingprep.com/api/v3/economic_calendar?from=%s&to=%s&apikey=" + MACRO_API_KEY;
 
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
