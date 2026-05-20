@@ -5,12 +5,16 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.Intent;
+import android.database.Cursor;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Bundle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
-import androidx.core.app.NotificationCompat;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.*;
@@ -28,12 +32,15 @@ public class NotificationService extends NotificationListenerService {
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     
+    // URL de secours pour récupérer l'historique macroéconomique en cas de déconnexion prolongée
+    private static final String BACKUP_FEED_URL = "https://www.financialjuice.com/feed"; 
+
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private EventDatabase eventDb;
+    private boolean isSyncing = false;
 
     public static void sendTelegramSecure(String message) {
-        Log.d(TAG, "Routage Sortant Telegram : " + message);
         new Thread(() -> {
             try {
                 if (MainActivity.TELEGRAM_TOKEN.isEmpty() || MainActivity.TELEGRAM_CHAT_ID.isEmpty()) return;
@@ -44,9 +51,9 @@ public class NotificationService extends NotificationListenerService {
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(5000);
-                int responseCode = conn.getResponseCode();
+                conn.getResponseCode();
                 conn.disconnect();
-            } catch (Exception e) { Log.e(TAG, "Erreur Telegram", e); }
+            } catch (Exception e) { Log.e(TAG, "Échec Telegram (Hors-ligne)"); }
         }).start();
     }
 
@@ -55,7 +62,9 @@ public class NotificationService extends NotificationListenerService {
         super.onCreate();
         eventDb = new EventDatabase(this);
         createNotificationChannel();
-        startDailyBriefScheduler(); // 🌅 Lancement du planificateur de résumé automatique
+        startDailyBriefScheduler();
+        startMonthlyReportScheduler();
+        registerNetworkCallback();
     }
 
     @Override
@@ -76,40 +85,38 @@ public class NotificationService extends NotificationListenerService {
         else if (packageName.contains("twitter") || packageName.contains("periscope")) sourceName = "X / Twitter";
         else return; 
 
+        processRawMacroFeed(sourceName, title, text, unifiedFeed, packageName, sbn.getPostTime(), false);
+    }
+
+    /**
+     * Coeur du traitement : Valide, filtre et stocke les drivers
+     */
+    private void processRawMacroFeed(String sourceName, String title, String text, String unifiedFeed, String packageName, long postTime, boolean isFromScraper) {
         List<String> targetAssets = filterActiveAssets(unifiedFeed);
-        EconomicEventDetector.DetectedEvent inputEvent = EconomicEventDetector.detectEvent(title, text);
-        
         boolean isDriverChanged = detectDriverDeviation(unifiedFeed);
         boolean isFomcPivot = unifiedFeed.toUpperCase().contains("FOMC") || unifiedFeed.toUpperCase().contains("FED ");
-
-        long exactTimestamp = parseTimeFromText(unifiedFeed, sbn.getPostTime());
+        
+        long exactTimestamp = parseTimeFromText(unifiedFeed, postTime);
         String fingerPrint = generateSecureHash(title + text);
+        
         if (eventDb.eventExists(fingerPrint)) return;
-
         long unixSeconds = exactTimestamp / 1000;
 
-        // 📉 CAS 1 : La news est conforme ET ce n'est pas un événement majeur (FOMC) -> On filtre pour couper le bruit
         if (!isDriverChanged && !isFomcPivot) {
-            eventDb.saveEvent(fingerPrint, packageName, sourceName, inputEvent.eventType, title, unifiedFeed, 
-                    String.join(", ", targetAssets), "Conforme (Ignoré)", (int) unixSeconds, "database_only");
+            eventDb.saveEvent(fingerPrint, packageName, sourceName, "Macro-Feed", title, unifiedFeed, 
+                    String.join(", ", targetAssets), "Conforme", (int) unixSeconds, "synced");
             return; 
         }
 
-        // ⚡ CAS 2 : Événement Pivot Majeur (FOMC) ou Déviation Fondamentale Réelle
-        inputEvent.impact = isFomcPivot ? "PIVOT CRITIQUE FOMC" : "CHANGEMENT DE DRIVER MACRO";
+        String initialImpact = isFomcPivot ? "PIVOT CRITIQUE FOMC" : "CHANGEMENT DE DRIVER MACRO";
+        String syncStatus = (isDeviceOnline() && !isFromScraper) ? "en_attente" : "en_attente";
         
-        boolean logged = eventDb.saveEvent(fingerPrint, packageName, sourceName, 
-                inputEvent.eventType, title, unifiedFeed, String.join(", ", targetAssets), 
-                inputEvent.impact, (int) unixSeconds, "telegram"); 
-        
-        if (logged) {
-            SystemMonitor.registerEvent(sourceName, targetAssets);
-            final String finalSource = sourceName;
-            
-            // On extrait l'historique complet (y compris les news CPI/NFP conformes stockées en tâche de fond)
-            String historyContext = eventDb.getRecentEventsForAssets(targetAssets, 6);
-            
-            exec.submit(() -> runSeniorAnalystPipeline(finalSource, unifiedFeed, historyContext, targetAssets, exactTimestamp, isFomcPivot));
+        // Sauvegarde locale sécurisée
+        boolean saved = eventDb.saveEvent(fingerPrint, packageName, sourceName, "Macro-Choc", title, unifiedFeed, 
+                String.join(", ", targetAssets), initialImpact, (int) unixSeconds, syncStatus);
+
+        if (saved && isDeviceOnline()) {
+            triggerQueueSynchronization();
         }
     }
 
@@ -135,160 +142,225 @@ public class NotificationService extends NotificationListenerService {
     }
 
     /**
-     * Pipeline d'Analyse IA : Gère les déviations standards ET la modélisation prédictive FOMC
+     * 📡 SYNCHRONISATEUR DE FILE : Traite les données locales et récupère les données manquantes sur internet
      */
-    private void runSeniorAnalystPipeline(String source, String feed, String history, List<String> assets, long eventTimestamp, boolean isFomcPivot) {
+    private synchronized void triggerQueueSynchronization() {
+        if (isSyncing || !isDeviceOnline()) return;
+        isSyncing = true;
+
+        exec.submit(() -> {
+            try {
+                long now = System.currentTimeMillis() / 1000;
+                
+                // 1. Récupération forcé de l'historique sur les serveurs si on a été déconnecté longtemps
+                fetchMissingDriversFromWeb();
+
+                // 2. Traitement de la file d'attente globale accumulée
+                Cursor cursor = eventDb.getUnsyncedEvents(now);
+                if (cursor != null && cursor.moveToFirst()) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog("🔄 [RÉSEAU] Alignement des drivers suite à reconnexion...");
+                    }
+                    do {
+                        String fingerprint = cursor.getString(cursor.getColumnIndexOrThrow("fingerprint"));
+                        String source = cursor.getString(cursor.getColumnIndexOrThrow("source"));
+                        String feed = cursor.getString(cursor.getColumnIndexOrThrow("feed_content"));
+                        String assetsStr = cursor.getString(cursor.getColumnIndexOrThrow("target_assets"));
+                        long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("unix_timestamp")) * 1000;
+                        String impactType = cursor.getString(cursor.getColumnIndexOrThrow("impact"));
+                        
+                        List<String> assets = Arrays.asList(assetsStr.split(", "));
+                        String historyContext = eventDb.getRecentEventsForAssets(assets, 5);
+                        boolean isFomc = impactType.contains("FOMC");
+
+                        boolean success = processSingleEventDelayed(source, feed, historyContext, assets, timestamp, isFomc, fingerprint);
+                        if (!success) break;
+
+                    } while (cursor.moveToNext());
+                    cursor.close();
+                }
+            } catch (Exception e) { Log.e(TAG, "Erreur synchronisation", e); }
+            isSyncing = false;
+        });
+    }
+
+    /**
+     * 🌐 MOTEUR DE RECUPERATION RETROACTIF (Scraper de Secours)
+     * Se connecte aux flux web pour extraire ce qui s'est passé pendant votre absence
+     */
+    private void fetchMissingDriversFromWeb() {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+            URL url = new URL(BACKUP_FEED_URL);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(8000); conn.setReadTimeout(8000);
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+            
+            if (conn.getResponseCode() == 200) {
+                BufferedReader rd = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                StringBuilder sb = new StringBuilder(); String line;
+                while ((line = rd.readLine()) != null) sb.append(line);
+                rd.close();
+
+                // Parsing XML standardisé des flux RSS d'actualité financière
+                Pattern itemPattern = Pattern.compile("<item>.*?<title>(.*?)</title>.*?<description>(.*?)</description>.*?</item>");
+                Matcher matcher = itemPattern.matcher(sb.toString());
+                
+                while (matcher.find()) {
+                    String title = matcher.group(1).replaceAll("<!\\[CDATA\\[|]]>", "").trim();
+                    String desc = matcher.group(2).replaceAll("<!\\[CDATA\\[|]]>", "").trim();
+                    String fullFeed = title + " " + desc;
+                    
+                    // Réinjection rétroactive dans le moteur de tri
+                    processRawMacroFeed("FinancialJuice (Web-Sync)", title, desc, fullFeed, "com.financialjuice.web", System.currentTimeMillis(), true);
+                }
+            }
+            conn.disconnect();
+        } catch (Exception e) { Log.e(TAG, "Le serveur de secours web n'a pas répondu ou flux protégé.", e); }
+    }
+
+    private boolean processSingleEventDelayed(String source, String feed, String history, List<String> assets, long timestamp, boolean isFomc, String fingerprint) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
             sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
-            String timeString = sdf.format(new Date(eventTimestamp)) + " (Mada)";
+            String timeString = sdf.format(new Date(timestamp)) + " (Mada)";
 
-            JSONObject payload = new JSONObject();
-            payload.put("model", GROQ_MODEL);
-            payload.put("temperature", isFomcPivot ? 0.15 : 0.02); // Plus de créativité de synthèse si c'est le FOMC
-
+            JSONObject payload = new JSONObject(); payload.put("model", GROQ_MODEL); payload.put("temperature", 0.02);
             JSONArray messages = new JSONArray();
             
-            String systemPrompt = "Tu es le Chef de la Stratégie Macroéconomique d'un fonds quantitatif. " +
-                    "Ton travail est d'analyser les ruptures de flux et d'interpréter les implications des banques centrales (FED/FOMC) en croisant les données historiques reçues (CPI, NFP). " +
-                    "Sois ultra-précis, froid, mathématique. Pas de blabla.";
-            messages.put(new JSONObject().put("role", "system").put("content", systemPrompt));
-            
-            StringBuilder userPrompt = new StringBuilder();
-            if (isFomcPivot) {
-                userPrompt.append("🚨 !!! ALERTE MAJEURE BANQUE CENTRALE : COMPLEXE FOMC !!!\n");
-            }
-            userPrompt.append("Flux actuel : ").append(feed).append("\n Source : ").append(source).append("\n\n")
-                      .append("--- MÉMOIRE MACRO DE LA BASE DE DONNÉES (CONTEXTE RECENT) ---\n")
-                      .append(history.isEmpty() ? "Aucune donnée macro mémorisée récemment.\n" : history).append("\n")
-                      .append("--- INSTRUCTIONS DE PROTOCOLE D'EXÉCUTION ---\n");
-
-            if (isFomcPivot) {
-                userPrompt.append("Tu dois obligatoirement croiser ce flash FOMC avec les données CPI (Inflation) et NFP (Emploi) présentes dans la mémoire ci-dessus.\n")
-                          .append("Rédige ton analyse sous cette forme exacte :\n")
-                          .append("1) CORRÉLATION HISTORIQUE : (Ex: 'Le CPI en hausse de mardi combiné à ce FOMC implique...')\n")
-                          .append("2) RÉSULTAT DU DRIVER DES TAUX D'INTÉRÊT : [HAUSSIER], [BAISSIER] ou [STABLE]\n")
-                          .append("3) IMPACT PAR ACTIF (").append(String.join(", ", assets)).append(") : Conclus chaque actif par [ACHAT CHOC], [VENTE CHOC] ou [NEUTRE].");
-            } else {
-                userPrompt.append("Pour chaque actif cible (").append(String.join(", ", assets)).append(") :\n")
-                          .append("1) Impact direct du flux.\n")
-                          .append("2) Bilan de la dynamique cumulative par rapport à l'historique.\n")
-                          .append("3) Tag de décision technique : [BIAIS HAUSSIER], [BIAIS BAISSIER] ou [STABLE/NEUTRE].");
-            }
-            
-            messages.put(new JSONObject().put("role", "user").put("content", userPrompt.toString()));
+            messages.put(new JSONObject().put("role", "system").put("content", "Tu es Macro-Strategist. Donne l'impact pour les actifs spécifiés à partir de l'alerte différée suivante. Conclus par [ACHAT CHOC], [VENTE CHOC] ou [NEUTRE]."));
+            messages.put(new JSONObject().put("role", "user").put("content", "ALERTE RECUPERÉE : " + feed + "\nContext historique :\n" + history));
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestMethod("POST"); conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + MainActivity.CLAUDE_API_KEY);
             conn.setDoOutput(true);
-
-            OutputStream os = conn.getOutputStream();
-            os.write(payload.toString().getBytes("UTF-8"));
-            os.flush(); os.close();
+            
+            OutputStream os = conn.getOutputStream(); os.write(payload.toString().getBytes("UTF-8")); os.flush(); os.close();
 
             if (conn.getResponseCode() == 200) {
                 BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = br.readLine()) != null) response.append(line);
-                br.close();
+                StringBuilder response = new StringBuilder(); String line;
+                while ((line = br.readLine()) != null) response.append(line); br.close();
 
                 JSONObject json = new JSONObject(response.toString());
                 String aiAnalysis = json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 
-                String header = isFomcPivot ? "*🔥 DECISION BANQUE CENTRALE | INTERPRÉTATION AUTOMATIQUE FOMC*" : "*⚡ DEVIATION CRITIQUE | " + source.toUpperCase() + "*";
-                String tgMsg = header + "\n🕒 " + timeString + "\n\n" + aiAnalysis;
+                String tgMsg = "⏳ *ALERTE RETROACTIVE | RECONNEXION REUSSIE*\n" +
+                               "📡 Origine : " + source.toUpperCase() + "\n" +
+                               "🕒 Émis le : " + timeString + "\n\n" + aiAnalysis;
                 
-                sendTelegramSecure(tgMsg);
+                String urlTg = "https://api.telegram.org/bot" + MainActivity.TELEGRAM_TOKEN + "/sendMessage?chat_id=" + MainActivity.TELEGRAM_CHAT_ID + "&parse_mode=Markdown&text=" + URLEncoder.encode(tgMsg, "UTF-8");
+                HttpURLConnection connTg = (HttpURLConnection) new URL(urlTg).openConnection();
+                int tgCode = connTg.getResponseCode(); connTg.disconnect();
+
+                if (tgCode == 200) {
+                    eventDb.markEventAsSynced(fingerprint, isFomc ? "PIVOT CRITIQUE FOMC (OK)" : "CHANGEMENT DE DRIVER MACRO (OK)");
+                    return true;
+                }
             }
-        } catch (Exception e) { Log.e(TAG, "Échec Pipeline Analyste", e); }
+        } catch (Exception e) { Log.e(TAG, "Échec traitement différé", e); }
+        return false;
     }
 
-    /**
-     * 🌅 PLANIFICATEUR DU RÉSUMÉ JOURNALIER (DAILY BRIEF)
-     * Calcule le temps restant jusqu'au prochain matin à 07h00 (Heure Madagascar UTC+3)
-     */
     private void startDailyBriefScheduler() {
         Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
-        nextRun.set(Calendar.HOUR_OF_DAY, 7);
-        nextRun.set(Calendar.MINUTE, 0);
-        nextRun.set(Calendar.SECOND, 0);
-
-        if (nextRun.getTimeInMillis() <= System.currentTimeMillis()) {
-            nextRun.add(Calendar.DAY_OF_YEAR, 1);
-        }
-
-        long initialDelay = nextRun.getTimeInMillis() - System.currentTimeMillis();
-        long period = 24 * 60 * 60 * 1000; // Exécution toutes les 24 heures
-
-        scheduler.scheduleAtFixedRate(this::generateAndSendDailyBrief, initialDelay, period, TimeUnit.MILLISECONDS);
-        Log.d(TAG, "Planificateur Daily Brief armé. Premier déclenchement dans : " + (initialDelay / 1000 / 60) + " minutes.");
+        nextRun.set(Calendar.HOUR_OF_DAY, 7); nextRun.set(Calendar.MINUTE, 0); nextRun.set(Calendar.SECOND, 0);
+        if (nextRun.getTimeInMillis() <= System.currentTimeMillis()) nextRun.add(Calendar.DAY_OF_YEAR, 1);
+        scheduler.scheduleAtFixedRate(this::generateAndSendDailyBrief, nextRun.getTimeInMillis() - System.currentTimeMillis(), 24L * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
     }
 
-    /**
-     * Génère la synthèse globale matinale basée sur les données de la veille stockées en BDD
-     */
     private void generateAndSendDailyBrief() {
         try {
-            long now = System.currentTimeMillis();
+            long now = System.currentTimeMillis() / 1000;
             String dailyDrivers = eventDb.getDailyMacroDrivers(now);
-            
-            if (dailyDrivers.isEmpty()) {
-                sendTelegramSecure("🌅 *DAILY BRIEF MACRO — ANTANANARIVO*\n\n" +
-                        "📊 *Statut :* Marché calme. Aucun changement de driver macroéconomique majeur enregistré au cours des dernières 24 heures.\n" +
-                        "💡 *Biais général :* Préservation des tendances de fond antérieures.");
-                return;
-            }
+            if (dailyDrivers.isEmpty()) return;
 
-            // Sollicitation de Groq pour condenser l'historique des dernières 24 heures en une matrice décisionnelle
-            JSONObject payload = new JSONObject();
-            payload.put("model", GROQ_MODEL);
-            payload.put("temperature", 0.1);
-
+            JSONObject payload = new JSONObject(); payload.put("model", GROQ_MODEL); payload.put("temperature", 0.1);
             JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", 
-                "Tu es un Analyste Inter-Marchés. Rédige un briefing matinal synthétique, clair et exploitable pour un trader à partir de la liste des chocs macro survenus hier. Indique s'il y a eu un changement de driver structurel. No chit-chat."));
-            
-            messages.put(new JSONObject().put("role", "user").put("content", 
-                "DONNÉES BRUTES DES CHOCS MACRO DES DERNIÈRES 24 HEURES :\n" + dailyDrivers + 
-                "\n\nFournis : 1) La synthèse du sentiment global de marché. 2) La matrice des biais par actif pour la session à venir."));
-            
+            messages.put(new JSONObject().put("role", "system").put("content", "Fais un briefing matinal synthétique, clair et exploitable des chocs macro d'hier pour la session d'aujourd'hui."));
+            messages.put(new JSONObject().put("role", "user").put("content", "DONNÉES HIER :\n" + dailyDrivers));
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestMethod("POST"); conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + MainActivity.CLAUDE_API_KEY);
             conn.setDoOutput(true);
-
-            OutputStream os = conn.getOutputStream();
-            os.write(payload.toString().getBytes("UTF-8"));
-            os.flush(); os.close();
+            OutputStream os = conn.getOutputStream(); os.write(payload.toString().getBytes("UTF-8")); os.flush(); os.close();
 
             if (conn.getResponseCode() == 200) {
                 BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = br.readLine()) != null) response.append(line);
-                br.close();
-
-                JSONObject json = new JSONObject(response.toString());
-                String dailySummary = json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-
-                String tgBrief = "🌅 *DAILY BRIEF MACRO — TERMINAL DE TRADING*\n" +
-                                 "📅 Date : " + new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(new Date()) + " (07:00 Mada)\n\n" +
-                                 dailySummary;
-                
-                sendTelegramSecure(tgBrief);
+                StringBuilder r = new StringBuilder(); String l;
+                while ((l = br.readLine()) != null) r.append(l); br.close();
+                String dailySummary = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+                sendTelegramSecure("🌅 *DAILY BRIEF MACRO — ANTANANARIVO*\n\n" + dailySummary);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Échec de la génération du Daily Brief matinal", e);
+        } catch (Exception e) { Log.e(TAG, "Erreur Daily Brief", e); }
+    }
+
+    private void startMonthlyReportScheduler() {
+        Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+        nextRun.set(Calendar.DAY_OF_MONTH, nextRun.getActualMaximum(Calendar.DAY_OF_MONTH));
+        nextRun.set(Calendar.HOUR_OF_DAY, 23); nextRun.set(Calendar.MINUTE, 0); nextRun.set(Calendar.SECOND, 0);
+        if (nextRun.getTimeInMillis() <= System.currentTimeMillis()) {
+            nextRun.add(Calendar.MONTH, 1);
+            nextRun.set(Calendar.DAY_OF_MONTH, nextRun.getActualMaximum(Calendar.DAY_OF_MONTH));
         }
+        scheduler.scheduleAtFixedRate(this::generateAndPurgeMonthlyReport, nextRun.getTimeInMillis() - System.currentTimeMillis(), 30L * 24 * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
+    }
+
+    private void generateAndPurgeMonthlyReport() {
+        try {
+            long now = System.currentTimeMillis() / 1000;
+            String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
+            if (monthlyRegistry.isEmpty()) return;
+
+            JSONObject payload = new JSONObject(); payload.put("model", GROQ_MODEL); payload.put("temperature", 0.1);
+            JSONArray messages = new JSONArray();
+            messages.put(new JSONObject().put("role", "system").put("content", "Analyse le registre des chocs macro du mois écoulé pour dégager la structure fondamentale dominante pour le début du mois prochain. Conclure de façon macro-structurelle."));
+            messages.put(new JSONObject().put("role", "user").put("content", "REGISTRE MENSUEL :\n" + monthlyRegistry));
+            payload.put("messages", messages);
+
+            URL url = new URL(GROQ_URL);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST"); conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Authorization", "Bearer " + MainActivity.CLAUDE_API_KEY);
+            conn.setDoOutput(true);
+            OutputStream os = conn.getOutputStream(); os.write(payload.toString().getBytes("UTF-8")); os.flush(); os.close();
+
+            if (conn.getResponseCode() == 200) {
+                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                StringBuilder r = new StringBuilder(); String l;
+                while ((l = br.readLine()) != null) r.append(l); br.close();
+                String report = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+
+                sendTelegramSecure("📊 *RAPPORT MACRO MENSUEL & TRANSITION J+30*\n\n" + report);
+                eventDb.purgeOldEvents(now);
+            }
+        } catch (Exception e) { Log.e(TAG, "Erreur rapport mensuel", e); }
+    }
+
+    private void registerNetworkCallback() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) { triggerQueueSynchronization(); }
+            });
+        }
+    }
+
+    private boolean isDeviceOnline() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Network net = cm.getActiveNetwork(); if (net == null) return false;
+            NetworkCapabilities cap = cm.getNetworkCapabilities(net);
+            return cap != null && (cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || cap.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR));
+        }
+        return false;
     }
 
     private long parseTimeFromText(String text, long defaultPostTime) {
@@ -341,6 +413,6 @@ public class NotificationService extends NotificationListenerService {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        scheduler.shutdown(); // Fermeture propre du planificateur si le service s'arrête
+        scheduler.shutdown();
     }
 }
