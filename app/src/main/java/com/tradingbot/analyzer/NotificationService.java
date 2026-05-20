@@ -22,6 +22,7 @@ import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.regex.*;
 
 public class NotificationService extends NotificationListenerService {
 
@@ -30,8 +31,8 @@ public class NotificationService extends NotificationListenerService {
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     
-    // API Macroéconomique Professionnelle (Remplacer par votre clé gratuite)
-    private static final String MACRO_API_KEY = "VOTRE_CLE_ALPHA_VANTAGE_OU_FMP";
+    // API Rest Macroéconomique de Secours (FMP ou Alpha Vantage)
+    private static final String MACRO_API_KEY = "VOTRE_CLE_API_MACRO_GRATUITE";
     private static final String ECONOMIC_CALENDAR_URL = "https://financialmodelingprep.com/api/v3/economic_calendar?from=%s&to=%s&apikey=" + MACRO_API_KEY;
 
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
@@ -52,7 +53,7 @@ public class NotificationService extends NotificationListenerService {
                 conn.setConnectTimeout(5000);
                 conn.getResponseCode();
                 conn.disconnect();
-            } catch (Exception e) { Log.e(TAG, "Échec envoi Telegram direct (Déconnecté)"); }
+            } catch (Exception e) { Log.e(TAG, "Échec Telegram (Hors-ligne)"); }
         }).start();
     }
 
@@ -84,24 +85,25 @@ public class NotificationService extends NotificationListenerService {
         else if (packageName.contains("twitter") || packageName.contains("periscope")) sourceName = "X / Twitter";
         else return;
 
-        processIncomingEvent(sourceName, title, text, unifiedFeed, packageName, sbn.getPostTime());
+        processIncomingMacroFeed(sourceName, title, text, unifiedFeed, packageName, sbn.getPostTime());
     }
 
-    private void processIncomingEvent(String source, String title, String text, String feed, String pkg, long postTime) {
+    private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
         List<String> targetAssets = filterActiveAssets(feed);
         boolean isFomcPivot = feed.toUpperCase().contains("FOMC") || feed.toUpperCase().contains("FED ");
         int weight = assignDriverWeight(feed);
 
-        // Si la donnée n'est pas une Hard Data ou un pivot de banque centrale, on l'évalue pour filtrer le bruit
+        // Élimination du bruit pour les actualités mineures sans écart
         if (weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
             String hash = generateSecureHash(title + text);
             eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed, String.join(", ", targetAssets), "Conforme (Filtré)", (int)(postTime/1000), "synced");
             return;
         }
 
-        String initialImpact = isFomcPivot ? "💥 PIVOT CRITIQUE BANQUE CENTRALE" : "⚡ CHOC DRIVER MACRO PONDÉRÉ (Poids: " + weight + ")";
+        String initialImpact = isFomcPivot ? "💥 PIVOT MAJEUR BANQUE CENTRALE" : "⚡ CHOC DRIVER MACRO PONDÉRÉ (Poids: " + weight + ")";
         String hash = generateSecureHash(title + text);
 
+        // Stockage d'urgence immédiat en mode 'en_attente'
         boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "en_attente");
 
         if (saved && isDeviceOnline()) {
@@ -111,17 +113,17 @@ public class NotificationService extends NotificationListenerService {
 
     private int assignDriverWeight(String text) {
         String u = text.toUpperCase();
-        if (u.contains("CPI") || u.contains("INFLATION") || u.contains("NFP") || u.contains("NON-FARM PAYROLLS") || u.contains("FOMC") || u.contains("INTEREST RATE")) return 5; // Hard Data Fondator
-        if (u.contains("GDP") || u.contains("PIB") || u.contains("RETAIL SALES") || u.contains("CHÔMAGE")) return 4; // Hard Data Secondaire
-        if (u.contains("PMI") || u.contains("ISM") || u.contains("MICHIGAN") || u.contains("CONSUMER CONFIDENCE")) return 3; // Soft Data Conjoncturelle
-        return 1; // Rumeur ou bruit de flux
+        if (u.contains("CPI") || u.contains("INFLATION") || u.contains("NFP") || u.contains("NON-FARM PAYROLLS") || u.contains("FOMC") || u.contains("INTEREST RATE") || u.contains("RBA") || u.contains("BOC") || u.contains("BOJ")) return 5;
+        if (u.contains("GDP") || u.contains("PIB") || u.contains("RETAIL SALES") || u.contains("EMPLOYMENT RATE") || u.contains("STOCKS")) return 4;
+        if (u.contains("PMI") || u.contains("ISM") || u.contains("MICHIGAN")) return 3;
+        return 1;
     }
 
     private boolean detectDriverDeviation(String text) {
         String upper = text.toUpperCase();
         if (upper.contains("HIGHER THAN EXPECTED") || upper.contains("LOWER THAN EXPECTED") ||
             upper.contains("ABOVE FORECAST") || upper.contains("BELOW FORECAST") ||
-            upper.contains("SURPRISE") || upper.contains("SHOCK")) return true;
+            upper.contains("SURPRISE") || upper.contains("SHOCK") || upper.contains("MISSES")) return true;
 
         Pattern pattern = Pattern.compile("(ACTUAL|ACT):?\\s*([\\d\\.\\-%]+).*?(FORECAST|EST|EXP):?\\s*([\\d\\.\\-%]+)");
         Matcher matcher = pattern.matcher(upper);
@@ -143,10 +145,10 @@ public class NotificationService extends NotificationListenerService {
             try {
                 long now = System.currentTimeMillis() / 1000;
                 
-                // 📊 ÉTAPE 1 : Récupération rétroactive via API pour combler les coupures prolongées (J+7)
+                // 1. Récupération historique API si deconnexion prolongée
                 fetchMissingDataFromInstitutionalAPI();
 
-                // 🧠 ÉTAPE 2 : Alignement et traitement séquentiel des éléments en attente
+                // 2. Vidage de la file d'attente locale accumulée
                 Cursor cursor = eventDb.getUnsyncedEvents(now);
                 if (cursor != null && cursor.moveToFirst()) {
                     do {
@@ -165,33 +167,29 @@ public class NotificationService extends NotificationListenerService {
                     } while (cursor.moveToNext());
                     cursor.close();
                 }
-            } catch (Exception e) { Log.e(TAG, "Erreur lors de l'alignement réseau", e); }
+            } catch (Exception e) { Log.e(TAG, "Erreur synchronisation réseau", e); }
             isSyncing = false;
         });
     }
 
-    /**
-     * 🌐 RECUPERATION HISTORIQUE SANS SCRAPING : Interroge l'API Institutionnelle sur les 7 derniers jours
-     */
     private void fetchMissingDataFromInstitutionalAPI() {
         try {
+            if (MACRO_API_KEY.equals("VOTRE_CLE_API_MACRO_GRATUITE")) return;
+
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
             Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
             String todayStr = dateFormat.format(cal.getTime());
-            
-            cal.add(Calendar.DAY_OF_YEAR, -7); // Retour en arrière de 7 jours complets
+            cal.add(Calendar.DAY_OF_YEAR, -7);
             String sevenDaysAgoStr = dateFormat.format(cal.getTime());
 
             URL url = new URL(String.format(ECONOMIC_CALENDAR_URL, sevenDaysAgoStr, todayStr));
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
             conn.setConnectTimeout(8000);
 
             if (conn.getResponseCode() == 200) {
                 BufferedReader rd = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
                 StringBuilder response = new StringBuilder(); String line;
-                while ((line = rd.readLine()) != null) response.append(line);
-                rd.close();
+                while ((line = rd.readLine()) != null) response.append(line); rd.close();
 
                 JSONArray calendarEvents = new JSONArray(response.toString());
                 StringBuilder apiMacroBlock = new StringBuilder();
@@ -199,16 +197,20 @@ public class NotificationService extends NotificationListenerService {
                 for (int i = 0; i < calendarEvents.length(); i++) {
                     JSONObject event = calendarEvents.getJSONObject(i);
                     String impact = event.optString("impact", "LOW");
+                    String currency = event.optString("currency", "USD");
                     
-                    // On ne traite que les événements à fort impact macroéconomique
-                    if (impact.equalsIgnoreCase("HIGH")) {
+                    // On filtre pour cibler la macro globale et nos actifs spécifiques (USD, AUD, CAD, JPY, EUR, GBP)
+                    if (impact.equalsIgnoreCase("HIGH") && 
+                       (currency.equals("USD") || currency.equals("AUD") || currency.equals("CAD") || 
+                        currency.equals("JPY") || currency.equals("EUR") || currency.equals("GBP"))) {
+                        
                         String date = event.optString("date", "");
                         String eventName = event.optString("event", "");
                         double actual = event.optDouble("actual", 0.0);
                         double estimate = event.optDouble("estimate", 0.0);
 
-                        if (actual != estimate) { // Il y a un écart fondamental (Surprise)
-                            apiMacroBlock.append(String.format("- [%s] %s | Réel: %s vs Attendu: %s\n", date, eventName, actual, estimate));
+                        if (actual != estimate) {
+                            apiMacroBlock.append(String.format("- [%s] (%s) %s | Actuel: %s vs Attendu: %s\n", date, currency, eventName, actual, estimate));
                         }
                     }
                 }
@@ -218,24 +220,20 @@ public class NotificationService extends NotificationListenerService {
                 }
             }
             conn.disconnect();
-        } catch (Exception e) { Log.e(TAG, "Échec de synchronisation de l'API historique", e); }
+        } catch (Exception e) { Log.e(TAG, "Échec de récupération API historique", e); }
     }
 
     private void dispatchWeeklyBulkToGroq(String bulkData) {
         try {
-            JSONObject payload = new JSONObject();
-            payload.put("model", GROQ_MODEL);
-            payload.put("temperature", 0.1);
-
+            JSONObject payload = new JSONObject(); payload.put("model", GROQ_MODEL); payload.put("temperature", 0.1);
             JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", "Tu es Macro-Strategist principal. Analyse ce relevé de données économiques issues de notre API de secours suite à une déconnexion prolongée. Identifie le nouveau vecteur de momentum et conclus explicitement pour GOLD et US10Y."));
-            messages.put(new JSONObject().put("role", "user").put("content", "ÉVÉNEMENTS EXSTRAITS DE L'API :\n" + bulkData));
+            messages.put(new JSONObject().put("role", "system").put("content", "Tu es un Macro-Strategist de premier plan. Analyse ce relevé complet de données à fort impact survenu pendant notre coupure réseau. Identifie les déviations majeures et dresse la matrice de momentum pour GOLD, NASDAQ, USOIL, US10Y, EURUSD, GBPUSD, BITCOIN, AUDUSD, USDCAD et USDJPY."));
+            messages.put(new JSONObject().put("role", "user").put("content", "DONNÉES EXTRAITES :\n" + bulkData));
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestMethod("POST"); conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + MainActivity.CLAUDE_API_KEY);
             conn.setDoOutput(true);
             
@@ -247,12 +245,12 @@ public class NotificationService extends NotificationListenerService {
                 while ((l = br.readLine()) != null) r.append(l); br.close();
 
                 String analysis = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-                sendTelegramSecure("🚨 *RAPPORT DE RATTRAPAGE MACROÉCONOMIQUE API (J+7)*\n\n" + analysis);
+                sendTelegramSecure("🚨 *RAPPORT CRITIQUE DE RATTRAPAGE INTER-MARCHÉS (J+7)*\n\n" + analysis);
                 
-                eventDb.saveEvent(generateSecureHash(analysis), "com.tradingbot.sync", "API Sync Engine", "Weekly-Sync", "Audit Reconnexion", analysis, "GOLD, US10Y", "VECTEUR SÉCURISÉ", (int)(System.currentTimeMillis()/1000), "synced");
+                eventDb.saveEvent(generateSecureHash(analysis), "com.tradingbot.sync", "API Sync", "Weekly-Sync", "Audit Global", analysis, "ALL_ASSETS", "ALIGNE_OK", (int)(System.currentTimeMillis()/1000), "synced");
             }
             conn.disconnect();
-        } catch (Exception e) { Log.e(TAG, "Échec de l'audit de masse Groq", e); }
+        } catch (Exception e) { Log.e(TAG, "Échec dispatch historique Groq", e); }
     }
 
     private boolean executeAnalysisPipeline(String source, String feed, String history, List<String> assets, long ts, String fingerprint) {
@@ -263,8 +261,8 @@ public class NotificationService extends NotificationListenerService {
 
             JSONObject payload = new JSONObject(); payload.put("model", GROQ_MODEL); payload.put("temperature", 0.02);
             JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", "Tu es un modèle quantitatif de trading macro. Évalue la déviation fondamentale en associant le flux actuel à l'historique fourni. Conclus pour chaque actif par [ACHAT CHOC], [VENTE CHOC] ou [NEUTRE]. Pas de phrases inutiles."));
-            messages.put(new JSONObject().put("role", "user").put("content", "Flux: " + feed + "\nMémoire :\n" + history));
+            messages.put(new JSONObject().put("role", "system").put("content", "Tu es un algorithme de trading macro-fondamental. Analyse la news par rapport au contexte historique fourni. Conclus pour chaque actif cible par [ACHAT CHOC], [VENTE CHOC] ou [NEUTRE]."));
+            messages.put(new JSONObject().put("role", "user").put("content", "Flux : " + feed + "\nMémoire :\n" + history));
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
@@ -281,13 +279,41 @@ public class NotificationService extends NotificationListenerService {
                 while ((l = br.readLine()) != null) r.append(l); br.close();
 
                 String aiResult = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-                sendTelegramSecure("⚡ *ANALYSE DE FLUX DE DRIVER*\n🕒 " + timeString + "\n📡 Source : " + source + "\n\n" + aiResult);
+                sendTelegramSecure("⚡ *ANALYSE DE DRIVER MACRO PONDÉRÉ*\n🕒 " + timeString + "\n📡 Source : " + source + "\n📋 Actifs : " + String.join(", ", assets) + "\n\n" + aiResult);
                 
                 eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
                 return true;
             }
         } catch (Exception e) { Log.e(TAG, "Échec pipeline unitaire", e); }
         return false;
+    }
+
+    /**
+     * 📋 CARTOGRAPHIE EXACTE ET INTELLIGENTE DES ACTIFS DU PORTEFOUILLE
+     */
+    private List<String> filterActiveAssets(String text) {
+        List<String> assets = new ArrayList<>();
+        String upper = text.toUpperCase();
+
+        if (upper.contains("GOLD") || upper.contains("XAU") || upper.contains("OR ") || upper.contains("SILVER")) assets.add("GOLD");
+        if (upper.contains("OIL") || upper.contains("WTI") || upper.contains("CRUDE") || upper.contains("BRENT")) assets.add("USOIL");
+        if (upper.contains("NASDAQ") || upper.contains("NAS100") || upper.contains("TECH") || upper.contains("OPENAI") || upper.contains("NVIDIA") || upper.contains("APPLE")) assets.add("NASDAQ");
+        if (upper.contains("SP500") || upper.contains("S&P") || upper.contains("SPX")) assets.add("SP500");
+        if (upper.contains("BITCOIN") || upper.contains("BTC") || upper.contains("CRYPTO")) assets.add("BITCOIN");
+        if (upper.contains("YIELD") || upper.contains("US10Y") || upper.contains("BOND") || upper.contains("TREASURY")) assets.add("US10Y");
+        if (upper.contains("EUR ") || upper.contains("EURUSD") || upper.contains("ECB") || upper.contains("EUROZONE")) assets.add("EURUSD");
+        if (upper.contains("GBP") || upper.contains("GBPUSD") || upper.contains("CABLE") || upper.contains("BOE")) assets.add("GBPUSD");
+        
+        // 🌟 Nouveaux Actifs Forex ajoutés :
+        if (upper.contains("AUD") || upper.contains("AUDUSD") || upper.contains("AUSSIE") || upper.contains("RBA")) assets.add("AUDUSD");
+        if (upper.contains("CAD") || upper.contains("USDCAD") || upper.contains("LOONIE") || upper.contains("BOC")) assets.add("USDCAD");
+        if (upper.contains("JPY") || upper.contains("USDJPY") || upper.contains("YEN") || upper.contains("BOJ")) assets.add("USDJPY");
+
+        // Sécurité systémique si aucun actif n'est directement nommé dans la news macro
+        if (assets.isEmpty()) {
+            assets.addAll(Arrays.asList("GOLD", "NASDAQ", "USOIL", "EURUSD", "AUDUSD", "USDCAD", "USDJPY"));
+        }
+        return assets;
     }
 
     private void startDailyBriefScheduler() {
@@ -305,8 +331,8 @@ public class NotificationService extends NotificationListenerService {
 
             JSONObject payload = new JSONObject(); payload.put("model", GROQ_MODEL); payload.put("temperature", 0.1);
             JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", "Rédige une note stratégique matinale concise basée sur les chocs macroéconomiques majeurs de la veille enregistrés dans notre système."));
-            messages.put(new JSONObject().put("role", "user").put("content", "CHOCS ENREGISTRÉS :\n" + dailyDrivers));
+            messages.put(new JSONObject().put("role", "system").put("content", "Rédige un briefing matinal synthétique des chocs macroéconomiques enregistrés la veille."));
+            messages.put(new JSONObject().put("role", "user").put("content", "DONNÉES HIER :\n" + dailyDrivers));
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
@@ -314,7 +340,6 @@ public class NotificationService extends NotificationListenerService {
             conn.setRequestMethod("POST"); conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + MainActivity.CLAUDE_API_KEY);
             conn.setDoOutput(true);
-            
             OutputStream os = conn.getOutputStream(); os.write(payload.toString().getBytes("UTF-8")); os.flush(); os.close();
 
             if (conn.getResponseCode() == 200) {
@@ -322,9 +347,9 @@ public class NotificationService extends NotificationListenerService {
                 StringBuilder r = new StringBuilder(); String l;
                 while ((l = br.readLine()) != null) r.append(l); br.close();
                 String summary = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-                sendTelegramSecure("🌅 *DAILY BRIEF MATINAL STRATÉGIQUE*\n\n" + summary);
+                sendTelegramSecure("🌅 *DAILY BRIEF STRATÉGIQUE AMÉLIORÉ*\n\n" + summary);
             }
-        } catch (Exception e) { Log.e(TAG, "Erreur du briefing quotidien", e); }
+        } catch (Exception e) { Log.e(TAG, "Erreur Daily Brief", e); }
     }
 
     private void startMonthlyReportScheduler() {
@@ -346,7 +371,7 @@ public class NotificationService extends NotificationListenerService {
 
             JSONObject payload = new JSONObject(); payload.put("model", GROQ_MODEL); payload.put("temperature", 0.1);
             JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", "Analyse le registre mensuel des ruptures fondamentales pour extraire la structure globale dominante pour le mois qui commence."));
+            messages.put(new JSONObject().put("role", "system").put("content", "Analyse le registre mensuel des ruptures fondamentales pour extraire la structure globale de transition pour le début du mois suivant."));
             messages.put(new JSONObject().put("role", "user").put("content", "REGISTRE MENSUEL :\n" + monthlyRegistry));
             payload.put("messages", messages);
 
@@ -355,7 +380,6 @@ public class NotificationService extends NotificationListenerService {
             conn.setRequestMethod("POST"); conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + MainActivity.CLAUDE_API_KEY);
             conn.setDoOutput(true);
-            
             OutputStream os = conn.getOutputStream(); os.write(payload.toString().getBytes("UTF-8")); os.flush(); os.close();
 
             if (conn.getResponseCode() == 200) {
@@ -367,7 +391,7 @@ public class NotificationService extends NotificationListenerService {
                 sendTelegramSecure("📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report);
                 eventDb.purgeOldEvents(now);
             }
-        } catch (Exception e) { Log.e(TAG, "Erreur du rapport mensuel", e); }
+        } catch (Exception e) { Log.e(TAG, "Erreur Rapport Mensuel", e); }
     }
 
     private void registerNetworkCallback() {
@@ -391,39 +415,6 @@ public class NotificationService extends NotificationListenerService {
         return false;
     }
 
-    private long parseTimeFromText(String text, long defaultPostTime) {
-        String lowerText = text.toLowerCase();
-        Pattern minsPattern = Pattern.compile("(\\d+)\\s*min?(s|ute|utes)?\\s*(ago)?");
-        Matcher minsMatcher = minsPattern.matcher(lowerText);
-        if (minsMatcher.find()) {
-            try { return System.currentTimeMillis() - ((long) Integer.parseInt(minsMatcher.group(1)) * 60 * 1000); } catch (Exception e) {}
-        }
-        return defaultPostTime; 
-    }
-
-    private List<String> filterActiveAssets(String text) {
-        List<String> assets = new ArrayList<>();
-        String upper = text.toUpperCase();
-        if (upper.contains("GOLD") || upper.contains("XAU") || upper.contains("OR ")) assets.add("GOLD");
-        if (upper.contains("OIL") || upper.contains("WTI") || upper.contains("CRUDE")) assets.add("USOIL");
-        if (upper.contains("NASDAQ") || upper.contains("NAS100") || upper.contains("TECH")) assets.add("NASDAQ");
-        if (upper.contains("SP500") || upper.contains("S&P")) assets.add("SP500");
-        if (upper.contains("BITCOIN") || upper.contains("BTC")) assets.add("BITCOIN");
-        if (upper.contains("YIELD") || upper.contains("US10Y") || upper.contains("BOND")) assets.add("US10Y");
-        if (upper.contains("GBP") || upper.contains("CABLE")) assets.add("GBPUSD");
-        if (upper.contains("EUROZONE") || upper.contains("EUR ") || upper.contains("ECB")) assets.add("EURUSD");
-        if (assets.isEmpty()) assets.add("GLOBAL-MACRO");
-        return assets;
-    }
-
-    private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Trading Core Alerts", NotificationManager.IMPORTANCE_HIGH);
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) manager.createNotificationChannel(channel);
-        }
-    }
-
     private String generateSecureHash(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -436,6 +427,14 @@ public class NotificationService extends NotificationListenerService {
             }
             return hexString.toString();
         } catch (Exception e) { return String.valueOf(System.currentTimeMillis()); }
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Trading Core Alerts", NotificationManager.IMPORTANCE_HIGH);
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.createNotificationChannel(channel);
+        }
     }
 
     @Override
