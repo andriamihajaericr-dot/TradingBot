@@ -25,6 +25,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView statusText, logText;
     private Switch botSwitch;
     private EditText apiKeyInput, telegramTokenInput, telegramChatIdInput;
+    private ScrollView mainScrollView;
     private EventDatabase eventDb;
 
     @Override
@@ -32,43 +33,53 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         instance = this;
+        
+        // Initialisation de la base de données locale
         eventDb = new EventDatabase(this);
 
+        // Liaison des composants avec le fichier XML activity_main
+        mainScrollView      = (ScrollView) findViewById(android.R.id.content).getChildAt(0);
         statusText          = findViewById(R.id.statusText);
         botSwitch           = findViewById(R.id.botSwitch);
         logText             = findViewById(R.id.logText);
         apiKeyInput         = findViewById(R.id.apiKeyInput);
         telegramTokenInput  = findViewById(R.id.telegramTokenInput);
         telegramChatIdInput = findViewById(R.id.telegramChatIdInput);
+        
         Button saveBtn      = findViewById(R.id.saveBtn);
         Button permBtn      = findViewById(R.id.permBtn);
         Button testBtn      = findViewById(R.id.testBtn);
 
+        // Chargement initial des configurations enregistrées
         loadSavedKeys();
         updateStatus();
 
+        // 1. Bouton Sauvegarder
         saveBtn.setOnClickListener(v -> saveKeys());
 
+        // 2. Bouton Demande de Permission
         permBtn.setOnClickListener(v -> {
             addLog("[SYSTEM] Redirection vers les autorisations Android.");
             startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
         });
 
+        // 3. Bouton Test de Transmission Telegram
         testBtn.setOnClickListener(v -> {
-            addLog("🧪 [TEST] Vérification de la liaison réseau descendante...");
-            new Thread(() -> {
-                try {
-                    NotificationService.sendTelegramSecure(
-                        "🧪 **TEST LIAISON TRANSMISSION**\n" +
-                        "Statut : Opérationnel (UTC+3 Madagascar)\n" +
-                        "Flux simulé : *Moteur d'acquisition actif*"
-                    );
-                } catch (Exception e) {
-                    Log.e(TAG, "Échec du bouton de test", e);
-                }
-            }).start();
+            addLog("🧪 [TEST] Déclenchement d'une simulation réseau...");
+            try {
+                NotificationService.sendTelegramSecure(
+                    "🧪 **TEST DU CAPTEUR DE TRADING**\n" +
+                    "Statut : Opérationnel\n" +
+                    "Zone Temporelle : UTC+3 (Madagascar)\n" +
+                    "Flux : Liaison montante et descendante OK."
+                );
+            } catch (Exception e) {
+                Log.e(TAG, "Échec lors de l'envoi du test", e);
+                addLog("❌ [TEST] Erreur lors de l'appel : " + e.getMessage());
+            }
         });
 
+        // 4. Interrupteur d'activation globale du Bot
         botSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
             if (isChecked && !isPermissionGranted()) {
                 Toast.makeText(this, "Active d'abord la permission notifications !", Toast.LENGTH_LONG).show();
@@ -77,9 +88,10 @@ public class MainActivity extends AppCompatActivity {
             }
             getPrefs().edit().putBoolean("bot_active", isChecked).apply();
             updateStatus();
-            addLog(isChecked ? "🚀 MOTEUR MACRO ACTIVÉ" : "🛑 MOTEUR EN VEILLE");
+            addLog(isChecked ? "🚀 MOTEUR MACRO ACTIVÉ (EN ÉCOUTE)" : "🛑 MOTEUR EN VEILLE (STANDBY)");
         });
 
+        // Appliquer l'état sauvegardé du switch au démarrage
         botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
         addLog("📱 Terminal prêt pour l'acquisition.");
     }
@@ -101,13 +113,13 @@ public class MainActivity extends AppCompatActivity {
         boolean perm   = isPermissionGranted();
         if (!perm) {
             statusText.setText("⚠️ PERMISSION NOTIFICATIONS REQUISE");
-            statusText.setTextColor(0xFFFF9800);
+            statusText.setTextColor(0xFFFF9800); // Orange
         } else if (active) {
             statusText.setText("🟢 BOT ACTIF — EN ÉCOUTE DES DRIVERS...");
-            statusText.setTextColor(0xFF00FF00);
+            statusText.setTextColor(0xFF00FF00); // Vert
         } else {
             statusText.setText("🔴 BOT INACTIF — COUPE FLUX ENGAGÉ");
-            statusText.setTextColor(0xFFFF0000);
+            statusText.setTextColor(0xFFFF0000); // Rouge
         }
     }
 
@@ -124,7 +136,7 @@ public class MainActivity extends AppCompatActivity {
         TELEGRAM_TOKEN = t; 
         TELEGRAM_CHAT_ID = c;
         Toast.makeText(this, "✅ Clés sauvegardées !", Toast.LENGTH_SHORT).show();
-        addLog("✅ Clés API configurées avec succès.");
+        addLog("✅ Configuration des clés API mise à jour.");
     }
 
     private void loadSavedKeys() {
@@ -141,14 +153,32 @@ public class MainActivity extends AppCompatActivity {
         return getSharedPreferences("TradingBot", MODE_PRIVATE);
     }
 
+    /**
+     * Imprime un message dans la console noire de l'application
+     * et gère le défilement vers le bas automatique (Auto-Scroll)
+     */
     public void addLog(String message) {
         runOnUiThread(() -> {
             String ts = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-            String cur = logText.getText().toString();
-            if (cur.length() > 5000) {
-                cur = cur.substring(0, 2000);
+            String currentText = logText.getText().toString();
+            
+            // Nettoyage de l'état d'attente initial au démarrage
+            if (currentText.contains("En attente de notifications...")) {
+                currentText = "";
             }
-            logText.setText("[" + ts + "] " + message + "\n" + cur);
+            
+            // Sécurité anti-saturation mémoire de l'affichage
+            if (currentText.length() > 5000) {
+                currentText = currentText.substring(0, 2000);
+            }
+            
+            // Ajout du log à la suite
+            logText.setText(currentText + "[" + ts + "] " + message + "\n");
+            
+            // Commande de défilement forcée sur le ScrollView
+            if (mainScrollView != null) {
+                mainScrollView.post(() -> mainScrollView.fullScroll(View.FOCUS_DOWN));
+            }
         });
     }
 
