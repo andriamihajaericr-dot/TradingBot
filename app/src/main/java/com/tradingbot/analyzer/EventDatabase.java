@@ -129,6 +129,37 @@ public class EventDatabase extends SQLiteOpenHelper {
         return sb.toString();
     }
     /**
+     * Extrait tous les changements de drivers macroéconomiques significatifs 
+     * des dernières 24 heures pour la génération du résumé quotidien.
+     */
+    public String getDailyMacroDrivers(long currentUnixTime) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        StringBuilder sb = new StringBuilder();
+        long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
+
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_EVENTS, 
+                    new String[]{"source", "title", "target_assets", "impact"}, 
+                    "unix_timestamp >= ? AND impact = ?", 
+                    new String[]{String.valueOf(twentyFourHoursAgo), "CHANGEMENT DE DRIVER MACRO"}, 
+                    null, null, "id ASC", null);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    sb.append("• [").append(cursor.getString(0)).append("] ")
+                      .append(cursor.getString(1)).append(" | Actifs: ")
+                      .append(cursor.getString(2)).append("\n");
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e("EventDatabase", "Erreur extraction Daily Drivers", e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return sb.toString();
+    }
+    /**
      * Nettoie les anciens événements pour éviter de saturer la mémoire du téléphone à Madagascar.
      * Garde uniquement les dernières 48 heures de trading.
      */
