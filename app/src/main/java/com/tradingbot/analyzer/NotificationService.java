@@ -30,9 +30,49 @@ public class NotificationService extends NotificationListenerService {
     
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
     private EventDatabase eventDb;
-
     public static void sendTelegramSecure(String message) {
         Log.d(TAG, "Routage Sortant Telegram : " + message);
+        
+        // Exécution dans un thread séparé pour éviter de bloquer l'application Android (NetworkOnMainThreadException)
+        new Thread(() -> {
+            try {
+                // Vérification que les clés de configuration sont bien chargées dans la MainActivity
+                if (MainActivity.TELEGRAM_TOKEN.isEmpty() || MainActivity.TELEGRAM_CHAT_ID.isEmpty()) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog("❌ [TELEGRAM] Envoi impossible : Clés manquantes dans l'interface.");
+                    }
+                    return;
+                }
+
+                // Construction de l'URL de l'API Bot Telegram avec encodage UTF-8 des caractères spéciaux
+                String urlString = "https://api.telegram.org/bot" + MainActivity.TELEGRAM_TOKEN 
+                        + "/sendMessage?chat_id=" + MainActivity.TELEGRAM_CHAT_ID 
+                        + "&parse_mode=Markdown&text=" + URLEncoder.encode(message, "UTF-8");
+
+                URL url = new URL(urlString);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode == 200) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog("📤 [TELEGRAM] Message transmis avec succès.");
+                    }
+                } else {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog("❌ [TELEGRAM] Échec de l'envoi. Code serveur : " + responseCode);
+                    }
+                }
+                conn.disconnect();
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur critique d'envoi Telegram", e);
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("❌ [TELEGRAM] Erreur réseau : " + e.getMessage());
+                }
+            }
+        }).start();
     }
 
     @Override
