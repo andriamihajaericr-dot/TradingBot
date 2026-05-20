@@ -9,18 +9,16 @@ public class EventValidator {
     private static Map<String, EconomicCalendarAPI.CalendarEvent> upcomingEvents = 
         new ConcurrentHashMap<>();
 
-    // ====================== CLASSE INTERNE ======================
     public static class ValidationResult {
         public boolean isConfirmed = false;
         public int confidence = 0;
-        public String forecast;
-        public String previous;
-        public String actual;
+        public String forecast = "N/A";
+        public String previous = "N/A";
+        public String actual = "N/A";
         public boolean assetsEnriched = false;
         public String reason = "";
 
-        public ValidationResult() {
-        }
+        public ValidationResult() {}
 
         public ValidationResult(boolean isConfirmed, int confidence, String reason) {
             this.isConfirmed = isConfirmed;
@@ -29,71 +27,64 @@ public class EventValidator {
         }
     }
 
-    // ====================== MÉTHODE PRINCIPALE ======================
     public static ValidationResult validate(
             String title,
             String content,
             long timestamp,
             List<String> detectedAssets
     ) {
-
         ValidationResult result = new ValidationResult();
+
+        if (title == null) title = "";
+        if (content == null) content = "";
+        if (detectedAssets == null) detectedAssets = new ArrayList<>();
 
         String combined = (title + " " + content).toLowerCase();
 
-        // ❌ Rejeter immédiatement si contenu politique/opinion
-        if (containsPoliticalContent(combined)) {
+        // ❌ Filtre Institutionnel : Élimination immédiate du bruit éditorial et politique
+        if (containsPoliticalOrOpinionContent(combined)) {
             result.confidence = 0;
             result.isConfirmed = false;
-            result.reason = "Contenu politique/opinion";
+            result.reason = "Bruit macroéconomique (Opinion/Politique/Éditorial)";
             
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[VALIDATOR] ❌ Rejeté - Contenu politique/opinion");
+                MainActivity.instance.addLog("[VALIDATOR] ❌ Rejeté - Contenu non factuel/opinion");
             }
             return result;
         }
 
-        // 1. Chercher événement correspondant dans calendrier
-        EconomicCalendarAPI.CalendarEvent match = 
-            findMatchingEvent(title, content, timestamp);
+        EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp);
 
         if (match != null) {
-            // ✅ Événement confirmé par calendrier
             result.isConfirmed = true;
-            result.confidence = 95;
-            result.forecast = match.forecast;
-            result.previous = match.previous;
-            result.actual = match.actual;
-            result.reason = "Confirmé par calendrier";
+            result.confidence = 98; // Niveau institutionnel si validé par le calendrier
+            result.forecast = match.forecast != null ? match.forecast : "N/A";
+            result.previous = match.previous != null ? match.previous : "N/A";
+            result.actual = match.actual != null ? match.actual : "N/A";
+            result.reason = "Confirmé par calendrier économique global";
 
-            // Enrichir actifs avec calendrier
-            for (String asset : match.affectedAssets) {
-                if (!detectedAssets.contains(asset)) {
-                    detectedAssets.add(asset);
-                    result.assetsEnriched = true;
+            if (match.affectedAssets != null) {
+                for (String asset : match.affectedAssets) {
+                    if (asset != null && !detectedAssets.contains(asset)) {
+                        detectedAssets.add(asset);
+                        result.assetsEnriched = true;
+                    }
                 }
             }
 
             if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[VALIDATOR] ✓ Confirmé: " + match.indicator);
+                MainActivity.instance.addLog("[VALIDATOR] ✓ Confirmé: " + (match.indicator != null ? match.indicator : "Inconnu"));
             }
 
         } else {
-            // Événement non dans calendrier (breaking news)
             result.confidence = calculateBreakingNewsConfidence(title, content);
-            result.reason = "Breaking news";
+            result.reason = "Breaking News (Flux Interbancaire)";
 
-            if (result.confidence < 60) {
+            if (result.confidence < 65) {
                 result.confidence = 0;
                 result.isConfirmed = false;
                 if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("[VALIDATOR] ❌ Confiance insuffisante: " 
-                        + result.confidence + "%");
-                }
-            } else {
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("[VALIDATOR] Breaking news - Confiance: " 
-                        + result.confidence + "%");
+                    MainActivity.instance.addLog("[VALIDATOR] ❌ Confiance insuffisante : " + result.confidence + "%");
                 }
             }
         }
@@ -101,27 +92,31 @@ public class EventValidator {
         return result;
     }
 
-    private static boolean containsPoliticalContent(String text) {
+    private static boolean containsPoliticalOrOpinionContent(String text) {
+        if (text == null) return false;
         return text.contains("opinion") || text.contains("democrat") ||
                text.contains("republican") || text.contains("party") ||
-               text.contains("politician") || text.contains("editorial");
+               text.contains("politician") || text.contains("editorial") ||
+               text.contains("op-ed") || text.contains("commentary") ||
+               text.contains("think tank") || text.contains("rumor");
     }
 
-    // ====================== MÉTHODES INTERNES ======================
     private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(
             String title, String content, long timestamp) {
 
         String combined = (title + " " + content).toLowerCase();
-        long window = 10 * 60 * 1000; // ±10 minutes
+        long window = 10 * 60 * 1000; // Fenêtre stricte de ±10 minutes
 
         for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
+            if (event == null || event.timestamp == null || event.indicator == null) continue;
+            
             long eventTime = parseTimestamp(event.timestamp);
 
             if (Math.abs(eventTime - timestamp) < window) {
                 String indicator = event.indicator.toLowerCase();
+                String country = event.country != null ? event.country : "";
 
-                if (combined.contains(indicator) || 
-                    matchesIndicatorKeywords(combined, indicator, event.country)) {
+                if (combined.contains(indicator) || matchesIndicatorKeywords(combined, indicator, country)) {
                     return event;
                 }
             }
@@ -130,59 +125,31 @@ public class EventValidator {
     }
 
     private static boolean matchesIndicatorKeywords(String text, String indicator, String country) {
-        // NFP
+        if (text == null || indicator == null) return false;
         if (indicator.contains("nfp") || indicator.contains("non-farm")) {
             return text.contains("nfp") || text.contains("non-farm") || text.contains("payroll");
         }
-        // CPI
-        if (indicator.contains("cpi")) {
-            return text.contains("cpi") || text.contains("inflation");
+        if (indicator.contains("cpi") || indicator.contains("inflation")) {
+            return text.contains("cpi") || text.contains("inflation") || text.contains("pce");
         }
-        // GDP
-        if (indicator.contains("gdp")) {
+        if (indicator.contains("gdp") || indicator.contains("growth")) {
             return text.contains("gdp") || text.contains("gross domestic");
         }
-        // Fed Rate
-        if (indicator.contains("fed") && indicator.contains("rate")) {
-            return text.contains("fed") && (text.contains("rate") || text.contains("fomc"));
-        }
-        // BoE, BoJ, EIA, OPEC...
-        if (indicator.contains("boe") || (country != null && country.toLowerCase().contains("uk"))) {
-            return text.contains("boe") || text.contains("bank of england");
-        }
-        if (indicator.contains("boj") || (country != null && country.toLowerCase().contains("japan"))) {
-            return text.contains("boj") || text.contains("bank of japan");
-        }
-        if (indicator.contains("eia") || indicator.contains("oil inventory")) {
-            return text.contains("eia") || text.contains("oil inventory") || text.contains("crude inventory");
-        }
-        if (indicator.contains("opec")) {
-            return text.contains("opec");
+        if (indicator.contains("fed") || indicator.contains("fomc") || indicator.contains("rate")) {
+            return text.contains("fed") || text.contains("rate") || text.contains("fomc") || text.contains("powell");
         }
         return false;
     }
 
     private static int calculateBreakingNewsConfidence(String title, String content) {
-        int score = 50;
-        String lower = (title + " " + content).toLowerCase();
+        int score = 40;
+        String lower = ((title != null ? title : "") + " " + (content != null ? content : "")).toLowerCase();
 
-        if (lower.contains("breaking")) score += 20;
-        if (lower.contains("urgent") || lower.contains("alert")) score += 15;
-        if (lower.contains("flash")) score += 10;
-
-        if (lower.contains("fxhedgers")) score += 20;
-        if (lower.contains("deltaone") || lower.contains("firstsquawk")) score += 20;
-        if (lower.contains("financialjuice")) score += 15;
-
-        if (lower.contains("federal reserve")) score += 25;
-        if (lower.contains("bank of england")) score += 25;
-        if (lower.contains("eia")) score += 20;
-
-        if (content.matches(".*\\d+\\.\\d+%.*")) score += 10;
-        if (content.matches(".*\\d+[KM].*")) score += 5;
-
-        if (lower.contains("war") || lower.contains("attack") || lower.contains("nuclear")) score += 15;
-        if (lower.contains("fed") || lower.contains("boe") || lower.contains("boj") || lower.contains("ecb")) score += 10;
+        if (lower.contains("breaking")) score += 25;
+        if (lower.contains("urgent") || lower.contains("alert")) score += 20;
+        if (lower.contains("fxhedgers") || lower.contains("deltaone")) score += 25;
+        if (lower.contains("federal reserve") || lower.contains("fomc")) score += 20;
+        if (content != null && content.matches(".*\\d+\\.\\d+%.*")) score += 15;
 
         return Math.min(100, score);
     }
@@ -195,6 +162,7 @@ public class EventValidator {
     }
 
     private static long parseTimestamp(String timestamp) {
+        if (timestamp == null) return System.currentTimeMillis();
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
             return sdf.parse(timestamp).getTime();
@@ -207,26 +175,17 @@ public class EventValidator {
         }
     }
 
-    // ====================== PRELOAD ======================
     public static void preloadCalendar() {
         try {
-            List<EconomicCalendarAPI.CalendarEvent> events = 
-                EconomicCalendarAPI.fetchUpcomingEvents(24);
-
+            List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(24);
+            if (events == null) return;
             upcomingEvents.clear();
 
             for (EconomicCalendarAPI.CalendarEvent event : events) {
+                if (event == null) continue;
                 String key = createEventKey(event.indicator, event.timestamp);
                 upcomingEvents.put(key, event);
             }
-
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[VALIDATOR] Calendrier chargé: " + events.size() + " événements");
-            }
-        } catch (Exception e) {
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[VALIDATOR] Erreur chargement: " + e.getMessage());
-            }
-        }
+        } catch (Exception e) {}
     }
 }
