@@ -80,50 +80,58 @@ public class EconomicEventDetector {
     // =====================================================
     
     private void processCalendarEvent(EconomicCalendarAPI.CalendarEvent event) {
-        try {
-            long eventTime = Long.parseLong(event.timestamp) * 1000;
-            long now = System.currentTimeMillis();
-            long timeUntilEvent = eventTime - now;
-            
-            if (timeUntilEvent < 0) {
-                return;
-            }
-            
-            String eventId = "calendar_" + event.timestamp + "_" + 
-                           event.country.hashCode() + "_" + 
-                           event.indicator.hashCode();
-            
-            if (eventDb.eventExists(eventId)) {
-                return;
-            }
-            
-            String assetsStr = String.join(", ", event.affectedAssets);
-            
-            boolean saved = eventDb.saveEvent(
-                eventId,
-                "economic.calendar",
-                "Economic Calendar API",
-                event.importance,
-                event.indicator,
-                buildEventContent(event),
-                assetsStr,
-                "Neutre"
-            );
-            
-            if (saved && MainActivity.instance != null) {
-                MainActivity.instance.addLog(
-                    "[CALENDAR] Sauvegardé: " + event.country + " - " + 
-                    event.indicator + " → " + event.affectedAssets.get(0)
-                );
-            }
-            
-            if ("High".equals(event.importance) && timeUntilEvent < 60 * 60 * 1000) {
-                sendUpcomingEventAlert(event, timeUntilEvent);
-            }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur processCalendarEvent", e);
+    try {
+        if (event == null || event.timestamp == null) return;
+        long eventTime = Long.parseLong(event.timestamp) * 1000;
+        long now = System.currentTimeMillis();
+        long timeUntilEvent = eventTime - now;
+        
+        if (timeUntilEvent < 0) {
+            return;
         }
+        
+        // Sécurisation contre les valeurs nulles
+        String countryStr = event.country != null ? event.country : "UNKNOWN";
+        String indicatorStr = event.indicator != null ? event.indicator : "UNKNOWN";
+        
+        String eventId = "calendar_" + event.timestamp + "_" + 
+                       countryStr.hashCode() + "_" + 
+                       indicatorStr.hashCode();
+        
+        if (eventDb.eventExists(eventId)) {
+            return;
+        }
+        
+        String assetsStr = "";
+        if (event.affectedAssets != null && !event.affectedAssets.isEmpty()) {
+            assetsStr = String.join(", ", event.affectedAssets);
+        }
+        
+        boolean saved = eventDb.saveEvent(
+            eventId,
+            "economic.calendar",
+            "Economic Calendar API",
+            event.importance != null ? event.importance : "Medium",
+            indicatorStr,
+            buildEventContent(event),
+            assetsStr,
+            "Neutre"
+        );
+        
+        if (saved && MainActivity.instance != null) {
+            String firstAsset = (event.affectedAssets != null && !event.affectedAssets.isEmpty()) 
+                ? event.affectedAssets.get(0) : "Aucun actif";
+            MainActivity.instance.addLog(
+                "[CALENDAR] Sauvegardé: " + countryStr + " - " + indicatorStr + " → " + firstAsset
+            );
+        }
+        
+        if ("High".equals(event.importance) && timeUntilEvent < 60 * 60 * 1000) {
+            sendUpcomingEventAlert(event, timeUntilEvent);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur processCalendarEvent", e);
+    }
     }
     
     // =====================================================
