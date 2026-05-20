@@ -31,10 +31,10 @@ public class NotificationService extends NotificationListenerService {
     
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
     private EventDatabase eventDb;
-    
+
     public static void sendTelegramSecure(String message) {
-        // Méthode réseau d'envoi chiffré vers votre canal Telegram
-        Log.d(TAG, "Envoi Telegram : " + message);
+        // Log de secours local avant routage infrastructure réseau Telegram
+        Log.d(TAG, "Routage Sortant Telegram : " + message);
     }
 
     @Override
@@ -43,7 +43,7 @@ public class NotificationService extends NotificationListenerService {
         eventDb = new EventDatabase(this);
         createNotificationChannel();
         if (MainActivity.instance != null) {
-            MainActivity.instance.addLog("[SERVICE] Moteur d'écoute initialisé.");
+            MainActivity.instance.addLog("[SERVICE] Moteur d'écoute macro opérationnel.");
         }
     }
 
@@ -59,11 +59,11 @@ public class NotificationService extends NotificationListenerService {
 
         if (unifiedFeed.length() < 10) return;
 
-        // ✨ AMÉLIORATION : Inclusion d'Investing.com dans les sources de confiance Tier 1
+        // Validation des plateformes majeures d'actualités
         boolean isInstitutionalSource = packageName.contains("financialjuice") 
                 || packageName.contains("twitter") 
                 || packageName.contains("periscope")
-                || packageName.contains("investing"); // <--- Ajout d'Investing app
+                || packageName.contains("investing");
 
         List<String> targetAssets = filterActiveAssets(unifiedFeed);
         EconomicEventDetector.DetectedEvent inputEvent = EconomicEventDetector.detectEvent(title, text);
@@ -76,7 +76,7 @@ public class NotificationService extends NotificationListenerService {
             inputEvent.impact = "Alerte Flash Marché"; 
         }
 
-        // ✨ CORRECTION CRITIQUE : Extraction de la vraie heure de l'événement depuis le texte anglais
+        // ADAPTATION GEOGRAPHIQUE : Recalcul dynamique de l'horaire pour Madagascar (Fixe UTC+3)
         long exactTimestamp = parseTimeFromText(unifiedFeed, sbn.getPostTime());
 
         String fingerPrint = generateSecureHash(title + text);
@@ -90,35 +90,34 @@ public class NotificationService extends NotificationListenerService {
                 inputEvent.impact, exactTimestamp, "notification");
         
         if (logged) {
+            // Notification immédiate au tableau de bord système de contrôle
+            SystemMonitor.registerEvent(sourceName, targetAssets);
             exec.submit(() -> runSeniorAnalystPipeline(fingerPrint, unifiedFeed, inputEvent, targetAssets, exactTimestamp));
         }
     }
 
     /**
-     * Parse le texte en anglais pour détecter une heure exacte ou relative ("5 mins ago")
-     * et ajuste l'horodatage de l'événement.
+     * Moteur de normalisation temporelle mondiale.
+     * Aligne les fuseaux (EST/EDT/UTC) sur l'heure de Madagascar sans faille de DST.
      */
     private long parseTimeFromText(String text, long defaultPostTime) {
         String lowerText = text.toLowerCase();
         
-        // Cas 1: Détection des minutes relatives ("X mins ago" ou "X minutes ago")
+        // Extraction des délais relatifs anglo-saxons ("5 mins ago")
         Pattern minsPattern = Pattern.compile("(\\d+)\\s*min(s|ute|utes)?\\s*ago");
         Matcher minsMatcher = minsPattern.matcher(lowerText);
         if (minsMatcher.find()) {
             try {
                 int minutesAgo = Integer.parseInt(minsMatcher.group(1));
-                long correctedTime = System.currentTimeMillis() - ((long) minutesAgo * 60 * 1000);
-                Log.d(TAG, "[TIME-PARSE] Détection relative: il y a " + minutesAgo + " minutes.");
-                return correctedTime;
+                return System.currentTimeMillis() - ((long) minutesAgo * 60 * 1000);
             } catch (Exception e) { /**/ }
         }
 
-        // Cas 2: Détection "Just now" (À l'instant)
         if (lowerText.contains("just now")) {
             return System.currentTimeMillis();
         }
 
-        // Cas 3: Détection d'une heure fixe au format HH:MM (ex: 14:30 ou 09:15)
+        // Extraction d'une heure absolue intégrée dans le texte (ex: "14:30 EST")
         Pattern timePattern = Pattern.compile("([0-1]?[0-9]|2[0-3]):([0-5][0-9])");
         Matcher timeMatcher = timePattern.matcher(lowerText);
         if (timeMatcher.find()) {
@@ -126,22 +125,39 @@ public class NotificationService extends NotificationListenerService {
                 int hour = Integer.parseInt(timeMatcher.group(1));
                 int minute = Integer.parseInt(timeMatcher.group(2));
                 
-                Calendar cal = Calendar.getInstance();
-                cal.setTimeInMillis(defaultPostTime);
-                cal.set(Calendar.HOUR_OF_DAY, hour);
-                cal.set(Calendar.MINUTE, minute);
-                cal.set(Calendar.SECOND, 0);
+                TimeZone sourceTimeZone = TimeZone.getTimeZone("UTC"); // Normalisation par défaut
                 
-                // Si l'heure détectée est supérieure à l'heure actuelle, elle appartient probablement à la veille
-                if (cal.getTimeInMillis() > System.currentTimeMillis()) {
-                    cal.add(Calendar.DAY_OF_YEAR, -1);
+                if (lowerText.contains("est") || lowerText.contains("edt") || lowerText.contains("am") || lowerText.contains("pm") || lowerText.contains("us")) {
+                    // Les terminaux US alternent dynamiquement entre EST (UTC-5) et EDT (UTC-4)
+                    sourceTimeZone = TimeZone.getTimeZone("America/New_York");
+                } else if (lowerText.contains("bst") || lowerText.contains("gmt")) {
+                    sourceTimeZone = TimeZone.getTimeZone("Europe/London");
                 }
-                Log.d(TAG, "[TIME-PARSE] Détection heure absolue dans le texte: " + hour + ":" + minute);
-                return cal.getTimeInMillis();
-            } catch (Exception e) { /**/ }
+
+                Calendar sourceCal = Calendar.getInstance(sourceTimeZone);
+                sourceCal.setTimeInMillis(defaultPostTime);
+                sourceCal.set(Calendar.HOUR_OF_DAY, hour);
+                sourceCal.set(Calendar.MINUTE, minute);
+                sourceCal.set(Calendar.SECOND, 0);
+
+                // Conversion mathématique vers Antananarivo (UTC+3 constant)
+                TimeZone madaTimeZone = TimeZone.getTimeZone("Indian/Antananarivo");
+                Calendar madaCal = Calendar.getInstance(madaTimeZone);
+                madaCal.setTimeInMillis(sourceCal.getTimeInMillis());
+
+                if (madaCal.getTimeInMillis() > System.currentTimeMillis() + (2 * 60 * 60 * 1000)) {
+                    madaCal.add(Calendar.DAY_OF_YEAR, -1);
+                }
+
+                Log.d(TAG, "[TIME-MADA] Alignement horaire réussi : " + madaCal.getTime());
+                return madaCal.getTimeInMillis();
+
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur lors du calcul du fuseau adaptatif", e);
+            }
         }
 
-        return defaultPostTime; // Fallback sur l'heure de la notification si rien n'est trouvé
+        return defaultPostTime; 
     }
 
     private List<String> filterActiveAssets(String text) {
@@ -165,11 +181,12 @@ public class NotificationService extends NotificationListenerService {
     private void runSeniorAnalystPipeline(String hash, String feed, EconomicEventDetector.DetectedEvent ev, List<String> assets, long eventTimestamp) {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
-            String timeString = sdf.format(new Date(eventTimestamp));
+            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+            String timeString = sdf.format(new Date(eventTimestamp)) + " (Heure Mada)";
 
             JSONObject payload = new JSONObject();
             payload.put("model", GROQ_MODEL);
-            payload.put("temperature", 0.02); // Mode strict d'analyse financière
+            payload.put("temperature", 0.02);
 
             JSONArray messages = new JSONArray();
             messages.put(new JSONObject().put("role", "system").put("content", 
@@ -203,16 +220,15 @@ public class NotificationService extends NotificationListenerService {
                 JSONObject json = new JSONObject(response.toString());
                 String aiAnalysis = json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 
-                // Envoi vers l'infrastructure de communication
-                String emoji = "🚨";
-                String tgMsg = "*" + emoji + " ALERT INSTITUTIONNELLE* - Evénement de [" + timeString + "]\n" +
-                               "*Source :* " + ev.description + "\n*Impact :* " + ev.impact + "\n\n" +
-                               "*ANALYSE DES FLUX :*\n" + aiAnalysis;
+                String emoji = ev.impact.contains("Haussier") ? "📈" : ev.impact.contains("Baissier") ? "📉" : "🚨";
+                String tgMsg = "*" + emoji + " PIPELINE MACRO SECURE* - " + timeString + "\n" +
+                               "*Filtre Origine :* " + ev.description + "\n*Biais Technique :* " + ev.impact + "\n\n" +
+                               "*ANALYSE DE FLUX DE CAPITAUX:* \n" + aiAnalysis;
                 
                 sendTelegramSecure(tgMsg);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Erreur pipeline", e);
+            Log.e(TAG, "Échec traitement Pipeline", e);
         }
     }
 
