@@ -1,167 +1,268 @@
 package com.tradingbot.analyzer;
 
-import android.content.SharedPreferences;
+import java.util.Locale; 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Context;
+import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
-import android.content.Intent;
+import android.service.notification.NotificationListenerService;
+import android.service.notification.StatusBarNotification;
 import android.util.Log;
-import android.view.View;
-import android.widget.*;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.NotificationManagerCompat;
+import androidx.core.app.NotificationCompat;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.io.*;
+import java.net.*;
+import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.regex.*;
 
-public class MainActivity extends AppCompatActivity {
+public class NotificationService extends NotificationListenerService {
 
-    private static final String TAG = "MainActivity";
-    public static String CLAUDE_API_KEY   = "";
-    public static String TELEGRAM_TOKEN   = "";
-    public static String TELEGRAM_CHAT_ID = "";
-    public static MainActivity instance;
-
-    private TextView statusText, logText;
-    private Switch botSwitch;
-    private EditText apiKeyInput, telegramTokenInput, telegramChatIdInput;
+    private static final String TAG = "NotificationService";
+    private static final String CHANNEL_ID = "trading_alerts";
+    private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
+    private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+    
+    private final ExecutorService exec = Executors.newFixedThreadPool(5);
     private EventDatabase eventDb;
 
+    public static void sendTelegramSecure(String message) {
+        Log.d(TAG, "Routage Sortant Telegram : " + message);
+    }
+
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        instance = this;
-        
-        // ✨ INITIALISATION CRITIQUE : Ouverture de la BDD locale pour éviter les conflits de verrous
+    public void onCreate() {
+        super.onCreate();
         eventDb = new EventDatabase(this);
+        createNotificationChannel();
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog("[SERVICE] Moteur Macro Institutionnel Opérationnel.");
+        }
+    }
 
-        statusText          = findViewById(R.id.statusText);
-        botSwitch           = findViewById(R.id.botSwitch);
-        logText             = findViewById(R.id.logText);
-        apiKeyInput         = findViewById(R.id.apiKeyInput);
-        telegramTokenInput  = findViewById(R.id.telegramTokenInput);
-        telegramChatIdInput = findViewById(R.id.telegramChatIdInput);
-        Button saveBtn      = findViewById(R.id.saveBtn);
-        Button permBtn      = findViewById(R.id.permBtn);
-        Button testBtn      = findViewById(R.id.testBtn);
+    @Override
+    public void onNotificationPosted(StatusBarNotification sbn) {
+        if (!getSharedPreferences("TradingBot", MODE_PRIVATE).getBoolean("bot_active", false)) return;
 
-        loadSavedKeys();
-        updateStatus();
+        String packageName = sbn.getPackageName().toLowerCase();
+        Bundle extras = sbn.getNotification().extras;
+        String title = extras.getString(Notification.EXTRA_TITLE, "");
+        String text = extras.getString(Notification.EXTRA_TEXT, "");
+        String unifiedFeed = (title + " " + text).trim();
 
-        saveBtn.setOnClickListener(v -> saveKeys());
+        if (unifiedFeed.length() < 10) return;
 
-        permBtn.setOnClickListener(v -> {
-            addLog("[SYSTEM] Redirection vers les autorisations Android.");
-            startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
-        });
+        boolean isInstitutionalSource = packageName.contains("financialjuice") 
+                || packageName.contains("twitter") 
+                || packageName.contains("periscope")
+                || packageName.contains("investing");
 
-        // ✨ ALIGNEMENT TEST SÉCURISÉ : Déclenche le canal réseau Telegram valide sans planter le Listener
-        testBtn.setOnClickListener(v -> {
-            addLog("🧪 [TEST] Vérification de la liaison réseau descendante...");
-            new Thread(() -> {
-                try {
-                    NotificationService.sendTelegramSecure(
-                        "🧪 **TEST LIAISON TRANSMISSION**\n" +
-                        "Statut : Opérationnel (UTC+3 Madagascar)\n" +
-                        "Flux simulé : *Eurozone CPI Flash Alert*"
-                    );
-                } catch (Exception e) {
-                    Log.e(TAG, "Échec du bouton de test", e);
+        List<String> targetAssets = filterActiveAssets(unifiedFeed);
+        EconomicEventDetector.DetectedEvent inputEvent = EconomicEventDetector.detectEvent(title, text);
+        
+        if ("Neutre".equalsIgnoreCase(inputEvent.impact) && !isInstitutionalSource) {
+            return; 
+        }
+        
+        boolean isDriverChanged = detectDriverDeviation(unifiedFeed);
+        
+        if (isDriverChanged && isInstitutionalSource) {
+            inputEvent.impact = "CHANGEMENT DE DRIVER MACRO";
+        } else if ("Neutre".equalsIgnoreCase(inputEvent.impact) && isInstitutionalSource) {
+            inputEvent.impact = "ALERTE MACRO EN DIRECT (CONFORME)"; 
+        }
+
+        long exactTimestamp = parseTimeFromText(unifiedFeed, sbn.getPostTime());
+
+        String fingerPrint = generateSecureHash(title + text);
+        if (eventDb.eventExists(fingerPrint)) return;
+
+        String sourceName = packageName.contains("financialjuice") ? "FinancialJuice" :
+                           packageName.contains("investing") ? "Investing.com" : "X/Twitter";
+
+        long unixSeconds = exactTimestamp / 1000;
+
+        boolean logged = eventDb.saveEvent(fingerPrint, packageName, sourceName, 
+                inputEvent.eventType, title, unifiedFeed, String.join(", ", targetAssets), 
+                inputEvent.impact, (int) unixSeconds, "notification"); 
+        
+        if (logged) {
+            SystemMonitor.registerEvent(sourceName, targetAssets);
+            exec.submit(() -> runSeniorAnalystPipeline(fingerPrint, unifiedFeed, inputEvent, targetAssets, exactTimestamp, isDriverChanged));
+        }
+    }
+
+    private boolean detectDriverDeviation(String text) {
+        String upper = text.toUpperCase();
+        if (upper.contains("HIGHER THAN EXPECTED") || upper.contains("LOWER THAN EXPECTED") ||
+            upper.contains("ABOVE FORECAST") || upper.contains("BELOW FORECAST") ||
+            upper.contains("BEATS ESTIMATES") || upper.contains("MISSES ESTIMATES") ||
+            upper.contains("SURPRISE") || upper.contains("SHOCK") || upper.contains("UNEXPECTED")) {
+            return true;
+        }
+        
+        Pattern pattern = Pattern.compile("(ACTUAL|ACT):?\\s*([\\d\\.\\-%]+).*?(FORECAST|EST|EXP):?\\s*([\\d\\.\\-%]+)");
+        Matcher matcher = pattern.matcher(upper);
+        if (matcher.find()) {
+            try {
+                String actualStr = matcher.group(2).replaceAll("[^\\d\\.]", "");
+                String forecastStr = matcher.group(4).replaceAll("[^\\d\\.]", "");
+                double actual = Double.parseDouble(actualStr);
+                double forecast = Double.parseDouble(forecastStr);
+                return actual != forecast;
+            } catch (Exception e) {
+                return true; 
+            }
+        }
+        return false;
+    }
+
+    private long parseTimeFromText(String text, long defaultPostTime) {
+        String lowerText = text.toLowerCase();
+        
+        Pattern minsPattern = Pattern.compile("(\\d+)\\s*min?(s|ute|utes)?\\s*(ago)?");
+        Matcher minsMatcher = minsPattern.matcher(lowerText);
+        if (minsMatcher.find()) {
+            try {
+                int minutesAgo = Integer.parseInt(minsMatcher.group(1));
+                return System.currentTimeMillis() - ((long) minutesAgo * 60 * 1000);
+            } catch (Exception e) { /**/ }
+        }
+
+        if (lowerText.contains("just now")) {
+            return System.currentTimeMillis();
+        }
+
+        Pattern timePattern = Pattern.compile("([0-1]?[0-9]|2[0-3]):([0-5][0-9])");
+        Matcher timeMatcher = timePattern.matcher(lowerText);
+        if (timeMatcher.find()) {
+            try {
+                int hour = Integer.parseInt(timeMatcher.group(1));
+                int minute = Integer.parseInt(timeMatcher.group(2));
+                
+                TimeZone sourceTimeZone = TimeZone.getTimeZone("UTC");
+                if (lowerText.contains("est") || lowerText.contains("edt") || lowerText.contains("am") || lowerText.contains("pm") || lowerText.contains("us")) {
+                    sourceTimeZone = TimeZone.getTimeZone("America/New_York");
+                } else if (lowerText.contains("bst") || lowerText.contains("gmt")) {
+                    sourceTimeZone = TimeZone.getTimeZone("Europe/London");
                 }
-            }).start();
-        });
 
-        botSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
-            if (isChecked && !isPermissionGranted()) {
-                Toast.makeText(this, "Active d'abord la permission notifications !", Toast.LENGTH_LONG).show();
-                botSwitch.setChecked(false);
-                return;
+                Calendar sourceCal = Calendar.getInstance(sourceTimeZone);
+                sourceCal.setTimeInMillis(defaultPostTime);
+                sourceCal.set(Calendar.HOUR_OF_DAY, hour);
+                sourceCal.set(Calendar.MINUTE, minute);
+                sourceCal.set(Calendar.SECOND, 0);
+
+                TimeZone madaTimeZone = TimeZone.getTimeZone("Indian/Antananarivo");
+                Calendar madaCal = Calendar.getInstance(madaTimeZone);
+                madaCal.setTimeInMillis(sourceCal.getTimeInMillis());
+
+                if (madaCal.getTimeInMillis() > System.currentTimeMillis() + (2 * 60 * 60 * 1000)) {
+                    madaCal.add(Calendar.DAY_OF_YEAR, -1);
+                }
+                return madaCal.getTimeInMillis();
+            } catch (Exception e) { /**/ }
+        }
+        return defaultPostTime; 
+    }
+
+    private List<String> filterActiveAssets(String text) {
+        List<String> assets = new ArrayList<>();
+        String upper = text.toUpperCase();
+        if (upper.contains("GOLD") || upper.contains("XAU") || upper.contains("OR ")) assets.add("GOLD");
+        if (upper.contains("OIL") || upper.contains("WTI") || upper.contains("CRUDE")) assets.add("USOIL");
+        if (upper.contains("NASDAQ") || upper.contains("NAS100") || upper.contains("TECH")) assets.add("NASDAQ");
+        if (upper.contains("SP500") || upper.contains("S&P")) assets.add("SP500");
+        if (upper.contains("BITCOIN") || upper.contains("BTC")) assets.add("BITCOIN");
+        if (upper.contains("YIELD") || upper.contains("US10Y") || upper.contains("BOND")) assets.add("US10Y");
+        if (upper.contains("GBP") || upper.contains("CABLE")) assets.add("GBPUSD");
+        if (upper.contains("AUD")) assets.add("AUDUSD");
+        if (upper.contains("CAD")) assets.add("USDCAD");
+        if (upper.contains("JPY")) assets.add("USDJPY");
+        if (upper.contains("EUROZONE") || upper.contains("EUR ") || upper.contains("ECB")) assets.add("EURUSD");
+        
+        if (assets.isEmpty()) assets.add("GLOBAL-MACRO");
+        return assets;
+    }
+
+    private void runSeniorAnalystPipeline(String hash, String feed, EconomicEventDetector.DetectedEvent ev, List<String> assets, long eventTimestamp, boolean driverChanged) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+            String timeString = sdf.format(new Date(eventTimestamp)) + " (Mada)";
+
+            JSONObject payload = new JSONObject();
+            payload.put("model", GROQ_MODEL);
+            payload.put("temperature", 0.02);
+
+            JSONArray messages = new JSONArray();
+            String systemPrompt = "Tu es un analyste macroéconomique de haut niveau. " +
+                    "Analyse si cette publication modifie le driver fondamental des actifs spécifiés. No chit-chat. Format direct.";
+            messages.put(new JSONObject().put("role", "system").put("content", systemPrompt));
+            
+            String userPrompt = "ALERTE CHRONOLOGIQUE À [" + timeString + "] :\n" + feed + 
+                    "\n\nACTIFS CONCERNÉS : " + String.join(", ", assets) + 
+                    "\nANOMALIE DE DRIVER DÉTECTÉE PAR LE SYSTEME : " + (driverChanged ? "OUI" : "NON");
+            messages.put(new JSONObject().put("role", "user").put("content", userPrompt));
+            
+            payload.put("messages", messages);
+
+            URL url = new URL(GROQ_URL);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Authorization", "Bearer " + MainActivity.CLAUDE_API_KEY);
+            conn.setDoOutput(true);
+
+            OutputStream os = conn.getOutputStream();
+            os.write(payload.toString().getBytes("UTF-8"));
+            os.flush();
+            os.close();
+
+            if (conn.getResponseCode() == 200) {
+                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) response.append(line);
+                br.close();
+
+                JSONObject json = new JSONObject(response.toString());
+                String aiAnalysis = json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+
+                String alertTitle = driverChanged ? "*⚡ DÉVIATION CRITIQUE : CHANGEMENT DE DRIVER MACRO*" : "*🚨 RAPPORT FLUSH MACRO (CONFORME)*";
+                
+                String tgMsg = alertTitle + " - " + timeString + "\n" +
+                               "*Origine :* " + ev.description + "\n*Actifs Cibles :* " + String.join(", ", assets) + "\n\n" +
+                               "*ANALYSE D'IMPACT SUR LES REVOLUTIONS DE FLUX :*\n" + aiAnalysis;
+                
+                sendTelegramSecure(tgMsg);
             }
-            getPrefs().edit().putBoolean("bot_active", isChecked).apply();
-            updateStatus();
-            addLog(isChecked ? "🚀 MOTEUR MACRO ACTIVÉ (RUNNING)" : "🛑 MOTEUR EN VEILLE (STANDBY)");
-        });
-
-        // Application de l'état sauvegardé au démarrage
-        botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
-        addLog("📱 Terminal prêt pour l'acquisition.");
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        instance = this;
-        updateStatus();
-    }
-
-    private boolean isPermissionGranted() {
-        Set<String> pkgs = NotificationManagerCompat.getEnabledListenerPackages(this);
-        return pkgs.contains(getPackageName());
-    }
-
-    private void updateStatus() {
-        boolean active = getPrefs().getBoolean("bot_active", false);
-        boolean perm   = isPermissionGranted();
-        if (!perm) {
-            statusText.setText("⚠️ PERMISSION NOTIFICATIONS REQUISE");
-            statusText.setTextColor(0xFFFF9800); // Orange
-        } else if (active) {
-            statusText.setText("🟢 BOT ACTIF — EN ÉCOUTE DES DRIVERS...");
-            statusText.setTextColor(0xFF00FF00); // Vert
-        } else {
-            statusText.setText("🔴 BOT INACTIF — COUPE FLUX ENGAGÉ");
-            statusText.setTextColor(0xFFFF0000); // Rouge
+        } catch (Exception e) {
+            Log.e(TAG, "Échec exécution Pipeline Groq", e);
         }
     }
 
-    private void saveKeys() {
-        String k = apiKeyInput.getText().toString().trim();
-        String t = telegramTokenInput.getText().toString().trim();
-        String c = telegramChatIdInput.getText().toString().trim();
-        if (k.isEmpty() || t.isEmpty() || c.isEmpty()) {
-            Toast.makeText(this, "Remplis toutes les clés !", Toast.LENGTH_SHORT).show();
-            return;
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Trading Core Alerts", NotificationManager.IMPORTANCE_HIGH);
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.createNotificationChannel(channel);
         }
-        getPrefs().edit().putString("claude_key", k).putString("tg_token", t).putString("tg_chat_id", c).apply();
-        CLAUDE_API_KEY = k; 
-        TELEGRAM_TOKEN = t; 
-        TELEGRAM_CHAT_ID = c;
-        Toast.makeText(this, "✅ Clés sauvegardées !", Toast.LENGTH_SHORT).show();
-        addLog("✅ Clés API configurées avec succès.");
     }
 
-    private void loadSavedKeys() {
-        SharedPreferences p = getPrefs();
-        CLAUDE_API_KEY   = p.getString("claude_key", "");
-        TELEGRAM_TOKEN   = p.getString("tg_token", "");
-        TELEGRAM_CHAT_ID = p.getString("tg_chat_id", "");
-        apiKeyInput.setText(CLAUDE_API_KEY);
-        telegramTokenInput.setText(TELEGRAM_TOKEN);
-        telegramChatIdInput.setText(TELEGRAM_CHAT_ID);
-    }
-
-    private SharedPreferences getPrefs() {
-        return getSharedPreferences("TradingBot", MODE_PRIVATE);
-    }
-
-    public void addLog(String message) {
-        runOnUiThread(() -> {
-            String ts = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-            String cur = logText.getText().toString();
-            // Nettoyage automatique pour éviter la saturation graphique si le log devient trop lourd
-            if (cur.length() > 5000) {
-                cur = cur.substring(0, 2000);
+    private String generateSecureHash(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes("UTF-8"));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
             }
-            logText.setText("[" + ts + "] " + message + "\n" + cur);
-        });
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (eventDb != null) {
-            eventDb.close();
-        }
-    }
-}
+            return hexString.toString
