@@ -25,7 +25,6 @@ public class NotificationService extends NotificationListenerService {
 
     private static final String TAG = "NotificationService";
     private static final String CHANNEL_ID = "trading_alerts";
-    private static final int NOTIF_ID = 2001;
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     
@@ -33,7 +32,6 @@ public class NotificationService extends NotificationListenerService {
     private EventDatabase eventDb;
 
     public static void sendTelegramSecure(String message) {
-        // Log de secours local avant routage infrastructure réseau Telegram
         Log.d(TAG, "Routage Sortant Telegram : " + message);
     }
 
@@ -43,7 +41,7 @@ public class NotificationService extends NotificationListenerService {
         eventDb = new EventDatabase(this);
         createNotificationChannel();
         if (MainActivity.instance != null) {
-            MainActivity.instance.addLog("[SERVICE] Moteur d'écoute macro opérationnel.");
+            MainActivity.instance.addLog("[SERVICE] Moteur de Drivers Macro opérationnel.");
         }
     }
 
@@ -59,6 +57,7 @@ public class NotificationService extends NotificationListenerService {
 
         if (unifiedFeed.length() < 10) return;
 
+        // Sources institutionnelles Tier 1
         boolean isInstitutionalSource = packageName.contains("financialjuice") 
                 || packageName.contains("twitter") 
                 || packageName.contains("periscope")
@@ -71,11 +70,16 @@ public class NotificationService extends NotificationListenerService {
             return; 
         }
         
-        if ("Neutre".equalsIgnoreCase(inputEvent.impact) && isInstitutionalSource) {
+        // Analyse du changement de driver en direct dans le flux textuel
+        boolean isDriverChanged = detectDriverDeviation(unifiedFeed);
+        
+        if (isDriverChanged && isInstitutionalSource) {
+            inputEvent.impact = "CHANGEMENT DE DRIVER MACRO";
+        } else if ("Neutre".equalsIgnoreCase(inputEvent.impact) && isInstitutionalSource) {
             inputEvent.impact = "Alerte Flash Marché"; 
         }
 
-        // Horodatage à la milliseconde pour l'analyse IA (UTC+3 Madagascar)
+        // Alignement horaire Madagascar (UTC+3)
         long exactTimestamp = parseTimeFromText(unifiedFeed, sbn.getPostTime());
 
         String fingerPrint = generateSecureHash(title + text);
@@ -84,29 +88,55 @@ public class NotificationService extends NotificationListenerService {
         String sourceName = packageName.contains("financialjuice") ? "FinancialJuice" :
                            packageName.contains("investing") ? "Investing.com" : "X/Twitter";
 
-        // Conversion en secondes Unix
         long unixSeconds = exactTimestamp / 1000;
 
-        // ✨ RE-FIX COMPILATION : Forçage explicite (int) pour correspondre à la signature de votre BDD
+        // Enregistrement base de données avec conversion explicite int
         boolean logged = eventDb.saveEvent(fingerPrint, packageName, sourceName, 
                 inputEvent.eventType, title, unifiedFeed, String.join(", ", targetAssets), 
                 inputEvent.impact, (int) unixSeconds, "notification"); 
         
         if (logged) {
             SystemMonitor.registerEvent(sourceName, targetAssets);
-            exec.submit(() -> runSeniorAnalystPipeline(fingerPrint, unifiedFeed, inputEvent, targetAssets, exactTimestamp));
+            exec.submit(() -> runSeniorAnalystPipeline(fingerPrint, unifiedFeed, inputEvent, targetAssets, exactTimestamp, isDriverChanged));
         }
     }
 
-
     /**
-     * Moteur de normalisation temporelle mondiale.
-     * Aligne les fuseaux (EST/EDT/UTC) sur l'heure de Madagascar sans faille de DST.
+     * Moteur algorithmique de détection des déviations (Ecart Actual vs Forecast)
+     * Repère si la news bouscule le driver d'un actif.
      */
+    private boolean detectDriverDeviation(String text) {
+        String upper = text.toUpperCase();
+        // Recherche des marqueurs de déviation économique anglo-saxons
+        if (upper.contains("HIGHER THAN EXPECTED") || upper.contains("LOWER THAN EXPECTED") ||
+            upper.contains("ABOVE FORECAST") || upper.contains("BELOW FORECAST") ||
+            upper.contains("BEATS ESTIMATES") || upper.contains("MISSES ESTIMATES") ||
+            upper.contains("SURPRISE") || upper.contains("SHOCK") || upper.contains("UNEXPECTED")) {
+            return true;
+        }
+        
+        // Extraction par Regex des structures "Actual: X | Forecast: Y" souvent envoyées par FinancialJuice
+        Pattern pattern = Pattern.compile("(ACTUAL|ACT):?\\s*([\\d\\.\\-%]+).*?(FORECAST|EST|EXP):?\\s*([\\d\\.\\-%]+)");
+        Matcher matcher = pattern.matcher(upper);
+        if (matcher.find()) {
+            try {
+                String actualStr = matcher.group(2).replaceAll("[^\\d\\.]", "");
+                String forecastStr = matcher.group(4).replaceAll("[^\\d\\.]", "");
+                double actual = Double.parseDouble(actualStr);
+                double forecast = Double.parseDouble(forecastStr);
+                
+                // Si la valeur réelle dévie du consensus, le driver a changé
+                return actual != forecast;
+            } catch (Exception e) {
+                return true; // En cas de doute structurel, on valide l'alerte de driver
+            }
+        }
+        return false;
+    }
+
     private long parseTimeFromText(String text, long defaultPostTime) {
         String lowerText = text.toLowerCase();
         
-        // Extraction des délais relatifs anglo-saxons ("5 mins ago")
         Pattern minsPattern = Pattern.compile("(\\d+)\\s*min(s|ute|utes)?\\s*ago");
         Matcher minsMatcher = minsPattern.matcher(lowerText);
         if (minsMatcher.find()) {
@@ -120,7 +150,6 @@ public class NotificationService extends NotificationListenerService {
             return System.currentTimeMillis();
         }
 
-        // Extraction d'une heure absolue intégrée dans le texte (ex: "14:30 EST")
         Pattern timePattern = Pattern.compile("([0-1]?[0-9]|2[0-3]):([0-5][0-9])");
         Matcher timeMatcher = timePattern.matcher(lowerText);
         if (timeMatcher.find()) {
@@ -128,10 +157,8 @@ public class NotificationService extends NotificationListenerService {
                 int hour = Integer.parseInt(timeMatcher.group(1));
                 int minute = Integer.parseInt(timeMatcher.group(2));
                 
-                TimeZone sourceTimeZone = TimeZone.getTimeZone("UTC"); // Normalisation par défaut
-                
+                TimeZone sourceTimeZone = TimeZone.getTimeZone("UTC");
                 if (lowerText.contains("est") || lowerText.contains("edt") || lowerText.contains("am") || lowerText.contains("pm") || lowerText.contains("us")) {
-                    // Les terminaux US alternent dynamiquement entre EST (UTC-5) et EDT (UTC-4)
                     sourceTimeZone = TimeZone.getTimeZone("America/New_York");
                 } else if (lowerText.contains("bst") || lowerText.contains("gmt")) {
                     sourceTimeZone = TimeZone.getTimeZone("Europe/London");
@@ -143,7 +170,6 @@ public class NotificationService extends NotificationListenerService {
                 sourceCal.set(Calendar.MINUTE, minute);
                 sourceCal.set(Calendar.SECOND, 0);
 
-                // Conversion mathématique vers Antananarivo (UTC+3 constant)
                 TimeZone madaTimeZone = TimeZone.getTimeZone("Indian/Antananarivo");
                 Calendar madaCal = Calendar.getInstance(madaTimeZone);
                 madaCal.setTimeInMillis(sourceCal.getTimeInMillis());
@@ -151,15 +177,9 @@ public class NotificationService extends NotificationListenerService {
                 if (madaCal.getTimeInMillis() > System.currentTimeMillis() + (2 * 60 * 60 * 1000)) {
                     madaCal.add(Calendar.DAY_OF_YEAR, -1);
                 }
-
-                Log.d(TAG, "[TIME-MADA] Alignement horaire réussi : " + madaCal.getTime());
                 return madaCal.getTimeInMillis();
-
-            } catch (Exception e) {
-                Log.e(TAG, "Erreur lors du calcul du fuseau adaptatif", e);
-            }
+            } catch (Exception e) { /**/ }
         }
-
         return defaultPostTime; 
     }
 
@@ -181,23 +201,25 @@ public class NotificationService extends NotificationListenerService {
         return assets;
     }
 
-    private void runSeniorAnalystPipeline(String hash, String feed, EconomicEventDetector.DetectedEvent ev, List<String> assets, long eventTimestamp) {
+    private void runSeniorAnalystPipeline(String hash, String feed, EconomicEventDetector.DetectedEvent ev, List<String> assets, long eventTimestamp, boolean driverChanged) {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
             sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
-            String timeString = sdf.format(new Date(eventTimestamp)) + " (Heure Mada)";
+            String timeString = sdf.format(new Date(eventTimestamp)) + " (Mada)";
 
             JSONObject payload = new JSONObject();
             payload.put("model", GROQ_MODEL);
             payload.put("temperature", 0.02);
 
             JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", 
-                "Tu es un analyste macroéconomique senior en salle des marchés. " +
-                "Analyse la news fournie et renvoie l'impact directionnel strict sur les actifs demandés. No chit-chat."));
+            String systemPrompt = "Tu es un analyste macroéconomique de haut niveau. " +
+                    "Analyse si cette publication modifie le driver fondamental des actifs spécifiés. No chit-chat. Format direct.";
+            messages.put(new JSONObject().put("role", "system").put("content", systemPrompt));
             
-            messages.put(new JSONObject().put("role", "user").put("content", 
-                "NEWS CHRONOLOGIQUE PARVENU À [" + timeString + "] :\n" + feed + "\n\nACTIFS CIBLES : " + String.join(", ", assets)));
+            String userPrompt = "ALERTE CHRONOLOGIQUE À [" + timeString + "] :\n" + feed + 
+                    "\n\nACTIFS CONCERNÉS : " + String.join(", ", assets) + 
+                    "\nANOMALIE DE DRIVER DÉTECTÉE PAR LE SYSTEME : " + (driverChanged ? "OUI" : "NON");
+            messages.put(new JSONObject().put("role", "user").put("content", userPrompt));
             
             payload.put("messages", messages);
 
@@ -223,15 +245,18 @@ public class NotificationService extends NotificationListenerService {
                 JSONObject json = new JSONObject(response.toString());
                 String aiAnalysis = json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 
-                String emoji = ev.impact.contains("Haussier") ? "📈" : ev.impact.contains("Baissier") ? "📉" : "🚨";
-                String tgMsg = "*" + emoji + " PIPELINE MACRO SECURE* - " + timeString + "\n" +
-                               "*Filtre Origine :* " + ev.description + "\n*Biais Technique :* " + ev.impact + "\n\n" +
-                               "*ANALYSE DE FLUX DE CAPITAUX:* \n" + aiAnalysis;
+                // Structuration de l'en-tête Telegram selon l'importance du Driver
+                String emoji = driverChanged ? "⚡" : "🚨";
+                String alertTitle = driverChanged ? "*⚡ DEVIATION CRITIQUE : CHANGEMENT DE DRIVER MACRO*" : "*🚨 INFRA FLUSH MACRO*";
+                
+                String tgMsg = alertTitle + " - " + timeString + "\n" +
+                               "*Origine :* " + ev.description + "\n*Actifs Cibles :* " + String.join(", ", assets) + "\n\n" +
+                               "*ANALYSE D'IMPACT SUR LES REVOLUTIONS DE FLUX :*\n" + aiAnalysis;
                 
                 sendTelegramSecure(tgMsg);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Échec traitement Pipeline", e);
+            Log.e(TAG, "Échec exécution Pipeline", e);
         }
     }
 
