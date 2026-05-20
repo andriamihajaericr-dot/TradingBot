@@ -1,5 +1,6 @@
 package com.tradingbot.analyzer;
 
+import android.util.Log;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.provider.Settings;
