@@ -11,11 +11,12 @@ import androidx.core.app.NotificationManagerCompat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Set; // ✨ RECORRIGÉ : Importation indispensable pour la détection des permissions
 
 public class MainActivity extends AppCompatActivity {
 
     // Harmonisation des clés institutionnelles d'accès
-    public static String CLAUDE_API_KEY   = ""; // Fait office de jeton d'accès pour l'API Groq Gateway
+    public static String CLAUDE_API_KEY   = ""; 
     public static String TELEGRAM_TOKEN   = "";
     public static String TELEGRAM_CHAT_ID = "";
     public static MainActivity instance;
@@ -43,10 +44,6 @@ public class MainActivity extends AppCompatActivity {
         Button permBtn      = findViewById(R.id.permBtn);
         Button testBtn      = findViewById(R.id.testBtn);
         
-        // Ajout d'un bouton de maintenance dans votre layout R.layout.activity_main
-        // Si l'ID n'existe pas dans votre ancien fichier XML, il suffit de le lier ou de le commenter.
-        Button clearDbBtn   = findViewById(R.id.clearDbBtn); 
-
         loadSavedKeys();
         checkNotificationPermission();
 
@@ -71,13 +68,24 @@ public class MainActivity extends AppCompatActivity {
             NotificationService.sendTelegramSecure("🧪 **TEST LIAISON INFRASTRUCTURE**\nStatut : Opérationnel.\nModèle : Llama-3.3-70B\nDestination : Flux Sécurisé.");
         });
 
-        if (clearDbBtn != null) {
-            clearDbBtn.setOnClickListener(v -> {
-                eventDb.cleanOldEvents(); // Purge immédiate forcée des enregistrements obsolètes
-                SystemMonitor.resetDailyCounters();
-                addLog("🧹 MAINTENANCE : Base de données locale et compteurs réinitialisés.");
-                Toast.makeText(MainActivity.this, "Base de données nettoyée", Toast.LENGTH_SHORT).show();
-            });
+        // ✨ RECORRIGÉ : Nettoyage de la base de données via un test de sécurité.
+        // Si le bouton n'existe pas dans votre fichier layout XML actuel (activity_main.xml),
+        // le code ne plantera plus à la compilation et s'adaptera de façon autonome.
+        try {
+            int clearBtnId = getResources().getIdentifier("clearDbBtn", "id", getPackageName());
+            if (clearBtnId != 0) {
+                Button clearDbBtn = findViewById(clearBtnId);
+                if (clearDbBtn != null) {
+                    clearDbBtn.setOnClickListener(v -> {
+                        eventDb.cleanOldEvents(); 
+                        SystemMonitor.resetDailyCounters();
+                        addLog("🧹 MAINTENANCE : Base de données locale et compteurs réinitialisés.");
+                        Toast.makeText(MainActivity.this, "Base de données nettoyée", Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }
+        } catch (Exception e) {
+            Log.e("MainActivity", "Bouton clearDbBtn absent du layout XML. Ignoré.", e);
         }
 
         addLog("📱 Interface Terminal Connectée.");
@@ -86,7 +94,7 @@ public class MainActivity extends AppCompatActivity {
     private void updateStatusText(boolean active) {
         if (active) {
             statusText.setText("STATUT : BOT OPÉRATIONNEL (RUNNING)");
-            statusText.setTextColor(0xFF00FF00); // Vert Finance
+            statusText.setTextColor(0xFF00FF00); // Vert de marché financier
         } else {
             statusText.setText("STATUT : ENGINE ARRÊTÉ (STANDBY)");
             statusText.setTextColor(0xFFFF0000); // Rouge Alerte
@@ -130,7 +138,6 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences p = getPrefs();
         String storedKey = p.getString("claude_key", "");
         
-        // Fallback rétrocompatible au cas où vous utiliseriez une clé brute dans votre code d'origine
         CLAUDE_API_KEY   = storedKey.isEmpty() ? "" : storedKey;
         TELEGRAM_TOKEN   = p.getString("tg_token", "");
         TELEGRAM_CHAT_ID = p.getString("tg_chat_id", "");
@@ -149,7 +156,6 @@ public class MainActivity extends AppCompatActivity {
             String ts = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
             logText.append("[" + ts + "] " + message + "\n");
             
-            // Auto-scroll automatique de l'interface pour suivre le flux en temps réel
             int scrollAmount = logText.getLayout() != null ? 
                 logText.getLayout().getLineTop(logText.getLineCount()) - logText.getHeight() : 0;
             if (scrollAmount > 0) logText.scrollTo(0, scrollAmount);
