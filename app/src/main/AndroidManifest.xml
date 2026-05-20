@@ -17,7 +17,7 @@
         android:allowBackup="false"
         android:hasFragileUserData="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Moteur Macro Analysis"
+        android:label="FondaIOF"
         android:roundIcon="@android:drawable/sym_def_app_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.TradingBot">
@@ -34,7 +34,7 @@
 
         <service
             android:name=".NotificationService"
-            android:label="Moteur Analytique (Core)"
+            android:label="Moteur Analysis IOF by Nisa"
             android:exported="true"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
