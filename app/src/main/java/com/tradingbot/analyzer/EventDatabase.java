@@ -11,7 +11,7 @@ import java.util.List;
 public class EventDatabase extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "trading_bot.db";
-    private static final int DATABASE_VERSION = 2; // Version augmentée pour intégrer le statut de synchronisation
+    private static final int DATABASE_VERSION = 2;
     public static final String TABLE_EVENTS = "events";
 
     public EventDatabase(Context context) {
@@ -31,7 +31,7 @@ public class EventDatabase extends SQLiteOpenHelper {
                 "target_assets TEXT, " +
                 "impact TEXT, " +
                 "unix_timestamp INTEGER, " +
-                "sync_status TEXT DEFAULT 'synced')"; // 'synced' ou 'en_attente'
+                "sync_status TEXT DEFAULT 'synced')";
         db.execSQL(createTable);
     }
 
@@ -41,7 +41,7 @@ public class EventDatabase extends SQLiteOpenHelper {
             try {
                 db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN sync_status TEXT DEFAULT 'synced'");
             } catch (Exception e) {
-                Log.e("EventDatabase", "La colonne sync_status existe déjà ou erreur d'upgrade.");
+                Log.e("EventDatabase", "Erreur d'upgrade ou colonne existante.");
             }
         }
     }
@@ -116,7 +116,7 @@ public class EventDatabase extends SQLiteOpenHelper {
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
-            Log.e("EventDatabase", "Erreur extraction contexte historique", e);
+            Log.e("EventDatabase", "Erreur extraction contexte", e);
         } finally {
             if (cursor != null) cursor.close();
         }
