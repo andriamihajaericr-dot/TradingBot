@@ -255,7 +255,21 @@ public class NotificationService extends NotificationListenerService {
 
     private boolean executeAnalysisPipeline(String source, String feed, String history, List<String> assets, long ts, String fingerprint) {
      try {
-        // 1. Préparation de l'horodatage pour Madagascar
+        // 🔑 Récupération de la clé API et des configurations Telegram depuis les SharedPreferences
+        android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
+        String apiKey = prefs.getString("claude_key", "");
+        String tgToken = prefs.getString("tg_token", "");
+        String tgChatId = prefs.getString("tg_chat_id", "");
+        
+        String GROQ_MODEL = "llama3-70b-8192"; 
+
+        // Sécurité : Si les configurations sont absentes, on avorte proprement
+        if (apiKey.isEmpty() || tgToken.isEmpty() || tgChatId.isEmpty()) {
+            Log.e(TAG, "Échec pipeline : Configurations ou clés API manquantes dans l'application.");
+            return false;
+        }
+
+        // 1. Préparation de l'horodatage pour Madagascar (UTC+3)
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.FRANCE);
         sdf.setTimeZone(java.util.TimeZone.getTimeZone("GMT+3"));
         String timeString = sdf.format(new java.util.Date(ts));
@@ -265,17 +279,17 @@ public class NotificationService extends NotificationListenerService {
         java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Authorization", "Bearer " + GROQ_API_KEY);
+        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
         conn.setDoOutput(true);
 
-        // 3. Construction de la charge utile (Payload) JSON
+        // 3. Construction du Payload JSON pour l'analyse macroéconomique
         JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
-        payload.put("temperature", 0.02); // Température basse pour éviter l'improvisation économique
+        payload.put("temperature", 0.02); // Stabilité algorithmique maximale
 
         JSONArray messages = new JSONArray();
 
-        // 🔥 PROMPT SYSTÈME ULTIME INSTITUTIONNEL
+        // 🔥 PROMPT SYSTÈME INSTITUTIONNEL ET DIRECTIVES FOREX ACCRUES
         messages.put(new JSONObject().put("role", "system").put("content", 
             "Tu es un terminal de trading quantitatif et macroéconomique haute fréquence.\n" +
             "Tu dois synthétiser le flux entrant de manière ultra-concise, froide et mathématique.\n\n" +
@@ -307,16 +321,16 @@ public class NotificationService extends NotificationListenerService {
             "🏁 FLUX DIRECTIONNEL GLOBAL : [HAUSSIER / BAISSIER / STABLE]"
         ));
 
-        // Transmission des données dynamiques (Le Flux en direct + La mémoire historique contextuelle)
+        // Injection des données de flux reçues par notification et de l'historique de la base locale
         messages.put(new JSONObject().put("role", "user").put("content", "Flux : " + feed + "\nMémoire :\n" + history));
         payload.put("messages", messages);
 
-        // 4. Envoi de la requête
+        // 4. Envoi effectif de la requête réseau
         java.io.OutputStream os = conn.getOutputStream();
         os.write(payload.toString().getBytes("UTF-8"));
         os.flush(); os.close();
 
-        // 5. Réception et traitement de la réponse Groq
+        // 5. Lecture et traitement sélectif de la réponse
         if (conn.getResponseCode() == 200) {
             java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
             StringBuilder r = new StringBuilder(); String l;
@@ -324,29 +338,29 @@ public class NotificationService extends NotificationListenerService {
 
             String aiResult = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 
-            // ✂️ FILTRE DYNAMIQUE ANTI-NEUTRE
+            // ✂️ FILTRE ANTI-NEUTRE INTÉGRÉ
             StringBuilder filteredMessage = new StringBuilder();
             String[] lines = aiResult.split("\n");
             int activeSignalsCount = 0;
 
             for (String line : lines) {
-                // Si la ligne traite d'un actif mais qu'elle est évaluée comme neutre, on la supprime de l'affichage
+                // Si la ligne traite d'un actif mais qu'il est qualifié de neutre, on le supprime du rapport Telegram
                 if (line.contains("•") && line.contains("[NEUTRE]")) {
                     continue; 
                 }
                 
-                // On comptabilise et valide uniquement les ruptures macroéconomiques nettes
+                // On stocke et valide uniquement les mouvements de forte intensité macroéconomique
                 if (line.contains("[ACHAT CHOC]") || line.contains("[VENTE CHOC]")) {
                     filteredMessage.append(line).append("\n");
                     activeSignalsCount++;
                 } else if (!line.contains("•")) {
-                    // On préserve la structure graphique globale (Titre, Conviction, Vecteur, Conclusion)
+                    // On conserve l'ossature visuelle (Titres, En-têtes, Conclusion du momentum)
                     filteredMessage.append(line).append("\n");
                 }
             }
 
-            // 🚀 EXPÉDITION CIBLÉE SUR TELEGRAM
-            // Si la notification ne provoque aucune réaction sur votre portefeuille, le canal reste propre (pas d'envoi inutile)
+            // 🚀 EXPÉDITION FILTRÉE SUR TELEGRAM
+            // Le message ne part sur Telegram que s'il y a un réel intérêt opérationnel (impact > 0)
             if (activeSignalsCount > 0) {
                 String finalTelegramPayload = "⚡ *ANALYSE DE DRIVER MACRO PONDÉRÉ*\n"
                         + "🕒 " + timeString + " (Mada)\n" 
@@ -356,20 +370,21 @@ public class NotificationService extends NotificationListenerService {
                         
                 sendTelegramSecure(finalTelegramPayload);
             } else {
-                Log.d(TAG, "Filtrage exécuté : Aucun mouvement d'intensité détecté sur les 11 actifs.");
+                Log.d(TAG, "Filtrage actif : Aucun mouvement à haute intensité sur vos 11 actifs.");
             }
 
-            // 🏁 MISE À JOUR DE LA BASE DE DONNÉES LOCALES (Archivage du statut)
+            // 🏁 Validation finale dans la base sqlite locale
             eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
             return true;
         } else {
-            Log.e(TAG, "Erreur API Groq Code : " + conn.getResponseCode());
+            Log.e(TAG, "Erreur renvoyée par l'API Groq. Code HTTP : " + conn.getResponseCode());
         }
      } catch (Exception e) { 
-        Log.e(TAG, "Échec critique du pipeline d'analyse macro", e); 
+        Log.e(TAG, "Échec critique du traitement macro-analytique", e); 
      }
      return false;
     }
+
     /**
      * 📋 CARTOGRAPHIE EXACTE ET INTELLIGENTE DES ACTIFS DU PORTEFOUILLE
      */
