@@ -254,73 +254,122 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private boolean executeAnalysisPipeline(String source, String feed, String history, List<String> assets, long ts, String fingerprint) {
-        try {
-            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
-            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
-            String timeString = sdf.format(new Date(ts)) + " (Mada)";
+     try {
+        // 1. Préparation de l'horodatage pour Madagascar
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.FRANCE);
+        sdf.setTimeZone(java.util.TimeZone.getTimeZone("GMT+3"));
+        String timeString = sdf.format(new java.util.Date(ts));
 
-            JSONObject payload = new JSONObject(); payload.put("model", GROQ_MODEL); payload.put("temperature", 0.02);
-            JSONArray messages = new JSONArray();
-            // 🔥 PROMPT SYSTÈME ULTIME INTER-MARCHÉS BLINDÉ POUR VOS 11 ACTIFS
-            messages.put(new JSONObject().put("role", "system").put("content", 
-                   "Tu es un algorithme de trading macro-quantitatif institutionnel. " +
-                   "Ton rôle est d'analyser l'impact du flux d'actualités en direct par rapport au contexte historique.\n\n" +
-    
-                   "CHARTE DE CORRÉLATION MACRO STRICTE :\n" +
-                   "- Un biais HAWKISH (Fed agressive, inflation forte, taux élevés) = USD fort, US10Y en [ACHAT CHOC] | GOLD, NASDAQ, SP500, BITCOIN en [VENTE CHOC].\n" +
-                   "- Un biais DOVISH (Fed souple, baisse des taux, injection de liquidités) = USD faible, US10Y en [VENTE CHOC] | GOLD, NASDAQ, SP500, BITCOIN en [ACHAT CHOC].\n" +
-                   "- Actif Énergie (USOIL) = Hausse si tensions géopolitiques concrètes au Moyen-Orient ou baisse des stocks. Baisse si résolution diplomatique.\n\n" +
-    
-                   "GUIDE DES PAIRES FOREX SPÉCIFIQUES (TRÈS STRICT) :\n" +
-                   "1. AUDUSD : Si l'USD est fort (Hawkish), le graphique BAISSE [VENTE CHOC]. Si l'USD est faible, il MONTE.\n" +
-                   "2. EURUSD & GBPUSD : Si l'USD est fort (Hawkish), les graphiques BAISSENT [VENTE CHOC].\n" +
-                   "3. USDCAD : Si l'USD est fort (Hawkish), le graphique MONTE [ACHAT CHOC] (Le Dollar US écrase le Dollar Canadien).\n" +
-                   "4. USDJPY : Si les taux US montent (US10Y en ACHAT), le graphique MONTE en flèche [ACHAT CHOC] (Le Dollar US écrase le Yen Japonais).\n\n" +
-                                                                    
-                   "CONSIGNES DE SÉCURITÉ :\n" +
-                   "- N'invente aucune donnée historique. Ignore les figures politiques obsolètes du passé.\n" +
-                   "- Ne réponds JAMAIS par des termes génériques comme 'Marchés boursiers' ou 'Actions'.\n\n" +
-    
-                   "FORMAT DE RÉPONSE IMPÉRATIF (Génère STRICTEMENT cette liste pour les actifs cibles, aucun autre texte) :\n" +
-                   "• GOLD : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
-                   "• NASDAQ : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
-                   "• SP500 : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
-                   "• USOIL : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
-                   "• US10Y : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
-                   "• BITCOIN : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
-                   "• EURUSD : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
-                   "• GBPUSD : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
-                   "• AUDUSD : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
-                   "• USDCAD : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n" +
-                   "• USDJPY : [ACHAT CHOC / VENTE CHOC / NEUTRE] - Justification très courte.\n\n" +
-                   "CONCLUSION : 'VECTEUR DE MOMENTUM DÉFINITIF : [HAUSSIER / BAISSIER / NEUTRE]'"
-            ));
-            messages.put(new JSONObject().put("role", "user").put("content", "Flux : " + feed + "\nMémoire :\n" + history));
-            payload.put("messages", messages);
+        // 2. Configuration de la connexion HTTP vers Groq API
+        java.net.URL url = new java.net.URL("https://api.groq.com/openai/v1/chat/completions");
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("Authorization", "Bearer " + GROQ_API_KEY);
+        conn.setDoOutput(true);
 
-            URL url = new URL(GROQ_URL);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST"); conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Authorization", "Bearer " + MainActivity.CLAUDE_API_KEY);
-            conn.setDoOutput(true);
+        // 3. Construction de la charge utile (Payload) JSON
+        JSONObject payload = new JSONObject();
+        payload.put("model", GROQ_MODEL);
+        payload.put("temperature", 0.02); // Température basse pour éviter l'improvisation économique
+
+        JSONArray messages = new JSONArray();
+
+        // 🔥 PROMPT SYSTÈME ULTIME INSTITUTIONNEL
+        messages.put(new JSONObject().put("role", "system").put("content", 
+            "Tu es un terminal de trading quantitatif et macroéconomique haute fréquence.\n" +
+            "Tu dois synthétiser le flux entrant de manière ultra-concise, froide et mathématique.\n\n" +
             
-            OutputStream os = conn.getOutputStream(); os.write(payload.toString().getBytes("UTF-8")); os.flush(); os.close();
+            "CHARTE DE TRANSMISSION STRICTE :\n" +
+            "- Mode HAWKISH / Inflation / Taux Forts = USD fort, US10Y [ACHAT] | GOLD, NASDAQ, SP500, BITCOIN [VENTE].\n" +
+            "- Mode DOVISH / Récession / Injections = USD faible, US10Y [VENTE] | GOLD, NASDAQ, SP500, BITCOIN [ACHAT].\n\n" +
+            
+            "RÈGLES FOREX IMPÉRATIVES (Sens du graphique) :\n" +
+            "- USD fort = AUDUSD, EURUSD, GBPUSD en [VENTE CHOC]\n" +
+            "- USD fort = USDCAD, USDJPY en [ACHAT CHOC] (L'USD est la devise de base, le graphique monte)\n\n" +
+            
+            "FORMAT DE RÉPONSE ATTENDU (Strict, direct, aucune phrase d'introduction, aucun blabla) :\n\n" +
+            "🚨 [CHOC MACRO : INSÉRER NOM DU DRIVER EX: CPI / FOMC / MINUTES]\n" +
+            "📊 CONVICTION ALGORITHMIQUE : [█████] 100% (adapter le pourcentage et la jauge selon l'importance de la news)\n" +
+            "🎯 VECTEUR CENTRAL : [HAWKISH / DOVISH / GÉOPOLITIQUE]\n\n" +
+            "--- IMPACTS ACTIFS INTER-MARCHÉS ---\n" +
+            "• GOLD   : [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n" +
+            "• NASDAQ : [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n" +
+            "• SP500  : [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n" +
+            "• USOIL  : [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n" +
+            "• US10Y  : [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n" +
+            "• BITCOIN: [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n" +
+            "• EURUSD : [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n" +
+            "• GBPUSD : [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n" +
+            "• AUDUSD : [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n" +
+            "• USDCAD : [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n" +
+            "• USDJPY : [VENTE CHOC / ACHAT CHOC / NEUTRE] | Justification technique en 5 mots.\n\n" +
+            "🏁 FLUX DIRECTIONNEL GLOBAL : [HAUSSIER / BAISSIER / STABLE]"
+        ));
 
-            if (conn.getResponseCode() == 200) {
-                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                StringBuilder r = new StringBuilder(); String l;
-                while ((l = br.readLine()) != null) r.append(l); br.close();
+        // Transmission des données dynamiques (Le Flux en direct + La mémoire historique contextuelle)
+        messages.put(new JSONObject().put("role", "user").put("content", "Flux : " + feed + "\nMémoire :\n" + history));
+        payload.put("messages", messages);
 
-                String aiResult = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-                sendTelegramSecure("⚡ *ANALYSE DE DRIVER MACRO PONDÉRÉ*\n🕒 " + timeString + "\n📡 Source : " + source + "\n📋 Actifs : " + String.join(", ", assets) + "\n\n" + aiResult);
+        // 4. Envoi de la requête
+        java.io.OutputStream os = conn.getOutputStream();
+        os.write(payload.toString().getBytes("UTF-8"));
+        os.flush(); os.close();
+
+        // 5. Réception et traitement de la réponse Groq
+        if (conn.getResponseCode() == 200) {
+            java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
+            StringBuilder r = new StringBuilder(); String l;
+            while ((l = br.readLine()) != null) r.append(l); br.close();
+
+            String aiResult = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+
+            // ✂️ FILTRE DYNAMIQUE ANTI-NEUTRE
+            StringBuilder filteredMessage = new StringBuilder();
+            String[] lines = aiResult.split("\n");
+            int activeSignalsCount = 0;
+
+            for (String line : lines) {
+                // Si la ligne traite d'un actif mais qu'elle est évaluée comme neutre, on la supprime de l'affichage
+                if (line.contains("•") && line.contains("[NEUTRE]")) {
+                    continue; 
+                }
                 
-                eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
-                return true;
+                // On comptabilise et valide uniquement les ruptures macroéconomiques nettes
+                if (line.contains("[ACHAT CHOC]") || line.contains("[VENTE CHOC]")) {
+                    filteredMessage.append(line).append("\n");
+                    activeSignalsCount++;
+                } else if (!line.contains("•")) {
+                    // On préserve la structure graphique globale (Titre, Conviction, Vecteur, Conclusion)
+                    filteredMessage.append(line).append("\n");
+                }
             }
-        } catch (Exception e) { Log.e(TAG, "Échec pipeline unitaire", e); }
-        return false;
-    }
 
+            // 🚀 EXPÉDITION CIBLÉE SUR TELEGRAM
+            // Si la notification ne provoque aucune réaction sur votre portefeuille, le canal reste propre (pas d'envoi inutile)
+            if (activeSignalsCount > 0) {
+                String finalTelegramPayload = "⚡ *ANALYSE DE DRIVER MACRO PONDÉRÉ*\n"
+                        + "🕒 " + timeString + " (Mada)\n" 
+                        + "📡 Source : " + source + "\n" 
+                        + "📋 Actifs Impactés : " + activeSignalsCount + "/11\n\n" 
+                        + filteredMessage.toString().trim();
+                        
+                sendTelegramSecure(finalTelegramPayload);
+            } else {
+                Log.d(TAG, "Filtrage exécuté : Aucun mouvement d'intensité détecté sur les 11 actifs.");
+            }
+
+            // 🏁 MISE À JOUR DE LA BASE DE DONNÉES LOCALES (Archivage du statut)
+            eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
+            return true;
+        } else {
+            Log.e(TAG, "Erreur API Groq Code : " + conn.getResponseCode());
+        }
+     } catch (Exception e) { 
+        Log.e(TAG, "Échec critique du pipeline d'analyse macro", e); 
+     }
+     return false;
+    }
     /**
      * 📋 CARTOGRAPHIE EXACTE ET INTELLIGENTE DES ACTIFS DU PORTEFOUILLE
      */
