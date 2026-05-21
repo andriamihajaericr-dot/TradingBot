@@ -180,9 +180,9 @@ public class NotificationService extends NotificationListenerService {
             Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
             String todayStr = dateFormat.format(cal.getTime());
             cal.add(Calendar.DAY_OF_YEAR, -2);
-            String sevenDaysAgoStr = dateFormat.format(cal.getTime());
+            String twoDaysAgoStr = dateFormat.format(cal.getTime());
 
-            URL url = new URL(String.format(ECONOMIC_CALENDAR_URL, sevenDaysAgoStr, todayStr));
+            URL url = new URL(String.format(ECONOMIC_CALENDAR_URL, twoDaysAgoStr, todayStr));
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(8000);
 
