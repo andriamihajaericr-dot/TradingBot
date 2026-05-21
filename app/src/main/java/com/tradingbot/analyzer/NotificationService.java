@@ -174,7 +174,7 @@ public class NotificationService extends NotificationListenerService {
 
     private void fetchMissingDataFromInstitutionalAPI() {
         try {
-            if (MACRO_API_KEY.equals("VOTRE_CLE_API_MACRO_GRATUITE")) return;
+            if (MACRO_API_KEY.equals("ykVnU2LFYM8nT6qj6aJlZZSWaMsciVJj")) return;
 
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
             Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
