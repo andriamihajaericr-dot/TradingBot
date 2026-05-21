@@ -179,7 +179,7 @@ public class NotificationService extends NotificationListenerService {
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
             Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
             String todayStr = dateFormat.format(cal.getTime());
-            cal.add(Calendar.DAY_OF_YEAR, -7);
+            cal.add(Calendar.DAY_OF_YEAR, -2);
             String sevenDaysAgoStr = dateFormat.format(cal.getTime());
 
             URL url = new URL(String.format(ECONOMIC_CALENDAR_URL, sevenDaysAgoStr, todayStr));
