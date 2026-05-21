@@ -56,7 +56,8 @@ public class SystemMonitor {
             sb.append("• ").append(getAssetEmoji(asset)).append(" ").append(asset).append(" : ").append(count).append(" analyses générées\n")
         );
         
-        NotificationService.sendTelegramSecure(sb.toString());
+        // Correctif de l'erreur 1 : Ajout de l'instance de contexte (MainActivity.instance) pour l'appel sécurisé POST
+        NotificationService.sendTelegramSecure(sb.toString(), MainActivity.instance);
     }
     
     public static void resetDailyCounters() {
@@ -80,7 +81,9 @@ public class SystemMonitor {
     }
     
     private static void sendSystemAlert(String message) {
-        NotificationService.sendTelegramSecure("🔧 " + message);
+        // Correctif de l'erreur 2 : Ajout de l'instance de contexte (MainActivity.instance) pour la méthode d'alerte système
+        NotificationService.sendTelegramSecure("🔧 " + message, MainActivity.instance);
+        
         if (MainActivity.instance != null) {
             MainActivity.instance.addLog("[MONITOR] " + message);
         }
