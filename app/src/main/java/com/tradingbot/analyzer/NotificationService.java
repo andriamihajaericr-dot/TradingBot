@@ -45,7 +45,6 @@ public class NotificationService extends NotificationListenerService {
                 
                 if (token.isEmpty() || chatId.isEmpty()) return;
                 
-                // Utilisation impérative de POST pour supporter les longs payloads Markdown de Groq
                 URL url = new URL("https://api.telegram.org/bot" + token + "/sendMessage");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -172,10 +171,9 @@ public class NotificationService extends NotificationListenerService {
                         List<String> assets = Arrays.asList(assetsStr.split(", "));
                         String historyContext = eventDb.getRecentEventsForAssets(assets, 5);
 
-                        // Analyse du pipeline
                         boolean success = executeAnalysisPipeline(source, feed, historyContext, assets, timestamp, fingerprint);
                         if (!success) {
-                            Log.w(TAG, "Échec de traitement du nœud : " + fingerprint + ". On continue pour éviter de bloquer la queue.");
+                            Log.w(TAG, "Échec de traitement du nœud : " + fingerprint);
                         }
 
                     } while (cursor.moveToNext());
@@ -303,7 +301,7 @@ public class NotificationService extends NotificationListenerService {
                 String tgChatId = prefs.getString("tg_chat_id", "");
 
                 if (apiKey.isEmpty() || tgToken.isEmpty() || tgChatId.isEmpty()) {
-                    Log.e(TAG, "Échec pipeline : Configurations ou clés API manquantes.");
+                    Log.e(TAG, "Échec pipeline : Configurations manquantes.");
                     return false;
                 }
 
@@ -324,23 +322,26 @@ public class NotificationService extends NotificationListenerService {
                 payload.put("model", GROQ_MODEL);
                 payload.put("temperature", 0.02);
 
+                // --- OPTIMISATION DU SYSTEM PROMPT POUR INCLURE LES CAUSES/RAISONS ---
                 JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content", 
-                    "Terminal trading quantitatif. Synthèse ultra-concise.\n\n" +
-                    "RÈGLES :\n" +
-                    "- USD FORT = AUDUSD/EURUSD/GBPUSD [VENTE] | USDCAD/USDJPY [ACHAT]\n" +
-                    "- USD FAIBLE = inverse\n\n" +
-                    "FORMAT STRICT :\n" +
-                    "🚨 [NOM DRIVER]\n" +
+                    "Tu es un terminal de trading macro-quantitatif ultra-précis.\n" +
+                    "Analyse le flux d'actualité fourni. Extrais d'abord le fait marquant précis (la cause).\n" +
+                    "Ensuite, pour chaque actif impacté, donne l'action ET la raison logique concise (max 7 mots par actif).\n\n" +
+                    "RÈGLES DE DIRECTIONNALITÉ :\n" +
+                    "- USD FORT (Hawkish / Chiffres US robustes) = GOLD, EURUSD, GBPUSD, AUDUSD, NASDAQ, SP500, BITCOIN [VENTE] | US10Y, USDCAD, USDJPY [ACHAT]\n" +
+                    "- USD FAIBLE (Dovish / Chiffres US mauvais) = Inverse\n\n" +
+                    "FORMAT REQUIS STRICT (respecte scrupuleusement les balises et sauts de ligne) :\n" +
+                    "🚨 [NOM DE L'EMETTEUR OU DRIVER]\n" +
                     "📊 CONVICTION : [█████] XX%\n" +
-                    "🎯 VECTEUR : [HAWKISH/DOVISH/GÉO]\n\n" +
-                    "--- IMPACTS ---\n" +
-                    "• ACTIF : [ACHAT CHOC/VENTE CHOC/NEUTRE] | 5 mots max\n" +
-                    "(11 actifs: GOLD, NASDAQ, SP500, USOIL, US10Y, BITCOIN, EURUSD, GBPUSD, AUDUSD, USDCAD, USDJPY)\n\n" +
+                    "🎯 VECTEUR : [HAWKISH/DOVISH/GÉO/LIQUIDITÉ]\n" +
+                    "📢 FAIT MARQUANT : [Traduis et résume brièvement en français ce qui vient de se passer ou ce qui a été dit]\n\n" +
+                    "--- IMPACTS ACQUISITION ---\n" +
+                    "• [NOM_ACTIF] : [ACHAT CHOC ou VENTE CHOC ou NEUTRE] | [Raison courte en français]\n\n" +
                     "🏁 FLUX : [HAUSSIER/BAISSIER/STABLE]"
                 ));
 
-                messages.put(new JSONObject().put("role", "user").put("content", "Flux : " + feed + "\nMémoire :\n" + history));
+                messages.put(new JSONObject().put("role", "user").put("content", "Flux brut reçu : " + feed + "\nMémoire contextuelle :\n" + history));
                 payload.put("messages", messages);
 
                 OutputStream os = conn.getOutputStream();
@@ -358,10 +359,10 @@ public class NotificationService extends NotificationListenerService {
                     String aiResult = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 
                     if (aiResult.isEmpty() || aiResult.length() < 50) {
-                        Log.e(TAG, "Réponse API invalide ou trop courte");
                         throw new Exception("Invalid API response");
                     }
 
+                    // Filtrage des lignes pour nettoyer l'affichage Telegram
                     StringBuilder filteredMessage = new StringBuilder();
                     String[] lines = aiResult.split("\n");
                     int activeSignalsCount = 0;
@@ -382,42 +383,31 @@ public class NotificationService extends NotificationListenerService {
                     }
 
                     if (neutralCount > 8) {
-                        Log.d(TAG, "Événement sans impact significatif (9/11 neutres) - Filtré");
                         eventDb.markEventAsSynced(fingerprint, "FILTERED_NEUTRAL");
                         return true;
                     }
 
                     if (activeSignalsCount > 0) {
-                        String finalPayload = "⚡ *ANALYSE DRIVER MACRO*\n"
+                        String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n"
                                 + "🕒 " + timeString + " (Mada)\n" 
                                 + "📡 Source : " + source + "\n" 
-                                + "📋 Actifs : " + activeSignalsCount + "/11\n\n" 
                                 + filteredMessage.toString().trim();
                                 
                         sendTelegramSecure(finalPayload, this);
-                    } else {
-                        Log.d(TAG, "Aucun mouvement haute intensité détecté.");
                     }
 
                     eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
                     return true;
                     
                 } else {
-                    Log.e(TAG, "Erreur API Groq : " + conn.getResponseCode());
                     throw new Exception("API Error: " + conn.getResponseCode());
                 }
                 
             } catch (Exception e) { 
                 attempt++;
                 Log.e(TAG, "Tentative " + attempt + "/" + maxRetries + " échouée", e);
-                
                 if (attempt < maxRetries) {
-                    try {
-                        Thread.sleep(2000 * attempt); // Backoff exponentiel
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        return false;
-                    }
+                    try { Thread.sleep(2000 * attempt); } catch (InterruptedException ie) { return false; }
                 }
             }
         }
@@ -435,7 +425,7 @@ public class NotificationService extends NotificationListenerService {
         if (upper.contains("BITCOIN") || upper.contains("BTC") || upper.contains("CRYPTO")) assets.add("BITCOIN");
         if (upper.contains("YIELD") || upper.contains("US10Y") || upper.contains("BOND") || upper.contains("TREASURY")) assets.add("US10Y");
         if (upper.contains("EUR ") || upper.contains("EURUSD") || upper.contains("ECB") || upper.contains("EUROZONE")) assets.add("EURUSD");
-        if (upper.contains("GBP") || upper.contains("GBPUSD") || upper.contains("CABLE") || upper.contains("BOE")) assets.add("GBPUSD");
+        if (upper.contains("GBP") || upper.contains("GBPUSD") || upper.contains("CABLE") || open.contains("BOE")) assets.add("GBPUSD");
         if (upper.contains("AUD") || upper.contains("AUDUSD") || upper.contains("AUSSIE") || upper.contains("RBA")) assets.add("AUDUSD");
         if (upper.contains("CAD") || upper.contains("USDCAD") || upper.contains("LOONIE") || upper.contains("BOC")) assets.add("USDCAD");
         if (upper.contains("JPY") || upper.contains("USDJPY") || upper.contains("YEN") || upper.contains("BOJ")) assets.add("USDJPY");
