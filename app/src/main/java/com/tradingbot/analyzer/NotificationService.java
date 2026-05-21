@@ -199,7 +199,7 @@ public class NotificationService extends NotificationListenerService {
                             Log.w(TAG, "Échec de traitement du nœud : " + fingerprint);
                         }
 
-                    } sidewhile (cursor.moveToNext());
+                    } while (cursor.moveToNext());
                 }
             } catch (Exception e) { 
                 Log.e(TAG, "Erreur synchronisation réseau", e); 
@@ -355,20 +355,46 @@ public class NotificationService extends NotificationListenerService {
                     "CONSIGNE FAIT MARQUANT : Ne fais pas de généralité. Précise la dynamique ou posture exacte (ex: au lieu de 'Barkin s'exprime', écris 'Barkin (FED) constate une inflation sous contrôle, validant le maintien des taux actuels').\n\n" +
                     "RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS STRICTES :\n" +
                     "- SI VECTEUR = HAWKISH (USD FORT / Chiffres robustes / Inflation haute / Discours restrictif) :\n" +
-                    "  • ACHAT CHOC -> US10Y, USDCAD, USDJPY\n" +
-                    "  • VENTE CHOC -> GOLD, NASDAQ, SP500, BITCOIN, EURUSD, GBPUSD, AUDUSD\n\n" +
+                    "  • 📈 US10Y : ACHAT CHOC 🟢\n" +
+                    "  • 🇨🇦 USDCAD : ACHAT CHOC 🟢\n" +
+                    "  • 🇯🇵 USDJPY : ACHAT CHOC 🟢\n" +
+                    "  • 🏆 GOLD : VENTE CHOC 🔴\n" +
+                    "  • 💻 NASDAQ : VENTE CHOC 🔴\n" +
+                    "  • 📊 SP500 : VENTE CHOC 🔴\n" +
+                    "  • ₿ BITCOIN : VENTE CHOC 🔴\n" +
+                    "  • 🇪🇺 EURUSD : VENTE CHOC 🔴\n" +
+                    "  • 🇬🇧 GBPUSD : VENTE CHOC 🔴\n" +
+                    "  • 🇦🇺 AUDUSD : VENTE CHOC 🔴\n\n" +
                     "- SI VECTEUR = DOVISH (USD FAIBLE / Chiffres mauvais / Taux en baisse / Discours accommodant) :\n" +
-                    "  • ACHAT CHOC -> GOLD, NASDAQ, SP500, BITCOIN, EURUSD, GBPUSD, AUDUSD\n" +
-                    "  • VENTE CHOC -> US10Y, USDCAD, USDJPY\n\n" +
-                    "FORMAT REQUIS STRICT (respecte scrupuleusement les balises et sauts de ligne) :\n" +
+                    "  • 🏆 GOLD : ACHAT CHOC 🟢\n" +
+                    "  • 💻 NASDAQ : ACHAT CHOC 🟢\n" +
+                    "  • 📊 SP500 : ACHAT CHOC 🟢\n" +
+                    "  • ₿ BITCOIN : ACHAT CHOC 🟢\n" +
+                    "  • 🇪🇺 EURUSD : ACHAT CHOC 🟢\n" +
+                    "  • 🇬🇧 GBPUSD : ACHAT CHOC 🟢\n" +
+                    "  • 🇦🇺 AUDUSD : ACHAT CHOC 🟢\n" +
+                    "  • 📈 US10Y : VENTE CHOC 🔴\n" +
+                    "  • 🇨🇦 USDCAD : VENTE CHOC 🔴\n" +
+                    "  • 🇯🇵 USDJPY : VENTE CHOC 🔴\n\n" +
+                    "CONSIGNE JAUGE CONVICTION : Calcule la jauge visuelle (5 cercles) basée sur le pourcentage de conviction :\n" +
+                    "- XX% < 40 : ⚪⚪⚪⚪⚪\n" +
+                    "- 41 < XX% < 60 : 🟠🟠🟠⚪⚪\n" +
+                    "- 61 < XX% < 80 : 🟡🟡🟡🟡⚪\n" +
+                    "- XX% > 81 : 🔴🔴🔴🔴🔴\n\n" +
+                    "FORMAT REQUIS STRICT (respecte scrupuleusement les balises, emojis et sauts de ligne) :\n" +
                     "🚨 [NOM DE L'EMETTEUR OU DRIVER]\n" +
-                    "📊 CONVICTION : [█████] XX%\n" +
+                    "📊 CONVICTION : [JAUGE_VISUELLE] XX%\n" +
                     "🎯 VECTEUR : [HAWKISH/DOVISH/GÉO/LIQUIDITÉ]\n" +
                     "📢 FAIT MARQUANT : [Traduis et résume précisément la posture ou le chiffre clé en français]\n\n" +
                     "--- IMPACTS ACQUISITION ---\n" +
-                    "• [NOM_ACTIF] : [ACHAT CHOC ou VENTE CHOC ou NEUTRE] | [Raison logique courte en français]\n\n" +
-                    "🏁 FLUX VALIDÉ : [DOLLAR FORT (MKT RISK-OFF) ou DOLLAR FAIBLE (MKT RISK-ON) ou NEUTRE]"
+                    "• [PICTOGRAMME_ACTIF] : [ACHAT CHOC 🟢 ou VENTE CHOC 🔴 ou NEUTRE] | [Raison logique courte en français]\n\n" +
+                    "🏁 FLUX VALIDÉ : [DOLLAR FORT (MKT RISK-OFF) 🐻 ou DOLLAR FAIBLE (MKT RISK-ON) 🐂 ou NEUTRE ⚖️]"
                 ));
+
+                String assetSpecs = "Spécifications strictes des Pictogrammes d'Actifs à insérer devant chaque ligne :\n" +
+                                    "GOLD: 🏆, USOIL: 🛢️, NASDAQ: 💻, SP500: 📊, US10Y: 📈, BITCOIN: ₿, " +
+                                    "EURUSD: 🇪🇺, GBPUSD: 🇬🇧, AUDUSD: 🇦🇺, USDCAD: 🇨🇦, USDJPY: 🇯🇵";
+                messages.put(new JSONObject().put("role", "system").put("content", assetSpecs));
 
                 messages.put(new JSONObject().put("role", "user").put("content", "Flux brut reçu : " + feed + "\nMémoire contextuelle :\n" + history));
                 payload.put("messages", messages);
