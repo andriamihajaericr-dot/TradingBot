@@ -36,6 +36,10 @@ public class NotificationService extends NotificationListenerService {
     private EventDatabase eventDb;
     private volatile boolean isSyncing = false;
 
+    // Gestion du filtre anti-spam pour les discours de banquiers centraux
+    private long lastSpeechTime = 0;
+    private String lastSpeaker = "";
+
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
             try {
@@ -99,6 +103,25 @@ public class NotificationService extends NotificationListenerService {
         else if (packageName.contains("twitter") || packageName.contains("periscope")) sourceName = "X / Twitter";
         else return;
 
+        // Anti-Spam automatique : Détection et filtrage des doublons de banquiers centraux (intervalle de 60s)
+        String upperFeed = unifiedFeed.toUpperCase();
+        long currentTime = System.currentTimeMillis();
+        String currentSpeaker = "";
+
+        if (upperFeed.contains("BARKIN")) currentSpeaker = "BARKIN";
+        else if (upperFeed.contains("GOOLSBEE")) currentSpeaker = "GOOLSBEE";
+        else if (upperFeed.contains("POWELL")) currentSpeaker = "POWELL";
+        else if (upperFeed.contains("LAGARDE")) currentSpeaker = "LAGARDE";
+
+        if (!currentSpeaker.isEmpty()) {
+            if (currentSpeaker.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
+                Log.d(TAG, "Doublon de notification filtré (" + currentSpeaker + ") pour éviter le spam.");
+                return;
+            }
+            lastSpeechTime = currentTime;
+            lastSpeaker = currentSpeaker;
+        }
+
         processIncomingMacroFeed(sourceName, title, text, unifiedFeed, packageName, sbn.getPostTime());
     }
 
@@ -126,7 +149,7 @@ public class NotificationService extends NotificationListenerService {
     private int assignDriverWeight(String text) {
         String u = text.toUpperCase();
         if (u.contains("CPI") || u.contains("INFLATION") || u.contains("NFP") || u.contains("NON-FARM PAYROLLS") || u.contains("FOMC") || u.contains("INTEREST RATE") || u.contains("RBA") || u.contains("BOC") || u.contains("BOJ")) return 5;
-        if (u.contains("GDP") || u.contains("PIB") || u.contains("RETAIL SALES") || u.contains("EMPLOYMENT RATE") || u.contains("STOCKS")) return 4;
+        if (u.contains("GDP") || u.contains("PIB") || u.contains("RETAIL SALES") || u.contains("EMPLOYMENT RATE") || u.contains("STOCKS") || u.contains("JOBLESS")) return 4;
         if (u.contains("PMI") || u.contains("ISM") || u.contains("MICHIGAN")) return 3;
         return 1;
     }
@@ -176,7 +199,7 @@ public class NotificationService extends NotificationListenerService {
                             Log.w(TAG, "Échec de traitement du nœud : " + fingerprint);
                         }
 
-                    } while (cursor.moveToNext());
+                    } sidewhile (cursor.moveToNext());
                 }
             } catch (Exception e) { 
                 Log.e(TAG, "Erreur synchronisation réseau", e); 
@@ -322,27 +345,29 @@ public class NotificationService extends NotificationListenerService {
                 payload.put("model", GROQ_MODEL);
                 payload.put("temperature", 0.02);
 
-                // --- OPTIMISATION DU SYSTEM PROMPT POUR INCLURE LES CAUSES/RAISONS ---
                 JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content", 
                     "Tu es un terminal de trading macro-quantitatif ultra-précis.\n" +
                     "Analyse le flux d'actualité fourni. Extrais d'abord le fait marquant précis (la cause).\n" +
-                    "Ensuite, pour chaque actif impacté, donne l'action ET la raison logique concise (max 7 mots par actif).\n\n" +
+                    "Détermine le VECTEUR principal par rapport à l'impact MAJEUR de la news.\n\n" +
+                    "Ensuite, pour chaque actif impacté, donne l'action ET la raison logique concise (max 7 mots par actif).\n" +
+                    "ATTENTION COHÉRENCE : Ta raison par actif doit obligatoirement découler logiquement du FAIT MARQUANT. Ne confonds pas la baisse d'une statistique et l'impact de marché.\n" +
+                    "CONSIGNE FAIT MARQUANT : Ne fais pas de généralité. Précise la dynamique ou posture exacte (ex: au lieu de 'Barkin s'exprime', écris 'Barkin (FED) constate une inflation sous contrôle, validant le maintien des taux actuels').\n\n" +
                     "RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS STRICTES :\n" +
-                    "- SI VECTEUR = HAWKISH (USD FORT / Chiffres robustes) :\n" +
+                    "- SI VECTEUR = HAWKISH (USD FORT / Chiffres robustes / Inflation haute / Discours restrictif) :\n" +
                     "  • ACHAT CHOC -> US10Y, USDCAD, USDJPY\n" +
                     "  • VENTE CHOC -> GOLD, NASDAQ, SP500, BITCOIN, EURUSD, GBPUSD, AUDUSD\n\n" +
-                    "- SI VECTEUR = DOVISH (USD FAIBLE / Chiffres mauvais / Taux en baisse) :\n" +
+                    "- SI VECTEUR = DOVISH (USD FAIBLE / Chiffres mauvais / Taux en baisse / Discours accommodant) :\n" +
                     "  • ACHAT CHOC -> GOLD, NASDAQ, SP500, BITCOIN, EURUSD, GBPUSD, AUDUSD\n" +
                     "  • VENTE CHOC -> US10Y, USDCAD, USDJPY\n\n" +
                     "FORMAT REQUIS STRICT (respecte scrupuleusement les balises et sauts de ligne) :\n" +
                     "🚨 [NOM DE L'EMETTEUR OU DRIVER]\n" +
                     "📊 CONVICTION : [█████] XX%\n" +
                     "🎯 VECTEUR : [HAWKISH/DOVISH/GÉO/LIQUIDITÉ]\n" +
-                    "📢 FAIT MARQUANT : [Traduis et résume brièvement en français ce qui vient de se passer ou ce qui a été dit]\n\n" +
+                    "📢 FAIT MARQUANT : [Traduis et résume précisément la posture ou le chiffre clé en français]\n\n" +
                     "--- IMPACTS ACQUISITION ---\n" +
-                    "• [NOM_ACTIF] : [ACHAT CHOC ou VENTE CHOC ou NEUTRE] | [Raison courte en français]\n\n" +
-                    "🏁 FLUX : [HAUSSIER/BAISSIER/STABLE]"
+                    "• [NOM_ACTIF] : [ACHAT CHOC ou VENTE CHOC ou NEUTRE] | [Raison logique courte en français]\n\n" +
+                    "🏁 FLUX VALIDÉ : [DOLLAR FORT (MKT RISK-OFF) ou DOLLAR FAIBLE (MKT RISK-ON) ou NEUTRE]"
                 ));
 
                 messages.put(new JSONObject().put("role", "user").put("content", "Flux brut reçu : " + feed + "\nMémoire contextuelle :\n" + history));
@@ -366,7 +391,6 @@ public class NotificationService extends NotificationListenerService {
                         throw new Exception("Invalid API response");
                     }
 
-                    // Filtrage des lignes pour nettoyer l'affichage Telegram
                     StringBuilder filteredMessage = new StringBuilder();
                     String[] lines = aiResult.split("\n");
                     int activeSignalsCount = 0;
