@@ -328,7 +328,6 @@ public class NotificationService extends NotificationListenerService {
                     "Tu es un terminal de trading macro-quantitatif ultra-précis.\n" +
                     "Analyse le flux d'actualité fourni. Extrais d'abord le fait marquant précis (la cause).\n" +
                     "Ensuite, pour chaque actif impacté, donne l'action ET la raison logique concise (max 7 mots par actif).\n\n" +
-                    // Remplacez cette section dans le System Prompt de votre NotificationService.java
                     "RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS STRICTES :\n" +
                     "- SI VECTEUR = HAWKISH (USD FORT / Chiffres robustes) :\n" +
                     "  • ACHAT CHOC -> US10Y, USDCAD, USDJPY\n" +
