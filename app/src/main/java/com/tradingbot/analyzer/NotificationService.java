@@ -362,10 +362,10 @@ public class NotificationService extends NotificationListenerService {
                     "B. RÈGLE SPÉCIFIQUE BANQUES CENTRALES ÉTRANGÈRES & REFUGE (JAPON, EUROPE, UK, CANADA, AUSTRALIE) :\n" +
                     "   - Rappel mathématique Forex : Pour EURUSD, GBPUSD, AUDUSD, une hausse de la devise = ACHAT 🟢. Pour USDCAD, USDJPY, une hausse de la devise locale (JPY, CAD) = VENTE 🔴 (car l'USD baisse face à elles).\n\n" +
                     "   - PROTECTION INFLATION / HAUSSE DE TAUX (Vecteur HAWKISH étranger) :\n" +
-                    "     Si une Banque Centrale hors USA hausse le ton ou monte ses taux pour contrer l'inflation, sa devise se RENFORCE :\n" +
-                    "     • 🇪🇺 Europe Hawkish (BCE) -> L'Euro monte -> Donc 🇪🇺 EURUSD : ACHAT CHOC 🟢\n" +
-                    "     • 🇬🇧 UK Hawkish (BoE) -> La GBP monte -> Donc 🇬🇧 GBPUSD : ACHAT CHOC 🟢\n" +
-                    "     • 🇯🇵 Japon Hawkish (BoJ) -> Le JPY monte -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴\n" +
+                    "     Si une Banque Centrale hors USA (comme la BCE) monte ses taux ou tient un discours Hawkish, l'impact est STRICTEMENT LOCALISÉ à sa propre devise face à l'USD. Cela NE crée PAS de mouvement de panique général sur les paires cross ou les indices américains :\n" +
+                    "     • 🇪🇺 Si Europe Hawkish (BCE) -> Seul l'Euro monte face au Dollar -> Donc 🇪🇺 EURUSD : ACHAT CHOC 🟢. Tous les autres actifs du Forex (🇬🇧, 🇦🇺, 🇨🇦, 🇯🇵), les indices US (💻, 📊) et les taux US (📈) restent strictement NEUTRES.\n" +
+                    "     • 🇬🇧 Si UK Hawkish (BoE) -> Seule la GBP monte face au Dollar -> Donc 🇬🇧 GBPUSD : ACHAT CHOC 🟢. Les autres actifs restent NEUTRES.\n" +
+                    "     • 🇯🇵 Si Japon Hawkish (BoJ) -> Seul le JPY monte face au Dollar -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴 (car la paire baisse). Les autres actifs restent NEUTRES.\n\n"                                                     
                     "     • 🇨🇦 Canada Hawkish (BoC) -> Le CAD monte -> Donc 🇨🇦 USDCAD : VENTE CHOC 🔴\n" +
                     "     • 🇦🇺 Australie Hawkish (RBA) -> L'AUD monte -> Donc 🇦🇺 AUDUSD : ACHAT CHOC 🟢\n\n" +
                     "   - BAISSE D'INFLATION / STRATÉGIE ACCOMMODANTE (Vecteur DOVISH étranger) :\n" +
