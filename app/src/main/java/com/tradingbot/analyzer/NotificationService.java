@@ -344,7 +344,6 @@ public class NotificationService extends NotificationListenerService {
                 JSONObject payload = new JSONObject();
                 payload.put("model", GROQ_MODEL);
                 payload.put("temperature", 0.02);
-
                 JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content", 
                     "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
@@ -354,26 +353,33 @@ public class NotificationService extends NotificationListenerService {
                     "2. RANG SECONDAIRE : Croissance (PIB/GDP), Indicateurs d'activité (PMI, ISM).\n" +
                     "3. RANG TACTIQUE : Géopolitique (GÉO), Rumeurs de marché, Sentiment.\n\n" +
                     "RÈGLE DE CONTRADICTION TEMPORELLE :\n" +
-                    "Si l'historique récent (moins de 30 min) montre un flux inverse (ex: RISK-ON puis soudain RISK-OFF), tu doit impérativement ARBITRER.\n" +
+                    "Si l'historique récent (moins de 30 min) montre un flux inverse (ex: RISK-ON puis soudain RISK-OFF), tu dois impérativement ARBITRER.\n" +
                     "Si la nouvelle news est d'un RANG SUPÉRIEUR à la précédente, écris explicitement dans le Fait Marquant que ce nouveau driver ANNU LE ET REMPLACE le sentiment précédent.\n\n" +
                     "RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS STRICTES (LIÉE À L'ÉMETTEUR) :\n" +
                     "A. SI LA NEWS CONCERNE LES ETATS-UNIS (OU GLOBAL CONTEXT) :\n" +
                     "   - VECTEUR = HAWKISH US : 📈 US10Y(🟢 ACHAT CHOC), 🇨🇦 USDCAD(🟢 ACHAT CHOC), 🇯🇵 USDJPY(🟢 ACHAT CHOC). Tous les autres actifs (🏆, 💻, 📊, ₿, 🇪🇺, 🇬🇧, 🇦🇺) sont 🔴 VENTE CHOC.\n" +
                     "   - VECTEUR = DOVISH US : 🏆 GOLD, 💻 NASDAQ, 📊 SP500, ₿ BITCOIN, 🇪🇺 EURUSD, 🇬🇧 GBPUSD, 🇦🇺 AUDUSD sont 🟢 ACHAT CHOC. Les taux/dollars (📈 US10Y, 🇨🇦 USDCAD, 🇯🇵 USDJPY) sont 🔴 VENTE CHOC.\n\n" +
-                    "B. RÈGLE SPÉCIFIQUE BANQUES CENTRALES ÉTRANGÈRES (JAPON, EUROPE, UK, CANADA, AUSTRALIE) :\n" +
-                    "   - Si l'inflation ou les taux BAISSENT hors USA (Vecteur DOVISH local), la devise locale faiblit mécaniquement face au Dollar :\n" +
-                    "     • 🇨🇦 Si BoC/CPI Canada est DOVISH -> Le CAD baisse -> Donc 🇨🇦 USDCAD : ACHAT CHOC 🟢\n" +
-                    "     • 🇯🇵 Si BoJ/CPI Japon est DOVISH -> Le JPY baisse -> Donc 🇯🇵 USDJPY : ACHAT CHOC 🟢\n" +
-                    "     • 🇪🇺 Si BCE/CPI Europe est DOVISH -> L'EURO baisse -> Donc 🇪🇺 EURUSD : VENTE CHOC 🔴\n" +
-                    "     • 🇬🇧 Si BoE/CPI UK est DOVISH -> La GBP baisse -> Donc 🇬🇧 GBPUSD : VENTE CHOC 🔴\n" +
-                    "     • 🇦🇺 Si RBA/CPI Australie est DOVISH -> L'AUD baisse -> Donc 🇦🇺 AUDUSD : VENTE CHOC 🔴\n\n" +
-                    "   - Si l'inflation ou les taux MONTENT hors USA (Vecteur HAWKISH local), la devise locale se renforce face au Dollar :\n" +
-                    "     • 🇨🇦 Si Canada est HAWKISH -> Le CAD monte -> Donc 🇨🇦 USDCAD : VENTE CHOC 🔴\n" +
-                    "     • 🇯🇵 Si Japon est HAWKISH -> Le JPY monte -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴\n" +
-                    "     • 🇪🇺 Si Europe est HAWKISH -> L'EURO monte -> Donc 🇪🇺 EURUSD : ACHAT CHOC 🟢\n" +
-                    "     • 🇬🇧 Si UK est HAWKISH -> La GBP monte -> Donc 🇬🇧 GBPUSD : ACHAT CHOC 🟢\n" +
-                    "     • 🇦🇺 Si Australie est HAWKISH -> L'AUD monte -> Donc 🇦🇺 AUDUSD : ACHAT CHOC 🟢\n\n" +
-                    "   - Rappel : Si la news est étrangère, les indices américains (💻 NASDAQ, 📊 SP500) et taux US (📈 US10Y) restent NEUTRES, sauf si l'événement secoue l'économie mondiale globale.\n\n" +
+                    "B. RÈGLE SPÉCIFIQUE BANQUES CENTRALES ÉTRANGÈRES & REFUGE (JAPON, EUROPE, UK, CANADA, AUSTRALIE) :\n" +
+                    "   - Rappel mathématique Forex : Pour EURUSD, GBPUSD, AUDUSD, une hausse de la devise = ACHAT 🟢. Pour USDCAD, USDJPY, une hausse de la devise locale (JPY, CAD) = VENTE 🔴 (car l'USD baisse face à elles).\n\n" +
+                    "   - PROTECTION INFLATION / HAUSSE DE TAUX (Vecteur HAWKISH étranger) :\n" +
+                    "     Si une Banque Centrale hors USA hausse le ton ou monte ses taux pour contrer l'inflation, sa devise se RENFORCE :\n" +
+                    "     • 🇪🇺 Europe Hawkish (BCE) -> L'Euro monte -> Donc 🇪🇺 EURUSD : ACHAT CHOC 🟢\n" +
+                    "     • 🇬🇧 UK Hawkish (BoE) -> La GBP monte -> Donc 🇬🇧 GBPUSD : ACHAT CHOC 🟢\n" +
+                    "     • 🇯🇵 Japon Hawkish (BoJ) -> Le JPY monte -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴\n" +
+                    "     • 🇨🇦 Canada Hawkish (BoC) -> Le CAD monte -> Donc 🇨🇦 USDCAD : VENTE CHOC 🔴\n" +
+                    "     • 🇦🇺 Australie Hawkish (RBA) -> L'AUD monte -> Donc 🇦🇺 AUDUSD : ACHAT CHOC 🟢\n\n" +
+                    "   - BAISSE D'INFLATION / STRATÉGIE ACCOMMODANTE (Vecteur DOVISH étranger) :\n" +
+                    "     Si l'inflation ou les taux baissent hors USA, la devise locale s'affaiblit face au Dollar US :\n" +
+                    "     • 🇪🇺 Europe Dovish (BCE) -> L'Euro baisse -> Donc 🇪🇺 EURUSD : VENTE CHOC 🔴\n" +
+                    "     • 🇬🇧 UK Dovish (BoE) -> La GBP baisse -> Donc 🇬🇧 GBPUSD : VENTE CHOC 🔴\n" +
+                    "     • 🇯🇵 Japon Dovish (BoJ) -> Le JPY baisse -> Donc 🇯🇵 USDJPY : ACHAT CHOC 🟢\n" +
+                    "     • 🇨🇦 Canada Dovish (BoC) -> Le CAD baisse -> Donc 🇨🇦 USDCAD : ACHAT CHOC 🟢\n" +
+                    "     • 🇦🇺 Australie Dovish (RBA) -> L'AUD baisse -> Donc 🇦🇺 AUDUSD : VENTE CHOC 🔴\n\n" +
+                    "   - FLUX DE REFUGE GÉOPOLITIQUE (Vecteur GÉO de panique ou guerre) :\n" +
+                    "     Le Dollar US (USD) et le Yen Japonais (JPY) agissent comme refuges. Face aux autres devises, l'USD gagne, mais face au JPY, le JPY s'apprécie fortement :\n" +
+                    "     • Panique Géo Générale -> Fuite vers le Yen -> Le JPY s'apprécie -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴 (Baisse du graphique, le Yen écrase le Dollar).\n" +
+                    "     • L'Euro (🇪🇺), la Livre (🇬🇧) et l'Australien (🇦🇺) subissent le choc de l'instabilité -> 🔴 VENTE CHOC.\n\n" +
+                    "   - Rappel : Si la news est purement étrangère et locale, les indices américains (💻 NASDAQ, 📊 SP500) et taux US (📈 US10Y) restent NEUTRES, sauf si l'événement secoue l'économie mondiale globale.\n\n" +
                     "CONSIGNE JAUGE CONVICTION :\n" +
                     "- XX% < 40 : ⚪⚪⚪⚪⚪ | 41-60% : 🟠🟠🟠⚪⚪ | 61-80% : 🟡🟡🟡🟡⚪ | >81% : 🔴🔴🔴🔴🔴\n\n" +
                     "FORMAT DE SORTIE STRICT ET OBLIGATOIRE (Respecte chaque symbole et espace) :\n" +
@@ -383,10 +389,10 @@ public class NotificationService extends NotificationListenerService {
                     "📢 FAIT MARQUANT : [Analyse pro en français + Mention d'arbitrage si écrasement d'un driver récent]\n\n" +
                     "--- IMPACTS ACQUISITION ---\n" +
                     "Génère uniquement les actifs REELLEMENT impactés par la news sous cette forme exacte (Exemples) :\n" +
-                    "• 🇯🇵 USDJPY : ACHAT CHOC 🟢 | Inflation japonaise faible reporte la hausse des taux BoJ\n" +
-                    "• 💻 NASDAQ : NEUTRE | Pas d'impact direct des statistiques asiatiques\n" +
-                    "• 📈 US10Y : NEUTRE | Marché obligataire américain stable sur cette annonce\n\n" +
-                    "🏁 FLUX DOMINANT : [Spécifie la dynamique de la devise concernée ex: YEN FAIBLE (MKT RISK-ON) 🐂 ou DOLLAR FORT (MKT RISK-OFF) 🐻]"
+                    "• 🇪🇺 EURUSD : ACHAT CHOC 🟢 | Discours Hawkish de la BCE soutient les rendements de l'Euro\n" +
+                    "• 🇯🇵 USDJPY : VENTE CHOC 🔴 | Le Yen s'apprécie fortement comme actif refuge géopolitique\n" +
+                    "• 💻 NASDAQ : NEUTRE | Pas d'impact direct des statistiques européennes\n\n" +
+                    "🏁 FLUX DOMINANT : [Spécifie la dynamique de la devise concernée ex: EURO FORT (MKT RISK-ON) 🐂 ou DOLLAR FORT (MKT RISK-OFF) 🐻]"
                 ));
 
                 String assetSpecs = "Spécifications strictes des Pictogrammes d'Actifs à insérer devant chaque ligne :\n" +
