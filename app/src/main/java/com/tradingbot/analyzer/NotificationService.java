@@ -301,7 +301,7 @@ public class NotificationService extends NotificationListenerService {
                 StringBuilder r = new StringBuilder(); 
                 String l;
                 while ((l = br.readLine()) != null) r.append(l); 
-                br.close();
+                r.close();
 
                 String analysis = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
                 sendTelegramSecure("🚨 *RAPPORT CRITIQUE DE RATTRAPAGE INTER-MARCHÉS (J+7)*\n\n" + analysis, this);
@@ -347,31 +347,46 @@ public class NotificationService extends NotificationListenerService {
 
                 JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content", 
-                "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
-                "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
-                "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
-                "1. RANG SUPRÊME : Politique Monétaire (HAWKISH/DOVISH), Nominations/Membres Fed, Inflation (CPI), Emploi (NFP).\n" +
-                "2. RANG SECONDAIRE : Croissance (PIB/GDP), Indicateurs d'activité (PMI, ISM).\n" +
-                "3. RANG TACTIQUE : Géopolitique (GÉO), Rumeurs de marché, Sentiment à court terme.\n\n" +
-                "RÈGLE DE CONTRADICTION TEMPORELLE :\n" +
-                "Si l'historique récent (moins de 30 min) montre un flux inverse (ex: RISK-ON puis soudain RISK-OFF), tu dois impérativement ARBITRER.\n" +
-                "Si la nouvelle news est d'un RANG SUPÉRIEUR à la précédente, écris explicitement dans le Fait Marquant que ce nouveau driver ANNU LE ET REMPLACE le sentiment précédent.\n\n" +
-                "RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS STRICTES :\n" +
-                "- SI VECTEUR = HAWKISH : US10Y(📈), USDCAD(🇨🇦), USDJPY(🇯🇵) sont ACHAT CHOC 🟢 | GOLD(🏆), NASDAQ(💻), SP500(📊), BITCOIN(₿), EURUSD(🇪🇺), GBPUSD(🇬🇧), AUDUSD(🇦🇺) sont VENTE CHOC 🔴\n" +
-                "- SI VECTEUR = DOVISH : GOLD(🏆), NASDAQ(💻), SP500(📊), BITCOIN(₿), EURUSD(🇪🇺), GBPUSD(🇬🇧), AUDUSD(🇦🇺) sont ACHAT CHOC 🟢 | US10Y(📈), USDCAD(🇨🇦), USDJPY(🇯🇵) sont VENTE CHOC 🔴\n\n" +
-                "CONSIGNE JAUGE CONVICTION :\n" +
-                "- XX% < 40 : ⚪⚪⚪⚪⚪ | 41-60% : 🟠🟠🟠⚪⚪ | 61-80% : 🟡🟡🟡🟡⚪ | >81% : 🔴🔴🔴🔴🔴\n\n" +
-                "FORMAT DE SORTIE STRICT ET OBLIGATOIRE (Respecte chaque symbole et espace) :\n" +
-                "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
-                "📊 CONVICTION : [JAUGE] XX%\n" +
-                "🎯 VECTEUR CIBLE : [HAWKISH/DOVISH/GÉO/LIQUIDITÉ]\n" +
-                "📢 FAIT MARQUANT : [Analyse pro en français + Mention d'arbitrage si écrasement d'un driver récent]\n\n" +
-                "--- IMPACTS ACQUISITION ---\n" +
-                "Tu dois OBLIGATOIREMENT générer chaque ligne d'actif sous cette forme exacte (Exemples) :\n" +
-                "• 💻 NASDAQ : VENTE CHOC 🔴 | Rendements élevés sous pression\n" +
-                "• 📈 US10Y : ACHAT CHOC 🟢 | Resserrement monétaire anticipé par le marché\n" +
-                "• 🏆 GOLD : VENTE CHOC 🔴 | Dollar fort détruit le support refuge\n\n" +
-                "🏁 FLUX DOMINANT : [DOLLAR FORT (MKT RISK-OFF) 🐻 ou DOLLAR FAIBLE (MKT RISK-ON) 🐂]"
+                    "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
+                    "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
+                    "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
+                    "1. RANG SUPRÊME : Politique Monétaire, Nominations/Membres Banques Centrales, Inflation (CPI), Emploi.\n" +
+                    "2. RANG SECONDAIRE : Croissance (PIB/GDP), Indicateurs d'activité (PMI, ISM).\n" +
+                    "3. RANG TACTIQUE : Géopolitique (GÉO), Rumeurs de marché, Sentiment.\n\n" +
+                    "RÈGLE DE CONTRADICTION TEMPORELLE :\n" +
+                    "Si l'historique récent (moins de 30 min) montre un flux inverse (ex: RISK-ON puis soudain RISK-OFF), tu doit impérativement ARBITRER.\n" +
+                    "Si la nouvelle news est d'un RANG SUPÉRIEUR à la précédente, écris explicitement dans le Fait Marquant que ce nouveau driver ANNU LE ET REMPLACE le sentiment précédent.\n\n" +
+                    "RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS STRICTES (LIÉE À L'ÉMETTEUR) :\n" +
+                    "A. SI LA NEWS CONCERNE LES ETATS-UNIS (OU GLOBAL CONTEXT) :\n" +
+                    "   - VECTEUR = HAWKISH US : 📈 US10Y(🟢 ACHAT CHOC), 🇨🇦 USDCAD(🟢 ACHAT CHOC), 🇯🇵 USDJPY(🟢 ACHAT CHOC). Tous les autres actifs (🏆, 💻, 📊, ₿, 🇪🇺, 🇬🇧, 🇦🇺) sont 🔴 VENTE CHOC.\n" +
+                    "   - VECTEUR = DOVISH US : 🏆 GOLD, 💻 NASDAQ, 📊 SP500, ₿ BITCOIN, 🇪🇺 EURUSD, 🇬🇧 GBPUSD, 🇦🇺 AUDUSD sont 🟢 ACHAT CHOC. Les taux/dollars (📈 US10Y, 🇨🇦 USDCAD, 🇯🇵 USDJPY) sont 🔴 VENTE CHOC.\n\n" +
+                    "B. RÈGLE SPÉCIFIQUE BANQUES CENTRALES ÉTRANGÈRES (JAPON, EUROPE, UK, CANADA, AUSTRALIE) :\n" +
+                    "   - Si l'inflation ou les taux BAISSENT hors USA (Vecteur DOVISH local), la devise locale faiblit mécaniquement face au Dollar :\n" +
+                    "     • 🇨🇦 Si BoC/CPI Canada est DOVISH -> Le CAD baisse -> Donc 🇨🇦 USDCAD : ACHAT CHOC 🟢\n" +
+                    "     • 🇯🇵 Si BoJ/CPI Japon est DOVISH -> Le JPY baisse -> Donc 🇯🇵 USDJPY : ACHAT CHOC 🟢\n" +
+                    "     • 🇪🇺 Si BCE/CPI Europe est DOVISH -> L'EURO baisse -> Donc 🇪🇺 EURUSD : VENTE CHOC 🔴\n" +
+                    "     • 🇬🇧 Si BoE/CPI UK est DOVISH -> La GBP baisse -> Donc 🇬🇧 GBPUSD : VENTE CHOC 🔴\n" +
+                    "     • 🇦🇺 Si RBA/CPI Australie est DOVISH -> L'AUD baisse -> Donc 🇦🇺 AUDUSD : VENTE CHOC 🔴\n\n" +
+                    "   - Si l'inflation ou les taux MONTENT hors USA (Vecteur HAWKISH local), la devise locale se renforce face au Dollar :\n" +
+                    "     • 🇨🇦 Si Canada est HAWKISH -> Le CAD monte -> Donc 🇨🇦 USDCAD : VENTE CHOC 🔴\n" +
+                    "     • 🇯🇵 Si Japon est HAWKISH -> Le JPY monte -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴\n" +
+                    "     • 🇪🇺 Si Europe est HAWKISH -> L'EURO monte -> Donc 🇪🇺 EURUSD : ACHAT CHOC 🟢\n" +
+                    "     • 🇬🇧 Si UK est HAWKISH -> La GBP monte -> Donc 🇬🇧 GBPUSD : ACHAT CHOC 🟢\n" +
+                    "     • 🇦🇺 Si Australie est HAWKISH -> L'AUD monte -> Donc 🇦🇺 AUDUSD : ACHAT CHOC 🟢\n\n" +
+                    "   - Rappel : Si la news est étrangère, les indices américains (💻 NASDAQ, 📊 SP500) et taux US (📈 US10Y) restent NEUTRES, sauf si l'événement secoue l'économie mondiale globale.\n\n" +
+                    "CONSIGNE JAUGE CONVICTION :\n" +
+                    "- XX% < 40 : ⚪⚪⚪⚪⚪ | 41-60% : 🟠🟠🟠⚪⚪ | 61-80% : 🟡🟡🟡🟡⚪ | >81% : 🔴🔴🔴🔴🔴\n\n" +
+                    "FORMAT DE SORTIE STRICT ET OBLIGATOIRE (Respecte chaque symbole et espace) :\n" +
+                    "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
+                    "📊 CONVICTION : [JAUGE] XX%\n" +
+                    "🎯 VECTEUR CIBLE : [HAWKISH/DOVISH/GÉO/LIQUIDITÉ]\n" +
+                    "📢 FAIT MARQUANT : [Analyse pro en français + Mention d'arbitrage si écrasement d'un driver récent]\n\n" +
+                    "--- IMPACTS ACQUISITION ---\n" +
+                    "Génère uniquement les actifs REELLEMENT impactés par la news sous cette forme exacte (Exemples) :\n" +
+                    "• 🇯🇵 USDJPY : ACHAT CHOC 🟢 | Inflation japonaise faible reporte la hausse des taux BoJ\n" +
+                    "• 💻 NASDAQ : NEUTRE | Pas d'impact direct des statistiques asiatiques\n" +
+                    "• 📈 US10Y : NEUTRE | Marché obligataire américain stable sur cette annonce\n\n" +
+                    "🏁 FLUX DOMINANT : [Spécifie la dynamique de la devise concernée ex: YEN FAIBLE (MKT RISK-ON) 🐂 ou DOLLAR FORT (MKT RISK-OFF) 🐻]"
                 ));
 
                 String assetSpecs = "Spécifications strictes des Pictogrammes d'Actifs à insérer devant chaque ligne :\n" +
@@ -450,7 +465,7 @@ public class NotificationService extends NotificationListenerService {
         }
         return false;
     }
-
+    
     private List<String> filterActiveAssets(String text) {
         List<String> assets = new ArrayList<>();
         String upper = text.toUpperCase();
