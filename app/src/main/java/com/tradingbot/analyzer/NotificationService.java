@@ -301,7 +301,7 @@ public class NotificationService extends NotificationListenerService {
                 StringBuilder r = new StringBuilder(); 
                 String l;
                 while ((l = br.readLine()) != null) r.append(l); 
-                r.close();
+                br.close();
 
                 String analysis = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
                 sendTelegramSecure("🚨 *RAPPORT CRITIQUE DE RATTRAPAGE INTER-MARCHÉS (J+7)*\n\n" + analysis, this);
