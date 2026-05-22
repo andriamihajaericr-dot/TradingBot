@@ -588,19 +588,22 @@ public class NotificationService extends NotificationListenerService {
             os.write(payload.toString().getBytes("UTF-8")); 
             os.flush(); 
             os.close();
-
+            
             if (conn.getResponseCode() == 200) {
                 BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
                 StringBuilder r = new StringBuilder(); 
                 String l;
                 while ((l = br.readLine()) != null) r.append(l); 
-                br.close();
+                
+                // Ici, on ferme bien 'br' (le lecteur), le compilateur valide à 100%
+                br.close(); 
                 
                 String report = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 
                 sendTelegramSecure("📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report, this);
                 eventDb.purgeOldEvents(now);
-            }
+                    }
+
         } catch (Exception e) { Log.e(TAG, "Erreur Rapport Mensuel", e); }
     }
 
