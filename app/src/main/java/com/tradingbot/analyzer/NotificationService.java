@@ -360,14 +360,14 @@ public class NotificationService extends NotificationListenerService {
                     "   - VECTEUR = HAWKISH US : 📈 US10Y(🟢 ACHAT CHOC), 🇨🇦 USDCAD(🟢 ACHAT CHOC), 🇯🇵 USDJPY(🟢 ACHAT CHOC). Tous les autres actifs (🏆, 💻, 📊, ₿, 🇪🇺, 🇬🇧, 🇦🇺) sont 🔴 VENTE CHOC.\n" +
                     "   - VECTEUR = DOVISH US : 🏆 GOLD, 💻 NASDAQ, 📊 SP500, ₿ BITCOIN, 🇪🇺 EURUSD, 🇬🇧 GBPUSD, 🇦🇺 AUDUSD sont 🟢 ACHAT CHOC. Les taux/dollars (📈 US10Y, 🇨🇦 USDCAD, 🇯🇵 USDJPY) sont 🔴 VENTE CHOC.\n\n" +
                     "B. RÈGLE SPÉCIFIQUE BANQUES CENTRALES ÉTRANGÈRES & REFUGE (JAPON, EUROPE, UK, CANADA, AUSTRALIE) :\n" +
-                    "   - Rappel mathématique Forex : Pour EURUSD, GBPUSD, AUDUSD, une hausse de la devise = ACHAT 🟢. Pour USDCAD, USDJPY, une hausse de la devise locale (JPY, CAD) = VENTE 🔴 (car l'USD baisse face à elles).\n\n" +
+                    "   - Rappel mathématique Forex : Pour EURUSD, GBPUSD, AUDUSD, une hausse de la devise = ACHAT 🟢. Pour USDCAD, USDJPY, une hausse de la devise locale (JPY, CAD) = VENTE 🔴 car l'USD baisse face à elles.\n\n" +
                     "   - PROTECTION INFLATION / HAUSSE DE TAUX (Vecteur HAWKISH étranger) :\n" +
                     "     Si une Banque Centrale hors USA (comme la BCE) monte ses taux ou tient un discours Hawkish, l'impact est STRICTEMENT LOCALISÉ à sa propre devise face à l'USD. Cela NE crée PAS de mouvement de panique général sur les paires cross ou les indices américains :\n" +
-                    "     • 🇪🇺 Si Europe Hawkish (BCE) -> Seul l'Euro monte face au Dollar -> Donc 🇪🇺 EURUSD : ACHAT CHOC 🟢. Tous les autres actifs du Forex (🇬🇧, 🇦🇺, 🇨🇦, 🇯🇵), les indices US (💻, 📊) et les taux US (📈) restent strictement NEUTRES.\n" +
+                    "     • 🇪🇺 Si Europe Hawkish (BCE) -> Seur l'Euro monte face au Dollar -> Donc 🇪🇺 EURUSD : ACHAT CHOC 🟢. Tous les autres actifs du Forex (🇬🇧, 🇦🇺, 🇨🇦, 🇯🇵), les indices US (💻, 📊) et les taux US (📈) restent strictement NEUTRES.\n" +
                     "     • 🇬🇧 Si UK Hawkish (BoE) -> Seule la GBP monte face au Dollar -> Donc 🇬🇧 GBPUSD : ACHAT CHOC 🟢. Les autres actifs restent NEUTRES.\n" +
-                    "     • 🇯🇵 Si Japon Hawkish (BoJ) -> Seul le JPY monte face au Dollar -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴 (car la paire baisse). Les autres actifs restent NEUTRES.\n\n"                                                     
-                    "     • 🇨🇦 Canada Hawkish (BoC) -> Le CAD monte -> Donc 🇨🇦 USDCAD : VENTE CHOC 🔴\n" +
-                    "     • 🇦🇺 Australie Hawkish (RBA) -> L'AUD monte -> Donc 🇦🇺 AUDUSD : ACHAT CHOC 🟢\n\n" +
+                    "     • 🇯🇵 Si Japon Hawkish (BoJ) -> Le JPY monte face au Dollar -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴. Les autres actifs restent NEUTRES.\n" +
+                    "     • 🇨🇦 Si Canada Hawkish (BoC) -> Le CAD monte face au Dollar -> Donc 🇨🇦 USDCAD : VENTE CHOC 🔴. Les autres actifs restent NEUTRES.\n" +
+                    "     • 🇦🇺 Si Australie Hawkish (RBA) -> L'AUD monte face au Dollar -> Donc 🇦🇺 AUDUSD : ACHAT CHOC 🟢. Les autres actifs restent NEUTRES.\n\n" +
                     "   - BAISSE D'INFLATION / STRATÉGIE ACCOMMODANTE (Vecteur DOVISH étranger) :\n" +
                     "     Si l'inflation ou les taux baissent hors USA, la devise locale s'affaiblit face au Dollar US :\n" +
                     "     • 🇪🇺 Europe Dovish (BCE) -> L'Euro baisse -> Donc 🇪🇺 EURUSD : VENTE CHOC 🔴\n" +
@@ -376,9 +376,9 @@ public class NotificationService extends NotificationListenerService {
                     "     • 🇨🇦 Canada Dovish (BoC) -> Le CAD baisse -> Donc 🇨🇦 USDCAD : ACHAT CHOC 🟢\n" +
                     "     • 🇦🇺 Australie Dovish (RBA) -> L'AUD baisse -> Donc 🇦🇺 AUDUSD : VENTE CHOC 🔴\n\n" +
                     "   - FLUX DE REFUGE GÉOPOLITIQUE (Vecteur GÉO de panique ou guerre) :\n" +
-                    "     Le Dollar US (USD) et le Yen Japonais (JPY) agissent comme refuges. Face aux autres devises, l'USD gagne, mais face au JPY, le JPY s'apprécie fortement :\n" +
-                    "     • Panique Géo Générale -> Fuite vers le Yen -> Le JPY s'apprécie -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴 (Baisse du graphique, le Yen écrase le Dollar).\n" +
-                    "     • L'Euro (🇪🇺), la Livre (🇬🇧) et l'Australien (🇦🇺) subissent le choc de l'instabilité -> 🔴 VENTE CHOC.\n\n" +
+                    "     Le Dollar US et le Yen Japonais agissent comme refuges. Face aux autres devises, l'USD gagne, mais face au JPY, le JPY s'apprécie fortement :\n" +
+                    "     • Panique Géo Générale -> Fuite vers le Yen -> Le JPY s'apprécie -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴. Le Yen écrase le Dollar.\n" +
+                    "     • L'Euro, la Livre et l'Australien subissent le choc de l'instabilité -> 🔴 VENTE CHOC.\n\n" +
                     "   - Rappel : Si la news est purement étrangère et locale, les indices américains (💻 NASDAQ, 📊 SP500) et taux US (📈 US10Y) restent NEUTRES, sauf si l'événement secoue l'économie mondiale globale.\n\n" +
                     "CONSIGNE JAUGE CONVICTION :\n" +
                     "- XX% < 40 : ⚪⚪⚪⚪⚪ | 41-60% : 🟠🟠🟠⚪⚪ | 61-80% : 🟡🟡🟡🟡⚪ | >81% : 🔴🔴🔴🔴🔴\n\n" +
@@ -388,7 +388,7 @@ public class NotificationService extends NotificationListenerService {
                     "🎯 VECTEUR CIBLE : [HAWKISH/DOVISH/GÉO/LIQUIDITÉ]\n" +
                     "📢 FAIT MARQUANT : [Analyse pro en français + Mention d'arbitrage si écrasement d'un driver récent]\n\n" +
                     "--- IMPACTS ACQUISITION ---\n" +
-                    "Génère uniquement les actifs REELLEMENT impactés par la news sous cette forme exacte (Exemples) :\n" +
+                    "Génère uniquement les actifs REELLEMENT impactés par la news sous cette forme exacte :\n" +
                     "• 🇪🇺 EURUSD : ACHAT CHOC 🟢 | Discours Hawkish de la BCE soutient les rendements de l'Euro\n" +
                     "• 🇯🇵 USDJPY : VENTE CHOC 🔴 | Le Yen s'apprécie fortement comme actif refuge géopolitique\n" +
                     "• 💻 NASDAQ : NEUTRE | Pas d'impact direct des statistiques européennes\n\n" +
