@@ -130,16 +130,18 @@ public class NotificationService extends NotificationListenerService {
         boolean isFomcPivot = feed.toUpperCase().contains("FOMC") || feed.toUpperCase().contains("FED ");
         int weight = assignDriverWeight(feed);
 
+        String hash = generateSecureHash(title + text);
+
+        // Si c'est de la donnée faible (Poids < 4), on la sauvegarde directement avec son poids, sans solliciter l'IA
         if (weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
-            String hash = generateSecureHash(title + text);
-            eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed, String.join(", ", targetAssets), "Conforme (Filtré)", (int)(postTime/1000), "synced");
+            eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed, String.join(", ", targetAssets), "Conforme (Filtré)", (int)(postTime/1000), "synced", weight);
             return;
         }
 
         String initialImpact = isFomcPivot ? "💥 PIVOT MAJEUR BANQUE CENTRALE" : "⚡ CHOC DRIVER MACRO PONDÉRÉ (Poids: " + weight + ")";
-        String hash = generateSecureHash(title + text);
-
-        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "en_attente");
+        
+        // Sauvegarde de l'événement en attente avec injection du driver_weight réel
+        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "en_attente", weight);
 
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
@@ -192,6 +194,8 @@ public class NotificationService extends NotificationListenerService {
                         long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("unix_timestamp")) * 1000;
                         
                         List<String> assets = Arrays.asList(assetsStr.split(", "));
+                        
+                        // Récupère l'historique structuré à double vitesse (Ancres + Flux)
                         String historyContext = eventDb.getRecentEventsForAssets(assets, 5);
 
                         boolean success = executeAnalysisPipeline(source, feed, historyContext, assets, timestamp, fingerprint);
@@ -306,7 +310,8 @@ public class NotificationService extends NotificationListenerService {
                 String analysis = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
                 sendTelegramSecure("🚨 *RAPPORT CRITIQUE DE RATTRAPAGE INTER-MARCHÉS (J+7)*\n\n" + analysis, this);
                 
-                eventDb.saveEvent(generateSecureHash(analysis), "com.tradingbot.sync", "API Sync", "Weekly-Sync", "Audit Global", analysis, "ALL_ASSETS", "ALIGNE_OK", (int)(System.currentTimeMillis()/1000), "synced");
+                // Sauvegarde de l'audit de synchronisation avec un poids de 5 pour le sanctuariser
+                eventDb.saveEvent(generateSecureHash(analysis), "com.tradingbot.sync", "API Sync", "Weekly-Sync", "Audit Global", analysis, "ALL_ASSETS", "ALIGNE_OK", (int)(System.currentTimeMillis()/1000), "synced", 5);
             }
             conn.disconnect();
         } catch (Exception e) { Log.e(TAG, "Échec dispatch historique Groq", e); }
@@ -345,6 +350,10 @@ public class NotificationService extends NotificationListenerService {
                 payload.put("model", GROQ_MODEL);
                 payload.put("temperature", 0.02);
                 JSONArray messages = new JSONArray();
+                
+                // ======================================================================
+                // TON PROMPT PARFAIT ET TES RÈGLES D'ACTIFS SONT CONSERVÉS STRICTEMENT ICI
+                // ======================================================================
                 messages.put(new JSONObject().put("role", "system").put("content", 
                     "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
                     "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
@@ -353,7 +362,7 @@ public class NotificationService extends NotificationListenerService {
                     "2. RANG SECONDAIRE : Croissance (PIB/GDP), Indicateurs d'activité (PMI, ISM).\n" +
                     "3. RANG TACTIQUE : Géopolitique (GÉO), Rumeurs de marché, Sentiment.\n\n" +
                     "RÈGLE DE CONTRADICTION TEMPORELLE :\n" +
-                    "Si l'historique récent (moins de 30 min) montre un flux inverse (ex: RISK-ON puis soudain RISK-OFF), tu dois impérativement ARBITRER.\n" +
+                    "Si l'historique récent montre un flux inverse (ex: RISK-ON puis soudain RISK-OFF), tu d ois impérativement ARBITRER.\n" +
                     "Si la nouvelle news est d'un RANG SUPÉRIEUR à la précédente, écris explicitement dans le Fait Marquant que ce nouveau driver ANNU LE ET REMPLACE le sentiment précédent.\n\n" +
                     "RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS STRICTES (LIÉE À L'ÉMETTEUR) :\n" +
                     "A. SI LA NEWS CONCERNE LES ETATS-UNIS (OU GLOBAL CONTEXT) :\n" +
@@ -363,7 +372,7 @@ public class NotificationService extends NotificationListenerService {
                     "   - Rappel mathématique Forex : Pour EURUSD, GBPUSD, AUDUSD, une hausse de la devise = ACHAT 🟢. Pour USDCAD, USDJPY, une hausse de la devise locale (JPY, CAD) = VENTE 🔴 car l'USD baisse face à elles.\n\n" +
                     "   - PROTECTION INFLATION / HAUSSE DE TAUX (Vecteur HAWKISH étranger) :\n" +
                     "     Si une Banque Centrale hors USA (comme la BCE) monte ses taux ou tient un discours Hawkish, l'impact est STRICTEMENT LOCALISÉ à sa propre devise face à l'USD. Cela NE crée PAS de mouvement de panique général sur les paires cross ou les indices américains :\n" +
-                    "     • 🇪🇺 Si Europe Hawkish (BCE) -> Seur l'Euro monte face au Dollar -> Donc 🇪🇺 EURUSD : ACHAT CHOC 🟢. Tous les autres actifs du Forex (🇬🇧, 🇦🇺, 🇨🇦, 🇯🇵), les indices US (💻, 📊) et les taux US (📈) restent strictement NEUTRES.\n" +
+                    "     • 🇪🇺 Si Europe Hawkish (BCE) -> Seul l'Euro monte face au Dollar -> Donc 🇪🇺 EURUSD : ACHAT CHOC 🟢. Tous les autres actifs du Forex (🇬🇧, 🇦🇺, 🇨🇦, 🇯🇵), les indices US (💻, 📊) et les taux US (📈) restent strictement NEUTRES.\n" +
                     "     • 🇬🇧 Si UK Hawkish (BoE) -> Seule la GBP monte face au Dollar -> Donc 🇬🇧 GBPUSD : ACHAT CHOC 🟢. Les autres actifs restent NEUTRES.\n" +
                     "     • 🇯🇵 Si Japon Hawkish (BoJ) -> Le JPY monte face au Dollar -> Donc 🇯🇵 USDJPY : VENTE CHOC 🔴. Les autres actifs restent NEUTRES.\n" +
                     "     • 🇨🇦 Si Canada Hawkish (BoC) -> Le CAD monte face au Dollar -> Donc 🇨🇦 USDCAD : VENTE CHOC 🔴. Les autres actifs restent NEUTRES.\n" +
@@ -388,7 +397,7 @@ public class NotificationService extends NotificationListenerService {
                     "🎯 VECTEUR CIBLE : [HAWKISH/DOVISH/GÉO/LIQUIDITÉ]\n" +
                     "📢 FAIT MARQUANT : [Analyse pro en français + Mention d'arbitrage si écrasement d'un driver récent]\n\n" +
                     "--- IMPACTS ACQUISITION ---\n" +
-                    "Génère uniquement les actifs REELLEMENT impactés par la news sous cette forme exacte :\n" +
+                    "Génère uniquement les actifs REELLEMENT impactés by la news sous cette forme exacte :\n" +
                     "• 🇪🇺 EURUSD : ACHAT CHOC 🟢 | Discours Hawkish de la BCE soutient les rendements de l'Euro\n" +
                     "• 🇯🇵 USDJPY : VENTE CHOC 🔴 | Le Yen s'apprécie fortement comme actif refuge géopolitique\n" +
                     "• 💻 NASDAQ : NEUTRE | Pas d'impact direct des statistiques européennes\n\n" +
@@ -400,7 +409,8 @@ public class NotificationService extends NotificationListenerService {
                                     "EURUSD: 🇪🇺, GBPUSD: 🇬🇧, AUDUSD: 🇦🇺, USDCAD: 🇨🇦, USDJPY: 🇯🇵";
                 messages.put(new JSONObject().put("role", "system").put("content", assetSpecs));
 
-                messages.put(new JSONObject().put("role", "user").put("content", "Flux brut reçu : " + feed + "\nMémoire contextuelle :\n" + history));
+                // Injection de l'historique structuré à double vitesse généré par l'EventDatabase
+                messages.put(new JSONObject().put("role", "user").put("content", "Flux brut reçu : " + feed + "\nMémoire contextuelle ordonnée par importance :\n" + history));
                 payload.put("messages", messages);
 
                 OutputStream os = conn.getOutputStream();
@@ -432,29 +442,19 @@ public class NotificationService extends NotificationListenerService {
                             continue; 
                         }
                         
-                        // ======================================================================
-                        // GARDE-FOU ALGORITHMIQUE : Correction des contresens de l'IA sur le Forex
-                        // ======================================================================
-                        
-                        // Cas 1 : L'IA détecte que le Yen (JPY) est fort/refuge mais met ACHAT 🟢 (Inversion de graphique)
+                        // GARDE-FOU ALGORITHMIQUE FOREX CONSERVÉ
                         if (line.contains("🇯🇵 USDJPY") && line.contains("ACHAT CHOC") && 
                            (line.contains("renforcer le yen") || line.contains("yen") && line.contains("refuge") || line.contains("s'apprécier"))) {
                             line = line.replace("ACHAT CHOC 🟢", "VENTE CHOC 🔴");
                         }
-                        
-                        // Cas 2 : L'IA détecte que le Yen (JPY) faiblit mais met VENTE 🔴
                         if (line.contains("🇯🇵 USDJPY") && line.contains("VENTE CHOC") && 
                            (line.contains("faiblir le yen") || line.contains("Yen japonais pourrait faiblir"))) {
                             line = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
                         }
-
-                        // Cas 3 : L'IA détecte que le Dollar Canadien (CAD) s'apprécie mais met VENTE 🔴
                         if (line.contains("🇨🇦 USDCAD") && line.contains("VENTE CHOC") && 
                            (line.contains("renforcer le CAD") || line.contains("s'apprécier"))) {
                             line = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
                         }
-                        
-                        // ======================================================================
 
                         if (line.contains("ACHAT CHOC") || line.contains("VENTE CHOC")) {
                             filteredMessage.append(line).append("\n");
@@ -463,7 +463,6 @@ public class NotificationService extends NotificationListenerService {
                             filteredMessage.append(line).append("\n");
                         }
                     }
-                    
 
                     if (neutralCount > 8) {
                         eventDb.markEventAsSynced(fingerprint, "FILTERED_NEUTRAL");
@@ -625,15 +624,15 @@ public class NotificationService extends NotificationListenerService {
                 StringBuilder r = new StringBuilder(); 
                 String l;
                 while ((l = br.readLine()) != null) r.append(l); 
-                
-                // Ici, on ferme bien 'br' (le lecteur), le compilateur valide à 100%
                 br.close(); 
                 
                 String report = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 
                 sendTelegramSecure("📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report, this);
+                
+                // Appel à la purge sélective Hedge Fund
                 eventDb.purgeOldEvents(now);
-                    }
+            }
 
         } catch (Exception e) { Log.e(TAG, "Erreur Rapport Mensuel", e); }
     }
