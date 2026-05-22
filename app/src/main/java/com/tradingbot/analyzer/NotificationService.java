@@ -425,13 +425,21 @@ public class NotificationService extends NotificationListenerService {
                     String[] lines = aiResult.split("\n");
                     int activeSignalsCount = 0;
                     int neutralCount = 0;
-
+                    
                     for (String line : lines) {
                         if (line.contains("•") && line.contains("NEUTRE")) {
                             neutralCount++;
                             continue; 
                         }
                         
+                        // SECURE PATCH : Correction automatique des contresens de l'IA sur le Forex inverse
+                        if (line.contains("🇯🇵 USDJPY") && line.contains("s'apprécier") && line.contains("ACHAT CHOC")) {
+                            line = line.replace("ACHAT CHOC 🟢", "VENTE CHOC 🔴");
+                        }
+                        if (line.contains("🇨🇦 USDCAD") && line.contains("s'apprécier") && line.contains("VENTE CHOC")) {
+                            line = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
+                        }
+
                         if (line.contains("ACHAT CHOC") || line.contains("VENTE CHOC")) {
                             filteredMessage.append(line).append("\n");
                             activeSignalsCount++;
