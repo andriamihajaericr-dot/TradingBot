@@ -432,13 +432,29 @@ public class NotificationService extends NotificationListenerService {
                             continue; 
                         }
                         
-                        // SECURE PATCH : Correction automatique des contresens de l'IA sur le Forex inverse
-                        if (line.contains("🇯🇵 USDJPY") && line.contains("s'apprécier") && line.contains("ACHAT CHOC")) {
+                        // ======================================================================
+                        // GARDE-FOU ALGORITHMIQUE : Correction des contresens de l'IA sur le Forex
+                        // ======================================================================
+                        
+                        // Cas 1 : L'IA détecte que le Yen (JPY) est fort/refuge mais met ACHAT 🟢 (Inversion de graphique)
+                        if (line.contains("🇯🇵 USDJPY") && line.contains("ACHAT CHOC") && 
+                           (line.contains("renforcer le yen") || line.contains("yen") && line.contains("refuge") || line.contains("s'apprécier"))) {
                             line = line.replace("ACHAT CHOC 🟢", "VENTE CHOC 🔴");
                         }
-                        if (line.contains("🇨🇦 USDCAD") && line.contains("s'apprécier") && line.contains("VENTE CHOC")) {
+                        
+                        // Cas 2 : L'IA détecte que le Yen (JPY) faiblit mais met VENTE 🔴
+                        if (line.contains("🇯🇵 USDJPY") && line.contains("VENTE CHOC") && 
+                           (line.contains("faiblir le yen") || line.contains("Yen japonais pourrait faiblir"))) {
                             line = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
                         }
+
+                        // Cas 3 : L'IA détecte que le Dollar Canadien (CAD) s'apprécie mais met VENTE 🔴
+                        if (line.contains("🇨🇦 USDCAD") && line.contains("VENTE CHOC") && 
+                           (line.contains("renforcer le CAD") || line.contains("s'apprécier"))) {
+                            line = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
+                        }
+                        
+                        // ======================================================================
 
                         if (line.contains("ACHAT CHOC") || line.contains("VENTE CHOC")) {
                             filteredMessage.append(line).append("\n");
@@ -447,6 +463,7 @@ public class NotificationService extends NotificationListenerService {
                             filteredMessage.append(line).append("\n");
                         }
                     }
+                    
 
                     if (neutralCount > 8) {
                         eventDb.markEventAsSynced(fingerprint, "FILTERED_NEUTRAL");
