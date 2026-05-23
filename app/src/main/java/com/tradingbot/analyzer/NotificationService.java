@@ -216,7 +216,7 @@ public class NotificationService extends NotificationListenerService {
         "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
         "📊 CONVICTION : [JAUGE_EMOJIS] XX%\n" +
         "⏱️ TIMING D'EFFET : Évalue l'inertie sémantique : '⚡ IMPULSION IMMÉDIATE (0-15 min)' (chocs de chiffres comme CPI/NFP) ou '🧱 INERTIE DE STRUCTURE (1-4 heures)' (discours, géopolitique, rapports).\n" +
-        "📢 ACTION TRADING : Associe une consigne d'exécution stricte selon l'inertie : soit 'Scalping M1/M5 - Breakout ou suivi d'impulsion' (si Immédiate), soit 'Suivi de tendance M15/H1 - Attendre un retracement/pullback sur zone clé' (si Structure).\n"
+        "📢 ACTION TRADING : Associe une consigne d'exécution stricte selon l'inertie : soit 'Scalping M1/M5 - Breakout ou suivi d'impulsion' (si Immédiate), soit 'Suivi de tendance M15/H1 - Attendre un retracement/pullback sur zone clé' (si Structure).\n" +
         "🎯 VECTEUR CIBLE : [HAWKISH / DOVISH / GÉO / LIQUIDITÉ]\n" +
         "📢 FAIT MARQUANT : [Analyse pro de la situation en français. Mentionner l'arbitrage si écrasement d'un driver récent.]\n\n" +
         "--- IMPACTS ACQUISITION ---\n" +
