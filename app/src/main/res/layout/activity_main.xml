@@ -13,7 +13,7 @@
         <TextView 
             android:layout_width="match_parent" 
             android:layout_height="wrap_content"
-            android:text="🤖 Fondamental Analyser" 
+            android:text="🤖 Analyser Fondamentale des Drivers" 
             android:textSize="26sp" 
             android:textStyle="bold"
             android:textColor="#f5c842" 
@@ -23,7 +23,7 @@
         <TextView 
             android:layout_width="match_parent" 
             android:layout_height="wrap_content"
-            android:text="Notifications →  AI → Buy/Sell" 
+            android:text="Notifications →  AI → Momentum" 
             android:textSize="12sp"
             android:textColor="#888888" 
             android:gravity="center" 
@@ -59,11 +59,12 @@
             android:textStyle="bold"
             android:layout_marginBottom="8dp"/>
 
+        <!-- CORRECTION : hint mis à jour de "Claude API ou Groq" → "Groq API" -->
         <EditText 
             android:id="@+id/apiKeyInput"
             android:layout_width="match_parent" 
             android:layout_height="wrap_content"
-            android:hint="Clé Claude API ou Groq" 
+            android:hint="Clé Groq API" 
             android:inputType="textPassword"
             android:textColor="#ffffff" 
             android:textColorHint="#555555"
