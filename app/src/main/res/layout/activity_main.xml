@@ -59,7 +59,6 @@
             android:textStyle="bold"
             android:layout_marginBottom="8dp"/>
 
-        <!-- CORRECTION : hint mis à jour de "Claude API ou Groq" → "Groq API" -->
         <EditText 
             android:id="@+id/apiKeyInput"
             android:layout_width="match_parent" 
@@ -113,8 +112,8 @@
             android:layout_width="match_parent" 
             android:layout_height="wrap_content"
             android:text="💾 Sauvegarder les clés" 
-            android:backgroundTint="#238636"
-            android:textColor="#ffffff" 
+            android:backgroundTint="#1f2937"
+            android:textColor="#E5E7EB" 
             android:layout_marginBottom="8dp"/>
 
         <Button 
@@ -122,8 +121,8 @@
             android:layout_width="match_parent" 
             android:layout_height="wrap_content"
             android:text="🔔 Activer Permission Notifications" 
-            android:backgroundTint="#238636"
-            android:textColor="#ffffff" 
+            android:backgroundTint="#1f2937"
+            android:textColor="#E5E7EB" 
             android:layout_marginBottom="8dp"/>
 
         <Button 
@@ -131,8 +130,8 @@
             android:layout_width="match_parent" 
             android:layout_height="wrap_content"
             android:text="🧪 Tester l'analyse" 
-            android:backgroundTint="#238636"
-            android:textColor="#ffffff" 
+            android:backgroundTint="#1f2937"
+            android:textColor="#E5E7EB" 
             android:layout_marginBottom="20dp"/>
 
         <TextView 
@@ -151,7 +150,7 @@
             android:minHeight="150dp"
             android:text="En attente de notifications..." 
             android:textColor="#ffffff" 
-            android:background="#238636" 
+            android:background="#161b22" 
             android:padding="12dp"
             android:textSize="12sp" 
             android:fontFamily="monospace"/>
