@@ -31,8 +31,17 @@ public class NotificationService extends NotificationListenerService {
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-    // CORRECTION 1 : Constante centralisée pour la clé Groq (renommée de "claude_key")
-    private static final String PREF_GROQ_KEY = "groq_key";
+    // Constantes centralisées pour toutes les clés SharedPreferences
+    private static final String PREF_GROQ_KEY   = "groq_key";
+    private static final String PREF_TG_TOKEN   = "tg_token";
+    private static final String PREF_TG_CHAT_ID = "tg_chat_id";
+    private static final String PREF_MACRO_KEY  = "macro_api_key";
+    private static final String PREFS_NAME      = "TradingBot";
+
+    /** Raccourci centralisé pour lire la clé Groq depuis les SharedPreferences. */
+    private String getGroqApiKey() {
+        return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
+    }
 
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
@@ -226,7 +235,7 @@ public class NotificationService extends NotificationListenerService {
         new Thread(() -> {
             try {
                 android.content.SharedPreferences prefs = context.getSharedPreferences("TradingBot", Context.MODE_PRIVATE);
-                String token = prefs.getString("tg_token", "");
+                String token  = prefs.getString("tg_token", "");
                 String chatId = prefs.getString("tg_chat_id", "");
 
                 if (token.isEmpty() || chatId.isEmpty()) return;
@@ -269,7 +278,7 @@ public class NotificationService extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        if (!getSharedPreferences("TradingBot", MODE_PRIVATE).getBoolean("bot_active", false)) return;
+        if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
 
         Bundle extras = sbn.getNotification().extras;
         String title = extras.getString(Notification.EXTRA_TITLE, "");
@@ -394,8 +403,7 @@ public class NotificationService extends NotificationListenerService {
 
     private void fetchMissingDataFromInstitutionalAPI() {
         try {
-            android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
-            String macroApiKey = prefs.getString("macro_api_key", "");
+            String macroApiKey = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_MACRO_KEY, "");
 
             if (macroApiKey.isEmpty()) return;
 
@@ -454,9 +462,7 @@ public class NotificationService extends NotificationListenerService {
     private void dispatchHistoricalBulkToGroq(String bulkData) {
         HttpURLConnection conn = null;
         try {
-            android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
-            // CORRECTION 1 : Utilisation de la constante PREF_GROQ_KEY
-            String apiKey = prefs.getString(PREF_GROQ_KEY, "");
+            String apiKey = getGroqApiKey();
             if (apiKey.isEmpty()) return;
 
             JSONObject payload = new JSONObject();
@@ -505,18 +511,16 @@ public class NotificationService extends NotificationListenerService {
         int maxRetries = 3;
         int attempt = 0;
 
+        // Lecture des clés une seule fois, avant la boucle retry
+        String apiKey = getGroqApiKey();
+        android.content.SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String tgToken  = prefs.getString(PREF_TG_TOKEN, "");
+        String tgChatId = prefs.getString(PREF_TG_CHAT_ID, "");
+        if (apiKey.isEmpty() || tgToken.isEmpty() || tgChatId.isEmpty()) return false;
+
         while (attempt < maxRetries) {
             HttpURLConnection conn = null;
             try {
-                android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
-                // CORRECTION 1 : Utilisation de la constante PREF_GROQ_KEY
-                String apiKey = prefs.getString(PREF_GROQ_KEY, "");
-                String tgToken = prefs.getString("tg_token", "");
-                String tgChatId = prefs.getString("tg_chat_id", "");
-
-                if (apiKey.isEmpty() || tgToken.isEmpty() || tgChatId.isEmpty()) {
-                    return false;
-                }
 
                 SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
                 sdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
@@ -667,9 +671,7 @@ public class NotificationService extends NotificationListenerService {
     private void generateAndSendDailyBrief() {
         HttpURLConnection conn = null;
         try {
-            android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
-            // CORRECTION 1 : Utilisation de la constante PREF_GROQ_KEY
-            String apiKey = prefs.getString(PREF_GROQ_KEY, "");
+            String apiKey = getGroqApiKey();
             if (apiKey.isEmpty()) return;
 
             long now = System.currentTimeMillis() / 1000;
@@ -732,9 +734,7 @@ public class NotificationService extends NotificationListenerService {
     private void generateAndPurgeMonthlyReport() {
         HttpURLConnection conn = null;
         try {
-            android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
-            // CORRECTION 1 : Utilisation de la constante PREF_GROQ_KEY
-            String apiKey = prefs.getString(PREF_GROQ_KEY, "");
+            String apiKey = getGroqApiKey();
             if (apiKey.isEmpty()) return;
 
             long now = System.currentTimeMillis() / 1000;
