@@ -319,6 +319,8 @@ public class NotificationService extends NotificationListenerService {
 
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
         List<String> targetAssets = filterActiveAssets(feed);
+        ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
+        if (!vr.isConfirmed) return; // rejeté par le validator
         boolean isFomcPivot = feed.toUpperCase().contains("FOMC") || feed.toUpperCase().contains("FED ");
         int weight = assignDriverWeight(feed);
 
