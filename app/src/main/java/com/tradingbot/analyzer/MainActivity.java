@@ -198,8 +198,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (eventDb != null) {
-            eventDb.close();
-        }
+        // Singleton : on ne ferme PAS la connexion ici.
+        // EventDatabase est partagé avec NotificationService ; fermer la connexion
+        // depuis l'activité provoquerait un crash du service lors du prochain accès DB.
     }
 }
