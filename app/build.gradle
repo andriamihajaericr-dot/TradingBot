@@ -1,13 +1,17 @@
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone // ← Import requis pour gérer le fuseau horaire
 
-// Fonction pour générer l'horodatage strict en Français (Exemple : 23052026-14H22)
+// Fonction pour générer l'horodatage strict calé sur UTC+3 (Exemple : 23052026-14H22)
 def getBuildTimestamp() {
     def date = new Date()
-    // 'dd' = Jour, 'MM' = Mois, 'yyyy' = Année
-    // Le 'H' entre guillemets simples insère la lettre H majuscule entre les heures et les minutes
     def formattedDate = new SimpleDateFormat("ddMMyyyy-HH'H'mm", Locale.FRANCE)
+    
+    // FORCE LE FUSEAU : Indique à Gradle d'appliquer UTC+3 (GMT+3)
+    // Même si le serveur GitHub compile aux États-Unis, l'heure écrite sera la tienne.
+    formattedDate.setTimeZone(TimeZone.getTimeZone("GMT+3"))
+    
     return formattedDate.format(date)
 }
 
@@ -23,8 +27,8 @@ android {
         applicationId "com.tradingbot.analyzer"
         minSdk 26
         targetSdk 33
-        versionCode 1 // ← Le sous-numéro (ex: le '1' de V1.0.1)
-        versionName "1.0" // ← Le préfixe de version (ex: le '1.0' de V1.0.1)
+        versionCode 1
+        versionName "1.0"
     }
 
     buildTypes {
