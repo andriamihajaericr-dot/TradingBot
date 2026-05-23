@@ -1,6 +1,6 @@
 package com.tradingbot.analyzer;
 
-import java.util.Locale; 
+import java.util.Locale;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -30,6 +30,9 @@ public class NotificationService extends NotificationListenerService {
     private static final String CHANNEL_ID = "trading_alerts";
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+    // CORRECTION 1 : Constante centralisée pour la clé Groq (renommée de "claude_key")
+    private static final String PREF_GROQ_KEY = "groq_key";
 
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
@@ -225,9 +228,9 @@ public class NotificationService extends NotificationListenerService {
                 android.content.SharedPreferences prefs = context.getSharedPreferences("TradingBot", Context.MODE_PRIVATE);
                 String token = prefs.getString("tg_token", "");
                 String chatId = prefs.getString("tg_chat_id", "");
-                
+
                 if (token.isEmpty() || chatId.isEmpty()) return;
-                
+
                 URL url = new URL("https://api.telegram.org/bot" + token + "/sendMessage");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -248,8 +251,8 @@ public class NotificationService extends NotificationListenerService {
 
                 conn.getResponseCode();
                 conn.disconnect();
-            } catch (Exception e) { 
-                Log.e(TAG, "Échec Telegram POST", e); 
+            } catch (Exception e) {
+                Log.e(TAG, "Échec Telegram POST", e);
             }
         }).start();
     }
@@ -257,7 +260,6 @@ public class NotificationService extends NotificationListenerService {
     @Override
     public void onCreate() {
         super.onCreate();
-        // Correction Problème 3 : Appel de la méthode getInstance(context) pour respecter le Singleton
         eventDb = EventDatabase.getInstance(this);
         createNotificationChannel();
         startDailyBriefScheduler();
@@ -278,6 +280,7 @@ public class NotificationService extends NotificationListenerService {
 
         String packageName = sbn.getPackageName().toLowerCase();
         String sourceName = "Source Institutionnelle";
+
         if (packageName.contains("financialjuice")) sourceName = "FinancialJuice";
         else if (packageName.contains("investing")) sourceName = "Investing.com";
         else if (packageName.contains("twitter") || packageName.contains("periscope")) sourceName = "X / Twitter";
@@ -311,14 +314,13 @@ public class NotificationService extends NotificationListenerService {
 
         String hash = generateSecureHash(title + text);
 
-        // Correction Problème 1 : Injection propre des 11 arguments avec le paramètre weight
         if (weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
             eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed, String.join(", ", targetAssets), "Conforme (Filtré)", (int)(postTime/1000), "synced", weight);
             return;
         }
 
         String initialImpact = isFomcPivot ? "💥 PIVOT MAJEUR BANQUE CENTRALE" : "⚡ CHOC DRIVER MACRO PONDÉRÉ (Poids: " + weight + ")";
-        
+
         boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "en_attente", weight);
 
         if (saved && isDeviceOnline()) {
@@ -370,7 +372,7 @@ public class NotificationService extends NotificationListenerService {
                         String feed = cursor.getString(cursor.getColumnIndexOrThrow("feed_content"));
                         String assetsStr = cursor.getString(cursor.getColumnIndexOrThrow("target_assets"));
                         long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("unix_timestamp")) * 1000;
-                        
+
                         List<String> assets = Arrays.asList(assetsStr.split(", "));
                         String historyContext = eventDb.getRecentEventsForAssets(assets, 5);
 
@@ -381,8 +383,8 @@ public class NotificationService extends NotificationListenerService {
 
                     } while (cursor.moveToNext());
                 }
-            } catch (Exception e) { 
-                Log.e(TAG, "Erreur synchronisation réseau", e); 
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur synchronisation réseau", e);
             } finally {
                 if (cursor != null) cursor.close();
                 isSyncing = false;
@@ -394,7 +396,7 @@ public class NotificationService extends NotificationListenerService {
         try {
             android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
             String macroApiKey = prefs.getString("macro_api_key", "");
-            
+
             if (macroApiKey.isEmpty()) return;
 
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
@@ -411,9 +413,9 @@ public class NotificationService extends NotificationListenerService {
 
             if (conn.getResponseCode() == 200) {
                 BufferedReader rd = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                StringBuilder response = new StringBuilder(); 
+                StringBuilder response = new StringBuilder();
                 String line;
-                while ((line = rd.readLine()) != null) response.append(line); 
+                while ((line = rd.readLine()) != null) response.append(line);
                 rd.close();
 
                 JSONArray calendarEvents = new JSONArray(response.toString());
@@ -423,11 +425,11 @@ public class NotificationService extends NotificationListenerService {
                     JSONObject event = calendarEvents.getJSONObject(i);
                     String impact = event.optString("impact", "LOW");
                     String currency = event.optString("currency", "USD");
-                    
-                    if (impact.equalsIgnoreCase("HIGH") && 
-                       (currency.equals("USD") || currency.equals("AUD") || currency.equals("CAD") || 
+
+                    if (impact.equalsIgnoreCase("HIGH") &&
+                       (currency.equals("USD") || currency.equals("AUD") || currency.equals("CAD") ||
                         currency.equals("JPY") || currency.equals("EUR") || currency.equals("GBP"))) {
-                        
+
                         String date = event.optString("date", "");
                         String eventName = event.optString("event", "");
                         double actual = event.optDouble("actual", 0.0);
@@ -440,66 +442,75 @@ public class NotificationService extends NotificationListenerService {
                 }
 
                 if (apiMacroBlock.length() > 0) {
-                    dispatchWeeklyBulkToGroq(apiMacroBlock.toString());
+                    dispatchHistoricalBulkToGroq(apiMacroBlock.toString());
                 }
             }
+            // CORRECTION 3 : Fermeture de la connexion dans fetchMissingDataFromInstitutionalAPI
             conn.disconnect();
         } catch (Exception e) { Log.e(TAG, "Échec de récupération API historique", e); }
     }
 
-    private void dispatchWeeklyBulkToGroq(String bulkData) {
+    // CORRECTION 5 : Renommage de dispatchWeeklyBulkToGroq → dispatchHistoricalBulkToGroq (nom plus fidèle)
+    private void dispatchHistoricalBulkToGroq(String bulkData) {
+        HttpURLConnection conn = null;
         try {
             android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
-            String apiKey = prefs.getString("claude_key", "");
+            // CORRECTION 1 : Utilisation de la constante PREF_GROQ_KEY
+            String apiKey = prefs.getString(PREF_GROQ_KEY, "");
             if (apiKey.isEmpty()) return;
 
-            JSONObject payload = new JSONObject(); 
-            payload.put("model", GROQ_MODEL); 
+            JSONObject payload = new JSONObject();
+            payload.put("model", GROQ_MODEL);
             payload.put("temperature", 0.1);
-            
+
             JSONArray messages = new JSONArray();
             messages.put(new JSONObject().put("role", "system").put("content", "Tu es un Macro-Strategist de premier plan. Analyse ce relevé complet de données à fort impact."));
             messages.put(new JSONObject().put("role", "user").put("content", "DONNÉES EXTRAITES :\n" + bulkData));
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST"); 
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + apiKey);
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(15000);
             conn.setDoOutput(true);
-            
-            OutputStream os = conn.getOutputStream(); 
-            os.write(payload.toString().getBytes("UTF-8")); 
-            os.flush(); 
+
+            OutputStream os = conn.getOutputStream();
+            os.write(payload.toString().getBytes("UTF-8"));
+            os.flush();
             os.close();
 
             if (conn.getResponseCode() == 200) {
                 BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                StringBuilder r = new StringBuilder(); 
+                StringBuilder r = new StringBuilder();
                 String l;
-                while ((l = br.readLine()) != null) r.append(l); 
+                while ((l = br.readLine()) != null) r.append(l);
                 br.close();
 
                 String analysis = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
                 sendTelegramSecure("🚨 *RAPPORT CRITIQUE DE RATTRAPAGE INTER-MARCHÉS (J+7)*\n\n" + analysis, this);
-                
+
                 eventDb.saveEvent(generateSecureHash(analysis), "com.tradingbot.sync", "API Sync", "Weekly-Sync", "Audit Global", analysis, "ALL_ASSETS", "ALIGNE_OK", (int)(System.currentTimeMillis()/1000), "synced", 5);
             }
-            conn.disconnect();
         } catch (Exception e) { Log.e(TAG, "Échec dispatch historique Groq", e); }
+        finally {
+            // CORRECTION 3 : Fermeture garantie dans le bloc finally
+            if (conn != null) conn.disconnect();
+        }
     }
 
     private boolean executeAnalysisPipeline(String source, String feed, String history, List<String> assets, long ts, String fingerprint) {
         int maxRetries = 3;
         int attempt = 0;
-        
+
         while (attempt < maxRetries) {
+            HttpURLConnection conn = null;
             try {
                 android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
-                String apiKey = prefs.getString("claude_key", "");
+                // CORRECTION 1 : Utilisation de la constante PREF_GROQ_KEY
+                String apiKey = prefs.getString(PREF_GROQ_KEY, "");
                 String tgToken = prefs.getString("tg_token", "");
                 String tgChatId = prefs.getString("tg_chat_id", "");
 
@@ -507,13 +518,12 @@ public class NotificationService extends NotificationListenerService {
                     return false;
                 }
 
-                // Correction Problème 5 : Remplacement propre de java.util.Locale par Locale grâce à l'import global
                 SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
                 sdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
                 String timeString = sdf.format(new Date(ts));
 
                 URL url = new URL(GROQ_URL);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("Authorization", "Bearer " + apiKey);
@@ -525,9 +535,9 @@ public class NotificationService extends NotificationListenerService {
                 payload.put("model", GROQ_MODEL);
                 payload.put("temperature", 0.02);
                 JSONArray messages = new JSONArray();
-                
+
                 messages.put(new JSONObject().put("role", "system").put("content", SYSTEM_PROMPT));
-                
+
                 String assetSpecs = "Spécifications strictes des Pictogrammes d'Actifs à insérer devant chaque ligne :\n" +
                                     "GOLD: 🏆, USOIL: 🛢️, NASDAQ: 💻, SP500: 📊, US10Y: 📈, BITCOIN: ₿, " +
                                     "EURUSD: 🇪🇺, GBPUSD: 🇬🇧, AUDUSD: 🇦🇺, USDCAD: 🇨🇦, USDJPY: 🇯🇵";
@@ -537,14 +547,14 @@ public class NotificationService extends NotificationListenerService {
 
                 OutputStream os = conn.getOutputStream();
                 os.write(payload.toString().getBytes("UTF-8"));
-                os.flush(); 
+                os.flush();
                 os.close();
 
                 if (conn.getResponseCode() == 200) {
                     BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                    StringBuilder r = new StringBuilder(); 
+                    StringBuilder r = new StringBuilder();
                     String l;
-                    while ((l = br.readLine()) != null) r.append(l); 
+                    while ((l = br.readLine()) != null) r.append(l);
                     br.close();
 
                     String aiResult = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
@@ -557,22 +567,23 @@ public class NotificationService extends NotificationListenerService {
                     String[] lines = aiResult.split("\n");
                     int activeSignalsCount = 0;
                     int neutralCount = 0;
-                    
+
                     for (String line : lines) {
                         if (line.contains("•") && line.contains("NEUTRE")) {
                             neutralCount++;
-                            continue; 
+                            continue;
                         }
-                        
-                        if (line.contains("🇯🇵 USDJPY") && line.contains("ACHAT CHOC") && 
-                           (line.contains("renforcer le yen") || line.contains("yen") && line.contains("refuge") || line.contains("s'apprécier"))) {
+
+                        // CORRECTION 2 : Parenthèses explicites pour lever l'ambiguïté &&/|| sur USDJPY
+                        if (line.contains("🇯🇵 USDJPY") && line.contains("ACHAT CHOC") &&
+                           (line.contains("renforcer le yen") || (line.contains("yen") && line.contains("refuge")) || line.contains("s'apprécier"))) {
                             line = line.replace("ACHAT CHOC 🟢", "VENTE CHOC 🔴");
                         }
-                        if (line.contains("🇯🇵 USDJPY") && line.contains("VENTE CHOC") && 
+                        if (line.contains("🇯🇵 USDJPY") && line.contains("VENTE CHOC") &&
                            (line.contains("faiblir le yen") || line.contains("Yen japonais pourrait faiblir"))) {
                             line = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
                         }
-                        if (line.contains("🇨🇦 USDCAD") && line.contains("VENTE CHOC") && 
+                        if (line.contains("🇨🇦 USDCAD") && line.contains("VENTE CHOC") &&
                            (line.contains("renforcer le CAD") || line.contains("s'apprécier"))) {
                             line = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
                         }
@@ -592,31 +603,34 @@ public class NotificationService extends NotificationListenerService {
 
                     if (activeSignalsCount > 0) {
                         String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n"
-                                + "🕒 " + timeString + " (Mada)\n" 
-                                + "📡 Source : " + source + "\n" 
+                                + "🕒 " + timeString + " (Mada)\n"
+                                + "📡 Source : " + source + "\n"
                                 + filteredMessage.toString().trim();
-                                
+
                         sendTelegramSecure(finalPayload, this);
                     }
 
                     eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
                     return true;
-                    
+
                 } else {
                     throw new Exception("API Error: " + conn.getResponseCode());
                 }
-                
-            } catch (Exception e) { 
+
+            } catch (Exception e) {
                 attempt++;
                 Log.e(TAG, "Tentative " + attempt + "/" + maxRetries + " échouée", e);
                 if (attempt < maxRetries) {
                     try { Thread.sleep(2000 * attempt); } catch (InterruptedException ie) { return false; }
                 }
+            } finally {
+                // CORRECTION 3 : Fermeture garantie de la connexion dans executeAnalysisPipeline
+                if (conn != null) conn.disconnect();
             }
         }
         return false;
     }
-    
+
     private List<String> filterActiveAssets(String text) {
         List<String> assets = new ArrayList<>();
         String upper = text.toUpperCase();
@@ -627,7 +641,9 @@ public class NotificationService extends NotificationListenerService {
         if (upper.contains("SP500") || upper.contains("S&P") || upper.contains("SPX")) assets.add("SP500");
         if (upper.contains("BITCOIN") || upper.contains("BTC") || upper.contains("CRYPTO")) assets.add("BITCOIN");
         if (upper.contains("YIELD") || upper.contains("US10Y") || upper.contains("BOND") || upper.contains("TREASURY")) assets.add("US10Y");
-        if (upper.contains("EUR ") || upper.contains("EURUSD") || upper.contains("ECB") || upper.contains("EUROZONE")) assets.add("EURUSD");
+        // CORRECTION 4 : Détection EUR élargie avec variantes sans espace (EUR., EUR,)
+        if (upper.contains("EURUSD") || upper.contains("ECB") || upper.contains("EUROZONE") ||
+            upper.matches(".*\\bEUR\\b.*")) assets.add("EURUSD");
         if (upper.contains("GBP") || upper.contains("GBPUSD") || upper.contains("CABLE") || upper.contains("BOE")) assets.add("GBPUSD");
         if (upper.contains("AUD") || upper.contains("AUDUSD") || upper.contains("AUSSIE") || upper.contains("RBA")) assets.add("AUDUSD");
         if (upper.contains("CAD") || upper.contains("USDCAD") || upper.contains("LOONIE") || upper.contains("BOC")) assets.add("USDCAD");
@@ -641,64 +657,70 @@ public class NotificationService extends NotificationListenerService {
 
     private void startDailyBriefScheduler() {
         Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
-        nextRun.set(Calendar.HOUR_OF_DAY, 7); 
-        nextRun.set(Calendar.MINUTE, 0); 
+        nextRun.set(Calendar.HOUR_OF_DAY, 7);
+        nextRun.set(Calendar.MINUTE, 0);
         nextRun.set(Calendar.SECOND, 0);
         if (nextRun.getTimeInMillis() <= System.currentTimeMillis()) nextRun.add(Calendar.DAY_OF_YEAR, 1);
         scheduler.scheduleAtFixedRate(this::generateAndSendDailyBrief, nextRun.getTimeInMillis() - System.currentTimeMillis(), 24L * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
     }
 
     private void generateAndSendDailyBrief() {
+        HttpURLConnection conn = null;
         try {
             android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
-            String apiKey = prefs.getString("claude_key", "");
+            // CORRECTION 1 : Utilisation de la constante PREF_GROQ_KEY
+            String apiKey = prefs.getString(PREF_GROQ_KEY, "");
             if (apiKey.isEmpty()) return;
 
             long now = System.currentTimeMillis() / 1000;
             String dailyDrivers = eventDb.getDailyMacroDrivers(now);
             if (dailyDrivers.isEmpty()) return;
 
-            JSONObject payload = new JSONObject(); 
-            payload.put("model", GROQ_MODEL); 
+            JSONObject payload = new JSONObject();
+            payload.put("model", GROQ_MODEL);
             payload.put("temperature", 0.1);
-            
+
             JSONArray messages = new JSONArray();
             messages.put(new JSONObject().put("role", "system").put("content", "Rédige un briefing matinal synthétique des chocs macroéconomiques enregistrés la veille."));
             messages.put(new JSONObject().put("role", "user").put("content", "DONNÉES HIER :\n" + dailyDrivers));
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST"); 
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + apiKey);
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(10000);
             conn.setDoOutput(true);
-            
-            OutputStream os = conn.getOutputStream(); 
-            os.write(payload.toString().getBytes("UTF-8")); 
-            os.flush(); 
+
+            OutputStream os = conn.getOutputStream();
+            os.write(payload.toString().getBytes("UTF-8"));
+            os.flush();
             os.close();
 
             if (conn.getResponseCode() == 200) {
                 BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                StringBuilder r = new StringBuilder(); 
+                StringBuilder r = new StringBuilder();
                 String l;
-                while ((l = br.readLine()) != null) r.append(l); 
+                while ((l = br.readLine()) != null) r.append(l);
                 br.close();
-                
+
                 String summary = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
                 sendTelegramSecure("🌅 *DAILY BRIEF STRATÉGIQUE*\n\n" + summary, this);
             }
         } catch (Exception e) { Log.e(TAG, "Erreur Daily Brief", e); }
+        finally {
+            // CORRECTION 3 : Fermeture garantie dans generateAndSendDailyBrief
+            if (conn != null) conn.disconnect();
+        }
     }
 
     private void startMonthlyReportScheduler() {
         Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
         nextRun.set(Calendar.DAY_OF_MONTH, nextRun.getActualMaximum(Calendar.DAY_OF_MONTH));
-        nextRun.set(Calendar.HOUR_OF_DAY, 23); 
-        nextRun.set(Calendar.MINUTE, 0); 
+        nextRun.set(Calendar.HOUR_OF_DAY, 23);
+        nextRun.set(Calendar.MINUTE, 0);
         nextRun.set(Calendar.SECOND, 0);
         if (nextRun.getTimeInMillis() <= System.currentTimeMillis()) {
             nextRun.add(Calendar.MONTH, 1);
@@ -708,45 +730,47 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private void generateAndPurgeMonthlyReport() {
+        HttpURLConnection conn = null;
         try {
             android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
-            String apiKey = prefs.getString("claude_key", "");
+            // CORRECTION 1 : Utilisation de la constante PREF_GROQ_KEY
+            String apiKey = prefs.getString(PREF_GROQ_KEY, "");
             if (apiKey.isEmpty()) return;
 
             long now = System.currentTimeMillis() / 1000;
             String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
             if (monthlyRegistry.isEmpty()) return;
 
-            JSONObject payload = new JSONObject(); 
-            payload.put("model", GROQ_MODEL); 
+            JSONObject payload = new JSONObject();
+            payload.put("model", GROQ_MODEL);
             payload.put("temperature", 0.1);
-            
+
             JSONArray messages = new JSONArray();
             messages.put(new JSONObject().put("role", "system").put("content", "Analyse le registre mensuel des ruptures fondamentales."));
             messages.put(new JSONObject().put("role", "user").put("content", "REGISTRE MENSUEL :\n" + monthlyRegistry));
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST"); 
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + apiKey);
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(10000);
             conn.setDoOutput(true);
-            
-            OutputStream os = conn.getOutputStream(); 
-            os.write(payload.toString().getBytes("UTF-8")); 
-            os.flush(); 
+
+            OutputStream os = conn.getOutputStream();
+            os.write(payload.toString().getBytes("UTF-8"));
+            os.flush();
             os.close();
-            
+
             if (conn.getResponseCode() == 200) {
                 BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                StringBuilder r = new StringBuilder(); 
+                StringBuilder r = new StringBuilder();
                 String l;
-                while ((l = br.readLine()) != null) r.append(l); 
-                br.close(); 
-                
+                while ((l = br.readLine()) != null) r.append(l);
+                br.close();
+
                 String report = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 
                 sendTelegramSecure("📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report, this);
@@ -754,6 +778,10 @@ public class NotificationService extends NotificationListenerService {
             }
 
         } catch (Exception e) { Log.e(TAG, "Erreur Rapport Mensuel", e); }
+        finally {
+            // CORRECTION 3 : Fermeture garantie dans generateAndPurgeMonthlyReport
+            if (conn != null) conn.disconnect();
+        }
     }
 
     private void registerNetworkCallback() {
@@ -761,8 +789,8 @@ public class NotificationService extends NotificationListenerService {
         if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
                 @Override
-                public void onAvailable(Network network) { 
-                    triggerQueueSynchronization(); 
+                public void onAvailable(Network network) {
+                    triggerQueueSynchronization();
                 }
             });
         }
@@ -772,7 +800,7 @@ public class NotificationService extends NotificationListenerService {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         if (cm == null) return false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Network net = cm.getActiveNetwork(); 
+            Network net = cm.getActiveNetwork();
             if (net == null) return false;
             NetworkCapabilities cap = cm.getNetworkCapabilities(net);
             return cap != null && (cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || cap.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR));
@@ -791,8 +819,8 @@ public class NotificationService extends NotificationListenerService {
                 hexString.append(hex);
             }
             return hexString.toString();
-        } catch (Exception e) { 
-            return String.valueOf(System.currentTimeMillis()); 
+        } catch (Exception e) {
+            return String.valueOf(System.currentTimeMillis());
         }
     }
 
