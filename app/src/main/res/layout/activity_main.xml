@@ -150,7 +150,7 @@
             android:layout_height="wrap_content"
             android:minHeight="150dp"
             android:text="En attente de notifications..." 
-            android:textColor="#00FF00" 
+            android:textColor="#ffffff" 
             android:background="#000000" 
             android:padding="12dp"
             android:textSize="12sp" 
