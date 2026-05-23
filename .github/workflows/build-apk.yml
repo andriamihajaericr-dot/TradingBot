@@ -5,8 +5,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-# Force l'ensemble des scripts de runner à s'exécuter sous Node.js 24 
-# pour anticiper les dépréciations d'infrastructure de GitHub.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -25,12 +23,15 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # Crée la variable de date pour GitHub
+      - name: Generate Build Date for GitHub
+        id: date
+        run: echo "CURRENT_DATE=$(date +'%d%m%Y-%H'H'%M')" >> $GITHUB_ENV
+
       - name: Install & Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          # ALIGNEMENT : Version 8.1.1 nécessaire pour supporter ton Android Gradle Plugin 8.1.0
           gradle-version: '8.1.1'
-          # COUPE-FILTRE : On désactive le cache pour ignorer les pannes réseau intermittentes des serveurs GitHub
           cache-disabled: true
 
       - name: Build Debug APK
@@ -39,8 +40,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TradingBot-APK
-          # CAPTURE UNIVERSELLE : Le double astérisque (**) scanne récursivement le dossier pour ramasser
-          # l'APK généré avec ton horodatage français (ex: Fonda_IOF_23052026-14H22.apk), peu importe la minute.
+          # Ici on écrit en dur le début "V1.0.1" pour correspondre au build.gradle
+          # et on ajoute la date dynamique juste après
+          name: Fonda_IOF_V1.0.1_${{ env.CURRENT_DATE }}
           path: app/build/outputs/apk/debug/**/*.apk
           retention-days: 30
