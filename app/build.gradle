@@ -2,11 +2,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// Fonction pour générer l'horodatage strict (Exemple : 22052026-14H22)
+// Fonction pour générer l'horodatage strict en Français (Exemple : 23052026-14H22)
 def getBuildTimestamp() {
     def date = new Date()
-    // 'dd' = Jour (2 chiffres), 'MM' = Mois (2 chiffres), 'yyyy' = Année (4 chiffres)
-    // Le 'H' entre guillemets insère la lettre H majuscule entre les heures et les minutes
+    // 'dd' = Jour, 'MM' = Mois, 'yyyy' = Année
+    // Le 'H' entre guillemets simples insère la lettre H majuscule entre les heures et les minutes
     def formattedDate = new SimpleDateFormat("ddMMyyyy-HH'H'mm", Locale.FRANCE)
     return formattedDate.format(date)
 }
@@ -23,8 +23,8 @@ android {
         applicationId "com.tradingbot.analyzer"
         minSdk 26
         targetSdk 33
-        versionCode 1
-        versionName "1.0"
+        versionCode 1 // ← Le sous-numéro (ex: le '1' de V1.0.1)
+        versionName "1.0" // ← Le préfixe de version (ex: le '1.0' de V1.0.1)
     }
 
     buildTypes {
@@ -41,14 +41,15 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    // Application du format personnalisé : Fonda_IOF_V1.0_22052026-14H22_debug.apk
-    // Ou si tu préfères UNIQUEMENT la date : Fonda_IOF_22052026-14H22.apk (voir note ci-dessous)
+    // Application du format combiné complet : Fonda_IOF_V1.0.1_23052026-14H22.apk
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach { output ->
             def timestamp = getBuildTimestamp()
+            def vName = variant.versionName      // Récupère "1.0"
+            def vCode = variant.versionCode      // Récupère "1"
             
-            // Format structuré avec le tag de l'application et la date stricte
-            outputFileName = "Fonda_IOF_${timestamp}.apk"
+            // Construit dynamiquement le nom complet demandé
+            outputFileName = "Fonda_IOF_V${vName}.${vCode}_${timestamp}.apk"
         }
     }
 }
