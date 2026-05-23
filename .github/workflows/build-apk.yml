@@ -32,6 +32,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TradingBot-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: Fondamental_IOF
+          path: app/build/outputs/apk/debug/Fonda_IOF_V1.0.3.apk
           retention-days: 30
