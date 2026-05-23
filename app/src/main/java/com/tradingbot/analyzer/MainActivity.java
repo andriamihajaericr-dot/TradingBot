@@ -36,7 +36,8 @@ public class MainActivity extends AppCompatActivity {
         instance = this;
         
         // Initialisation de la base de données locale
-        eventDb = new EventDatabase(this);
+        // Ligne correcte sécurisée
+        eventDb = EventDatabase.getInstance(this);
 
         // Liaison des composants avec le fichier XML activity_main
         mainScrollView = (ScrollView) ((android.view.ViewGroup) findViewById(android.R.id.content)).getChildAt(0);
