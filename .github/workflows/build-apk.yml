@@ -5,6 +5,8 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Force l'ensemble des scripts de runner à s'exécuter sous Node.js 24 
+# pour anticiper les dépréciations d'infrastructure de GitHub.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -26,8 +28,9 @@ jobs:
       - name: Install & Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          # ALIGNEMENT TECHNIQUE : Passage en 8.1.1 pour supporter ton plugin 8.1.0
+          # ALIGNEMENT : Version 8.1.1 nécessaire pour supporter ton Android Gradle Plugin 8.1.0
           gradle-version: '8.1.1'
+          # COUPE-FILTRE : On désactive le cache pour ignorer les pannes réseau intermittentes des serveurs GitHub
           cache-disabled: true
 
       - name: Build Debug APK
@@ -37,6 +40,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: TradingBot-APK
-          # Recherche universelle pour capturer l'APK quel que soit son nom de version
+          # CAPTURE UNIVERSELLE : Le double astérisque (**) scanne récursivement le dossier pour ramasser
+          # l'APK généré avec ton horodatage français (ex: Fonda_IOF_23052026-14H22.apk), peu importe la minute.
           path: app/build/outputs/apk/debug/**/*.apk
           retention-days: 30
