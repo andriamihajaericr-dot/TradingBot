@@ -165,7 +165,7 @@ public class NotificationService extends NotificationListenerService {
         "   • 🛢️ USOIL   : ACHAT CHOC 🟢  | Si Moyen-Orient / Détroit d'Ormuz impliqué (menace sur l'offre)\n" +
         "                  NEUTRE          | Si conflit local sans aucun impact sur les routes pétrolières\n" +
         "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴  | Devise risk-on fortement pénalisée en RISK-OFF\n" +
-        "   • 🇨🇦 USDCAD : ACHAT CHOC 🟢  | Le CAD subit la force de l'USD sauf si le pétrole compense\n" +
+        "   • 🇨🇦 USDCAD : RÈGLE DOUBLE ─ Si USOIL est en ACHAT CHOC 🟢 (pétrole monte) → USDCAD = NEUTRE (forces opposées qui s'annulent : USD fort vs CAD soutenu par pétrole). Si USOIL est NEUTRE → USDCAD : ACHAT CHOC 🟢. Mentionner obligatoirement la divergence dans le FAIT MARQUANT.\n" +
         "   • 🇪🇺 EURUSD : VENTE CHOC 🔴  | L'Euro subit le choc de l'instabilité internationale\n" +
         "   • 🇬🇧 GBPUSD : VENTE CHOC 🔴  | La Livre subit la baisse générale de l'aversion au risque\n" +
         "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Les marchés actions capitulent face à l'incertitude\n" +
