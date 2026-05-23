@@ -289,16 +289,20 @@ public class NotificationService extends NotificationListenerService {
         String unifiedFeed = (title + " " + text).trim();
 
         if (unifiedFeed.length() < 10) return;
-
         String packageName = sbn.getPackageName().toLowerCase();
         String sourceName = "Source Institutionnelle";
-        if (packageName.equals("com.financialjuice.androidapp") || packageName.contains("financialjuice")) {
-           sourceName = "FinancialJuice";
-        } else if (packageName.equals("com.fusionmedia.investing") || packageName.contains("investing")) {
-           sourceName = "Investing.com";
-        } else if (packageName.equals("com.twitter.android") || packageName.contains("twitter") || packageName.contains("periscope")) {
-           sourceName = "X / Twitter";
-        else return;
+
+       // Filtrage chirurgical des 3 paquets officiels
+       if (packageName.equals("com.financialjuice.androidapp") || packageName.contains("financialjuice")) {
+          sourceName = "FinancialJuice";
+       } else if (packageName.equals("com.fusionmedia.investing") || packageName.contains("investing")) {
+          sourceName = "Investing.com";
+       } else if (packageName.equals("com.twitter.android") || packageName.contains("twitter") || packageName.contains("periscope")) {
+          sourceName = "X / Twitter";
+       } else {
+        // Sécurité : Si l'application émettrice n'est pas dans ta liste, on stoppe tout immédiatement
+       return; 
+       }
 
         String upperFeed = unifiedFeed.toUpperCase();
         long currentTime = System.currentTimeMillis();
