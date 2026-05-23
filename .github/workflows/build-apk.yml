@@ -5,7 +5,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-# Force l'exécution sous Node.js 24 pour éliminer les warnings d'infrastructure
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -27,10 +26,9 @@ jobs:
       - name: Install & Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.0'
-          # CORRECTION : Empêche le build d'échouer ou de lever des alertes si les serveurs
-          # de cache de GitHub (actuellement instables) rejettent la connexion.
-          cache-disabled: false
+          # ALIGNEMENT TECHNIQUE : Passage en 8.1.1 pour supporter ton plugin 8.1.0
+          gradle-version: '8.1.1'
+          cache-disabled: true
 
       - name: Build Debug APK
         run: gradle assembleDebug
@@ -39,6 +37,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: TradingBot-APK
-          # CORRECTION STRICTE : Alignement du chemin sur le nom réel de ton fichier généré
-          path: app/build/outputs/apk/debug/Fonda_IOF_V1.0.3.apk
+          # Recherche universelle pour capturer l'APK quel que soit son nom de version
+          path: app/build/outputs/apk/debug/**/*.apk
           retention-days: 30
