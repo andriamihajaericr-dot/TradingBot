@@ -14,8 +14,8 @@ import java.util.Locale;
 public class EventDatabase extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "trading_bot.db";
-    private static final int DATABASE_VERSION = 3; 
-    public static final String TABLE_EVENTS = "events"; 
+    private static final int DATABASE_VERSION = 3;
+    public static final String TABLE_EVENTS = "events";
 
     // Implémentation du Singleton pour la sécurité d'accès concurrentiel (WAL)
     private static volatile EventDatabase instance;
@@ -38,7 +38,7 @@ public class EventDatabase extends SQLiteOpenHelper {
     @Override
     public void onConfigure(SQLiteDatabase db) {
         super.onConfigure(db);
-        // Activation du mode WAL (Write-Ahead Logging) pour éviter les accès bloquants (SQLiteDatabaseLockedException)
+        // Activation du mode WAL (Write-Ahead Logging) pour éviter les accès bloquants
         db.enableWriteAheadLogging();
     }
 
@@ -71,8 +71,8 @@ public class EventDatabase extends SQLiteOpenHelper {
         }
     }
 
-    public synchronized boolean saveEvent(String fingerprint, String pkg, String src, String type, 
-                                          String title, String content, String assets, String impact, 
+    public synchronized boolean saveEvent(String fingerprint, String pkg, String src, String type,
+                                          String title, String content, String assets, String impact,
                                           int timestamp, String status, int weight) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues cv = new ContentValues();
@@ -94,10 +94,11 @@ public class EventDatabase extends SQLiteOpenHelper {
 
     public Cursor getUnsyncedEvents(long currentUnixTime) {
         SQLiteDatabase db = this.getReadableDatabase();
-        long threshold = currentUnixTime - 1800; // Fenêtre des 30 dernières minutes max
-        return db.query(TABLE_EVENTS, null, 
-                "sync_status = ? AND unix_timestamp >= ?", 
-                new String[]{"en_attente", String.valueOf(threshold)}, 
+        // CORRECTION : Fenêtre élargie à 6h (21600s) pour couvrir les périodes offline prolongées
+        long threshold = currentUnixTime - 21600;
+        return db.query(TABLE_EVENTS, null,
+                "sync_status = ? AND unix_timestamp >= ?",
+                new String[]{"en_attente", String.valueOf(threshold)},
                 null, null, "unix_timestamp ASC");
     }
 
@@ -112,9 +113,9 @@ public class EventDatabase extends SQLiteOpenHelper {
     public String getRecentEventsForAssets(List<String> assets, int limit) {
         SQLiteDatabase db = this.getReadableDatabase();
         StringBuilder sb = new StringBuilder();
-        
+
         if (assets == null || assets.isEmpty()) return "";
-        
+
         StringBuilder selection = new StringBuilder("sync_status = 'synced' AND (");
         for (int i = 0; i < assets.size(); i++) {
             selection.append("target_assets LIKE ?");
@@ -129,10 +130,10 @@ public class EventDatabase extends SQLiteOpenHelper {
 
         Cursor cursor = null;
         try {
-            cursor = db.query(TABLE_EVENTS, 
-                    new String[]{"unix_timestamp", "source", "feed_content", "impact"}, 
+            cursor = db.query(TABLE_EVENTS,
+                    new String[]{"unix_timestamp", "source", "feed_content", "impact"},
                     selection.toString(), whereArgs, null, null, "unix_timestamp DESC", String.valueOf(limit));
-            
+
             if (cursor != null && cursor.moveToFirst()) {
                 SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.FRANCE);
                 do {
@@ -156,12 +157,11 @@ public class EventDatabase extends SQLiteOpenHelper {
         StringBuilder sb = new StringBuilder();
         long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
 
-        // Correction Problème 4 : Sécurisation de la requête en injectant proprement le paramètre via ?
         String selection = "unix_timestamp >= ? AND (impact LIKE ? OR impact LIKE ? OR driver_weight >= ?)";
         String[] whereArgs = new String[]{
-                String.valueOf(twentyFourHoursAgo), 
-                "%DRIVER%", 
-                "%PIVOT%", 
+                String.valueOf(twentyFourHoursAgo),
+                "%DRIVER%",
+                "%PIVOT%",
                 "4"
         };
 
@@ -188,8 +188,8 @@ public class EventDatabase extends SQLiteOpenHelper {
 
         Cursor cursor = null;
         try {
-            cursor = db.query(TABLE_EVENTS, new String[]{"feed_content", "impact"}, 
-                    "unix_timestamp >= ? AND (driver_weight = 5 OR impact LIKE '%PIVOT%')", 
+            cursor = db.query(TABLE_EVENTS, new String[]{"feed_content", "impact"},
+                    "unix_timestamp >= ? AND (driver_weight = 5 OR impact LIKE '%PIVOT%')",
                     new String[]{String.valueOf(thirtyDaysAgo)}, null, null, "unix_timestamp ASC");
             if (cursor != null && cursor.moveToFirst()) {
                 do {
@@ -206,7 +206,7 @@ public class EventDatabase extends SQLiteOpenHelper {
 
     public void purgeOldEvents(long currentUnixTime) {
         SQLiteDatabase db = this.getWritableDatabase();
-        
+
         long fortyEightHoursAgo = currentUnixTime - (2 * 24 * 60 * 60);
         int softDeleted = db.delete(TABLE_EVENTS, "unix_timestamp < ? AND driver_weight < 5", new String[]{String.valueOf(fortyEightHoursAgo)});
         Log.d("EventDatabase", "Purge Flux/Bruit effectuée : " + softDeleted + " lignes supprimées.");
