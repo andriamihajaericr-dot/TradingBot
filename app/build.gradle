@@ -1,3 +1,16 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+// Fonction pour générer l'horodatage strict (Exemple : 22052026-14H22)
+def getBuildTimestamp() {
+    def date = new Date()
+    // 'dd' = Jour (2 chiffres), 'MM' = Mois (2 chiffres), 'yyyy' = Année (4 chiffres)
+    // Le 'H' entre guillemets insère la lettre H majuscule entre les heures et les minutes
+    def formattedDate = new SimpleDateFormat("ddMMyyyy-HH'H'mm", Locale.FRANCE)
+    return formattedDate.format(date)
+}
+
 plugins {
     id 'com.android.application'
 }
@@ -26,6 +39,17 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // Application du format personnalisé : Fonda_IOF_V1.0_22052026-14H22_debug.apk
+    // Ou si tu préfères UNIQUEMENT la date : Fonda_IOF_22052026-14H22.apk (voir note ci-dessous)
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach { output ->
+            def timestamp = getBuildTimestamp()
+            
+            // Format structuré avec le tag de l'application et la date stricte
+            outputFileName = "Fonda_IOF_${timestamp}.apk"
+        }
     }
 }
 
