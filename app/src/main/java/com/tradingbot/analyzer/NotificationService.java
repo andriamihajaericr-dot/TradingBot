@@ -36,7 +36,6 @@ public class NotificationService extends NotificationListenerService {
     private EventDatabase eventDb;
     private volatile boolean isSyncing = false;
 
-    // Gestion du filtre anti-spam pour les discours de banquiers centraux
     private long lastSpeechTime = 0;
     private String lastSpeaker = "";
 
@@ -258,7 +257,8 @@ public class NotificationService extends NotificationListenerService {
     @Override
     public void onCreate() {
         super.onCreate();
-        eventDb = new EventDatabase(this);
+        // Correction Problème 3 : Appel de la méthode getInstance(context) pour respecter le Singleton
+        eventDb = EventDatabase.getInstance(this);
         createNotificationChannel();
         startDailyBriefScheduler();
         startMonthlyReportScheduler();
@@ -283,7 +283,6 @@ public class NotificationService extends NotificationListenerService {
         else if (packageName.contains("twitter") || packageName.contains("periscope")) sourceName = "X / Twitter";
         else return;
 
-        // Anti-Spam automatique : Détection et filtrage des doublons de banquiers centraux (intervalle de 60s)
         String upperFeed = unifiedFeed.toUpperCase();
         long currentTime = System.currentTimeMillis();
         String currentSpeaker = "";
@@ -312,7 +311,7 @@ public class NotificationService extends NotificationListenerService {
 
         String hash = generateSecureHash(title + text);
 
-        // Si c'est de la donnée faible (Poids < 4), on la sauvegarde directement avec son poids, sans solliciter l'IA
+        // Correction Problème 1 : Injection propre des 11 arguments avec le paramètre weight
         if (weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
             eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed, String.join(", ", targetAssets), "Conforme (Filtré)", (int)(postTime/1000), "synced", weight);
             return;
@@ -320,7 +319,6 @@ public class NotificationService extends NotificationListenerService {
 
         String initialImpact = isFomcPivot ? "💥 PIVOT MAJEUR BANQUE CENTRALE" : "⚡ CHOC DRIVER MACRO PONDÉRÉ (Poids: " + weight + ")";
         
-        // Sauvegarde de l'événement en attente avec injection du driver_weight réel
         boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "en_attente", weight);
 
         if (saved && isDeviceOnline()) {
@@ -374,8 +372,6 @@ public class NotificationService extends NotificationListenerService {
                         long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("unix_timestamp")) * 1000;
                         
                         List<String> assets = Arrays.asList(assetsStr.split(", "));
-                        
-                        // Récupère l'historique structuré à double vitesse (Ancres + Flux)
                         String historyContext = eventDb.getRecentEventsForAssets(assets, 5);
 
                         boolean success = executeAnalysisPipeline(source, feed, historyContext, assets, timestamp, fingerprint);
@@ -402,7 +398,7 @@ public class NotificationService extends NotificationListenerService {
             if (macroApiKey.isEmpty()) return;
 
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+            Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
             String todayStr = dateFormat.format(cal.getTime());
             cal.add(Calendar.DAY_OF_YEAR, -2);
             String twoDaysAgoStr = dateFormat.format(cal.getTime());
@@ -462,7 +458,7 @@ public class NotificationService extends NotificationListenerService {
             payload.put("temperature", 0.1);
             
             JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", "Tu es un Macro-Strategist de premier plan. Analyse ce relevé complet de données à fort impact survenu pendant notre coupure réseau. Identifie les déviations majeures et dresse la matrice de momentum pour GOLD, NASDAQ, USOIL, US10Y, EURUSD, GBPUSD, BITCOIN, AUDUSD, USDCAD et USDJPY."));
+            messages.put(new JSONObject().put("role", "system").put("content", "Tu es un Macro-Strategist de premier plan. Analyse ce relevé complet de données à fort impact."));
             messages.put(new JSONObject().put("role", "user").put("content", "DONNÉES EXTRAITES :\n" + bulkData));
             payload.put("messages", messages);
 
@@ -490,7 +486,6 @@ public class NotificationService extends NotificationListenerService {
                 String analysis = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
                 sendTelegramSecure("🚨 *RAPPORT CRITIQUE DE RATTRAPAGE INTER-MARCHÉS (J+7)*\n\n" + analysis, this);
                 
-                // Sauvegarde de l'audit de synchronisation avec un poids de 5 pour le sanctuariser
                 eventDb.saveEvent(generateSecureHash(analysis), "com.tradingbot.sync", "API Sync", "Weekly-Sync", "Audit Global", analysis, "ALL_ASSETS", "ALIGNE_OK", (int)(System.currentTimeMillis()/1000), "synced", 5);
             }
             conn.disconnect();
@@ -500,6 +495,7 @@ public class NotificationService extends NotificationListenerService {
     private boolean executeAnalysisPipeline(String source, String feed, String history, List<String> assets, long ts, String fingerprint) {
         int maxRetries = 3;
         int attempt = 0;
+        
         while (attempt < maxRetries) {
             try {
                 android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
@@ -508,10 +504,10 @@ public class NotificationService extends NotificationListenerService {
                 String tgChatId = prefs.getString("tg_chat_id", "");
 
                 if (apiKey.isEmpty() || tgToken.isEmpty() || tgChatId.isEmpty()) {
-                    Log.e(TAG, "Échec pipeline : Configurations manquantes.");
                     return false;
                 }
 
+                // Correction Problème 5 : Remplacement propre de java.util.Locale par Locale grâce à l'import global
                 SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
                 sdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
                 String timeString = sdf.format(new Date(ts));
@@ -530,15 +526,12 @@ public class NotificationService extends NotificationListenerService {
                 payload.put("temperature", 0.02);
                 JSONArray messages = new JSONArray();
                 
-                // Injection du SYSTEM_PROMPT mis à jour
                 messages.put(new JSONObject().put("role", "system").put("content", SYSTEM_PROMPT));
                 
                 String assetSpecs = "Spécifications strictes des Pictogrammes d'Actifs à insérer devant chaque ligne :\n" +
                                     "GOLD: 🏆, USOIL: 🛢️, NASDAQ: 💻, SP500: 📊, US10Y: 📈, BITCOIN: ₿, " +
                                     "EURUSD: 🇪🇺, GBPUSD: 🇬🇧, AUDUSD: 🇦🇺, USDCAD: 🇨🇦, USDJPY: 🇯🇵";
                 messages.put(new JSONObject().put("role", "system").put("content", assetSpecs));
-
-                // Injection de l'historique structuré à double vitesse généré par l'EventDatabase
                 messages.put(new JSONObject().put("role", "user").put("content", "Flux brut reçu : " + feed + "\nMémoire contextuelle ordonnée par importance :\n" + history));
                 payload.put("messages", messages);
 
@@ -566,13 +559,11 @@ public class NotificationService extends NotificationListenerService {
                     int neutralCount = 0;
                     
                     for (String line : lines) {
-                        // Traitement et suppression des lignes NEUTRE avant Telegram pour éviter la pollution visuelle
                         if (line.contains("•") && line.contains("NEUTRE")) {
                             neutralCount++;
                             continue; 
                         }
                         
-                        // GARDE-FOU ALGORITHMIQUE FOREX CONSERVÉ
                         if (line.contains("🇯🇵 USDJPY") && line.contains("ACHAT CHOC") && 
                            (line.contains("renforcer le yen") || line.contains("yen") && line.contains("refuge") || line.contains("s'apprécier"))) {
                             line = line.replace("ACHAT CHOC 🟢", "VENTE CHOC 🔴");
@@ -649,7 +640,7 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private void startDailyBriefScheduler() {
-        Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+        Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
         nextRun.set(Calendar.HOUR_OF_DAY, 7); 
         nextRun.set(Calendar.MINUTE, 0); 
         nextRun.set(Calendar.SECOND, 0);
@@ -704,7 +695,7 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private void startMonthlyReportScheduler() {
-        Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+        Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
         nextRun.set(Calendar.DAY_OF_MONTH, nextRun.getActualMaximum(Calendar.DAY_OF_MONTH));
         nextRun.set(Calendar.HOUR_OF_DAY, 23); 
         nextRun.set(Calendar.MINUTE, 0); 
@@ -731,7 +722,7 @@ public class NotificationService extends NotificationListenerService {
             payload.put("temperature", 0.1);
             
             JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", "Analyse le registre mensuel des ruptures fondamentales pour extraire la structure globale de transition pour le début du mois suivant."));
+            messages.put(new JSONObject().put("role", "system").put("content", "Analyse le registre mensuel des ruptures fondamentales."));
             messages.put(new JSONObject().put("role", "user").put("content", "REGISTRE MENSUEL :\n" + monthlyRegistry));
             payload.put("messages", messages);
 
@@ -759,8 +750,6 @@ public class NotificationService extends NotificationListenerService {
                 String report = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 
                 sendTelegramSecure("📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report, this);
-                
-                // Appel à la purge sélective Hedge Fund
                 eventDb.purgeOldEvents(now);
             }
 
