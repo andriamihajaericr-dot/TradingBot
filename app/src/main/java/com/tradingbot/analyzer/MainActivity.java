@@ -121,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
             statusText.setTextColor(0xFFFF9800); // Orange
         } else if (active) {
             statusText.setText("🟢 BOT ACTIF — EN ÉCOUTE DES DRIVERS...");
-            statusText.setTextColor(0xFF00FF00); // Vert
+            statusText.setTextColor(0xFF555555);
         } else {
             statusText.setText("🔴 BOT INACTIF — COUPE FLUX ENGAGÉ");
             statusText.setTextColor(0xFFFF0000); // Rouge
