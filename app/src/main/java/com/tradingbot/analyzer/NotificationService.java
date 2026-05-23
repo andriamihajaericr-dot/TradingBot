@@ -319,21 +319,45 @@ public class NotificationService extends NotificationListenerService {
 
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
         List<String> targetAssets = filterActiveAssets(feed);
-        ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
-        if (!vr.isConfirmed) return; // rejeté par le validator
+
+        // ── Validation institutionnelle (calendrier + géopolitique + anti-rumeur) ──────
+        // CORRECTION : qualification complète EventValidator.ValidationResult (classe interne)
+        // EventValidator enrichit targetAssets si un événement géo ou calendrier est détecté.
+        // Si isConfirmed = false → rejet silencieux, rien n'est sauvegardé ni envoyé.
+        EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
+
         boolean isFomcPivot = feed.toUpperCase().contains("FOMC") || feed.toUpperCase().contains("FED ");
         int weight = assignDriverWeight(feed);
 
+        // Élévation du poids pour les événements géopolitiques confirmés à haute conviction
+        if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 80) {
+            weight = Math.max(weight, 4); // Géo fort impact → traité comme driver secondaire minimum
+        }
+
         String hash = generateSecureHash(title + text);
 
-        if (weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
-            eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed, String.join(", ", targetAssets), "Conforme (Filtré)", (int)(postTime/1000), "synced", weight);
+        // Filtre pré-validation : bruit faible non confirmé → sauvegarde silencieuse sans traitement
+        if (!vr.isConfirmed && weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
+            eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
+                    String.join(", ", targetAssets), "Conforme (Filtré)", (int)(postTime/1000), "synced", weight);
             return;
         }
 
-        String initialImpact = isFomcPivot ? "💥 PIVOT MAJEUR BANQUE CENTRALE" : "⚡ CHOC DRIVER MACRO PONDÉRÉ (Poids: " + weight + ")";
+        // Rejet définitif si le validator a explicitement refusé (rumeur, éditorial)
+        if (!vr.isConfirmed && weight < 4) return;
 
-        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "en_attente", weight);
+        // Construction du label d'impact enrichi avec le contexte géo si disponible
+        String initialImpact;
+        if (!vr.geoContext.isEmpty()) {
+            initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "%";
+        } else if (isFomcPivot) {
+            initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRALE";
+        } else {
+            initialImpact = "⚡ CHOC DRIVER MACRO PONDÉRÉ (Poids: " + weight + ")";
+        }
+
+        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
+                String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "en_attente", weight);
 
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
