@@ -500,7 +500,6 @@ public class NotificationService extends NotificationListenerService {
     private boolean executeAnalysisPipeline(String source, String feed, String history, List<String> assets, long ts, String fingerprint) {
         int maxRetries = 3;
         int attempt = 0;
-        
         while (attempt < maxRetries) {
             try {
                 android.content.SharedPreferences prefs = getSharedPreferences("TradingBot", MODE_PRIVATE);
