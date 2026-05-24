@@ -1029,7 +1029,6 @@ public class NotificationService extends NotificationListenerService {
         super.onDestroy();
         scheduler.shutdownNow();
         exec.shutdownNow();
-        
         // Nettoyage final
         if (recentFingerprints != null) {
             recentFingerprints.clear();
