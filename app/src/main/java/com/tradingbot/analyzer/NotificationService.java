@@ -586,7 +586,9 @@ public class NotificationService extends NotificationListenerService {
         }
     }
 
-    private boolean executeAnalysisPipeline(String source, String feed, String history, List<String> assets, long ts, String fingerprint) {
+        private boolean executeAnalysisPipeline(String source, String feed, String history, 
+                                            List<String> assets, long ts, String fingerprint) {
+        
         int maxRetries = 3;
         int attempt = 0;
 
@@ -596,6 +598,26 @@ public class NotificationService extends NotificationListenerService {
         String tgToken  = prefs.getString(PREF_TG_TOKEN, "");
         String tgChatId = prefs.getString(PREF_TG_CHAT_ID, "");
         if (apiKey.isEmpty() || tgToken.isEmpty() || tgChatId.isEmpty()) return false;
+
+        long now = System.currentTimeMillis();
+
+        // ── THROTTLE GLOBAL + GÉO (ajouté sans casser la structure) ─────
+        if (now - lastAnalysisTime < GLOBAL_THROTTLE_MS) {
+            eventDb.markEventAsSynced(fingerprint, "THROTTLED_GLOBAL");
+            logToMain("[THROTTLE] Analyse bloquée (global - 8 min)");
+            return true;
+        }
+
+        boolean isGeoEvent = feed.toUpperCase(Locale.ROOT).contains("MOYEN-ORIENT") || 
+                            feed.toUpperCase(Locale.ROOT).contains("IRAN") || 
+                            feed.toUpperCase(Locale.ROOT).contains("ISRAEL") ||
+                            feed.toUpperCase(Locale.ROOT).contains("GÉO");
+
+        if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
+            eventDb.markEventAsSynced(fingerprint, "THROTTLED_GEO");
+            logToMain("[THROTTLE] Événement Géo bloqué (12 min)");
+            return true;
+        }
 
         while (attempt < maxRetries) {
             HttpURLConnection conn = null;
@@ -641,11 +663,13 @@ public class NotificationService extends NotificationListenerService {
                     br.close();
 
                     String aiResult = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+                    
                     if (aiResult.isEmpty() || aiResult.length() < 50) {
                         throw new Exception("Invalid API response");
                     }
+
                     // ─────────────────────────────────────────────────────────────
-                    // NOUVEAU FILTRAGE : Neutres gardés pour Groq, supprimés pour Telegram
+                    // FILTRAGE : Neutres gardés pour Groq, seulement signaux forts pour Telegram
                     // ─────────────────────────────────────────────────────────────
                     StringBuilder filteredMessage = new StringBuilder();
                     String[] lines = aiResult.split("\n");
@@ -655,7 +679,7 @@ public class NotificationService extends NotificationListenerService {
                         String trimmed = line.trim();
                         if (trimmed.isEmpty()) continue;
 
-                        // On garde toujours les métadonnées importantes
+                        // Métadonnées importantes
                         if (trimmed.startsWith("🚨") || 
                             trimmed.startsWith("📊") || 
                             trimmed.startsWith("🎯") || 
@@ -666,7 +690,7 @@ public class NotificationService extends NotificationListenerService {
                             continue;
                         }
 
-                        // On garde UNIQUEMENT les lignes avec ACHAT ou VENTE pour Telegram
+                        // Seulement les lignes avec ACHAT ou VENTE
                         if (trimmed.contains("•") && 
                            (line.contains("ACHAT CHOC") || line.contains("VENTE CHOC"))) {
                             
@@ -696,13 +720,26 @@ public class NotificationService extends NotificationListenerService {
                                 + "📡 Source : " + source + "\n"
                                 + filteredMessage.toString().trim();
 
+                        // Protection anti-spam : message trop court
+                        if (finalPayload.length() < 200) {
+                            eventDb.markEventAsSynced(fingerprint, "TOO_SHORT");
+                            return true;
+                        }
+
                         sendTelegramSecure(finalPayload, this);
+
+                        // Mise à jour des throttles
+                        lastAnalysisTime = now;
+                        if (isGeoEvent) {
+                            lastGeoTime = now;
+                        }
                     } else {
                         eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
                     }
 
                     eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
                     return true;
+
                 } else {
                     throw new Exception("API Error: " + conn.getResponseCode());
                 }
@@ -714,7 +751,6 @@ public class NotificationService extends NotificationListenerService {
                     try { Thread.sleep(2000 * attempt); } catch (InterruptedException ie) { return false; }
                 }
             } finally {
-                // CORRECTION 3 : Fermeture garantie de la connexion dans executeAnalysisPipeline
                 if (conn != null) conn.disconnect();
             }
         }
