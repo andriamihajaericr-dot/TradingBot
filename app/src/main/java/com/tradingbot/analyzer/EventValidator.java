@@ -8,7 +8,8 @@ public class EventValidator {
 
     private static Map<String, EconomicCalendarAPI.CalendarEvent> upcomingEvents =
         new ConcurrentHashMap<>();
-    private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>();
+    
+    private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
     private static final long DUPLICATE_WINDOW_MS = 45 * 60 * 1000L; // 45 minutes
 
     // ─────────────────────────────────────────────────────────────
@@ -501,19 +502,23 @@ public class EventValidator {
         // ─────────────────────────────────────────────────────────────
     //  ANTI-DOUBLONS
     // ─────────────────────────────────────────────────────────────
+        // ─────────────────────────────────────────────────────────────
+    //  ANTI-DOUBLONS OPTIMISÉ (Mémoire légère)
+    // ─────────────────────────────────────────────────────────────
 
     private static String generateFingerprint(String title, String content) {
         if (title == null) title = "";
         if (content == null) content = "";
 
-        String combined = (title + " " + content).toLowerCase()
-                            .replaceAll("[^a-z0-9\\s]", " ")   // Garde seulement lettres et espaces
-                            .replaceAll("\\s+", " ")           // Normalise les espaces
+        String combined = (title + " " + content)
+                            .toLowerCase()
+                            .replaceAll("[^a-z0-9\\s]", " ")
+                            .replaceAll("\\s+", " ")
                             .trim();
 
-        // On prend les 100 premiers caractères (suffisant pour identifier la news)
-        int length = Math.min(100, combined.length());
-        return combined.substring(0, length);
+        // On limite à 90 caractères pour minimiser la taille en mémoire
+        int maxLen = Math.min(90, combined.length());
+        return combined.substring(0, maxLen);
     }
 
     private static boolean isRecentDuplicate(String title, String content) {
@@ -521,23 +526,21 @@ public class EventValidator {
         long now = System.currentTimeMillis();
 
         Long lastSeen = recentFingerprints.get(fingerprint);
-
         if (lastSeen != null && (now - lastSeen) < DUPLICATE_WINDOW_MS) {
-            logToMain("[VALIDATOR] 🔄 Doublon détecté et ignoré");
+            logToMain("[VALIDATOR] 🔄 Doublon ignoré");
             return true;
         }
 
-        // Mise à jour
         recentFingerprints.put(fingerprint, now);
 
-        // Nettoyage périodique (toutes les ~200 entrées)
-        if (recentFingerprints.size() > 200) {
-            recentFingerprints.entrySet().removeIf(entry -> now - entry.getValue() > 2 * 60 * 60 * 1000L); // > 2h
+        // Nettoyage agressif si la map grossit trop
+        if (recentFingerprints.size() > 180) {
+            long cleanupThreshold = now - (2 * 60 * 60 * 1000L); // > 2 heures
+            recentFingerprints.entrySet().removeIf(entry -> entry.getValue() < cleanupThreshold);
         }
 
         return false;
     }
-
     // ─────────────────────────────────────────────────────────────
     //  PRÉCHARGEMENT DU CALENDRIER
     // ─────────────────────────────────────────────────────────────
