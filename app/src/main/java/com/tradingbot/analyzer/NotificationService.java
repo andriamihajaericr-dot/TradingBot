@@ -279,6 +279,8 @@ public class NotificationService extends NotificationListenerService {
         startDailyBriefScheduler();
         startMonthlyReportScheduler();
         registerNetworkCallback();
+        // Nettoyage périodique toutes les 30 minutes
+        scheduler.scheduleAtFixedRate(this::cleanupMemory, 30, 30, TimeUnit.MINUTES);
     }
 
     @Override
