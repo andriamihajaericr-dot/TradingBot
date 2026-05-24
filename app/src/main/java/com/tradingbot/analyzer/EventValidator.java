@@ -199,174 +199,141 @@ public class EventValidator {
         String       contextLabel  = "";
         List<String> impactedAssets = new ArrayList<>();
     }
-
-    private static GeoAssessment assessGeopoliticalEvent(String text) {
+        private static GeoAssessment assessGeopoliticalEvent(String text) {
         GeoAssessment geo = new GeoAssessment();
         int score = 0;
 
+        String lowerText = text.toLowerCase();
+
         // ── A. Source crédible (score source) ────────────────────
         boolean hasCredibleSource =
-            text.contains("reuters")         ||
-            text.contains("bloomberg")       ||
-            text.contains("associated press")||
-            text.contains(" ap ")            ||
-            text.contains("idf")             || // Israel Defense Forces (source officielle)
-            text.contains("pentagon")        ||
-            text.contains("nato")            ||
-            text.contains("white house")     ||
-            text.contains("ministry of")     ||
-            text.contains("times of israel") ||
-            text.contains("al jazeera")      ||
-            text.contains("bbc")             ||
-            text.contains("cnn")             ||
-            text.contains("axios")           ||
-            text.contains("haaretz")         ||
-            text.contains("fxhedgers")       ||
-            text.contains("deltaone");
+            lowerText.contains("reuters")         ||
+            lowerText.contains("bloomberg")       ||
+            lowerText.contains("associated press")||
+            lowerText.contains(" ap ")            ||
+            lowerText.contains("idf")             ||
+            lowerText.contains("pentagon")        ||
+            lowerText.contains("nato")            ||
+            lowerText.contains("white house")     ||
+            lowerText.contains("ministry of")     ||
+            lowerText.contains("times of israel") ||
+            lowerText.contains("al jazeera")      ||
+            lowerText.contains("bbc")             ||
+            lowerText.contains("cnn")             ||
+            lowerText.contains("axios")           ||
+            lowerText.contains("haaretz")         ||
+            lowerText.contains("fxhedgers")       ||
+            lowerText.contains("deltaone");
 
         if (hasCredibleSource) score += 25;
 
         // ── B. Action militaire/géo concrète (verbe factuel passé) ──
         boolean hasFactualAction =
-            text.contains("fired")        ||
-            text.contains("launched")     ||
-            text.contains("struck")       ||
-            text.contains("hit")          ||
-            text.contains("attacked")     ||
-            text.contains("bombed")       ||
-            text.contains("intercepted")  ||
-            text.contains("shot down")    ||
-            text.contains("killed")       ||
-            text.contains("destroyed")    ||
-            text.contains("sanctions")    ||
-            text.contains("sanctioned")   ||
-            text.contains("embargo")      ||
-            text.contains("blockade")     ||
-            text.contains("ceasefire")    ||
-            text.contains("escalation")   ||
-            text.contains("mobilization") ||
-            text.contains("invasion")     ||
-            text.contains("airstrike")    ||
-            text.contains("air strike")   ||
-            text.contains("missile")      ||
-            text.contains("drone")        ||
-            text.contains("explosion")    ||
-            text.contains("troops")       ||
-            text.contains("forces")       ||
-            text.contains("naval")        ||
-            text.contains("warship")      ||
-            text.contains("conflict")     ||
-            text.contains("offensive");
+            lowerText.contains("fired")        ||
+            lowerText.contains("launched")     ||
+            lowerText.contains("struck")       ||
+            lowerText.contains("hit")          ||
+            lowerText.contains("attacked")     ||
+            lowerText.contains("bombed")       ||
+            lowerText.contains("intercepted")  ||
+            lowerText.contains("shot down")    ||
+            lowerText.contains("killed")       ||
+            lowerText.contains("destroyed")    ||
+            lowerText.contains("airstrike")    ||
+            lowerText.contains("air strike")   ||
+            lowerText.contains("missile")      ||
+            lowerText.contains("drone")        ||
+            lowerText.contains("explosion")    ||
+            lowerText.contains("raid")         ||
+            lowerText.contains("invasion");
 
-        if (hasFactualAction) score += 30;
+        if (hasFactualAction) score += 32;
 
         // ── C. Zone géographique à impact marché direct ──────────
-        // Chaque zone a des actifs précis impactés
         boolean geoZoneFound = false;
 
-        // Zone 1 : Moyen-Orient (Israël, Iran, Golfe, Détroit d'Ormuz)
-        // Impact : USOIL critique (routes pétrolières), GOLD refuge, USDJPY refuge
+        // Zone 1 : Moyen-Orient (Israël, Iran, Golfe, etc.)
         boolean isMoyenOrient =
-            text.contains("israel")       ||
-            text.contains("iran")         ||
-            text.contains("gaza")         ||
-            text.contains("lebanon")      ||
-            text.contains("hezbollah")    ||
-            text.contains("hamas")        ||
-            text.contains("houthi")       ||
-            text.contains("yemen")        ||
-            text.contains("red sea")      ||
-            text.contains("strait of hormuz") ||
-            text.contains("persian gulf") ||
-            text.contains("saudi")        ||
-            text.contains("riyadh")       ||
-            text.contains("tel aviv")     ||
-            text.contains("jerusalem")    ||
-            text.contains("beirut")       ||
-            text.contains("tehran")       ||
-            text.contains("middle east");
+            lowerText.contains("israel")       ||
+            lowerText.contains("iran")         ||
+            lowerText.contains("gaza")         ||
+            lowerText.contains("lebanon")      ||
+            lowerText.contains("hezbollah")    ||
+            lowerText.contains("hamas")        ||
+            lowerText.contains("houthi")       ||
+            lowerText.contains("yemen")        ||
+            lowerText.contains("red sea")      ||
+            lowerText.contains("strait of hormuz") ||
+            lowerText.contains("persian gulf") ||
+            lowerText.contains("saudi")        ||
+            lowerText.contains("tel aviv")     ||
+            lowerText.contains("jerusalem")    ||
+            lowerText.contains("beirut")       ||
+            lowerText.contains("tehran")       ||
+            lowerText.contains("middle east");
+
+        boolean isTrumpIran = lowerText.contains("trump") && lowerText.contains("iran");
 
         if (isMoyenOrient) {
-            geo.contextLabel = "Moyen-Orient / Pétrole";
-            geo.impactedAssets.addAll(Arrays.asList(
-                "USOIL",   // Impact maximal — routes pétrolières directement menacées
-                "GOLD",    // Refuge universel
-                "USDJPY",  // Yen refuge (graphique baisse)
-                "NASDAQ",  // Risk-off actions
-                "SP500",   // Risk-off actions
-                "BITCOIN", // Actif spéculatif fuit
-                "EURUSD",  // Euro sous pression risk-off
-                "AUDUSD"   // Devise risk-on pénalisée
-            ));
-            score += 20;
+            if (hasFactualAction) {
+                geo.contextLabel = "Moyen-Orient - Action Militaire";
+                score += 26;
+                geo.impactedAssets.addAll(Arrays.asList(
+                    "USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN", "EURUSD", "AUDUSD"
+                ));
+            } else if (isTrumpIran) {
+                geo.contextLabel = "Moyen-Orient - Déclaration Trump/Iran";
+                score += 11;   // Score très réduit pour éviter les faux positifs
+                geo.impactedAssets.addAll(Arrays.asList("GOLD", "USOIL", "USDJPY", "NASDAQ", "SP500"));
+            } else {
+                geo.contextLabel = "Moyen-Orient / Pétrole";
+                score += 17;
+                geo.impactedAssets.addAll(Arrays.asList("GOLD", "USOIL", "USDJPY"));
+            }
             geoZoneFound = true;
         }
 
         // Zone 2 : Europe de l'Est (Ukraine, Russie, OTAN)
-        // Impact : EURUSD, GBPUSD (Europe exposée), USOIL (Russie = fournisseur)
         boolean isEuropeEst =
-            text.contains("ukraine")      ||
-            text.contains("russia")       ||
-            text.contains("moscow")       ||
-            text.contains("kyiv")         ||
-            text.contains("kiev")         ||
-            text.contains("kremlin")      ||
-            text.contains("nato")         ||
-            text.contains("putin")        ||
-            text.contains("zelensky")     ||
-            text.contains("donbas")       ||
-            text.contains("crimea")       ||
-            text.contains("kharkiv")      ||
-            text.contains("odessa")       ||
-            text.contains("nord stream")  ||
-            text.contains("black sea");
+            lowerText.contains("ukraine")      ||
+            lowerText.contains("russia")       ||
+            lowerText.contains("moscow")       ||
+            lowerText.contains("kyiv")         ||
+            lowerText.contains("kiev")         ||
+            lowerText.contains("kremlin")      ||
+            lowerText.contains("nato")         ||
+            lowerText.contains("putin")        ||
+            lowerText.contains("zelensky")     ||
+            lowerText.contains("donbas")       ||
+            lowerText.contains("crimea")       ||
+            lowerText.contains("black sea");
 
         if (isEuropeEst && !geoZoneFound) {
             geo.contextLabel = "Europe de l'Est / OTAN";
             geo.impactedAssets.addAll(Arrays.asList(
-                "EURUSD",  // Euro exposé directement
-                "GBPUSD",  // Livre exposée (OTAN)
-                "USOIL",   // Russie = producteur majeur, sanctions = choc offre
-                "GOLD",    // Refuge
-                "USDJPY",  // Yen refuge
-                "NASDAQ",  // Risk-off
-                "SP500",   // Risk-off
-                "BITCOIN"  // Actif spéculatif fuit
+                "EURUSD", "GBPUSD", "USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN"
             ));
             score += 20;
             geoZoneFound = true;
         } else if (isEuropeEst) {
-            // Co-occurrence Moyen-Orient + Europe de l'Est → enrichir les actifs
-            if (!geo.impactedAssets.contains("EURUSD"))  geo.impactedAssets.add("EURUSD");
-            if (!geo.impactedAssets.contains("GBPUSD"))  geo.impactedAssets.add("GBPUSD");
+            if (!geo.impactedAssets.contains("EURUSD")) geo.impactedAssets.add("EURUSD");
+            if (!geo.impactedAssets.contains("GBPUSD")) geo.impactedAssets.add("GBPUSD");
         }
 
-        // Zone 3 : Asie-Pacifique (Chine, Taïwan, Corée du Nord, Mer de Chine)
-        // Impact : AUDUSD (Chine = partenaire AUS), indices tech (TSMC/NASDAQ)
+        // Zone 3 : Asie-Pacifique
         boolean isAsiePacifique =
-            text.contains("china")        ||
-            text.contains("taiwan")       ||
-            text.contains("beijing")      ||
-            text.contains("south china sea") ||
-            text.contains("north korea")  ||
-            text.contains("pyongyang")    ||
-            text.contains("kim jong")     ||
-            text.contains("xi jinping")   ||
-            text.contains("pla ")         || // People's Liberation Army
-            text.contains("tsmc")         ||
-            text.contains("semiconductor")||
-            text.contains("strait of taiwan");
+            lowerText.contains("china")        ||
+            lowerText.contains("taiwan")       ||
+            lowerText.contains("beijing")      ||
+            lowerText.contains("south china sea") ||
+            lowerText.contains("north korea")  ||
+            lowerText.contains("tsmc")         ||
+            lowerText.contains("semiconductor");
 
         if (isAsiePacifique && !geoZoneFound) {
             geo.contextLabel = "Asie-Pacifique / Chine";
             geo.impactedAssets.addAll(Arrays.asList(
-                "AUDUSD",  // AUD corrélé à la Chine (partenaire commercial majeur)
-                "USDJPY",  // Japon en première ligne géographique
-                "NASDAQ",  // TSMC/semi-conducteurs = 30% du NASDAQ
-                "SP500",   // Risk-off
-                "GOLD",    // Refuge
-                "BITCOIN", // Actif spéculatif fuit
-                "USOIL"    // Demande Chine impactée
+                "AUDUSD", "USDJPY", "NASDAQ", "SP500", "GOLD", "BITCOIN", "USOIL"
             ));
             score += 20;
             geoZoneFound = true;
@@ -375,36 +342,25 @@ public class EventValidator {
             if (!geo.impactedAssets.contains("NASDAQ")) geo.impactedAssets.add("NASDAQ");
         }
 
-        // Zone 4 : Amérique Latine / Canada / Mexique (tarifs, commerce)
+        // Zone 4 : Amérique Latine / Commerce
         boolean isAmeriqueLatine =
-            text.contains("mexico")       ||
-            text.contains("tariff")       ||
-            text.contains("trade war")    ||
-            text.contains("canada sanctions") ||
-            text.contains("opec")         ||
-            text.contains("venezuela")    ||
-            text.contains("colombia");
+            lowerText.contains("mexico")       ||
+            lowerText.contains("tariff")       ||
+            lowerText.contains("trade war")    ||
+            lowerText.contains("opec")         ||
+            lowerText.contains("venezuela");
 
         if (isAmeriqueLatine && !geoZoneFound) {
             geo.contextLabel = "Commerce / OPEC / Amériques";
-            geo.impactedAssets.addAll(Arrays.asList(
-                "USDCAD",  // CAD directement lié aux relations US-Canada
-                "USOIL",   // OPEC / Venezuela = producteurs
-                "NASDAQ",  // Tarifs tech
-                "SP500"
-            ));
+            geo.impactedAssets.addAll(Arrays.asList("USDCAD", "USOIL", "NASDAQ", "SP500"));
             score += 15;
             geoZoneFound = true;
         }
 
-        // Zone 5 : Afrique / autres zones (impact plus limité, score réduit)
+        // Zone 5 : Autres
         boolean isAutresZones =
-            text.contains("africa")       ||
-            text.contains("sudan")        ||
-            text.contains("ethiopia")     ||
-            text.contains("coup")         ||
-            text.contains("junta")        ||
-            text.contains("civil war");
+            lowerText.contains("africa") || lowerText.contains("sudan") ||
+            lowerText.contains("coup")   || lowerText.contains("civil war");
 
         if (isAutresZones && !geoZoneFound) {
             geo.contextLabel = "Géopolitique Émergent";
@@ -413,38 +369,38 @@ public class EventValidator {
             geoZoneFound = true;
         }
 
-        // Si aucune zone détectée mais qu'on a des actions militaires → score partiel
+        // Si aucune zone mais action militaire → score partiel
         if (!geoZoneFound && hasFactualAction) {
             geo.contextLabel = "Événement Géo Non Régionalisé";
             geo.impactedAssets.addAll(Arrays.asList("GOLD", "USDJPY"));
-            score += 5;
+            score += 8;
         }
 
         // ── D. Entité précise (nombre, lieu précis) ──────────────
         boolean hasPreciseEntity =
-            text.matches(".*\\d+\\s*(drone|missile|rocket|soldier|ship|warship|bomb).*") ||
-            text.matches(".*\\d+\\s*(km|miles|kilometers).*")                            ||
-            text.contains("confirmed dead")   ||
-            text.contains("confirmed killed") ||
-            text.contains("confirmed hit");
+            lowerText.matches(".*\\d+\\s*(drone|missile|rocket|soldier|ship|bomb).*") ||
+            lowerText.matches(".*\\d+\\s*(km|miles|kilometers).*")                    ||
+            lowerText.contains("confirmed dead") || lowerText.contains("confirmed killed");
 
         if (hasPreciseEntity) score += 15;
 
         // ── E. Confirmation officielle citée ─────────────────────
         boolean hasOfficialConfirmation =
-            text.contains("confirmed")       ||
-            text.contains("official said")   ||
-            text.contains("officials said")  ||
-            text.contains("spokesman said")  ||
-            text.contains("statement said")  ||
-            text.contains("announced")       ||
-            text.contains("idf confirmed")   ||
-            text.contains("pentagon confirmed");
+            lowerText.contains("confirmed")       ||
+            lowerText.contains("official said")   ||
+            lowerText.contains("officials said")  ||
+            lowerText.contains("announced")       ||
+            lowerText.contains("idf confirmed")   ||
+            lowerText.contains("pentagon confirmed");
 
         if (hasOfficialConfirmation) score += 10;
 
+        // ── ANTI-FAUX POSITIF (spécifique Twitter + Trump) ───────
+        if (isTrumpIran && !hasFactualAction && !hasOfficialConfirmation) {
+            score = Math.min(score, 55);   // Bloque juste sous le seuil de 65
+        }
+
         // ── Pondération finale ────────────────────────────────────
-        // Sans zone géo ET sans action factualisée → pas un événement géo actionnable
         if (!geoZoneFound && !hasFactualAction) score = 0;
 
         geo.confidence = Math.min(100, score);
