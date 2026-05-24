@@ -8,6 +8,8 @@ public class EventValidator {
 
     private static Map<String, EconomicCalendarAPI.CalendarEvent> upcomingEvents =
         new ConcurrentHashMap<>();
+    private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>();
+    private static final long DUPLICATE_WINDOW_MS = 45 * 60 * 1000L; // 45 minutes
 
     // ─────────────────────────────────────────────────────────────
     //  RÉSULTAT DE VALIDATION
@@ -507,6 +509,46 @@ public class EventValidator {
         if (MainActivity.instance != null) {
             MainActivity.instance.addLog(message);
         }
+    }
+
+        // ─────────────────────────────────────────────────────────────
+    //  ANTI-DOUBLONS
+    // ─────────────────────────────────────────────────────────────
+
+    private static String generateFingerprint(String title, String content) {
+        if (title == null) title = "";
+        if (content == null) content = "";
+
+        String combined = (title + " " + content).toLowerCase()
+                            .replaceAll("[^a-z0-9\\s]", " ")   // Garde seulement lettres et espaces
+                            .replaceAll("\\s+", " ")           // Normalise les espaces
+                            .trim();
+
+        // On prend les 100 premiers caractères (suffisant pour identifier la news)
+        int length = Math.min(100, combined.length());
+        return combined.substring(0, length);
+    }
+
+    private static boolean isRecentDuplicate(String title, String content) {
+        String fingerprint = generateFingerprint(title, content);
+        long now = System.currentTimeMillis();
+
+        Long lastSeen = recentFingerprints.get(fingerprint);
+
+        if (lastSeen != null && (now - lastSeen) < DUPLICATE_WINDOW_MS) {
+            logToMain("[VALIDATOR] 🔄 Doublon détecté et ignoré");
+            return true;
+        }
+
+        // Mise à jour
+        recentFingerprints.put(fingerprint, now);
+
+        // Nettoyage périodique (toutes les ~200 entrées)
+        if (recentFingerprints.size() > 200) {
+            recentFingerprints.entrySet().removeIf(entry -> now - entry.getValue() > 2 * 60 * 60 * 1000L); // > 2h
+        }
+
+        return false;
     }
 
     // ─────────────────────────────────────────────────────────────
