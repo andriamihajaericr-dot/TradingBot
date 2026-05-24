@@ -41,7 +41,6 @@ public class EventDatabase extends SQLiteOpenHelper {
         // Activation du mode WAL (Write-Ahead Logging) pour éviter les accès bloquants
         db.enableWriteAheadLogging();
     }
-
     @Override
     public void onCreate(SQLiteDatabase db) {
         String createTable = "CREATE TABLE " + TABLE_EVENTS + " (" +
@@ -58,8 +57,10 @@ public class EventDatabase extends SQLiteOpenHelper {
                 "sync_status TEXT DEFAULT 'synced', " +
                 "driver_weight INTEGER DEFAULT 1)";
         db.execSQL(createTable);
-        // AJOUT INSTITUTIONNEL : Indexation à haute fréquence pour l'historique des 30 jours
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_perf ON " + TABLE_EVENTS + "(unix_timestamp, driver_weight);");
+
+        // Index principal (le plus important)
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_time_weight ON " + 
+                   TABLE_EVENTS + "(unix_timestamp, driver_weight);");
     }
 
     @Override
@@ -68,8 +69,16 @@ public class EventDatabase extends SQLiteOpenHelper {
             try {
                 db.execSQL("ALTER TABLE " + TABLE_EVENTS + " ADD COLUMN driver_weight INTEGER DEFAULT 1");
             } catch (Exception e) {
-                Log.d("EventDatabase", "Colonne driver_weight déjà présente ou erreur de migration ignorée.");
+                Log.d("EventDatabase", "driver_weight déjà présent");
             }
+        }
+
+        // Création des index (sécurisé même en mise à jour)
+        try {
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_time_weight ON " + 
+                       TABLE_EVENTS + "(unix_timestamp, driver_weight);");
+        } catch (Exception e) {
+            Log.d("EventDatabase", "Index déjà existant");
         }
     }
 
