@@ -57,18 +57,23 @@ public class EventValidator {
             logToMain("[VALIDATOR] 🔄 Doublon ignoré");
             return result;
         }
-                // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
+        // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
         String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
         
-        if (EventDatabase.getInstance(null) != null &&  // safety check
-            eventDb.isDriverActiveRecently(detectedType, timestamp / 1000)) {  // timestamp en secondes
-            
-            if (!detectedType.startsWith("GEO")) {  // On autorise plusieurs Géo si forts
-                result.confidence  = 0;
-                result.isConfirmed = false;
-                result.reason      = "Driver déjà actif récemment (Inertie Macro)";
-                logToMain("[VALIDATOR] ⏳ Driver " + detectedType + " déjà actif — ignoré");
-                return result;
+        // On vérifie seulement si on est dans un contexte où la DB est accessible
+        if (!detectedType.startsWith("GEO") && EventDatabase.getInstance(null) != null) {
+            try {
+                long currentSeconds = timestamp / 1000;
+                if (EventDatabase.getInstance(null).isDriverActiveRecently(detectedType, currentSeconds)) {
+                    result.confidence  = 0;
+                    result.isConfirmed = false;
+                    result.reason      = "Driver déjà actif récemment (Inertie Macro)";
+                    logToMain("[VALIDATOR] ⏳ Driver " + detectedType + " déjà actif — ignoré");
+                    return result;
+                }
+            } catch (Exception e) {
+                // Si erreur DB, on continue sans bloquer
+                Log.e("EventValidator", "Erreur inertie macro", e);
             }
         }
 
