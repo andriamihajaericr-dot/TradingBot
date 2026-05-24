@@ -57,6 +57,20 @@ public class EventValidator {
             logToMain("[VALIDATOR] 🔄 Doublon ignoré");
             return result;
         }
+                // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
+        String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
+        
+        if (EventDatabase.getInstance(null) != null &&  // safety check
+            eventDb.isDriverActiveRecently(detectedType, timestamp / 1000)) {  // timestamp en secondes
+            
+            if (!detectedType.startsWith("GEO")) {  // On autorise plusieurs Géo si forts
+                result.confidence  = 0;
+                result.isConfirmed = false;
+                result.reason      = "Driver déjà actif récemment (Inertie Macro)";
+                logToMain("[VALIDATOR] ⏳ Driver " + detectedType + " déjà actif — ignoré");
+                return result;
+            }
+        }
 
         // ── ÉTAPE 2 : Filtre anti-rumeur absolu ───────────────────────────
         if (containsRumorMarkers(combined)) {
