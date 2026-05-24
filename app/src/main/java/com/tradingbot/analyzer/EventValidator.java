@@ -561,4 +561,11 @@ public class EventValidator {
             logToMain("[VALIDATOR] ⚠️ Échec préchargement calendrier : " + e.getMessage());
         }
     }
+        // Méthode appelée depuis NotificationService pour nettoyage périodique
+    public static void cleanupOldFingerprints() {
+        if (recentFingerprints == null) return;
+        long now = System.currentTimeMillis();
+        long cleanupThreshold = now - (2 * 60 * 60 * 1000L); // > 2 heures
+        recentFingerprints.entrySet().removeIf(entry -> entry.getValue() < cleanupThreshold);
+    }
 }
