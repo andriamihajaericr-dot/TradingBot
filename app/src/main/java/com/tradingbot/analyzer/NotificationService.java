@@ -37,6 +37,10 @@ public class NotificationService extends NotificationListenerService {
     private static final String PREF_TG_CHAT_ID = "tg_chat_id";
     private static final String PREF_MACRO_KEY  = "macro_api_key";
     private static final String PREFS_NAME      = "TradingBot";
+    private static final long GLOBAL_THROTTLE_MS = 8 * 60 * 1000L;   // 8 minutes
+    private static final long GEO_THROTTLE_MS   = 12 * 60 * 1000L;  // 12 minutes pour géo
+    private volatile long lastAnalysisTime = 0;
+    private volatile long lastGeoTime = 0;
 
     /** Raccourci centralisé pour lire la clé Groq depuis les SharedPreferences. */
     private String getGroqApiKey() {
