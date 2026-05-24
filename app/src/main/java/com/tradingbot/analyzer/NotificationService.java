@@ -609,7 +609,7 @@ public class NotificationService extends NotificationListenerService {
         // ── THROTTLE GLOBAL + GÉO (ajouté sans casser la structure) ─────
         if (now - lastAnalysisTime < GLOBAL_THROTTLE_MS) {
             eventDb.markEventAsSynced(fingerprint, "THROTTLED_GLOBAL");
-            logToMain("[THROTTLE] Analyse bloquée (global - 8 min)");
+            Log.d("[THROTTLE] Analyse bloquée (global - 8 min)");
             return true;
         }
 
