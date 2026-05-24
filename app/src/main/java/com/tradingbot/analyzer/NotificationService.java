@@ -605,7 +605,6 @@ public class NotificationService extends NotificationListenerService {
         if (apiKey.isEmpty() || tgToken.isEmpty() || tgChatId.isEmpty()) return false;
 
         long now = System.currentTimeMillis();
-
         // ── THROTTLE GLOBAL + GÉO ─────────────────────────────
         if (now - lastAnalysisTime < GLOBAL_THROTTLE_MS) {
             eventDb.markEventAsSynced(fingerprint, "THROTTLED_GLOBAL");
