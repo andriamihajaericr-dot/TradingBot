@@ -99,7 +99,7 @@ public class EconomicEventDetector {
     }
 
     // Méthode utilitaire pour éviter les répétitions
-    private static boolean containsAny(String text, String... keywords) {
+    private static boolean containsAny(String text, String keywords) {
         for (String keyword : keywords) {
             if (text.contains(keyword)) {
                 return true;
