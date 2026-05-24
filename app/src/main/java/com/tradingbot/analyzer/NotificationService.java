@@ -374,9 +374,24 @@ public class NotificationService extends NotificationListenerService {
 
     private int assignDriverWeight(String text) {
         String u = text.toUpperCase();
-        if (u.contains("CPI") || u.contains("INFLATION") || u.contains("NFP") || u.contains("NON-FARM PAYROLLS") || u.contains("FOMC") || u.contains("INTEREST RATE") || u.contains("RBA") || u.contains("BOC") || u.contains("BOJ")) return 5;
-        if (u.contains("GDP") || u.contains("PIB") || u.contains("RETAIL SALES") || u.contains("EMPLOYMENT RATE") || u.contains("STOCKS") || u.contains("JOBLESS")) return 4;
-        if (u.contains("PMI") || u.contains("ISM") || u.contains("MICHIGAN")) return 3;
+        if (u.contains("GDP")                || u.contains("PIB")                  ||
+           u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT RATE")      ||
+           u.contains("STOCKS")             || u.contains("JOBLESS")              ||
+           u.contains("ADP")                || u.contains("JOLTS")                ||
+           u.contains("JOB OPENINGS")       || u.contains("PPI")                  ||
+           u.contains("PRODUCER PRICE")     || u.contains("DURABLE GOODS")        ||
+           u.contains("TRADE BALANCE")      || u.contains("CURRENT ACCOUNT")      ||
+           u.contains("INDUSTRIAL PRODUCTION") || u.contains("CAPACITY UTILIZATION") ||
+           u.contains("PHILLY FED")         || u.contains("EMPIRE STATE")         ||
+           u.contains("CHICAGO PMI")        || u.contains("BEIGE BOOK")           ||
+           u.contains("PERSONAL SPENDING")  || u.contains("PERSONAL INCOME")      ||
+           u.contains("HOUSING STARTS")     || u.contains("BUILDING PERMITS")     ||
+           u.contains("HOME SALES")         || u.contains("CHALLENGER")) return 4;
+
+        if (u.contains("PMI") || u.contains("ISM") ||
+           u.contains("MICHIGAN") || u.contains("CONSUMER CONFIDENCE") ||
+           u.contains("CONSUMER SENTIMENT") || u.contains("IMPORT PRICE") ||
+           u.contains("EXPORT PRICE")       || u.contains("NATURAL GAS")) return 3;
         return 1;
     }
 
