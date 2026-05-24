@@ -307,11 +307,15 @@ public class NotificationService extends NotificationListenerService {
         String upperFeed = unifiedFeed.toUpperCase();
         long currentTime = System.currentTimeMillis();
         String currentSpeaker = "";
-
-        if (upperFeed.contains("BARKIN")) currentSpeaker = "BARKIN";
+        if (upperFeed.contains("WARSH"))          currentSpeaker = "WARSH";
+        else if (upperFeed.contains("POWELL"))    currentSpeaker = "POWELL";
+        else if (upperFeed.contains("BARKIN"))    currentSpeaker = "BARKIN";
         else if (upperFeed.contains("GOOLSBEE")) currentSpeaker = "GOOLSBEE";
-        else if (upperFeed.contains("POWELL")) currentSpeaker = "POWELL";
-        else if (upperFeed.contains("LAGARDE")) currentSpeaker = "LAGARDE";
+        else if (upperFeed.contains("LAGARDE"))  currentSpeaker = "LAGARDE";
+        else if (upperFeed.contains("BAILEY"))   currentSpeaker = "BAILEY";
+        else if (upperFeed.contains("MACKLEM"))  currentSpeaker = "MACKLEM";
+        else if (upperFeed.contains("BULLOCK"))  currentSpeaker = "BULLOCK";
+        else if (upperFeed.contains("UEDA"))     currentSpeaker = "UEDA";
 
         if (!currentSpeaker.isEmpty()) {
             if (currentSpeaker.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
