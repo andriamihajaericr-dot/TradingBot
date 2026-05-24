@@ -280,10 +280,9 @@ public class NotificationService extends NotificationListenerService {
         startMonthlyReportScheduler();
         registerNetworkCallback();
 
-        // Nettoyage périodique toutes les 30 minutes (version légère)
-        scheduler.scheduleAtFixedRate(() -> {
-            EventValidator.cleanupOldFingerprints(); // On va l'ajouter dans EventValidator
-        }, 30, 30, TimeUnit.MINUTES);
+        // Nettoyage périodique toutes les 30 minutes
+        scheduler.scheduleAtFixedRate(EventValidator::cleanupOldFingerprints, 
+                                     30, 30, TimeUnit.MINUTES);
     }
 
     @Override
