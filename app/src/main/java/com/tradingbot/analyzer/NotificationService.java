@@ -359,7 +359,6 @@ public class NotificationService extends NotificationListenerService {
 
         // Rejet définitif si le validator a explicitement refusé (rumeur, éditorial)
         if (!vr.isConfirmed && weight < 4) return;
-
         // ── Détection et classification de l'événement ──────────────
         EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
 
@@ -374,9 +373,19 @@ public class NotificationService extends NotificationListenerService {
             initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
         }
 
+        // =========================================================================
+        // SÉCURITÉ : Filtrer le neutre UNIQUEMENT s'il ne s'agit ni de GÉO ni de FOMC
+        // =========================================================================
+        if (vr.geoContext.isEmpty() && !isFomcPivot) {
+            if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
+                Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation de la base et de l'envoi Groq/Telegram.");
+                return; // Rejet silencieux total
+            }
+        }
+        // =========================================================================
+
         boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
                 String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "en_attente", weight);
-
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
         }
