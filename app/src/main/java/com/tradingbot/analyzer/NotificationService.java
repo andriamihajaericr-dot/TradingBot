@@ -215,8 +215,6 @@ public class NotificationService extends NotificationListenerService {
         "FORMAT DE SORTIE STRICT ET OBLIGATOIRE :\n" +
         "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
         "📊 CONVICTION : [JAUGE_EMOJIS] XX%\n" +
-        "⏱️ TIMING D'EFFET : Évalue l'inertie sémantique : '⚡ IMPULSION IMMÉDIATE (0-15 min)' (chocs de chiffres comme CPI/NFP) ou '🧱 INERTIE DE STRUCTURE (1-4 heures)' (discours, géopolitique, rapports).\n" +
-        "📢 ACTION TRADING : Associe une consigne d'exécution stricte selon l'inertie : soit 'Scalping M1/M5 - Breakout ou suivi d'impulsion' (si Immédiate), soit 'Suivi de tendance M15/H1 - Attendre un retracement/pullback sur zone clé' (si Structure).\n" +
         "🎯 VECTEUR CIBLE : [HAWKISH / DOVISH / GÉO / LIQUIDITÉ]\n" +
         "📢 FAIT MARQUANT : [Analyse pro de la situation en français. Mentionner l'arbitrage si écrasement d'un driver récent.]\n\n" +
         "--- IMPACTS ACQUISITION ---\n" +
@@ -289,37 +287,32 @@ public class NotificationService extends NotificationListenerService {
         String unifiedFeed = (title + " " + text).trim();
 
         if (unifiedFeed.length() < 10) return;
+
         String packageName = sbn.getPackageName().toLowerCase();
         String sourceName = "Source Institutionnelle";
 
-       // Filtrage chirurgical des 3 paquets officiels
-       if (packageName.equals("com.financialjuice.androidapp") || packageName.contains("financialjuice")) {
-          sourceName = "FinancialJuice";
-       } else if (packageName.equals("com.fusionmedia.investing") || packageName.contains("investing")) {
-          sourceName = "Investing.com";
-       } else if (packageName.equals("com.twitter.android") || packageName.contains("twitter") || packageName.contains("periscope")) {
-          sourceName = "X / Twitter";
-       } else {
-        // Sécurité : Si l'application émettrice n'est pas dans ta liste, on stoppe tout immédiatement
-       return; 
-       }
+        if (packageName.contains("financialjuice")) sourceName = "FinancialJuice";
+        else if (packageName.contains("investing")) sourceName = "Investing.com";
+        else if (packageName.contains("twitter") || packageName.contains("periscope")) sourceName = "X / Twitter";
+        else return;
 
         String upperFeed = unifiedFeed.toUpperCase();
         long currentTime = System.currentTimeMillis();
         String currentSpeaker = "";
-        if (upperFeed.contains("WARSH"))          currentSpeaker = "WARSH";
-        else if (upperFeed.contains("POWELL"))    currentSpeaker = "POWELL";
-        else if (upperFeed.contains("BARKIN"))    currentSpeaker = "BARKIN";
-        else if (upperFeed.contains("GOOLSBEE")) currentSpeaker = "GOOLSBEE";
-        else if (upperFeed.contains("LAGARDE"))  currentSpeaker = "LAGARDE";
-        else if (upperFeed.contains("BAILEY"))   currentSpeaker = "BAILEY";
-        else if (upperFeed.contains("MACKLEM"))  currentSpeaker = "MACKLEM";
-        else if (upperFeed.contains("BULLOCK"))  currentSpeaker = "BULLOCK";
-        else if (upperFeed.contains("UEDA"))     currentSpeaker = "UEDA";
-        else if (upperFeed.contains("HAMMACK"))  currentSpeaker = "HAMMACK";  // Fed Cleveland
-        else if (upperFeed.contains("WALLER"))   currentSpeaker = "WALLER";   // Fed Governor
-        else if (upperFeed.contains("WILLIAMS")) currentSpeaker = "WILLIAMS"; // Fed NY
-        else if (upperFeed.contains("KUGLER"))   currentSpeaker = "KUGLER";   // Fed Governor
+
+        if (upperFeed.contains("WARSH"))           currentSpeaker = "WARSH";
+        else if (upperFeed.contains("POWELL"))     currentSpeaker = "POWELL";
+        else if (upperFeed.contains("BARKIN"))     currentSpeaker = "BARKIN";
+        else if (upperFeed.contains("GOOLSBEE"))   currentSpeaker = "GOOLSBEE";
+        else if (upperFeed.contains("HAMMACK"))    currentSpeaker = "HAMMACK";
+        else if (upperFeed.contains("WALLER"))     currentSpeaker = "WALLER";
+        else if (upperFeed.contains("WILLIAMS"))   currentSpeaker = "WILLIAMS";
+        else if (upperFeed.contains("KUGLER"))     currentSpeaker = "KUGLER";
+        else if (upperFeed.contains("LAGARDE"))    currentSpeaker = "LAGARDE";
+        else if (upperFeed.contains("BAILEY"))     currentSpeaker = "BAILEY";
+        else if (upperFeed.contains("MACKLEM"))    currentSpeaker = "MACKLEM";
+        else if (upperFeed.contains("BULLOCK"))    currentSpeaker = "BULLOCK";
+        else if (upperFeed.contains("UEDA"))       currentSpeaker = "UEDA";
 
         if (!currentSpeaker.isEmpty()) {
             if (currentSpeaker.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
@@ -362,14 +355,18 @@ public class NotificationService extends NotificationListenerService {
         // Rejet définitif si le validator a explicitement refusé (rumeur, éditorial)
         if (!vr.isConfirmed && weight < 4) return;
 
-        // Construction du label d'impact enrichi avec le contexte géo si disponible
+        // ── Détection et classification de l'événement ──────────────
+        EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
+
+        // Construction du label d'impact enrichi :
+        // Priorité : Géo (EventValidator) > FOMC Pivot > EconomicEventDetector > Générique
         String initialImpact;
         if (!vr.geoContext.isEmpty()) {
-            initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "%";
+            initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
         } else if (isFomcPivot) {
-            initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRALE";
+            initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRALE | " + detected.description + " | " + detected.impact;
         } else {
-            initialImpact = "⚡ CHOC DRIVER MACRO PONDÉRÉ (Poids: " + weight + ")";
+            initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
         }
 
         boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
@@ -382,31 +379,30 @@ public class NotificationService extends NotificationListenerService {
 
     private int assignDriverWeight(String text) {
         String u = text.toUpperCase();
-        if (u.contains("CPI")           || u.contains("INFLATION")       || u.contains("NFP")     ||
-           u.contains("NON-FARM PAYROLLS") || u.contains("FOMC")        || u.contains("INTEREST RATE") ||
-           u.contains("RBA")           || u.contains("BOC")             || u.contains("BOJ")      ||
-           u.contains("BOE")           || u.contains("ECB")             || u.contains("BCE")      ||
-           u.contains("LAGARDE")       || u.contains("BAILEY")          || u.contains("MACKLEM")  ||
-           u.contains("BULLOCK")       || u.contains("UEDA")            ||
-           u.contains("WARSH")         || u.contains("POWELL")) return 5;
-        if (u.contains("GDP")                || u.contains("PIB")                  ||
-           u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT RATE")      ||
-           u.contains("STOCKS")             || u.contains("JOBLESS")              ||
-           u.contains("ADP")                || u.contains("JOLTS")                ||
-           u.contains("JOB OPENINGS")       || u.contains("PPI")                  ||
-           u.contains("PRODUCER PRICE")     || u.contains("DURABLE GOODS")        ||
-           u.contains("TRADE BALANCE")      || u.contains("CURRENT ACCOUNT")      ||
-           u.contains("INDUSTRIAL PRODUCTION") || u.contains("CAPACITY UTILIZATION") ||
-           u.contains("PHILLY FED")         || u.contains("EMPIRE STATE")         ||
-           u.contains("CHICAGO PMI")        || u.contains("BEIGE BOOK")           ||
-           u.contains("PERSONAL SPENDING")  || u.contains("PERSONAL INCOME")      ||
-           u.contains("HOUSING STARTS")     || u.contains("BUILDING PERMITS")     ||
-           u.contains("HOME SALES")         || u.contains("CHALLENGER")) return 4;
-
-        if (u.contains("PMI") || u.contains("ISM") ||
-           u.contains("MICHIGAN") || u.contains("CONSUMER CONFIDENCE") ||
-           u.contains("CONSUMER SENTIMENT") || u.contains("IMPORT PRICE") ||
-           u.contains("EXPORT PRICE")       || u.contains("NATURAL GAS")) return 3;
+        if (u.contains("CPI")            || u.contains("INFLATION")       || u.contains("NFP")          ||
+            u.contains("NON-FARM PAYROLLS") || u.contains("FOMC")           || u.contains("INTEREST RATE") ||
+            u.contains("RBA")            || u.contains("BOC")             || u.contains("BOJ")           ||
+            u.contains("BOE")            || u.contains("ECB")             || u.contains("BCE")           ||
+            u.contains("LAGARDE")        || u.contains("BAILEY")          || u.contains("MACKLEM")       ||
+            u.contains("BULLOCK")        || u.contains("UEDA")            ||
+            u.contains("WARSH")          || u.contains("POWELL")) return 5;
+        if (u.contains("GDP")                || u.contains("PIB")                   ||
+            u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT RATE")       ||
+            u.contains("STOCKS")             || u.contains("JOBLESS")               ||
+            u.contains("ADP")                || u.contains("JOLTS")                 ||
+            u.contains("JOB OPENINGS")       || u.contains("PPI")                   ||
+            u.contains("PRODUCER PRICE")     || u.contains("DURABLE GOODS")         ||
+            u.contains("TRADE BALANCE")      || u.contains("CURRENT ACCOUNT")       ||
+            u.contains("INDUSTRIAL PRODUCTION") || u.contains("CAPACITY UTILIZATION") ||
+            u.contains("PHILLY FED")         || u.contains("EMPIRE STATE")          ||
+            u.contains("CHICAGO PMI")        || u.contains("BEIGE BOOK")            ||
+            u.contains("PERSONAL SPENDING")  || u.contains("PERSONAL INCOME")       ||
+            u.contains("HOUSING STARTS")     || u.contains("BUILDING PERMITS")      ||
+            u.contains("HOME SALES")         || u.contains("CHALLENGER")) return 4;
+        if (u.contains("PMI")               || u.contains("ISM")                  ||
+            u.contains("MICHIGAN")          || u.contains("CONSUMER CONFIDENCE")   ||
+            u.contains("CONSUMER SENTIMENT")|| u.contains("IMPORT PRICE")          ||
+            u.contains("EXPORT PRICE")      || u.contains("NATURAL GAS")) return 3;
         return 1;
     }
 
@@ -699,83 +695,84 @@ public class NotificationService extends NotificationListenerService {
         }
         return false;
     }
+
     private List<String> filterActiveAssets(String text) {
-     List<String> assets = new ArrayList<>();
-     String upper = text.toUpperCase();
+        List<String> assets = new ArrayList<>();
+        String upper = text.toUpperCase();
 
-    // ── USD / Fed — impact global systémique ─────────────────────
-    // Warsh, Powell et membres Fed → tous les actifs majeurs impactés
-     if (upper.contains("WARSH")      || upper.contains("POWELL")   ||
-        upper.contains("BARKIN")     || upper.contains("GOOLSBEE") ||
-        upper.contains("HAMMACK")    || upper.contains("WALLER")   ||
-        upper.contains("WILLIAMS")   || upper.contains("KUGLER")   ||
-        upper.contains("FOMC")       || upper.contains("FEDERAL RESERVE") ||
-        upper.contains("FED CHAIR")  || upper.contains("FED RATE")) {
-        assets.addAll(Arrays.asList(
-            "GOLD", "NASDAQ", "SP500", "BITCOIN",
-            "USDJPY", "EURUSD", "GBPUSD", "AUDUSD", "USDCAD", "US10Y"
-        ));
-      }
+        // ── USD / Fed — impact global systémique ─────────────────────
+        // Warsh, Powell et membres Fed → tous les actifs majeurs impactés
+        if (upper.contains("WARSH")       || upper.contains("POWELL")          ||
+            upper.contains("BARKIN")      || upper.contains("GOOLSBEE")        ||
+            upper.contains("HAMMACK")     || upper.contains("WALLER")          ||
+            upper.contains("WILLIAMS")    || upper.contains("KUGLER")          ||
+            upper.contains("FOMC")        || upper.contains("FEDERAL RESERVE") ||
+            upper.contains("FED CHAIR")   || upper.contains("FED RATE")) {
+            assets.addAll(Arrays.asList(
+                "GOLD", "NASDAQ", "SP500", "BITCOIN",
+                "USDJPY", "EURUSD", "GBPUSD", "AUDUSD", "USDCAD", "US10Y"
+            ));
+        }
 
-     // ── Or / Métaux précieux ──────────────────────────────────────
-     if (upper.contains("GOLD")   || upper.contains("XAU")    ||
-        upper.contains("OR ")    || upper.contains("SILVER")) assets.add("GOLD");
+        // ── Or / Métaux précieux ──────────────────────────────────────
+        if (upper.contains("GOLD")   || upper.contains("XAU")    ||
+            upper.contains("OR ")    || upper.contains("SILVER")) assets.add("GOLD");
 
-     // ── Pétrole ───────────────────────────────────────────────────
-     if (upper.contains("OIL")    || upper.contains("WTI")    ||
-        upper.contains("CRUDE")  || upper.contains("BRENT")) assets.add("USOIL");
+        // ── Pétrole ───────────────────────────────────────────────────
+        if (upper.contains("OIL")    || upper.contains("WTI")    ||
+            upper.contains("CRUDE")  || upper.contains("BRENT")) assets.add("USOIL");
 
-     // ── Indices US ────────────────────────────────────────────────
-     if (upper.contains("NASDAQ") || upper.contains("NAS100") ||
-        upper.contains("TECH")   || upper.contains("OPENAI") ||
-        upper.contains("NVIDIA") || upper.contains("APPLE")) assets.add("NASDAQ");
+        // ── Indices US ────────────────────────────────────────────────
+        if (upper.contains("NASDAQ") || upper.contains("NAS100") ||
+            upper.contains("TECH")   || upper.contains("OPENAI") ||
+            upper.contains("NVIDIA") || upper.contains("APPLE")) assets.add("NASDAQ");
 
-     if (upper.contains("SP500")  || upper.contains("S&P")    ||
-        upper.contains("SPX")) assets.add("SP500");
+        if (upper.contains("SP500")  || upper.contains("S&P")    ||
+            upper.contains("SPX")) assets.add("SP500");
 
-     // ── Crypto ────────────────────────────────────────────────────
-     if (upper.contains("BITCOIN") || upper.contains("BTC")   ||
-        upper.contains("CRYPTO")) assets.add("BITCOIN");
+        // ── Crypto ────────────────────────────────────────────────────
+        if (upper.contains("BITCOIN") || upper.contains("BTC")   ||
+            upper.contains("CRYPTO")) assets.add("BITCOIN");
 
-     // ── Obligations US ────────────────────────────────────────────
-     if (upper.contains("YIELD")  || upper.contains("US10Y")  ||
-        upper.contains("BOND")   || upper.contains("TREASURY")) assets.add("US10Y");
+        // ── Obligations US ────────────────────────────────────────────
+        if (upper.contains("YIELD")  || upper.contains("US10Y")  ||
+            upper.contains("BOND")   || upper.contains("TREASURY")) assets.add("US10Y");
 
-     // ── EURUSD ────────────────────────────────────────────────────
-     if (upper.contains("EURUSD")    || upper.contains("ECB")       ||
-        upper.contains("EUROZONE")  || upper.contains("LAGARDE")   ||
-        upper.contains("BCE")       || upper.contains("FRANKFURT") ||
-        upper.matches(".*\\bEUR\\b.*")) assets.add("EURUSD");
+        // ── EURUSD ────────────────────────────────────────────────────
+        if (upper.contains("EURUSD")   || upper.contains("ECB")       ||
+            upper.contains("EUROZONE") || upper.contains("LAGARDE")   ||
+            upper.contains("BCE")      || upper.contains("FRANKFURT") ||
+            upper.matches(".*\\bEUR\\b.*")) assets.add("EURUSD");
 
-     // ── GBPUSD ────────────────────────────────────────────────────
-     if (upper.contains("GBP")    || upper.contains("GBPUSD") ||
-        upper.contains("CABLE")  || upper.contains("BOE")    ||
-        upper.contains("BAILEY")) assets.add("GBPUSD");
+        // ── GBPUSD ────────────────────────────────────────────────────
+        if (upper.contains("GBP")    || upper.contains("GBPUSD") ||
+            upper.contains("CABLE")  || upper.contains("BOE")    ||
+            upper.contains("BAILEY")) assets.add("GBPUSD");
 
-     // ── AUDUSD ────────────────────────────────────────────────────
-     if (upper.contains("AUD")    || upper.contains("AUDUSD") ||
-        upper.contains("AUSSIE") || upper.contains("RBA")    ||
-        upper.contains("BULLOCK")) assets.add("AUDUSD");
+        // ── AUDUSD ────────────────────────────────────────────────────
+        if (upper.contains("AUD")    || upper.contains("AUDUSD") ||
+            upper.contains("AUSSIE") || upper.contains("RBA")    ||
+            upper.contains("BULLOCK")) assets.add("AUDUSD");
 
-     // ── USDCAD ────────────────────────────────────────────────────
-     if (upper.contains("CAD")    || upper.contains("USDCAD") ||
-        upper.contains("LOONIE") || upper.contains("BOC")    ||
-        upper.contains("MACKLEM")) assets.add("USDCAD");
+        // ── USDCAD ────────────────────────────────────────────────────
+        if (upper.contains("CAD")    || upper.contains("USDCAD") ||
+            upper.contains("LOONIE") || upper.contains("BOC")    ||
+            upper.contains("MACKLEM")) assets.add("USDCAD");
 
-     // ── USDJPY ────────────────────────────────────────────────────
-     if (upper.contains("JPY")    || upper.contains("USDJPY") ||
-        upper.contains("YEN")    || upper.contains("BOJ")    ||
-        upper.contains("UEDA")) assets.add("USDJPY");
+        // ── USDJPY ────────────────────────────────────────────────────
+        if (upper.contains("JPY")    || upper.contains("USDJPY") ||
+            upper.contains("YEN")    || upper.contains("BOJ")    ||
+            upper.contains("UEDA")) assets.add("USDJPY");
 
-     // ── Fallback : si aucun actif détecté → actifs majeurs par défaut ──
-     if (assets.isEmpty()) {
-        assets.addAll(Arrays.asList(
-            "GOLD", "NASDAQ", "USOIL", "EURUSD", "AUDUSD", "USDCAD", "USDJPY"
-        ));
-      }
+        // ── Fallback : si aucun actif détecté → actifs majeurs par défaut ──
+        if (assets.isEmpty()) {
+            assets.addAll(Arrays.asList(
+                "GOLD", "NASDAQ", "USOIL", "EURUSD", "AUDUSD", "USDCAD", "USDJPY"
+            ));
+        }
 
-     // Dédoublonnage en conservant l'ordre
-     return new ArrayList<>(new LinkedHashSet<>(assets));
+        // Dédoublonnage en conservant l'ordre
+        return new ArrayList<>(new LinkedHashSet<>(assets));
     }
 
     private void startDailyBriefScheduler() {
