@@ -606,10 +606,10 @@ public class NotificationService extends NotificationListenerService {
 
         long now = System.currentTimeMillis();
 
-        // ── THROTTLE GLOBAL + GÉO (ajouté sans casser la structure) ─────
+        // ── THROTTLE GLOBAL + GÉO ─────────────────────────────
         if (now - lastAnalysisTime < GLOBAL_THROTTLE_MS) {
             eventDb.markEventAsSynced(fingerprint, "THROTTLED_GLOBAL");
-            Log.d("[THROTTLE] Analyse bloquée (global - 8 min)");
+            Log.d(TAG, "[THROTTLE] Analyse bloquée (global - 8 min)");
             return true;
         }
 
@@ -620,7 +620,7 @@ public class NotificationService extends NotificationListenerService {
 
         if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
             eventDb.markEventAsSynced(fingerprint, "THROTTLED_GEO");
-            Log.d("[THROTTLE] Événement Géo bloqué (12 min)");
+            Log.d(TAG, "[THROTTLE] Événement Géo bloqué (12 min)");
             return true;
         }
 
