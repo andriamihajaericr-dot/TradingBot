@@ -374,6 +374,13 @@ public class NotificationService extends NotificationListenerService {
 
     private int assignDriverWeight(String text) {
         String u = text.toUpperCase();
+        if (u.contains("CPI")           || u.contains("INFLATION")       || u.contains("NFP")     ||
+           u.contains("NON-FARM PAYROLLS") || u.contains("FOMC")        || u.contains("INTEREST RATE") ||
+           u.contains("RBA")           || u.contains("BOC")             || u.contains("BOJ")      ||
+           u.contains("BOE")           || u.contains("ECB")             || u.contains("BCE")      ||
+           u.contains("LAGARDE")       || u.contains("BAILEY")          || u.contains("MACKLEM")  ||
+           u.contains("BULLOCK")       || u.contains("UEDA")            ||
+           u.contains("WARSH")         || u.contains("POWELL")) return 5;
         if (u.contains("GDP")                || u.contains("PIB")                  ||
            u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT RATE")      ||
            u.contains("STOCKS")             || u.contains("JOBLESS")              ||
