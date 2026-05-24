@@ -34,11 +34,7 @@ public class EventValidator {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    //  POINT D'ENTRÉE PRINCIPAL
-    // ─────────────────────────────────────────────────────────────
-
-    public static ValidationResult validate(
+        public static ValidationResult validate(
             String title,
             String content,
             long timestamp,
@@ -52,44 +48,42 @@ public class EventValidator {
 
         String combined = (title + " " + content).toLowerCase();
 
-        // ── ÉTAPE 1 : Filtre anti-rumeur absolu (avant tout autre traitement) ──────────
-        // Si le texte contient des marqueurs de non-confirmation, rejet immédiat.
-        // Un événement géo réel n'a pas besoin d'être "rumored" ou "alleged".
-        if (containsRumorMarkers(combined)) {
-            result.confidence  = 0;
-            result.isConfirmed = false;
-            result.reason      = "Rejeté — Marqueur de rumeur ou non-confirmé détecté";
-            logToMain("[VALIDATOR] ❌ Rumeur/Non-confirmé — rejeté avant analyse");
-            return result;
-        }
-        // ── ANTI-DOUBLONS (avant tout autre traitement lourd) ─────────────
+        // ── ÉTAPE 1 : Anti-Doublons (très haut dans le flux) ─────────────
         if (isRecentDuplicate(title, content)) {
             result.confidence  = 0;
             result.isConfirmed = false;
             result.reason      = "Doublon récent détecté (45min)";
+            logToMain("[VALIDATOR] 🔄 Doublon ignoré");
             return result;
         }
-        // ── ÉTAPE 2 : Filtre éditorial et opinion pure ───────────────────────────────
-        // CORRECTION : mots resserrés pour ne pas bloquer des news géo légitimes.
-        // "party", "republican", "democrat" retirés (bloquaient des news Fed policy et géo).
+
+        // ── ÉTAPE 2 : Filtre anti-rumeur absolu ───────────────────────────
+        if (containsRumorMarkers(combined)) {
+            result.confidence  = 0;
+            result.isConfirmed = false;
+            result.reason      = "Rejeté — Marqueur de rumeur ou non-confirmé détecté";
+            logToMain("[VALIDATOR] ❌ Rumeur/Non-confirmé rejeté");
+            return result;
+        }
+
+        // ── ÉTAPE 3 : Filtre éditorial ───────────────────────────────────
         if (containsEditorialContent(combined)) {
             result.confidence  = 0;
             result.isConfirmed = false;
             result.reason      = "Bruit macroéconomique (Opinion/Éditorial pur)";
-            logToMain("[VALIDATOR] ❌ Rejeté — Contenu éditorial/opinion pur");
+            logToMain("[VALIDATOR] ❌ Rejeté — Contenu éditorial");
             return result;
         }
 
-        // ── ÉTAPE 3 : Validation calendrier économique (données chiffrées) ────────────
+        // ── ÉTAPE 4 : Calendrier économique ──────────────────────────────
         EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp);
-
         if (match != null) {
             result.isConfirmed = true;
-            result.confidence  = 98; // Niveau institutionnel — donnée confirmée par calendrier
+            result.confidence  = 98;
             result.forecast    = match.forecast != null ? match.forecast : "N/A";
             result.previous    = match.previous != null ? match.previous : "N/A";
             result.actual      = match.actual   != null ? match.actual   : "N/A";
-            result.reason      = "Confirmé par calendrier économique global";
+            result.reason      = "Confirmé par calendrier économique";
 
             if (match.affectedAssets != null) {
                 for (String asset : match.affectedAssets) {
@@ -99,39 +93,33 @@ public class EventValidator {
                     }
                 }
             }
-
-            logToMain("[VALIDATOR] ✓ Calendrier confirmé : " +
-                      (match.indicator != null ? match.indicator : "Inconnu"));
+            logToMain("[VALIDATOR] ✓ Calendrier confirmé");
             return result;
         }
 
-        // ── ÉTAPE 4 : Détection géopolitique (hors calendrier, impact direct marché) ──
+        // ── ÉTAPE 5 : Géopolitique (déjà amélioré précédemment) ─────────
         GeoAssessment geo = assessGeopoliticalEvent(combined);
-
         if (geo.confidence >= 65) {
             result.isConfirmed = true;
             result.confidence  = geo.confidence;
-            result.reason      = "Événement géopolitique confirmé (Impact direct marché)";
+            result.reason      = "Événement géopolitique confirmé";
             result.geoContext  = geo.contextLabel;
 
-            // Enrichissement des actifs impactés par la zone géo détectée
             for (String asset : geo.impactedAssets) {
                 if (!detectedAssets.contains(asset)) {
                     detectedAssets.add(asset);
                     result.assetsEnriched = true;
                 }
             }
-
-            logToMain("[VALIDATOR] 🌍 Géo confirmé [" + geo.contextLabel + "] " +
-                      geo.confidence + "% — Actifs : " + geo.impactedAssets);
+            logToMain("[VALIDATOR] 🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "%");
             return result;
         }
 
-        // ── ÉTAPE 5 : Breaking News générique (flux interbancaire) ───────────────────
+        // ── ÉTAPE 6 : Breaking News générique (seuil plus strict) ───────
         result.confidence = calculateBreakingNewsConfidence(title, content);
         result.reason     = "Breaking News (Flux Interbancaire)";
 
-        if (result.confidence < 65) {
+        if (result.confidence < 70) {   // Augmenté de 65 → 70
             result.confidence  = 0;
             result.isConfirmed = false;
             logToMain("[VALIDATOR] ❌ Confiance insuffisante : " + result.confidence + "%");
@@ -142,13 +130,6 @@ public class EventValidator {
 
         return result;
     }
-
-    // ─────────────────────────────────────────────────────────────
-    //  FILTRE ANTI-RUMEUR (ÉTAPE 1)
-    //  Rejette tout texte contenant un marqueur de non-confirmation.
-    //  Un fait réel (drone tiré, sanction annoncée) n'est jamais
-    //  qualifié de "rumored" ou "allegedly" dans un flux institutionnel.
-    // ─────────────────────────────────────────────────────────────
 
     private static boolean containsRumorMarkers(String text) {
         if (text == null) return false;
