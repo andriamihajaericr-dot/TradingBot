@@ -699,29 +699,83 @@ public class NotificationService extends NotificationListenerService {
         }
         return false;
     }
-
     private List<String> filterActiveAssets(String text) {
-        List<String> assets = new ArrayList<>();
-        String upper = text.toUpperCase();
+     List<String> assets = new ArrayList<>();
+     String upper = text.toUpperCase();
 
-        if (upper.contains("GOLD") || upper.contains("XAU") || upper.contains("OR ") || upper.contains("SILVER")) assets.add("GOLD");
-        if (upper.contains("OIL") || upper.contains("WTI") || upper.contains("CRUDE") || upper.contains("BRENT")) assets.add("USOIL");
-        if (upper.contains("NASDAQ") || upper.contains("NAS100") || upper.contains("TECH") || upper.contains("OPENAI") || upper.contains("NVIDIA") || upper.contains("APPLE")) assets.add("NASDAQ");
-        if (upper.contains("SP500") || upper.contains("S&P") || upper.contains("SPX")) assets.add("SP500");
-        if (upper.contains("BITCOIN") || upper.contains("BTC") || upper.contains("CRYPTO")) assets.add("BITCOIN");
-        if (upper.contains("YIELD") || upper.contains("US10Y") || upper.contains("BOND") || upper.contains("TREASURY")) assets.add("US10Y");
-        // CORRECTION 4 : Détection EUR élargie avec variantes sans espace (EUR., EUR,)
-        if (upper.contains("EURUSD") || upper.contains("ECB") || upper.contains("EUROZONE") ||
-            upper.matches(".*\\bEUR\\b.*")) assets.add("EURUSD");
-        if (upper.contains("GBP") || upper.contains("GBPUSD") || upper.contains("CABLE") || upper.contains("BOE")) assets.add("GBPUSD");
-        if (upper.contains("AUD") || upper.contains("AUDUSD") || upper.contains("AUSSIE") || upper.contains("RBA")) assets.add("AUDUSD");
-        if (upper.contains("CAD") || upper.contains("USDCAD") || upper.contains("LOONIE") || upper.contains("BOC")) assets.add("USDCAD");
-        if (upper.contains("JPY") || upper.contains("USDJPY") || upper.contains("YEN") || upper.contains("BOJ")) assets.add("USDJPY");
+    // ── USD / Fed — impact global systémique ─────────────────────
+    // Warsh, Powell et membres Fed → tous les actifs majeurs impactés
+     if (upper.contains("WARSH")      || upper.contains("POWELL")   ||
+        upper.contains("BARKIN")     || upper.contains("GOOLSBEE") ||
+        upper.contains("HAMMACK")    || upper.contains("WALLER")   ||
+        upper.contains("WILLIAMS")   || upper.contains("KUGLER")   ||
+        upper.contains("FOMC")       || upper.contains("FEDERAL RESERVE") ||
+        upper.contains("FED CHAIR")  || upper.contains("FED RATE")) {
+        assets.addAll(Arrays.asList(
+            "GOLD", "NASDAQ", "SP500", "BITCOIN",
+            "USDJPY", "EURUSD", "GBPUSD", "AUDUSD", "USDCAD", "US10Y"
+        ));
+      }
 
-        if (assets.isEmpty()) {
-            assets.addAll(Arrays.asList("GOLD", "NASDAQ", "USOIL", "EURUSD", "AUDUSD", "USDCAD", "USDJPY"));
-        }
-        return assets;
+     // ── Or / Métaux précieux ──────────────────────────────────────
+     if (upper.contains("GOLD")   || upper.contains("XAU")    ||
+        upper.contains("OR ")    || upper.contains("SILVER")) assets.add("GOLD");
+
+     // ── Pétrole ───────────────────────────────────────────────────
+     if (upper.contains("OIL")    || upper.contains("WTI")    ||
+        upper.contains("CRUDE")  || upper.contains("BRENT")) assets.add("USOIL");
+
+     // ── Indices US ────────────────────────────────────────────────
+     if (upper.contains("NASDAQ") || upper.contains("NAS100") ||
+        upper.contains("TECH")   || upper.contains("OPENAI") ||
+        upper.contains("NVIDIA") || upper.contains("APPLE")) assets.add("NASDAQ");
+
+     if (upper.contains("SP500")  || upper.contains("S&P")    ||
+        upper.contains("SPX")) assets.add("SP500");
+
+     // ── Crypto ────────────────────────────────────────────────────
+     if (upper.contains("BITCOIN") || upper.contains("BTC")   ||
+        upper.contains("CRYPTO")) assets.add("BITCOIN");
+
+     // ── Obligations US ────────────────────────────────────────────
+     if (upper.contains("YIELD")  || upper.contains("US10Y")  ||
+        upper.contains("BOND")   || upper.contains("TREASURY")) assets.add("US10Y");
+
+     // ── EURUSD ────────────────────────────────────────────────────
+     if (upper.contains("EURUSD")    || upper.contains("ECB")       ||
+        upper.contains("EUROZONE")  || upper.contains("LAGARDE")   ||
+        upper.contains("BCE")       || upper.contains("FRANKFURT") ||
+        upper.matches(".*\\bEUR\\b.*")) assets.add("EURUSD");
+
+     // ── GBPUSD ────────────────────────────────────────────────────
+     if (upper.contains("GBP")    || upper.contains("GBPUSD") ||
+        upper.contains("CABLE")  || upper.contains("BOE")    ||
+        upper.contains("BAILEY")) assets.add("GBPUSD");
+
+     // ── AUDUSD ────────────────────────────────────────────────────
+     if (upper.contains("AUD")    || upper.contains("AUDUSD") ||
+        upper.contains("AUSSIE") || upper.contains("RBA")    ||
+        upper.contains("BULLOCK")) assets.add("AUDUSD");
+
+     // ── USDCAD ────────────────────────────────────────────────────
+     if (upper.contains("CAD")    || upper.contains("USDCAD") ||
+        upper.contains("LOONIE") || upper.contains("BOC")    ||
+        upper.contains("MACKLEM")) assets.add("USDCAD");
+
+     // ── USDJPY ────────────────────────────────────────────────────
+     if (upper.contains("JPY")    || upper.contains("USDJPY") ||
+        upper.contains("YEN")    || upper.contains("BOJ")    ||
+        upper.contains("UEDA")) assets.add("USDJPY");
+
+     // ── Fallback : si aucun actif détecté → actifs majeurs par défaut ──
+     if (assets.isEmpty()) {
+        assets.addAll(Arrays.asList(
+            "GOLD", "NASDAQ", "USOIL", "EURUSD", "AUDUSD", "USDCAD", "USDJPY"
+        ));
+      }
+
+     // Dédoublonnage en conservant l'ordre
+     return new ArrayList<>(new LinkedHashSet<>(assets));
     }
 
     private void startDailyBriefScheduler() {
