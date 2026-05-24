@@ -291,10 +291,15 @@ public class NotificationService extends NotificationListenerService {
         String packageName = sbn.getPackageName().toLowerCase();
         String sourceName = "Source Institutionnelle";
 
-        if (packageName.contains("financialjuice")) sourceName = "FinancialJuice";
-        else if (packageName.contains("investing")) sourceName = "Investing.com";
-        else if (packageName.contains("twitter") || packageName.contains("periscope")) sourceName = "X / Twitter";
-        else return;
+        if (packageName.equals("com.financialjuice.androidapp") || packageName.contains("financialjuice")) {
+            sourceName = "FinancialJuice";
+        } else if (packageName.equals("com.fusionmedia.investing") || packageName.contains("investing")) {
+            sourceName = "Investing.com";
+        } else if (packageName.equals("com.twitter.android") || packageName.contains("twitter") || packageName.contains("periscope")) {
+            sourceName = "X / Twitter";
+        } else {
+            return;
+        }
 
         String upperFeed = unifiedFeed.toUpperCase();
         long currentTime = System.currentTimeMillis();
