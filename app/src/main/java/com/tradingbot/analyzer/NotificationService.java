@@ -316,6 +316,10 @@ public class NotificationService extends NotificationListenerService {
         else if (upperFeed.contains("MACKLEM"))  currentSpeaker = "MACKLEM";
         else if (upperFeed.contains("BULLOCK"))  currentSpeaker = "BULLOCK";
         else if (upperFeed.contains("UEDA"))     currentSpeaker = "UEDA";
+        else if (upperFeed.contains("HAMMACK"))  currentSpeaker = "HAMMACK";  // Fed Cleveland
+        else if (upperFeed.contains("WALLER"))   currentSpeaker = "WALLER";   // Fed Governor
+        else if (upperFeed.contains("WILLIAMS")) currentSpeaker = "WILLIAMS"; // Fed NY
+        else if (upperFeed.contains("KUGLER"))   currentSpeaker = "KUGLER";   // Fed Governor
 
         if (!currentSpeaker.isEmpty()) {
             if (currentSpeaker.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
