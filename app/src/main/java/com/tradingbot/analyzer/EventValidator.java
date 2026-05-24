@@ -62,7 +62,13 @@ public class EventValidator {
             logToMain("[VALIDATOR] ❌ Rumeur/Non-confirmé — rejeté avant analyse");
             return result;
         }
-
+        // ── ANTI-DOUBLONS (avant tout autre traitement lourd) ─────────────
+        if (isRecentDuplicate(title, content)) {
+            result.confidence  = 0;
+            result.isConfirmed = false;
+            result.reason      = "Doublon récent détecté (45min)";
+            return result;
+        }
         // ── ÉTAPE 2 : Filtre éditorial et opinion pure ───────────────────────────────
         // CORRECTION : mots resserrés pour ne pas bloquer des news géo légitimes.
         // "party", "republican", "democrat" retirés (bloquaient des news Fed policy et géo).
