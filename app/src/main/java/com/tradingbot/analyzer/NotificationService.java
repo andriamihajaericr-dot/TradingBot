@@ -637,47 +637,53 @@ public class NotificationService extends NotificationListenerService {
                     br.close();
 
                     String aiResult = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-
                     if (aiResult.isEmpty() || aiResult.length() < 50) {
                         throw new Exception("Invalid API response");
                     }
-
+                    // ─────────────────────────────────────────────────────────────
+                    // NOUVEAU FILTRAGE : Neutres gardés pour Groq, supprimés pour Telegram
+                    // ─────────────────────────────────────────────────────────────
                     StringBuilder filteredMessage = new StringBuilder();
                     String[] lines = aiResult.split("\n");
                     int activeSignalsCount = 0;
-                    int neutralCount = 0;
 
                     for (String line : lines) {
-                        if (line.contains("•") && line.contains("NEUTRE")) {
-                            neutralCount++;
+                        String trimmed = line.trim();
+                        if (trimmed.isEmpty()) continue;
+
+                        // On garde toujours les métadonnées importantes
+                        if (trimmed.startsWith("🚨") || 
+                            trimmed.startsWith("📊") || 
+                            trimmed.startsWith("🎯") || 
+                            trimmed.startsWith("📢") || 
+                            trimmed.startsWith("🏁") ||
+                            trimmed.startsWith("--- IMPACTS")) {
+                            filteredMessage.append(line).append("\n");
                             continue;
                         }
 
-                        // CORRECTION 2 : Parenthèses explicites pour lever l'ambiguïté &&/|| sur USDJPY
-                        if (line.contains("🇯🇵 USDJPY") && line.contains("ACHAT CHOC") &&
-                           (line.contains("renforcer le yen") || (line.contains("yen") && line.contains("refuge")) || line.contains("s'apprécier"))) {
-                            line = line.replace("ACHAT CHOC 🟢", "VENTE CHOC 🔴");
-                        }
-                        if (line.contains("🇯🇵 USDJPY") && line.contains("VENTE CHOC") &&
-                           (line.contains("faiblir le yen") || line.contains("Yen japonais pourrait faiblir"))) {
-                            line = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
-                        }
-                        if (line.contains("🇨🇦 USDCAD") && line.contains("VENTE CHOC") &&
-                           (line.contains("renforcer le CAD") || line.contains("s'apprécier"))) {
-                            line = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
-                        }
+                        // On garde UNIQUEMENT les lignes avec ACHAT ou VENTE pour Telegram
+                        if (trimmed.contains("•") && 
+                           (line.contains("ACHAT CHOC") || line.contains("VENTE CHOC"))) {
+                            
+                            // Corrections de cohérence (USDJPY / USDCAD)
+                            String processedLine = line;
+                            if (line.contains("🇯🇵 USDJPY") && line.contains("ACHAT CHOC") &&
+                               (line.contains("renforcer le yen") || (line.contains("yen") && line.contains("refuge")) || line.contains("s'apprécier"))) {
+                                processedLine = line.replace("ACHAT CHOC 🟢", "VENTE CHOC 🔴");
+                            }
+                            if (line.contains("🇯🇵 USDJPY") && line.contains("VENTE CHOC") &&
+                               (line.contains("faiblir le yen") || line.contains("Yen japonais pourrait faiblir"))) {
+                                processedLine = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
+                            }
+                            if (line.contains("🇨🇦 USDCAD") && line.contains("VENTE CHOC") &&
+                               (line.contains("renforcer le CAD") || line.contains("s'apprécier"))) {
+                                processedLine = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
+                            }
 
-                        if (line.contains("ACHAT CHOC") || line.contains("VENTE CHOC")) {
-                            filteredMessage.append(line).append("\n");
+                            filteredMessage.append(processedLine).append("\n");
                             activeSignalsCount++;
-                        } else if (!line.contains("•")) {
-                            filteredMessage.append(line).append("\n");
                         }
-                    }
-
-                    if (neutralCount > 8) {
-                        eventDb.markEventAsSynced(fingerprint, "FILTERED_NEUTRAL");
-                        return true;
                     }
 
                     if (activeSignalsCount > 0) {
@@ -687,11 +693,12 @@ public class NotificationService extends NotificationListenerService {
                                 + filteredMessage.toString().trim();
 
                         sendTelegramSecure(finalPayload, this);
+                    } else {
+                        eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
                     }
 
                     eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
                     return true;
-
                 } else {
                     throw new Exception("API Error: " + conn.getResponseCode());
                 }
