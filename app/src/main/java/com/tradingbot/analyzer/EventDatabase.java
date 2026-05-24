@@ -58,6 +58,8 @@ public class EventDatabase extends SQLiteOpenHelper {
                 "sync_status TEXT DEFAULT 'synced', " +
                 "driver_weight INTEGER DEFAULT 1)";
         db.execSQL(createTable);
+        // AJOUT INSTITUTIONNEL : Indexation à haute fréquence pour l'historique des 30 jours
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_perf ON " + TABLE_EVENTS + "(unix_timestamp, driver_weight);");
     }
 
     @Override
@@ -214,5 +216,21 @@ public class EventDatabase extends SQLiteOpenHelper {
         long fortyFiveDaysAgo = currentUnixTime - (45L * 24 * 60 * 60);
         int hardDeleted = db.delete(TABLE_EVENTS, "unix_timestamp < ? AND driver_weight = 5", new String[]{String.valueOf(fortyFiveDaysAgo)});
         Log.d("EventDatabase", "Purge Piliers ancres effectuée : " + hardDeleted + " lignes nettoyées.");
+    }
+    // AJOUT HEDGE FUND : Détecte si un événement majeur de la même catégorie est déjà actif (Inertie Macro)
+    public boolean isDriverActiveRecently(String eventType, long currentUnixTime) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        long twoHoursAgo = currentUnixTime - (2 * 60 * 60); // Fenêtre de stabilisation de 2 heures
+        try {
+            cursor = db.rawQuery("SELECT 1 FROM " + TABLE_EVENTS + " WHERE event_type = ? AND unix_timestamp >= ? AND driver_weight = 5 LIMIT 1",
+                    new String[]{eventType, String.valueOf(twoHoursAgo)});
+            return cursor != null && cursor.moveToFirst();
+        } catch (Exception e) {
+            Log.e("EventDatabase", "Erreur filtre inertie macro", e);
+            return false;
+        } finally {
+            if (cursor != null) cursor.close();
+        }
     }
 }
