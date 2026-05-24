@@ -1013,14 +1013,6 @@ public class NotificationService extends NotificationListenerService {
             if (manager != null) manager.createNotificationChannel(channel);
         }
     }
-    
-    // Nettoyage mémoire périodique
-    private void cleanupMemory() {
-        long now = System.currentTimeMillis();
-        if (recentFingerprints != null) {  // si tu l'as rendu accessible ou via EventValidator
-            // On laisse EventValidator gérer son propre map
-        }
-    }
         // Nettoyage mémoire périodique
     private void cleanupMemory() {
         long now = System.currentTimeMillis();
