@@ -3,6 +3,7 @@ package com.tradingbot.analyzer;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import android.util.Log;
 
 public class EventValidator {
 
