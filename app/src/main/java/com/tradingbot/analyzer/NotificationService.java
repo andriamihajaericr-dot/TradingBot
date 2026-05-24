@@ -620,7 +620,7 @@ public class NotificationService extends NotificationListenerService {
 
         if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
             eventDb.markEventAsSynced(fingerprint, "THROTTLED_GEO");
-            logToMain("[THROTTLE] Événement Géo bloqué (12 min)");
+            Log.d("[THROTTLE] Événement Géo bloqué (12 min)");
             return true;
         }
 
