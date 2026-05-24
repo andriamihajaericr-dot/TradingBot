@@ -54,7 +54,6 @@ public class NotificationService extends NotificationListenerService {
 
     private long lastSpeechTime = 0;
     private String lastSpeaker = "";
-
     private static final String SYSTEM_PROMPT =
         "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
         "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
@@ -63,6 +62,11 @@ public class NotificationService extends NotificationListenerService {
         "1. RANG SUPRÊME    : Politique Monétaire, Nominations Banques Centrales, CPI/PCE, NFP/Emploi.\n" +
         "2. RANG SECONDAIRE : PIB/GDP, PMI, ISM, Ventes au détail, Stocks EIA, Stimulus Fiscal / Dépenses Publiques.\n" +
         "3. RANG TACTIQUE   : Géopolitique (GÉO), Sentiment consommateurs (Michigan, Conference Board), Rumeurs de marché.\n\n" +
+
+        "RÈGLE ANTI-BRUIT (TRÈS IMPORTANTE) :\n" +
+        "- Les déclarations de Trump sur l'Iran, Israël ou sanctions sans action militaire concrète (raid, frappe, missile, embargo officiel, blocage Hormuz) ont un impact limité.\n" +
+        "- Ne transforme JAMAIS une simple déclaration diplomatique ou répétition de news en choc majeur.\n" +
+        "- Un événement Géo doit comporter une action concrète ou une mesure officielle forte pour justifier un impact élevé.\n\n" +
 
         "RÈGLE DE CONTRADICTION TEMPORELLE :\n" +
         "Si l'historique récent (moins de 30 min) montre un flux inverse :\n" +
