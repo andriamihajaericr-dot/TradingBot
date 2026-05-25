@@ -641,12 +641,25 @@ public class NotificationService extends NotificationListenerService {
         while (attempt < maxRetries) {
             HttpURLConnection conn = null;
             try {
-                String upperFeed = feed.toUpperCase(Locale.ROOT);
-                boolean isGeoEvent = upperFeed.contains("MOYEN-ORIENT") || 
-                                    upperFeed.contains("IRAN") || 
-                                    upperFeed.contains("ISRAEL") ||
-                                    upperFeed.contains("GÉO") ||
-                                    upperFeed.contains("GEO");
+                String upperFeedGeo = feed.toUpperCase(Locale.ROOT);
+                boolean isGeoEvent = upperFeedGeo.contains("MOYEN-ORIENT") ||
+                    upperFeedGeo.contains("IRAN")      ||
+                    upperFeedGeo.contains("ISRAEL")    ||
+                    upperFeedGeo.contains("HEZBOLLAH") ||
+                    upperFeedGeo.contains("HOUTHI")    ||
+                    upperFeedGeo.contains("HORMUZ")    ||
+                    upperFeedGeo.contains("GAZA")      ||
+                    upperFeedGeo.contains("LEBANON")   ||
+                    upperFeedGeo.contains("UKRAINE")   ||
+                    upperFeedGeo.contains("RUSSIA")    ||
+                    upperFeedGeo.contains("PUTIN")     ||
+                    upperFeedGeo.contains("ZELENSKY")  ||
+                    upperFeedGeo.contains("NATO")      ||
+                    upperFeedGeo.contains("CHINA")     ||
+                    upperFeedGeo.contains("TAIWAN")    ||
+                    upperFeedGeo.contains("XI JINPING")||
+                    upperFeedGeo.contains("GÉO")       ||
+                    upperFeedGeo.contains("GEO");
 
                 SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
                 sdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
