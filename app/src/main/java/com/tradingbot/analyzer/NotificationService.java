@@ -31,7 +31,6 @@ public class NotificationService extends NotificationListenerService {
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-    // Constantes centralisées pour toutes les clés SharedPreferences
     private static final String PREF_GROQ_KEY   = "groq_key";
     private static final String PREF_TG_TOKEN   = "tg_token";
     private static final String PREF_TG_CHAT_ID = "tg_chat_id";
@@ -42,7 +41,6 @@ public class NotificationService extends NotificationListenerService {
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
 
-    /** Raccourci centralisé pour lire la clé Groq depuis les SharedPreferences. */
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
@@ -52,17 +50,17 @@ public class NotificationService extends NotificationListenerService {
     private EventDatabase eventDb;
     private volatile boolean isSyncing = false;
 
+    // Point 7 : Ajout du mot-clé volatile pour garantir la cohérence multi-thread
     private volatile long lastSpeechTime = 0;
     private volatile String lastSpeaker = "";
+    
     private static final String SYSTEM_PROMPT =
     "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
     "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
-
     "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
     "1. RANG SUPRÊME    : Politique Monétaire, Nominations Banques Centrales, CPI/PCE, NFP/Emploi.\n" +
     "2. RANG SECONDAIRE : PIB/GDP, PMI, ISM, Ventes au détail, Stocks EIA, Stimulus Fiscal / Dépenses Publiques.\n" +
     "3. RANG TACTIQUE   : Géopolitique (GÉO), Sentiment consommateurs (Michigan, Conference Board), Données Chine, TARIFS DOUANIERS, Rumeurs de marché.\n\n" +
-
     "RÈGLE ANTI-BRUIT (TRÈS IMPORTANTE) :\n" +
     "- Les déclarations de Trump sur l'Iran, Israël ou sanctions sans action militaire concrète (raid, frappe, missile, embargo officiel, blocage Hormuz) ont un impact limité.\n" +
     "- Ne transforme JAMAIS une simple déclaration diplomatique ou répétition de news en choc majeur.\n" +
@@ -70,23 +68,19 @@ public class NotificationService extends NotificationListenerService {
     "- Les nouvelles sur des 'accords pour rouvrir Hormuz', 'discussions', 'possibilités d'apaisement' = baisse de tension → impact RISK-ON modéré, conviction plafonnée à 45%.\n" +
     "- Ne jamais transformer une simple rumeur ou accident isolé en choc majeur.\n" +
     "- ₿ BITCOIN : Actif amplificateur, pas initiateur. Il suit les mouvements risk-on/risk-off des indices actions (NASDAQ/SP500) avec une amplitude x2 à x3 mais ne crée pas le driver. Ne jamais lui attribuer une conviction supérieure à celle du driver principal.\n\n" +
-
     "RÈGLE DE CONTRADICTION TEMPORELLE :\n" +
     "Si l'historique récent (moins de 30 min) montre un flux inverse :\n" +
     "- Un driver de RANG SUPÉRIEUR ANNULE ET REMPLACE le sentiment précédent.\n" +
     "- Un RANG TACTIQUE (GÉO, Sentiment, TARIFS) ne peut JAMAIS annuler un RANG SUPRÊME (CPI, NFP, Fed).\n" +
     "- En cas de coexistence impossible, signale les deux drivers sans forcer l'arbitrage.\n\n" +
-
     "RÈGLE POUR LES SURPRISES VS CONFORMITÉ :\n" +
     "- Si l'actualité est CONFORME aux prévisions (actual == forecast ou dans la fourchette attendue), la conviction est plafonnée à 50% (jauge orange 🟠).\n" +
     "- Dans ce cas, utilise exclusivement les mentions 'INCLINATION ACHAT MAIS NEUTRE' ou 'INCLINATION VENTE MAIS NEUTRE' sur les actifs concernés.\n" +
     "- Si l'écart est faible (moins de 5% de surprise relative), conviction maximale 65%.\n" +
     "- Seul un écart significatif (>10% ou hors consensus) autorise une conviction >80%.\n\n" +
-
     "════════════════════════════════════════════════════════\n" +
     " RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS — EXHAUSTIVES\n" +
     "════════════════════════════════════════════════════════\n\n" +
-
     "A. NEWS ÉTATS-UNIS — POLITIQUE MONÉTAIRE / CPI / NFP\n" +
     "───────────────────────────────────────────────────────\n" +
     "   HAWKISH US (CPI > prévisions, NFP fort, Fed hawkish, nomination hawkish) :\n" +
@@ -102,7 +96,6 @@ public class NotificationService extends NotificationListenerService {
     "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴  | Devise risk-on pénalisée\n" +
     "   • 🛢️ USOIL    : NEUTRE          | Pas d'impact direct sauf si contexte GÉO simultané\n" +
     "   🏁 FLUX DOMINANT OBLIGATOIRE : DOLLAR FORT (MKT RISK-OFF) 🐻\n\n" +
-
     "   DOVISH US (CPI < prévisions, NFP faible, Fed dovish, anticipation de baisses de taux) :\n" +
     "   • 📈 US10Y    : VENTE CHOC 🔴  | Rendements baissent avec les anticipations de baisse\n" +
     "   • 🇨🇦 USDCAD : VENTE CHOC 🔴  | Dollar faible face au CAD\n" +
@@ -116,11 +109,9 @@ public class NotificationService extends NotificationListenerService {
     "   • 🇦🇺 AUDUSD : ACHAT CHOC 🟢  | Devise risk-on bénéficie du Dollar faible\n" +
     "   • 🛢️ USOIL    : NEUTRE          | Pas d'impact direct sauf si contexte GÉO simultané\n" +
     "   🏁 FLUX DOMINANT OBLIGATOIRE : DOLLAR FAIBLE (MKT RISK-ON) 🐂\n\n" +
-
     "   CAS MIXTE (ex: CPI core baisse mais headline monte) :\n" +
     "   Utilise le composant le plus surveillé par la Fed (Core > Headline).\n" +
     "   Signale la divergence dans le FAIT MARQUANT. Conviction plafonnée à 65%.\n\n" +
-
     "B. NEWS SENTIMENT CONSOMMATEURS (Michigan, Conference Board)\n" +
     "─────────────────────────────────────────────────────────────\n" +
     "   Rang TACTIQUE — impact modéré, conviction plafonnée à 70% (Jauge d'émojis de la CONTRAINTE 5 à appliquer).\n" +
@@ -137,7 +128,6 @@ public class NotificationService extends NotificationListenerService {
     "   Sentiment HAUT (> prévisions) → Signal HAWKISH modéré :\n" +
     "   Inverser toutes les directions ci-dessus.\n" +
     "   🏁 FLUX DOMINANT : RISK-ON MODÉRÉ (MKT CONFIANT) 🐂\n\n" +
-
     "C. NEWS BANQUES CENTRALES ÉTRANGÈRES (BoJ, BCE/ECB, BoE, RBA, BoC)\n" +
     "────────────────────────────────────────────────────────────────\n" +
     "   VERROU MONÉTAIRE ABSOLU : La devise locale réagit exclusivement à sa propre banque centrale.\n" +
@@ -158,7 +148,6 @@ public class NotificationService extends NotificationListenerService {
     "   • 🇦🇺 RBA HAWKISH     → 🇦🇺 AUDUSD: ACHAT CHOC 🟢 | 🛢️ USOIL: ACHAT CHOC 🟢 | 🇪🇺 EURUSD: NEUTRE | 🇬🇧 GBPUSD: NEUTRE | 🇨🇦 USDCAD: NEUTRE | 🇯🇵 USDJPY: NEUTRE | 🏆 GOLD: NEUTRE\n" +
     "   🏁 FLUX DOMINANT OBLIGATOIRE : [DEVISE_LOCALE] FORTE / DOLLAR FAIBLE par différentiel 🐂\n\n" +
     "   NOTE CANADA/PÉTROLE : Le CAD et USOIL sont corrélés. BoC HAWKISH = économie forte = demande pétrolière = USOIL ACHAT. BoC DOVISH = économie faible = USOIL VENTE.\n\n" +
-
     "D. GÉO — STIMULUS MILITAIRE / DÉPENSES DE DÉFENSE EUROPÉENNES (OTAN, 2% PIB)\n" +
     "─────────────────────────────────────────────────────────────────────────────\n" +
     "   VECTEUR = LIQUIDITÉ. C'est un stimulus fiscal localisé (relance budgétaire) sur l'Europe.\n" +
@@ -174,7 +163,6 @@ public class NotificationService extends NotificationListenerService {
     "   • 🇨🇦 USDCAD : VENTE CHOC 🔴  | Effet de flux : le Dollar fléchit face aux devises européennes/refuges\n" +
     "   • 🇦🇺 AUDUSD : ACHAT CHOC 🟢  | Devise cyclique soutenue par l'injection globale de liquidité fiscale\n" +
     "   🏁 FLUX DOMINANT OBLIGATOIRE : EURO FORT / YEN FORT (MKT RISK-OFF) 🐻\n\n" +
-
     "E1. GÉO — CONFLITS / PANIQUE / MOYEN-ORIENT / CHINE\n" +
     "────────────────────────────────────────────────────\n" +
     "   VECTEUR = GÉO. RISK-OFF classique, fuite vers les refuges.\n" +
@@ -192,7 +180,6 @@ public class NotificationService extends NotificationListenerService {
     "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Retrait immédiat des capitaux des actifs spéculatifs\n" +
     "   • 📈 US10Y    : ACHAT CHOC 🟢  | Ruée vers la sécurité des bons du Trésor américains\n" +
     "   🏁 FLUX DOMINANT OBLIGATOIRE : YEN FORT / OR FORT (MKT RISK-OFF) 🐻\n\n" +
-
     "   DÉSESCALADE MOYEN-ORIENT (Discussions, Accords, Trêve) :\n" +
     "   Impact modéré, conviction plafonnée à 45% (Jauge d'émojis de la CONTRAINTE 5 à appliquer).\n" +
     "   • 🏆 GOLD    : VENTE CHOC 🔴  | Sortie des refuges\n" +
@@ -205,7 +192,6 @@ public class NotificationService extends NotificationListenerService {
     "   • ₿ BITCOIN  : ACHAT CHOC 🟢  | Retour des flux spéculatifs (amplitude x2 à x3 par rapport aux actions)\n" +
     "   • 📈 US10Y, 🇪🇺 EURUSD, 🇬🇧 GBPUSD : NEUTRE | Retrait ordonné sans panique\n" +
     "   🏁 FLUX DOMINANT OBLIGATOIRE : RISK-ON RETOUR (MKT APPAISÉ) 🐂\n\n" +
-
     "F. STOCKS PÉTROLE EIA / OPEC\n" +
     "─────────────────────────────\n" +
     "   Rang SECONDAIRE. Impact principal sur USOIL et CAD.\n" +
@@ -217,7 +203,6 @@ public class NotificationService extends NotificationListenerService {
     "   • 🛢️ USOIL    : ACHAT CHOC 🟢\n" +
     "   • 🇨🇦 USDCAD : VENTE CHOC 🔴  | Le CAD se renforce en même temps que le pétrole grimpe\n" +
     "   • Tous les autres actifs : NEUTRE\n\n" +
-
     "G. TARIFS DOUANIERS (Chine, UE, USA, etc.)\n" +
     "────────────────────────────────────────────\n" +
     "   Rang TACTIQUE, impact modéré à élevé selon l'ampleur. Conviction plafonnée à 70% (Palier d'émojis de la CONTRAINTE 5 à appliquer strictement).\n" +
@@ -235,7 +220,6 @@ public class NotificationService extends NotificationListenerService {
     "   DÉSESCALADE TARIFAIRE (suspension, baisse, accord) :\n" +
     "   Inverser toutes les directions ci-dessus, conviction plafonnée à 50%.\n" +
     "   🏁 FLUX DOMINANT : RISK-ON / APPÉTIT POUR LE RISQUE 🐂\n\n" +
-
     "<HARD_CONSTRAINTS>\n" +
     "CONTRAINTE 1 — SECTIONS INTERDITES :\n" +
     "   N'écris JAMAIS 'TIMING D'EFFET', 'ACTION TRADING', 'CONTEXTE' ou toute autre section\n" +
@@ -246,8 +230,8 @@ public class NotificationService extends NotificationListenerService {
     "   💻 NASDAQ et 📊 SP500 ont TOUJOURS exactement la même directionnalité (Achat, Vente ou Neutre).\n" +
     "   Aucune exception tolérée.\n\n" +
     "CONTRAINTE 4 — COHÉRENCE USDJPY / FLUX DOMINANT :\n" +
-    "   - Si 🇯🇵 USDJPY est en VENTE CHOC 🔴 → Le FLUX DOMINANT a l'interdiction formelle d'écrire 'DOLLAR FORT'.\n" +
-    "   - Si 🇯🇵 USDJPY est en ACHAT CHOC 🟢 → Le FLUX DOMINANT a l'interdiction formelle d'écrire 'YEN FORT'.\n" +
+    "   - Si 🇯🇵 USDJPY is in VENTE CHOC 🔴 → Le FLUX DOMINANT a l'interdiction formelle d'écrire 'DOLLAR FORT'.\n" +
+    "   - Si 🇯🇵 USDJPY is in ACHAT CHOC 🟢 → Le FLUX DOMINANT a l'interdiction formelle d'écrire 'YEN FORT'.\n" +
     "   - En cas de contradiction, le flux doit mentionner YEN FORT si USDJPY est en VENTE.\n\n" +
     "CONTRAINTE 5 — JAUGE CONVICTION OBLIGATOIRE :\n" +
     "   Tu dois obligatoirement générer la jauge visuelle d'émojis avant le pourcentage. Format strict :\n" +
@@ -262,7 +246,6 @@ public class NotificationService extends NotificationListenerService {
     "   Les 11 actifs listés dans le FORMAT DE SORTIE doivent TOUS apparaître explicitement dans la réponse,\n" +
     "   sans aucune exception, même s'ils reçoivent la mention NEUTRE ou une INCLINATION.\n" +
     "</HARD_CONSTRAINTS>\n\n" +
-
     "FORMAT DE SORTIE STRICT ET OBLIGATOIRE :\n" +
     "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
     "📊 CONVICTION : [JAUGE_EMOJIS] XX%\n" +
@@ -282,8 +265,10 @@ public class NotificationService extends NotificationListenerService {
     "• ₿ BITCOIN  : [ACHAT CHOC 🟢 / VENTE CHOC 🔴 / NEUTRE / INCLINATION ACHAT MAIS NEUTRE / INCLINATION VENTE MAIS NEUTRE] | [raison succincte]\n\n" +
     "🏁 FLUX DOMINANT : [Chaîne de caractères exacte issue des règles de directionnalité]";
 
+    // Point 5 : Déconnexion sécurisée encapsulée de manière étanche dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
+            HttpURLConnection conn = null;
             try {
                 android.content.SharedPreferences prefs = context.getSharedPreferences("TradingBot", Context.MODE_PRIVATE);
                 String token  = prefs.getString("tg_token", "");
@@ -292,7 +277,7 @@ public class NotificationService extends NotificationListenerService {
                 if (token.isEmpty() || chatId.isEmpty()) return;
 
                 URL url = new URL("https://api.telegram.org/bot" + token + "/sendMessage");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
                 conn.setDoOutput(true);
@@ -310,9 +295,10 @@ public class NotificationService extends NotificationListenerService {
                 os.close();
 
                 conn.getResponseCode();
-                conn.disconnect();
             } catch (Exception e) {
                 Log.e(TAG, "Échec Telegram POST", e);
+            } finally {
+                if (conn != null) conn.disconnect();
             }
         }).start();
     }
@@ -327,9 +313,7 @@ public class NotificationService extends NotificationListenerService {
         startDailyBriefScheduler();
         startMonthlyReportScheduler();
         registerNetworkCallback();
-        // Nettoyage périodique toutes les 30 minutes
-        scheduler.scheduleAtFixedRate(EventValidator::cleanupOldFingerprints, 
-                                     30, 30, TimeUnit.MINUTES);
+        scheduler.scheduleAtFixedRate(EventValidator::cleanupOldFingerprints, 30, 30, TimeUnit.MINUTES);
     }
 
     @Override
@@ -387,57 +371,61 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
-        List<String> targetAssets = filterActiveAssets(feed);
+        long now = System.currentTimeMillis();
+        
+        if (now - lastAnalysisTime < GLOBAL_THROTTLE_MS) {
+            Log.d(TAG, "[THROTTLE] Notification instantanée bloquée (global - 8 min)");
+            return;
+        }
 
-        // ── Validation institutionnelle (calendrier + géopolitique + anti-rumeur) ──────
-        // CORRECTION : qualification complète EventValidator.ValidationResult (classe interne)
-        // EventValidator enrichit targetAssets si un événement géo ou calendrier est détecté.
-        // Si isConfirmed = false → rejet silencieux, rien n'est sauvegardé ni envoyé.
+        boolean isGeoEvent = feed.toUpperCase(Locale.ROOT).contains("MOYEN-ORIENT") || 
+                            feed.toUpperCase(Locale.ROOT).contains("IRAN") || 
+                            feed.toUpperCase(Locale.ROOT).contains("ISRAEL") ||
+                            feed.toUpperCase(Locale.ROOT).contains("GÉO") ||
+                            feed.toUpperCase(Locale.ROOT).contains("GEO");
+
+        if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
+            Log.d(TAG, "[THROTTLE] Notification Géo instantanée bloquée (12 min)");
+            return;
+        }
+
+        List<String> targetAssets = filterActiveAssets(feed);
         EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
 
         boolean isFomcPivot = feed.toUpperCase().contains("FOMC") || feed.toUpperCase().contains("FED ");
         int weight = assignDriverWeight(feed);
 
-        // Élévation du poids pour les événements géopolitiques confirmés à haute conviction
         if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 80) {
-            weight = Math.max(weight, 4); // Géo fort impact → traité comme driver secondaire minimum
+            weight = Math.max(weight, 4);
         }
 
         String hash = generateSecureHash(title + text);
 
-        // Filtre pré-validation : bruit faible non confirmé → sauvegarde silencieuse sans traitement
         if (!vr.isConfirmed && weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
             eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
                     String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
             return;
         }
 
-        // Rejet définitif si le validator a explicitement refusé (rumeur, éditorial)
         if (!vr.isConfirmed && weight < 4) return;
-        // ── Détection et classification de l'événement ──────────────
+
         EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
 
-        // Construction du label d'impact enrichi :
-        // Priorité : Géo (EventValidator) > FOMC Pivot > EconomicEventDetector > Générique
         String initialImpact;
         if (!vr.geoContext.isEmpty()) {
             initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
         } else if (isFomcPivot) {
-            initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRALE | " + detected.description + " | " + detected.impact;
+            initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRAL | " + detected.description + " | " + detected.impact;
         } else {
             initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
         }
 
-        // =========================================================================
-        // SÉCURITÉ : Filtrer le neutre UNIQUEMENT s'il ne s'agit ni de GÉO ni de FOMC
-        // =========================================================================
         if (vr.geoContext.isEmpty() && !isFomcPivot) {
             if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
-                Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation de la base et de l'envoi Groq/Telegram.");
-                return; // Rejet silencieux total
+                Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
+                return;
             }
         }
-        // =========================================================================
 
         boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
                 String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "pending", weight);
@@ -531,10 +519,11 @@ public class NotificationService extends NotificationListenerService {
         });
     }
 
+    // Point 6 : Fermeture hermétique de la connexion dans un bloc finally
     private void fetchMissingDataFromInstitutionalAPI() {
+        HttpURLConnection conn = null;
         try {
             String macroApiKey = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_MACRO_KEY, "");
-
             if (macroApiKey.isEmpty()) return;
 
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
@@ -545,7 +534,7 @@ public class NotificationService extends NotificationListenerService {
 
             String urlString = String.format("https://financialmodelingprep.com/api/v3/economic_calendar?from=%s&to=%s&apikey=%s", twoDaysAgoStr, todayStr, macroApiKey);
             URL url = new URL(urlString);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(10000);
 
@@ -583,12 +572,13 @@ public class NotificationService extends NotificationListenerService {
                     dispatchHistoricalBulkToGroq(apiMacroBlock.toString());
                 }
             }
-            // CORRECTION 3 : Fermeture de la connexion dans fetchMissingDataFromInstitutionalAPI
-            conn.disconnect();
-        } catch (Exception e) { Log.e(TAG, "Échec de récupération API historique", e); }
+        } catch (Exception e) { 
+            Log.e(TAG, "Échec de récupération API historique", e); 
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
 
-    // CORRECTION 5 : Renommage de dispatchWeeklyBulkToGroq → dispatchHistoricalBulkToGroq (nom plus fidèle)
     private void dispatchHistoricalBulkToGroq(String bulkData) {
         HttpURLConnection conn = null;
         try {
@@ -632,46 +622,31 @@ public class NotificationService extends NotificationListenerService {
             }
         } catch (Exception e) { Log.e(TAG, "Échec dispatch historique Groq", e); }
         finally {
-            // CORRECTION 3 : Fermeture garantie dans le bloc finally
             if (conn != null) conn.disconnect();
         }
     }
 
-        private boolean executeAnalysisPipeline(String source, String feed, String history, 
+    // Points 3 & 4 : Gestion propre de isGeoEvent, filtrage strict étendu aux inclinations, markEventAsSynced et return true garantis
+    private boolean executeAnalysisPipeline(String source, String feed, String history, 
                                             List<String> assets, long ts, String fingerprint) {
-        
         int maxRetries = 3;
         int attempt = 0;
 
-        // Lecture des clés une seule fois, avant la boucle retry
         String apiKey = getGroqApiKey();
         android.content.SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String tgToken  = prefs.getString(PREF_TG_TOKEN, "");
         String tgChatId = prefs.getString(PREF_TG_CHAT_ID, "");
         if (apiKey.isEmpty() || tgToken.isEmpty() || tgChatId.isEmpty()) return false;
 
-        long now = System.currentTimeMillis();
-        // ── THROTTLE GLOBAL + GÉO ─────────────────────────────
-        if (now - lastAnalysisTime < GLOBAL_THROTTLE_MS) {
-            eventDb.markEventAsSynced(fingerprint, "THROTTLED_GLOBAL");
-            Log.d(TAG, "[THROTTLE] Analyse bloquée (global - 8 min)");
-            return true;
-        }
-
-        boolean isGeoEvent = feed.toUpperCase(Locale.ROOT).contains("MOYEN-ORIENT") || 
-                            feed.toUpperCase(Locale.ROOT).contains("IRAN") || 
-                            feed.toUpperCase(Locale.ROOT).contains("ISRAEL") ||
-                            feed.toUpperCase(Locale.ROOT).contains("GÉO");
-
-        if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
-            eventDb.markEventAsSynced(fingerprint, "THROTTLED_GEO");
-            Log.d(TAG, "[THROTTLE] Événement Géo bloqué (12 min)");
-            return true;
-        }
-
         while (attempt < maxRetries) {
             HttpURLConnection conn = null;
             try {
+                String upperFeed = feed.toUpperCase(Locale.ROOT);
+                boolean isGeoEvent = upperFeed.contains("MOYEN-ORIENT") || 
+                                    upperFeed.contains("IRAN") || 
+                                    upperFeed.contains("ISRAEL") ||
+                                    upperFeed.contains("GÉO") ||
+                                    upperFeed.contains("GEO");
 
                 SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
                 sdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
@@ -718,18 +693,14 @@ public class NotificationService extends NotificationListenerService {
                         throw new Exception("Invalid API response");
                     }
 
-                    // ─────────────────────────────────────────────────────────────
-                    // FILTRAGE : Neutres gardés pour Groq, seulement signaux forts pour Telegram
-                    // ─────────────────────────────────────────────────────────────
                     StringBuilder filteredMessage = new StringBuilder();
                     String[] lines = aiResult.split("\n");
                     int activeSignalsCount = 0;
 
-                   for (String line : lines) {
+                    for (String line : lines) {
                         String trimmed = line.trim();
                         if (trimmed.isEmpty()) continue;
 
-                        // Métadonnées importantes
                         if (trimmed.startsWith("🚨") || 
                             trimmed.startsWith("📊") || 
                             trimmed.startsWith("🎯") || 
@@ -740,20 +711,20 @@ public class NotificationService extends NotificationListenerService {
                             continue;
                         }
 
-                        // Seulement les lignes avec ACHAT ou VENTE (CHOC et INCLINATION)
-                        if (trimmed.contains("•") && 
-                           (line.contains("ACHAT CHOC") || line.contains("VENTE CHOC") || 
-                            line.contains("INCLINATION ACHAT") || line.contains("INCLINATION VENTE"))) {
-                           
-                            String processedLine = line;
-                            
-                            filteredMessage.append(processedLine).append("\n");
-                            activeSignalsCount++;
+                        if (trimmed.contains("•")) {
+                            String upperLine = line.toUpperCase(Locale.ROOT);
+                            if (upperLine.contains("ACHAT CHOC") || 
+                                upperLine.contains("VENTE CHOC") || 
+                                upperLine.contains("INCLINATION ACHAT") || 
+                                upperLine.contains("INCLINATION VENTE")) {
+                                
+                                filteredMessage.append(line).append("\n");
+                                activeSignalsCount++;
+                            }
                         }
                     }
 
                     if (activeSignalsCount > 0) {
-                        // NOUVEAU : Filtre de conviction minimum
                         if (aiResult.contains("CONVICTION") && 
                             (aiResult.contains("⚪⚪⚪⚪⚪") || aiResult.contains("20%") || aiResult.contains("30%"))) {
                             eventDb.markEventAsSynced(fingerprint, "LOW_CONVICTION");
@@ -764,24 +735,24 @@ public class NotificationService extends NotificationListenerService {
                                 + "📡 Source : " + source + "\n"
                                 + filteredMessage.toString().trim();
 
-                        // Protection anti-spam : message trop court
                         if (finalPayload.length() < 200) {
                             eventDb.markEventAsSynced(fingerprint, "TOO_SHORT");
                             return true;
                         }
 
                         sendTelegramSecure(finalPayload, this);
-
-                        // Mise à jour des throttles
-                        lastAnalysisTime = now;
+                        
+                        lastAnalysisTime = System.currentTimeMillis();
                         if (isGeoEvent) {
-                            lastGeoTime = now;
+                            lastGeoTime = System.currentTimeMillis();
                         }
+                        
+                        eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
+                        return true;
                     } else {
                         eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
                     }
 
-                    eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
                     return true;
 
                 } else {
@@ -805,8 +776,6 @@ public class NotificationService extends NotificationListenerService {
         List<String> assets = new ArrayList<>();
         String upper = text.toUpperCase();
 
-        // ── USD / Fed — impact global systémique ─────────────────────
-        // Warsh, Powell et membres Fed → tous les actifs majeurs impactés
         if (upper.contains("WARSH")       || upper.contains("POWELL")          ||
             upper.contains("BARKIN")      || upper.contains("GOOLSBEE")        ||
             upper.contains("HAMMACK")     || upper.contains("WALLER")          ||
@@ -819,15 +788,12 @@ public class NotificationService extends NotificationListenerService {
             ));
         }
 
-        // ── Or / Métaux précieux ──────────────────────────────────────
         if (upper.contains("GOLD")   || upper.contains("XAU")    ||
             upper.contains("OR ")    || upper.contains("SILVER")) assets.add("GOLD");
 
-        // ── Pétrole ───────────────────────────────────────────────────
         if (upper.contains("OIL")    || upper.contains("WTI")    ||
             upper.contains("CRUDE")  || upper.contains("BRENT")) assets.add("USOIL");
 
-        // ── Indices US ────────────────────────────────────────────────
         if (upper.contains("NASDAQ") || upper.contains("NAS100") ||
             upper.contains("TECH")   || upper.contains("OPENAI") ||
             upper.contains("NVIDIA") || upper.contains("APPLE")) assets.add("NASDAQ");
@@ -835,48 +801,40 @@ public class NotificationService extends NotificationListenerService {
         if (upper.contains("SP500")  || upper.contains("S&P")    ||
             upper.contains("SPX")) assets.add("SP500");
 
-        // ── Crypto ────────────────────────────────────────────────────
         if (upper.contains("BITCOIN") || upper.contains("BTC")   ||
             upper.contains("CRYPTO")) assets.add("BITCOIN");
 
-        // ── Obligations US ────────────────────────────────────────────
         if (upper.contains("YIELD")  || upper.contains("US10Y")  ||
             upper.contains("BOND")   || upper.contains("TREASURY")) assets.add("US10Y");
 
-        // ── EURUSD ────────────────────────────────────────────────────
         if (upper.contains("EURUSD")   || upper.contains("ECB")       ||
             upper.contains("EUROZONE") || upper.contains("LAGARDE")   ||
             upper.contains("BCE")      || upper.contains("FRANKFURT") ||
             upper.matches(".*\\bEUR\\b.*")) assets.add("EURUSD");
 
-        // ── GBPUSD ────────────────────────────────────────────────────
         if (upper.contains("GBP")    || upper.contains("GBPUSD") ||
             upper.contains("CABLE")  || upper.contains("BOE")    ||
             upper.contains("BAILEY")) assets.add("GBPUSD");
 
-        // ── AUDUSD ────────────────────────────────────────────────────
         if (upper.contains("AUD")    || upper.contains("AUDUSD") ||
             upper.contains("AUSSIE") || upper.contains("RBA")    ||
             upper.contains("BULLOCK")) assets.add("AUDUSD");
 
-        // ── USDCAD ────────────────────────────────────────────────────
         if (upper.contains("CAD")    || upper.contains("USDCAD") ||
             upper.contains("LOONIE") || upper.contains("BOC")    ||
             upper.contains("MACKLEM")) assets.add("USDCAD");
 
-        // ── USDJPY ────────────────────────────────────────────────────
         if (upper.contains("JPY")    || upper.contains("USDJPY") ||
             upper.contains("YEN")    || upper.contains("BOJ")    ||
             upper.contains("UEDA")) assets.add("USDJPY");
 
-        // ── Fallback : si aucun actif détecté → actifs majeurs par défaut ──
+        // Point 8 : Remplacement du fallback global par une sélection minimale restreinte pertinente
         if (assets.isEmpty()) {
-            assets.addAll(Arrays.asList(
-                "GOLD", "NASDAQ", "USOIL", "EURUSD", "AUDUSD", "USDCAD", "USDJPY"
-            ));
+            assets.add("NASDAQ");
+            assets.add("SP500");
+            assets.add("US10Y");
         }
 
-        // Dédoublonnage en conservant l'ordre
         return new ArrayList<>(new LinkedHashSet<>(assets));
     }
 
@@ -934,7 +892,6 @@ public class NotificationService extends NotificationListenerService {
             }
         } catch (Exception e) { Log.e(TAG, "Erreur Daily Brief", e); }
         finally {
-            // CORRECTION 3 : Fermeture garantie dans generateAndSendDailyBrief
             if (conn != null) conn.disconnect();
         }
     }
@@ -997,10 +954,8 @@ public class NotificationService extends NotificationListenerService {
                 sendTelegramSecure("📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report, this);
                 eventDb.purgeOldEvents(now);
             }
-
         } catch (Exception e) { Log.e(TAG, "Erreur Rapport Mensuel", e); }
         finally {
-            // CORRECTION 3 : Fermeture garantie dans generateAndPurgeMonthlyReport
             if (conn != null) conn.disconnect();
         }
     }
