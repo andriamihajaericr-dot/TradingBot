@@ -423,7 +423,7 @@ public class NotificationService extends NotificationListenerService {
         }
 
         // Le mot 'attente' est remplacé par 'pending' ici (comme demandé)
-        boolean saved=eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
+        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
         String.join(", ", targetAssets), initialImpact, postTime/1000, "pending", weight);
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
