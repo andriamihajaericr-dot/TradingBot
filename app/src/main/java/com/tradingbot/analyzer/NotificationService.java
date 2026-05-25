@@ -52,8 +52,8 @@ public class NotificationService extends NotificationListenerService {
     private EventDatabase eventDb;
     private volatile boolean isSyncing = false;
 
-    private long lastSpeechTime = 0;
-    private String lastSpeaker = "";
+    private volatile long lastSpeechTime = 0;
+    private volatile String lastSpeaker = "";
     private static final String SYSTEM_PROMPT =
     "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
     "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
