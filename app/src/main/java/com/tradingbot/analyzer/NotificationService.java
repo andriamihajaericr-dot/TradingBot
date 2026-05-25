@@ -378,11 +378,25 @@ public class NotificationService extends NotificationListenerService {
             return;
         }
 
-        boolean isGeoEvent = feed.toUpperCase(Locale.ROOT).contains("MOYEN-ORIENT") || 
-                            feed.toUpperCase(Locale.ROOT).contains("IRAN") || 
-                            feed.toUpperCase(Locale.ROOT).contains("ISRAEL") ||
-                            feed.toUpperCase(Locale.ROOT).contains("GÉO") ||
-                            feed.toUpperCase(Locale.ROOT).contains("GEO");
+        String upperFeed = feed.toUpperCase(Locale.ROOT);
+        boolean isGeoEvent = upperFeed.contains("MOYEN-ORIENT") ||
+                    upperFeed.contains("IRAN")      ||
+                    upperFeed.contains("ISRAEL")    ||
+                    upperFeed.contains("HEZBOLLAH") ||
+                    upperFeed.contains("HOUTHI")    ||
+                    upperFeed.contains("HORMUZ")    ||
+                    upperFeed.contains("GAZA")      ||
+                    upperFeed.contains("LEBANON")   ||
+                    upperFeed.contains("UKRAINE")   ||
+                    upperFeed.contains("RUSSIA")    ||
+                    upperFeed.contains("PUTIN")     ||
+                    upperFeed.contains("ZELENSKY")  ||
+                    upperFeed.contains("NATO")      ||
+                    upperFeed.contains("CHINA")     ||
+                    upperFeed.contains("TAIWAN")    ||
+                    upperFeed.contains("XI JINPING")||
+                    upperFeed.contains("GÉO")       ||
+                    upperFeed.contains("GEO");
 
         if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
             Log.d(TAG, "[THROTTLE] Notification Géo instantanée bloquée (12 min)");
