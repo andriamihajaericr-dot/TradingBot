@@ -371,63 +371,64 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
-        long now = System.currentTimeMillis();
-        
-        if (now - lastAnalysisTime < GLOBAL_THROTTLE_MS) {
-            Log.d(TAG, "[THROTTLE] Notification instantanée bloquée (global - 8 min)");
+    long now = System.currentTimeMillis();
+    boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
+
+    // 1. Throttle géopolitique prioritaire
+    if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
+        Log.d(TAG, "[THROTTLE] Notification Géo instantanée bloquée (12 min)");
+        return;
+    }
+
+    // 2. Throttle global uniquement pour les événements non-géo
+    if (!isGeoEvent && (now - lastAnalysisTime < GLOBAL_THROTTLE_MS)) {
+        Log.d(TAG, "[THROTTLE] Notification instantanée bloquée (global - 8 min)");
+        return;
+    }
+
+    List<String> targetAssets = filterActiveAssets(feed);
+    EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
+
+    boolean isFomcPivot = feed.toUpperCase().contains("FOMC") || feed.toUpperCase().contains("FED ");
+    int weight = assignDriverWeight(feed);
+
+    if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 80) {
+        weight = Math.max(weight, 4);
+    }
+
+    String hash = generateSecureHash(title + text);
+
+    if (!vr.isConfirmed && weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
+        eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
+                String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
+        return;
+    }
+
+    if (!vr.isConfirmed && weight < 4) return;
+
+    EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
+
+    String initialImpact;
+    if (!vr.geoContext.isEmpty()) {
+        initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
+    } else if (isFomcPivot) {
+        initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRAL | " + detected.description + " | " + detected.impact;
+    } else {
+        initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
+    }
+
+    if (vr.geoContext.isEmpty() && !isFomcPivot) {
+        if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
+            Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
             return;
         }
-        boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
+    }
 
-        if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
-            Log.d(TAG, "[THROTTLE] Notification Géo instantanée bloquée (12 min)");
-            return;
-        }
-
-        List<String> targetAssets = filterActiveAssets(feed);
-        EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
-
-        boolean isFomcPivot = feed.toUpperCase().contains("FOMC") || feed.toUpperCase().contains("FED ");
-        int weight = assignDriverWeight(feed);
-
-        if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 80) {
-            weight = Math.max(weight, 4);
-        }
-
-        String hash = generateSecureHash(title + text);
-
-        if (!vr.isConfirmed && weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
-            eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
-                    String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
-            return;
-        }
-
-        if (!vr.isConfirmed && weight < 4) return;
-
-        EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
-
-        String initialImpact;
-        if (!vr.geoContext.isEmpty()) {
-            initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
-        } else if (isFomcPivot) {
-            initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRAL | " + detected.description + " | " + detected.impact;
-        } else {
-            initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
-        }
-
-        if (vr.geoContext.isEmpty() && !isFomcPivot) {
-            if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
-                Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
-                return;
-            }
-        }
-
-        // Le mot 'attente' est remplacé par 'pending' ici (comme demandé)
-        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
-        String.join(", ", targetAssets), initialImpact, postTime/1000, "pending", weight);
-        if (saved && isDeviceOnline()) {
-            triggerQueueSynchronization();
-        }
+    boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
+            String.join(", ", targetAssets), initialImpact, postTime/1000, "pending", weight);
+    if (saved && isDeviceOnline()) {
+        triggerQueueSynchronization();
+       }
     }
 
     private int assignDriverWeight(String text) {
