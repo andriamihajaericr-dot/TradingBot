@@ -706,9 +706,10 @@ public class NotificationService extends NotificationListenerService {
                         if (trimmed.contains("•")) {
                             String upperLine = line.toUpperCase(Locale.ROOT);
                             if (upperLine.contains("ACHAT CHOC") || 
-                                upperLine.contains("VENTE CHOC") || 
-                                upperLine.contains("INCLINATION ACHAT") || 
-                                upperLine.contains("INCLINATION VENTE")) {
+                            upperLine.contains("VENTE CHOC") || 
+                            upperLine.contains("INCLINATION ACHAT") || 
+                            upperLine.contains("INCLINATION VENTE") ||
+                            upperLine.contains("NEUTRE")) {
                                 
                                 filteredMessage.append(line).append("\n");
                                 activeSignalsCount++;
