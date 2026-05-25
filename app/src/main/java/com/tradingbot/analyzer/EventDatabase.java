@@ -105,7 +105,7 @@ public class EventDatabase extends SQLiteOpenHelper {
         long threshold = currentUnixTime - 21600;
         // FIX #2 : valeur unifiée "pending" (cohérence avec NotificationService)
         return db.query(TABLE_EVENTS, null,
-                "sync_status = ? AND unix_timestamp >= ?",
+                "sync_status = ? AND unix_timestamp >= ? AND driver_weight >= 2",
                 new String[]{"pending", String.valueOf(threshold)},
                 null, null, "unix_timestamp ASC");
     }
