@@ -742,7 +742,8 @@ public class NotificationService extends NotificationListenerService {
 
                         // Seulement les lignes avec ACHAT ou VENTE
                         if (trimmed.contains("•") && 
-                           (line.contains("ACHAT CHOC") || line.contains("VENTE CHOC"))) {
+                           (line.contains("ACHAT CHOC") || line.contains("VENTE CHOC") || line.contains("INCLINATION ACHAT") || 
+                                 line.contains("INCLINATION VENTE")) {
                             
                             // Corrections de cohérence (USDJPY / USDCAD)
                             String processedLine = line;
