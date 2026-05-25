@@ -440,7 +440,7 @@ public class NotificationService extends NotificationListenerService {
         // =========================================================================
 
         boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
-                String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "en_attente", weight);
+                String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "pending", weight);
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
         }
