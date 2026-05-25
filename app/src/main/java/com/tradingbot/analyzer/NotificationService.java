@@ -638,11 +638,7 @@ public class NotificationService extends NotificationListenerService {
             HttpURLConnection conn = null;
             try {
                 String upperFeed = feed.toUpperCase(Locale.ROOT);
-                boolean isGeoEvent = upperFeed.contains("MOYEN-ORIENT") || 
-                                    upperFeed.contains("IRAN") || 
-                                    upperFeed.contains("ISRAEL") ||
-                                    upperFeed.contains("GÉO") ||
-                                    upperFeed.contains("GEO");
+                boolean isGeoEvent = isGeoEvent(upperFeed);
 
                 SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
                 sdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
