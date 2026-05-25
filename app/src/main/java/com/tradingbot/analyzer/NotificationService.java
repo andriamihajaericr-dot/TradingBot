@@ -408,7 +408,7 @@ public class NotificationService extends NotificationListenerService {
         // Filtre pré-validation : bruit faible non confirmé → sauvegarde silencieuse sans traitement
         if (!vr.isConfirmed && weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
             eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
-                    String.join(", ", targetAssets), "Conforme (Filtré)", (int)(postTime/1000), "synced", weight);
+                    String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
             return;
         }
 
@@ -628,7 +628,7 @@ public class NotificationService extends NotificationListenerService {
                 String analysis = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
                 sendTelegramSecure("🚨 *RAPPORT CRITIQUE DE RATTRAPAGE INTER-MARCHÉS (J+7)*\n\n" + analysis, this);
 
-                eventDb.saveEvent(generateSecureHash(analysis), "com.tradingbot.sync", "API Sync", "Weekly-Sync", "Audit Global", analysis, "ALL_ASSETS", "ALIGNE_OK", (int)(System.currentTimeMillis()/1000), "synced", 5);
+                eventDb.saveEvent(generateSecureHash(analysis), "com.tradingbot.sync", "API Sync", "Weekly-Sync", "Audit Global", analysis, "ALL_ASSETS", "ALIGNE_OK", (long)(System.currentTimeMillis()/1000), "synced", 5);
             }
         } catch (Exception e) { Log.e(TAG, "Échec dispatch historique Groq", e); }
         finally {
