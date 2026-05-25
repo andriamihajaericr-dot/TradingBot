@@ -67,10 +67,10 @@ public class EventValidator {
         String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
         
         // On vérifie seulement si on est dans un contexte où la DB est accessible
-        if (!detectedType.startsWith("GEO") && EventDatabase.getInstance(null) != null) {
+        if (!detectedType.startsWith("GEO") && eventDatabase != null) {
             try {
                 long currentSeconds = timestamp / 1000;
-                if (EventDatabase.getInstance(null).isDriverActiveRecently(detectedType, currentSeconds)) {
+                if (eventDatabase.isDriverActiveRecently(detectedType, currentSeconds)) {
                     result.confidence  = 0;
                     result.isConfirmed = false;
                     result.reason      = "Driver déjà actif récemment (Inertie Macro)";
