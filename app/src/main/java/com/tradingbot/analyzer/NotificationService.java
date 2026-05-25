@@ -377,12 +377,7 @@ public class NotificationService extends NotificationListenerService {
             Log.d(TAG, "[THROTTLE] Notification instantanée bloquée (global - 8 min)");
             return;
         }
-
-        boolean isGeoEvent = feed.toUpperCase(Locale.ROOT).contains("MOYEN-ORIENT") || 
-                            feed.toUpperCase(Locale.ROOT).contains("IRAN") || 
-                            feed.toUpperCase(Locale.ROOT).contains("ISRAEL") ||
-                            feed.toUpperCase(Locale.ROOT).contains("GÉO") ||
-                            feed.toUpperCase(Locale.ROOT).contains("GEO");
+        boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
 
         if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
             Log.d(TAG, "[THROTTLE] Notification Géo instantanée bloquée (12 min)");
@@ -428,8 +423,8 @@ public class NotificationService extends NotificationListenerService {
         }
 
         // Le mot 'attente' est remplacé par 'pending' ici (comme demandé)
-        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
-                String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "pending", weight);
+        eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
+        String.join(", ", targetAssets), initialImpact, postTime/1000, "pending", weight);
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
         }
