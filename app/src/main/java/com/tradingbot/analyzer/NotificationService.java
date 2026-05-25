@@ -67,7 +67,10 @@ public class NotificationService extends NotificationListenerService {
         "- Les déclarations de Trump sur l'Iran, Israël ou sanctions sans action militaire concrète (raid, frappe, missile, embargo officiel, blocage Hormuz) ont un impact limité.\n" +
         "- Ne transforme JAMAIS une simple déclaration diplomatique ou répétition de news en choc majeur.\n" +
         "- Un événement Géo doit comporter une action concrète ou une mesure officielle forte pour justifier un impact élevé.\n\n" +
-
+        "- Les déclarations de Trump sur l'Iran, Israël ou sanctions sans action militaire concrète ont un impact limité.\n" +
+        "- Les nouvelles sur des 'accords pour rouvrir Hormuz', 'discussions', 'possibilités d'apaisement' = baisse de tension → impact RISK-ON modéré, conviction plafonnée à 45%.\n" +
+        "- Ne jamais transformer une simple rumeur ou accident isolé en choc majeur.\n" +
+    
         "RÈGLE DE CONTRADICTION TEMPORELLE :\n" +
         "Si l'historique récent (moins de 30 min) montre un flux inverse :\n" +
         "- Un driver de RANG SUPÉRIEUR ANNULE ET REMPLACE le sentiment précédent.\n" +
