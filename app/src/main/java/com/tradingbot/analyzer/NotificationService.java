@@ -829,6 +829,26 @@ public class NotificationService extends NotificationListenerService {
 
         return new ArrayList<>(new LinkedHashSet<>(assets));
     }
+    private boolean isGeoEvent(String upperText) {
+    return upperText.contains("MOYEN-ORIENT") ||
+           upperText.contains("IRAN")         ||
+           upperText.contains("ISRAEL")       ||
+           upperText.contains("HEZBOLLAH")    ||
+           upperText.contains("HOUTHI")       ||
+           upperText.contains("HORMUZ")       ||
+           upperText.contains("GAZA")         ||
+           upperText.contains("LEBANON")      ||
+           upperText.contains("UKRAINE")      ||
+           upperText.contains("RUSSIA")       ||
+           upperText.contains("PUTIN")        ||
+           upperText.contains("ZELENSKY")     ||
+           upperText.contains("NATO")         ||
+           upperText.contains("CHINA")        ||
+           upperText.contains("TAIWAN")       ||
+           upperText.contains("XI JINPING")   ||
+           upperText.contains("GÉO")          ||
+           upperText.contains("GEO");
+    }
 
     private void startDailyBriefScheduler() {
         Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
