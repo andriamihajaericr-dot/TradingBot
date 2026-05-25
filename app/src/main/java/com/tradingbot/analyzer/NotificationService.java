@@ -50,7 +50,7 @@ public class NotificationService extends NotificationListenerService {
     private EventDatabase eventDb;
     private volatile boolean isSyncing = false;
 
-    // Point 7 : Ajout du mot-clé volatile pour garantir la cohérence multi-thread
+    // Volatile pour la cohérence multi-thread (Point 7)
     private volatile long lastSpeechTime = 0;
     private volatile String lastSpeaker = "";
     
@@ -114,7 +114,7 @@ public class NotificationService extends NotificationListenerService {
     "   Signale la divergence dans le FAIT MARQUANT. Conviction plafonnée à 65%.\n\n" +
     "B. NEWS SENTIMENT CONSOMMATEURS (Michigan, Conference Board)\n" +
     "─────────────────────────────────────────────────────────────\n" +
-    "   Rang TACTIQUE — impact modéré, conviction plafonnée à 70% (Jauge d'émojis de la CONTRAINTE 5 à appliquer).\n" +
+    "   Rang TACTIQUE — impact modéré, conviction plafonnée à 70%.\n" +
     "   Sentiment BAS (< prévisions) → Signal DOVISH modéré :\n" +
     "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Crainte de ralentissement de la consommation\n" +
     "   • 📊 SP500    : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
@@ -172,7 +172,7 @@ public class NotificationService extends NotificationListenerService {
     "   • 🛢️ USOIL    : ACHAT CHOC 🟢  | Si Moyen-Orient / Détroit d'Ormuz impliqué (menace sur l'offre)\n" +
     "                  NEUTRE          | Si conflit local sans aucun impact sur les routes pétrolières\n" +
     "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴  | Devise risk-on fortement pénalisée en RISK-OFF\n" +
-    "   • 🇨🇦 USDCAD : [ACHAT CHOC si USOIL NEUTRE] / [NEUTRE si USOIL ACHAT] | Justification selon la divergence pétrole/cad (forces opposées : USD refuge vs CAD soutenu par le brut). Mentionner obligatoirement la divergence dans le FAIT MARQUANT.\n" +
+    "   • 🇨🇦 USDCAD : [ACHAT CHOC si USOIL NEUTRE] / [NEUTRE si USOIL ACHAT] | Justification selon la divergence pétrole/cad. Mentionner obligatoirement la divergence dans le FAIT MARQUANT.\n" +
     "   • 🇪🇺 EURUSD : VENTE CHOC 🔴  | L'Euro subit le choc de l'instabilité internationale\n" +
     "   • 🇬🇧 GBPUSD : VENTE CHOC 🔴  | La Livre subit la baisse générale de l'aversion au risque\n" +
     "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Les marchés actions capitulent face à l'incertitude\n" +
@@ -181,7 +181,7 @@ public class NotificationService extends NotificationListenerService {
     "   • 📈 US10Y    : ACHAT CHOC 🟢  | Ruée vers la sécurité des bons du Trésor américains\n" +
     "   🏁 FLUX DOMINANT OBLIGATOIRE : YEN FORT / OR FORT (MKT RISK-OFF) 🐻\n\n" +
     "   DÉSESCALADE MOYEN-ORIENT (Discussions, Accords, Trêve) :\n" +
-    "   Impact modéré, conviction plafonnée à 45% (Jauge d'émojis de la CONTRAINTE 5 à appliquer).\n" +
+    "   Impact modéré, conviction plafonnée à 45%.\n" +
     "   • 🏆 GOLD    : VENTE CHOC 🔴  | Sortie des refuges\n" +
     "   • 🛢️ USOIL    : VENTE CHOC 🔴  | Prime de risque géopolitique s'efface sur le brut\n" +
     "   • 💻 NASDAQ  : ACHAT CHOC 🟢  | Soulagement des indices actions\n" +
@@ -205,7 +205,7 @@ public class NotificationService extends NotificationListenerService {
     "   • Tous les autres actifs : NEUTRE\n\n" +
     "G. TARIFS DOUANIERS (Chine, UE, USA, etc.)\n" +
     "────────────────────────────────────────────\n" +
-    "   Rang TACTIQUE, impact modéré à élevé selon l'ampleur. Conviction plafonnée à 70% (Palier d'émojis de la CONTRAINTE 5 à appliquer strictement).\n" +
+    "   Rang TACTIQUE, impact modéré à élevé selon l'ampleur. Conviction plafonnée à 70%.\n" +
     "   Annonce de SURTAXE / GUERRE COMMERCIALE (ex: +25% sur produits chinois) :\n" +
     "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Crainte sur les chaînes d'approvisionnement tech\n" +
     "   • 📊 SP500    : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
@@ -265,7 +265,7 @@ public class NotificationService extends NotificationListenerService {
     "• ₿ BITCOIN  : [ACHAT CHOC 🟢 / VENTE CHOC 🔴 / NEUTRE / INCLINATION ACHAT MAIS NEUTRE / INCLINATION VENTE MAIS NEUTRE] | [raison succincte]\n\n" +
     "🏁 FLUX DOMINANT : [Chaîne de caractères exacte issue des règles de directionnalité]";
 
-    // Point 5 : Déconnexion sécurisée encapsulée de manière étanche dans un bloc finally
+    // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
             HttpURLConnection conn = null;
@@ -378,25 +378,11 @@ public class NotificationService extends NotificationListenerService {
             return;
         }
 
-        String upperFeed = feed.toUpperCase(Locale.ROOT);
-        boolean isGeoEvent = upperFeed.contains("MOYEN-ORIENT") ||
-                    upperFeed.contains("IRAN")      ||
-                    upperFeed.contains("ISRAEL")    ||
-                    upperFeed.contains("HEZBOLLAH") ||
-                    upperFeed.contains("HOUTHI")    ||
-                    upperFeed.contains("HORMUZ")    ||
-                    upperFeed.contains("GAZA")      ||
-                    upperFeed.contains("LEBANON")   ||
-                    upperFeed.contains("UKRAINE")   ||
-                    upperFeed.contains("RUSSIA")    ||
-                    upperFeed.contains("PUTIN")     ||
-                    upperFeed.contains("ZELENSKY")  ||
-                    upperFeed.contains("NATO")      ||
-                    upperFeed.contains("CHINA")     ||
-                    upperFeed.contains("TAIWAN")    ||
-                    upperFeed.contains("XI JINPING")||
-                    upperFeed.contains("GÉO")       ||
-                    upperFeed.contains("GEO");
+        boolean isGeoEvent = feed.toUpperCase(Locale.ROOT).contains("MOYEN-ORIENT") || 
+                            feed.toUpperCase(Locale.ROOT).contains("IRAN") || 
+                            feed.toUpperCase(Locale.ROOT).contains("ISRAEL") ||
+                            feed.toUpperCase(Locale.ROOT).contains("GÉO") ||
+                            feed.toUpperCase(Locale.ROOT).contains("GEO");
 
         if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
             Log.d(TAG, "[THROTTLE] Notification Géo instantanée bloquée (12 min)");
@@ -441,6 +427,7 @@ public class NotificationService extends NotificationListenerService {
             }
         }
 
+        // Le mot 'attente' est remplacé par 'pending' ici (comme demandé)
         boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
                 String.join(", ", targetAssets), initialImpact, (int)(postTime/1000), "pending", weight);
         if (saved && isDeviceOnline()) {
@@ -533,7 +520,7 @@ public class NotificationService extends NotificationListenerService {
         });
     }
 
-    // Point 6 : Fermeture hermétique de la connexion dans un bloc finally
+    // Point 6 : Connexion fermée de manière étanche dans le bloc finally
     private void fetchMissingDataFromInstitutionalAPI() {
         HttpURLConnection conn = null;
         try {
@@ -640,7 +627,7 @@ public class NotificationService extends NotificationListenerService {
         }
     }
 
-    // Points 3 & 4 : Gestion propre de isGeoEvent, filtrage strict étendu aux inclinations, markEventAsSynced et return true garantis
+    // Points 3 & 4 : Traitement rigoureux et robuste de isGeoEvent, filtrage strict de la casse et return / markEvent synchronisés
     private boolean executeAnalysisPipeline(String source, String feed, String history, 
                                             List<String> assets, long ts, String fingerprint) {
         int maxRetries = 3;
@@ -655,25 +642,12 @@ public class NotificationService extends NotificationListenerService {
         while (attempt < maxRetries) {
             HttpURLConnection conn = null;
             try {
-                String upperFeedGeo = feed.toUpperCase(Locale.ROOT);
-                boolean isGeoEvent = upperFeedGeo.contains("MOYEN-ORIENT") ||
-                    upperFeedGeo.contains("IRAN")      ||
-                    upperFeedGeo.contains("ISRAEL")    ||
-                    upperFeedGeo.contains("HEZBOLLAH") ||
-                    upperFeedGeo.contains("HOUTHI")    ||
-                    upperFeedGeo.contains("HORMUZ")    ||
-                    upperFeedGeo.contains("GAZA")      ||
-                    upperFeedGeo.contains("LEBANON")   ||
-                    upperFeedGeo.contains("UKRAINE")   ||
-                    upperFeedGeo.contains("RUSSIA")    ||
-                    upperFeedGeo.contains("PUTIN")     ||
-                    upperFeedGeo.contains("ZELENSKY")  ||
-                    upperFeedGeo.contains("NATO")      ||
-                    upperFeedGeo.contains("CHINA")     ||
-                    upperFeedGeo.contains("TAIWAN")    ||
-                    upperFeedGeo.contains("XI JINPING")||
-                    upperFeedGeo.contains("GÉO")       ||
-                    upperFeedGeo.contains("GEO");
+                String upperFeed = feed.toUpperCase(Locale.ROOT);
+                boolean isGeoEvent = upperFeed.contains("MOYEN-ORIENT") || 
+                                    upperFeed.contains("IRAN") || 
+                                    upperFeed.contains("ISRAEL") ||
+                                    upperFeed.contains("GÉO") ||
+                                    upperFeed.contains("GEO");
 
                 SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
                 sdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
@@ -855,7 +829,7 @@ public class NotificationService extends NotificationListenerService {
             upper.contains("YEN")    || upper.contains("BOJ")    ||
             upper.contains("UEDA")) assets.add("USDJPY");
 
-        // Point 8 : Remplacement du fallback global par une sélection minimale restreinte pertinente
+        // Point 8 : Fallback minimal restreint et pertinent au lieu du bloc massif par défaut
         if (assets.isEmpty()) {
             assets.add("NASDAQ");
             assets.add("SP500");
