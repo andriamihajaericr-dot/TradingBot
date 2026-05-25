@@ -321,6 +321,7 @@ public class NotificationService extends NotificationListenerService {
     public void onCreate() {
         super.onCreate();
         eventDb = EventDatabase.getInstance(this);
+        EventValidator.init(eventDb); 
         EventValidator.preloadCalendar(); 
         createNotificationChannel();
         startDailyBriefScheduler();
