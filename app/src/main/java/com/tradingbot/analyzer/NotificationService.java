@@ -725,35 +725,35 @@ public class NotificationService extends NotificationListenerService {
                     String[] lines = aiResult.split("\n");
                     int activeSignalsCount = 0;
 
-                    for (String line : lines) {
-                        String trimmed = line.trim();
-                        if (trimmed.isEmpty()) continue;
+                   for (String line : lines) {
+                   String trimmed = line.trim();
+                   if (trimmed.isEmpty()) continue;
 
-                        // Métadonnées importantes
-                        if (trimmed.startsWith("🚨") || 
-                            trimmed.startsWith("📊") || 
-                            trimmed.startsWith("🎯") || 
-                            trimmed.startsWith("📢") || 
-                            trimmed.startsWith("🏁") ||
-                            trimmed.startsWith("--- IMPACTS")) {
-                            filteredMessage.append(line).append("\n");
-                            continue;
-                        }
+                   // Métadonnées importantes
+                   if (trimmed.startsWith("🚨") || 
+                    trimmed.startsWith("📊") || 
+                    trimmed.startsWith("🎯") || 
+                    trimmed.startsWith("📢") || 
+                    trimmed.startsWith("🏁") ||
+                    trimmed.startsWith("--- IMPACTS")) {
+                    filteredMessage.append(line).append("\n");
+                     continue;
+                   }
 
-                        // Seulement les lignes avec ACHAT ou VENTE
-                        // Seulement les lignes d'actifs contenant un signal valide (Correction de la parenthèse fermante)
-                        if (trimmed.contains("•")) {
-                          String upperLine = line.toUpperCase(Locale.ROOT);
+                  // Seulement les lignes d'actifs contenant un signal valide (Correction de la parenthèse fermante)
+                  if (trimmed.contains("•")) {
+                  String upperLine = line.toUpperCase(Locale.ROOT);
         
-                        if (upperLine.contains("ACHAT CHOC") || 
-                          upperLine.contains("VENTE CHOC") || 
-                          upperLine.contains("INCLINATION ACHAT") || 
-                          upperLine.contains("INCLINATION VENTE")) {
+                  if (upperLine.contains("ACHAT CHOC") || 
+                    upperLine.contains("VENTE CHOC") || 
+                    upperLine.contains("INCLINATION ACHAT") || 
+                    upperLine.contains("INCLINATION VENTE")) {
             
-                          filteredMessage.append(line).append("\n");
-                           activeSignalsCount++;
-                          }
-                         }
+                    filteredMessage.append(line).append("\n");
+                    activeSignalsCount++;
+                     }
+                     }
+                    }
 
                     if (activeSignalsCount > 0) {
                         // NOUVEAU : Filtre de conviction minimum
