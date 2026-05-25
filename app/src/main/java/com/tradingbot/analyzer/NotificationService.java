@@ -744,9 +744,8 @@ public class NotificationService extends NotificationListenerService {
                         return true;
                     } else {
                         eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                        return true;
                     }
-
-                    return true;
 
                 } else {
                     throw new Exception("API Error: " + conn.getResponseCode());
