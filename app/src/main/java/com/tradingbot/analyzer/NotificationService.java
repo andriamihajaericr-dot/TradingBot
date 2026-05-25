@@ -746,19 +746,7 @@ public class NotificationService extends NotificationListenerService {
                             
                             // Corrections de cohérence (USDJPY / USDCAD)
                             String processedLine = line;
-                            if (line.contains("🇯🇵 USDJPY") && line.contains("ACHAT CHOC") &&
-                               (line.contains("renforcer le yen") || (line.contains("yen") && line.contains("refuge")) || line.contains("s'apprécier"))) {
-                                processedLine = line.replace("ACHAT CHOC 🟢", "VENTE CHOC 🔴");
-                            }
-                            if (line.contains("🇯🇵 USDJPY") && line.contains("VENTE CHOC") &&
-                               (line.contains("faiblir le yen") || line.contains("Yen japonais pourrait faiblir"))) {
-                                processedLine = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
-                            }
-                            if (line.contains("🇨🇦 USDCAD") && line.contains("VENTE CHOC") &&
-                               (line.contains("renforcer le CAD") || line.contains("s'apprécier"))) {
-                                processedLine = line.replace("VENTE CHOC 🔴", "ACHAT CHOC 🟢");
-                            }
-
+                            
                             filteredMessage.append(processedLine).append("\n");
                             activeSignalsCount++;
                         }
