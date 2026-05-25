@@ -423,7 +423,7 @@ public class NotificationService extends NotificationListenerService {
         }
 
         // Le mot 'attente' est remplacé par 'pending' ici (comme demandé)
-        eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
+        boolean saved=eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
         String.join(", ", targetAssets), initialImpact, postTime/1000, "pending", weight);
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
@@ -708,8 +708,7 @@ public class NotificationService extends NotificationListenerService {
                             if (upperLine.contains("ACHAT CHOC") || 
                             upperLine.contains("VENTE CHOC") || 
                             upperLine.contains("INCLINATION ACHAT") || 
-                            upperLine.contains("INCLINATION VENTE") ||
-                            upperLine.contains("NEUTRE")) {
+                            upperLine.contains("INCLINATION VENTE") {
                                 
                                 filteredMessage.append(line).append("\n");
                                 activeSignalsCount++;
