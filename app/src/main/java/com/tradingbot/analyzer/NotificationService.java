@@ -708,7 +708,7 @@ public class NotificationService extends NotificationListenerService {
                             if (upperLine.contains("ACHAT CHOC") || 
                             upperLine.contains("VENTE CHOC") || 
                             upperLine.contains("INCLINATION ACHAT") || 
-                            upperLine.contains("INCLINATION VENTE") {
+                            upperLine.contains("INCLINATION VENTE")) {
                                 
                                 filteredMessage.append(line).append("\n");
                                 activeSignalsCount++;
