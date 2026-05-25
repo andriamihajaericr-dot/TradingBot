@@ -721,6 +721,12 @@ public class NotificationService extends NotificationListenerService {
                     }
 
                     if (activeSignalsCount > 0) {
+                        // NOUVEAU : Filtre de conviction minimum
+                        if (aiResult.contains("CONVICTION") && 
+                            (aiResult.contains("⚪⚪⚪⚪⚪") || aiResult.contains("20%") || aiResult.contains("30%"))) {
+                            eventDb.markEventAsSynced(fingerprint, "LOW_CONVICTION");
+                            return true;
+                        }
                         String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n"
                                 + "🕒 " + timeString + " (Mada)\n"
                                 + "📡 Source : " + source + "\n"
