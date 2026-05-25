@@ -71,20 +71,16 @@ public class EventDatabase extends SQLiteOpenHelper {
             } catch (Exception e) {
                 Log.d("EventDatabase", "driver_weight déjà présent");
             }
-        }
-
-        // Création des index (sécurisé même en mise à jour)
-        try {
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_time_weight ON " + 
+            // FIX #7 : index créé directement dans le bloc de migration v3 (garantie)
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_time_weight ON " +
                        TABLE_EVENTS + "(unix_timestamp, driver_weight);");
-        } catch (Exception e) {
-            Log.d("EventDatabase", "Index déjà existant");
         }
     }
 
+    // FIX #1 : timestamp en long (évite la troncature Y2K38 avec un int)
     public synchronized boolean saveEvent(String fingerprint, String pkg, String src, String type,
                                           String title, String content, String assets, String impact,
-                                          int timestamp, String status, int weight) {
+                                          long timestamp, String status, int weight) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues cv = new ContentValues();
         cv.put("fingerprint", fingerprint);
@@ -107,9 +103,10 @@ public class EventDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getReadableDatabase();
         // CORRECTION : Fenêtre élargie à 6h (21600s) pour couvrir les périodes offline prolongées
         long threshold = currentUnixTime - 21600;
+        // FIX #2 : valeur unifiée "pending" (cohérence avec NotificationService)
         return db.query(TABLE_EVENTS, null,
                 "sync_status = ? AND unix_timestamp >= ?",
-                new String[]{"en_attente", String.valueOf(threshold)},
+                new String[]{"pending", String.valueOf(threshold)},
                 null, null, "unix_timestamp ASC");
     }
 
@@ -168,12 +165,12 @@ public class EventDatabase extends SQLiteOpenHelper {
         StringBuilder sb = new StringBuilder();
         long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
 
-        String selection = "unix_timestamp >= ? AND (impact LIKE ? OR impact LIKE ? OR driver_weight >= ?)";
+        // FIX #5 : driver_weight comparé via rawQuery avec littéral entier (évite le binding String sur INTEGER)
+        String selection = "unix_timestamp >= ? AND (impact LIKE ? OR impact LIKE ? OR driver_weight >= 4)";
         String[] whereArgs = new String[]{
                 String.valueOf(twentyFourHoursAgo),
                 "%DRIVER%",
-                "%PIVOT%",
-                "4"
+                "%PIVOT%"
         };
 
         Cursor cursor = null;
@@ -215,16 +212,23 @@ public class EventDatabase extends SQLiteOpenHelper {
         return sb.toString();
     }
 
+    // FIX #3 : double DELETE encapsulé dans une transaction atomique
     public void purgeOldEvents(long currentUnixTime) {
         SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            long fortyEightHoursAgo = currentUnixTime - (2 * 24 * 60 * 60);
+            int softDeleted = db.delete(TABLE_EVENTS, "unix_timestamp < ? AND driver_weight < 5", new String[]{String.valueOf(fortyEightHoursAgo)});
+            Log.d("EventDatabase", "Purge Flux/Bruit effectuée : " + softDeleted + " lignes supprimées.");
 
-        long fortyEightHoursAgo = currentUnixTime - (2 * 24 * 60 * 60);
-        int softDeleted = db.delete(TABLE_EVENTS, "unix_timestamp < ? AND driver_weight < 5", new String[]{String.valueOf(fortyEightHoursAgo)});
-        Log.d("EventDatabase", "Purge Flux/Bruit effectuée : " + softDeleted + " lignes supprimées.");
+            long fortyFiveDaysAgo = currentUnixTime - (45L * 24 * 60 * 60);
+            int hardDeleted = db.delete(TABLE_EVENTS, "unix_timestamp < ? AND driver_weight = 5", new String[]{String.valueOf(fortyFiveDaysAgo)});
+            Log.d("EventDatabase", "Purge Piliers ancres effectuée : " + hardDeleted + " lignes nettoyées.");
 
-        long fortyFiveDaysAgo = currentUnixTime - (45L * 24 * 60 * 60);
-        int hardDeleted = db.delete(TABLE_EVENTS, "unix_timestamp < ? AND driver_weight = 5", new String[]{String.valueOf(fortyFiveDaysAgo)});
-        Log.d("EventDatabase", "Purge Piliers ancres effectuée : " + hardDeleted + " lignes nettoyées.");
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }   
     
     public boolean isDriverActiveRecently(String eventType, long currentUnixTime) {
