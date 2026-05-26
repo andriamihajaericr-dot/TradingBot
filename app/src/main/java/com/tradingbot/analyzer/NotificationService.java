@@ -463,7 +463,7 @@ public class NotificationService extends NotificationListenerService {
     boolean isFomcPivot = feed.toUpperCase().contains("FOMC") || feed.toUpperCase().contains("FED ");
     int weight = assignDriverWeight(feed);
 
-    if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 80) {
+    if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 70) {
         weight = Math.max(weight, 4);
     }
 
@@ -502,6 +502,12 @@ public class NotificationService extends NotificationListenerService {
     if (saved && isDeviceOnline()) {
         triggerQueueSynchronization();
        }
+    // ====================== AJOUT ICI ======================
+    if (weight >= 4 || (vr.isConfirmed && vr.confidence >= 70)) {
+      Log.d(TAG, "[DAILY TRIGGER] Driver majeur détecté (weight=" + weight + 
+                ", confidence=" + vr.confidence + ") → génération immédiate du rapport");
+      exec.submit(this::generateAndSendDailyBrief);
+    }
     }
 
     private int assignDriverWeight(String text) {
