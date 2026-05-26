@@ -245,6 +245,32 @@ public class NotificationService extends NotificationListenerService {
     "CONTRAINTE 6 — INTERDICTION D'OMISSION :\n" +
     "   Les 11 actifs listés dans le FORMAT DE SORTIE doivent TOUS apparaître explicitement dans la réponse,\n" +
     "   sans aucune exception, même s'ils reçoivent la mention NEUTRE ou une INCLINATION.\n" +
+    "CONTRAINTE 7 — SÉCURITÉ BANQUES CENTRALES ÉTRANGÈRES (BASÉE SUR LE CONTENU) :\n" +
+    "   - Si le texte du flux (le contenu) mentionne une banque centrale étrangère (BCE, ECB, BOJ, BOE, RBA, BOC), tu as l'INTERDICTION ABSOLUE de mettre ACHAT CHOC, VENTE CHOC ou toute INCLINATION sur NASDAQ, SP500, US10Y et BITCOIN. Ils doivent obligatoirement être marqués [NEUTRE] avec la raison exacte suivante : \"Pas d'impact direct – actif américain / crypto\".\n" +
+    "   - Quelle que soit la source ou l'émetteur de la notification (Twitter, FinancialJuice, etc.), c'est la nature du contenu textuel qui déclenche cette règle.\n" +
+    "   - RÈGLE DE DIRECTIONNALITÉ DE LA DEVISE LOCALE :\n" +
+    "     * Banque centrale étrangère DOVISH (baisse des taux, ton accommodant) -> sa devise locale baisse face au USD. Exemple strict : BCE DOVISH = EURUSD VENTE CHOC 🔴. (Mettre ACHAT est une erreur éliminatoire).\n" +
+    "     * Banque centrale étrangère HAWKISH (hausse des taux, ton restrictif) -> sa devise locale monte face au USD. Exemple strict : BCE HAWKISH = EURUSD ACHAT CHOC 🟢.\n" +
+    "   - Les autres paires de devises (GBPUSD, AUDUSD, USDJPY, USDCAD) et actifs (GOLD, USOIL) se conforment strictement aux directives de flux et de corrélation de la RÈGLE C (Différentiel de taux / effet dollar), ou restent [NEUTRE] s'ils ne sont pas mentionnés.\n\n" +
+
+    "CONTRAINTE 8 — COMPLÉTUDE ABSOLUE DE LA MATRICE :\n" +
+    "   - Tu dois obligatoirement copier-coller la liste complète des 11 actifs dans l'ordre exact du format de sortie. Aucune ligne ne peut être omise ou supprimée, sous aucun prétexte.\n" +
+    "   - Si un actif n'est pas directement touché ou doit rester neutre par application de la CONTRAINTE 7, sa mention réglementaire stricte doit être : `NEUTRE | Pas d'impact direct de ce driver.` (ou la raison spécifique exigée par la contrainte 7).\n" +
+    "   - Cette règle de complétude prévaut sur toute logique de concision.\n\n" +
+
+    "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
+    "   Si l'actualité dit : \"BCE dovish, Schnabel s'inquiète de la croissance européenne\", la réponse DOIT copier l'intégralité des 11 lignes ainsi :\n" +
+    "   • 📈 US10Y   : NEUTRE | Pas d'impact direct de ce driver.\n" +
+    "   • 💻 NASDAQ  : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
+    "   • 📊 SP500   : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
+    "   • 🏆 GOLD    : NEUTRE | Pas d'impact direct de ce driver.\n" +
+    "   • 🛢️ USOIL   : NEUTRE | Pas d'impact direct de ce driver.\n" +
+    "   • 🇪🇺 EURUSD : VENTE CHOC 🔴 | BCE dovish -> baisse et affaiblissement de l'euro.\n" +
+    "   • 🇯🇵 USDJPY : ACHAT CHOC 🟢 | Hausse mécanique par différentiel (Dollar Fort face au Yen).\n" +
+    "   • 🇨🇦 USDCAD : ACHAT CHOC 🟢 | Hausse mécanique par différentiel (Dollar Fort face au CAD).\n" +
+    "   • 🇬🇧 GBPUSD : VENTE CHOC 🔴 | Baisse mécanique par différentiel (Dollar Fort écrase la Livre).\n" +
+    "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴 | Baisse mécanique par différentiel (Dollar Fort écrase l'Aussie).\n" +
+    "   • ₿ BITCOIN  : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
     "</HARD_CONSTRAINTS>\n\n" +
     "FORMAT DE SORTIE STRICT ET OBLIGATOIRE :\n" +
     "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
