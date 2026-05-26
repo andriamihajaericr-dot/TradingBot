@@ -85,20 +85,22 @@ public class EventValidator {
 
         // ── ÉTAPE 2 : Filtre anti-rumeur absolu ───────────────────────────
         if (containsRumorMarkers(combined)) {
-            result.confidence  = 0;
-            result.isConfirmed = false;
-            result.reason      = "Rejeté — Marqueur de rumeur ou non-confirmé détecté";
-            logToMain("[VALIDATOR] ❌ Rumeur/Non-confirmé rejeté");
-            return result;
+         result.confidence  = 0;
+         result.isConfirmed = false;
+         result.reason      = "Rejeté — Marqueur de rumeur ou non-confirmé détecté";
+         String shortTitle = (title != null && title.length() > 0) ? title.substring(0, Math.min(50, title.length())) : "?";
+         logToMain("[VALIDATOR] ❌ Rumeur/Non-confirmé rejeté – " + shortTitle + "…");
+          return result;
         }
 
         // ── ÉTAPE 3 : Filtre éditorial ───────────────────────────────────
         if (containsEditorialContent(combined)) {
-            result.confidence  = 0;
-            result.isConfirmed = false;
-            result.reason      = "Bruit macroéconomique (Opinion/Éditorial pur)";
-            logToMain("[VALIDATOR] ❌ Rejeté — Contenu éditorial");
-            return result;
+          result.confidence  = 0;
+          result.isConfirmed = false;
+          result.reason      = "Bruit macroéconomique (Opinion/Éditorial pur)";
+          String shortTitle = (title != null && title.length() > 0) ? title.substring(0, Math.min(50, title.length())) : "?";
+          logToMain("[VALIDATOR] ❌ Rejeté – Contenu éditorial – " + shortTitle + "…");
+          return result;
         }
 
         // ── ÉTAPE 4 : Calendrier économique ──────────────────────────────
@@ -119,7 +121,8 @@ public class EventValidator {
                     }
                 }
             }
-            logToMain("[VALIDATOR] ✓ Calendrier confirmé");
+            String indicatorName = (match.indicator != null && match.indicator.length() > 0) ? match.indicator.substring(0, Math.min(40, match.indicator.length())) : "événement";
+            logToMain("[VALIDATOR] ✓ Calendrier confirmé – " + indicatorName);
             return result;
         }
 
@@ -137,7 +140,8 @@ public class EventValidator {
                     result.assetsEnriched = true;
                 }
             }
-            logToMain("[VALIDATOR] 🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "%");
+            String shortTitle = (title != null && title.length() > 0) ? title.substring(0, Math.min(40, title.length())) : "?";
+            logToMain("[VALIDATOR] 🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
             return result;
         }
 
@@ -151,7 +155,8 @@ public class EventValidator {
             MainActivity.instance.addLog("[VALIDATOR] ❌ Rejeté – " + (title != null ? title.substring(0, Math.min(40, title.length())) : "?") + "… (confiance " + result.confidence + "%)");
         } else {
             result.isConfirmed = true;
-            logToMain("[VALIDATOR] ⚡ Breaking News retenu : " + result.confidence + "%");
+            String shortTitle = (title != null && title.length() > 0) ? title.substring(0, Math.min(50, title.length())) : "?";
+            logToMain("[VALIDATOR] ⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
         }
 
         return result;
@@ -545,17 +550,16 @@ public class EventValidator {
         int maxLen = Math.min(90, combined.length());
         return combined.substring(0, maxLen);
     }
-
     private static boolean isRecentDuplicate(String title, String content) {
-        String fingerprint = generateFingerprint(title, content);
-        long now = System.currentTimeMillis();
+    String fingerprint = generateFingerprint(title, content);
+    long now = System.currentTimeMillis();
 
-        Long lastSeen = recentFingerprints.get(fingerprint);
-        if (lastSeen != null && (now - lastSeen) < DUPLICATE_WINDOW_MS) {
-            logToMain("[VALIDATOR] 🔄 Doublon ignoré");
-            return true;
+    Long lastSeen = recentFingerprints.get(fingerprint);
+    if (lastSeen != null && (now - lastSeen) < DUPLICATE_WINDOW_MS) {
+        String shortTitle = (title != null && title.length() > 0) ? title.substring(0, Math.min(50, title.length())) : "?";
+        logToMain("[VALIDATOR] 🔄 Doublon ignoré – " + shortTitle + "…");
+        return true;
         }
-
         recentFingerprints.put(fingerprint, now);
 
         // Nettoyage agressif si la map grossit trop
