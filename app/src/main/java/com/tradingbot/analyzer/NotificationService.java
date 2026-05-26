@@ -423,7 +423,9 @@ public class NotificationService extends NotificationListenerService {
     }
 
     String hash = generateSecureHash(title + text);
-
+        
+    Log.d(TAG, "🟢 Nouvelle notification : source=" + source + ", title=" + title + ", hash=" + hash);
+        
     if (!vr.isConfirmed && weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
         eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
                 String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
