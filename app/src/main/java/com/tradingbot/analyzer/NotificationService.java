@@ -706,7 +706,7 @@ public class NotificationService extends NotificationListenerService {
                 boolean isGeoEvent = isGeoEvent(upperFeed);
 
                 SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
-                sdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
+                sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
                 String timeString = sdf.format(new Date(ts));
 
                 URL url = new URL(GROQ_URL);
