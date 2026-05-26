@@ -921,6 +921,7 @@ public class NotificationService extends NotificationListenerService {
           scheduleDailyBriefAt(hour, tz);
        }
     }
+    
     private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
     Calendar now = Calendar.getInstance(tz);
     Calendar nextRun = Calendar.getInstance(tz);
@@ -929,11 +930,13 @@ public class NotificationService extends NotificationListenerService {
     nextRun.set(Calendar.SECOND, 0);
     nextRun.set(Calendar.MILLISECOND, 0);
 
-    // Rattrapage si l'heure est déjà passée aujourd'hui
+    // Si l'heure cible est déjà passée aujourd'hui, on planifie pour demain pile
     if (nextRun.getTimeInMillis() <= now.getTimeInMillis()) {
         String today = DATE_FORMAT.format(new Date());
         String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
+        
+        // Rattrapage unique au démarrage de l'app si jamais envoyé aujourd'hui
         if (!today.equals(lastSent)) {
             Log.d(TAG, "[DAILY] Rattrapage pour " + targetHour + "h : envoi immédiat");
             generateAndSendDailyBrief();
@@ -942,35 +945,38 @@ public class NotificationService extends NotificationListenerService {
                 .putString(prefKey, today)
                 .apply();
         }
+        // On projette la prochaine exécution planifiée à demain pile à l'heure cible
         nextRun.add(Calendar.DAY_OF_YEAR, 1);
     }
 
     long delay = nextRun.getTimeInMillis() - now.getTimeInMillis();
-    
-    // Log de diagnostic
+
     SimpleDateFormat sdfLog = new SimpleDateFormat("dd/MM HH:mm:ss", Locale.getDefault());
     sdfLog.setTimeZone(tz);
     String nextRunStr = sdfLog.format(nextRun.getTime());
     Log.d(TAG, "[DAILY] Horaire " + targetHour + "h : prochain déclenchement à " + nextRunStr + " (délai " + delay/1000 + " secondes)");
 
-    scheduler.scheduleAtFixedRate(() -> {
+    // Remplacement par scheduleWithFixedDelay ou un scheduler unique pour éviter les décalages de ticks
+    scheduler.schedule(() -> {
         Log.d(TAG, "[DAILY] Exécution programmée pour " + targetHour + "h à " + new Date());
+        
         String today = DATE_FORMAT.format(new Date());
         String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
+
         if (!today.equals(lastSent)) {
             generateAndSendDailyBrief();
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 .edit()
                 .putString(prefKey, today)
                 .apply();
-        } else {
-            Log.d(TAG, "[DAILY] Rapport déjà envoyé aujourd'hui pour " + targetHour + "h, ignoré");
         }
-    }, delay, 24 * 60 * 60 * 1000L, TimeUnit.MILLISECONDS);
-        }
-
-   private void generateAndSendDailyBrief() {
+        
+        // On replanifie récursivement pour le lendemain à la même heure pile
+        scheduleDailyBriefAt(targetHour, tz);
+    }, delay, TimeUnit.MILLISECONDS);
+    }
+    private void generateAndSendDailyBrief() {
     HttpURLConnection conn = null;
     try {
         Log.d(TAG, "[DAILY] Génération du rapport journalier...");
