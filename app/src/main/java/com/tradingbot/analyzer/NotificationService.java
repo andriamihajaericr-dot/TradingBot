@@ -961,6 +961,10 @@ public class NotificationService extends NotificationListenerService {
        }
     }
     private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
+    // 1. Créer un formateur de date fiable (UTC+3)
+    SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+    dayFormat.setTimeZone(tz);  // Force UTC+3
+
     Calendar now = Calendar.getInstance(tz);
     Calendar nextRun = Calendar.getInstance(tz);
     nextRun.set(Calendar.HOUR_OF_DAY, targetHour);
@@ -968,36 +972,49 @@ public class NotificationService extends NotificationListenerService {
     nextRun.set(Calendar.SECOND, 0);
     nextRun.set(Calendar.MILLISECOND, 0);
 
+    // 2. Rattrapage si l'heure cible est déjà passée aujourd'hui
     if (nextRun.getTimeInMillis() <= now.getTimeInMillis()) {
+        String today = dayFormat.format(now.getTime());
+        String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
+        String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
+        if (!today.equals(lastSent)) {
+            Log.d(TAG, "[DAILY] Rattrapage pour " + targetHour + "h : envoi immédiat");
+            generateAndSendDailyBrief();
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .edit()
+                .putString(prefKey, today)
+                .apply();
+        }
         nextRun.add(Calendar.DAY_OF_YEAR, 1);
     }
 
     long delay = nextRun.getTimeInMillis() - now.getTimeInMillis();
 
+    // 3. Log de diagnostic avec la date planifiée (UTC+3)
     SimpleDateFormat sdfLog = new SimpleDateFormat("dd/MM HH:mm:ss", Locale.getDefault());
     sdfLog.setTimeZone(tz);
     String nextRunStr = sdfLog.format(nextRun.getTime());
     Log.d(TAG, "[DAILY] Horaire " + targetHour + "h : prochain déclenchement à " + nextRunStr);
 
+    // 4. Planification unique (pas de récursion)
     scheduler.schedule(() -> {
-        Log.d(TAG, "[DAILY] Exécution pour " + targetHour + "h");
-
-        String currentDay = DATE_FORMAT.format(Calendar.getInstance(tz).getTime());
+        String currentDay = dayFormat.format(Calendar.getInstance(tz).getTime());
         String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
-
         if (!currentDay.equals(lastSent)) {
             generateAndSendDailyBrief();
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 .edit()
                 .putString(prefKey, currentDay)
                 .apply();
+        } else {
+            Log.d(TAG, "[DAILY] Rapport déjà envoyé aujourd'hui pour " + targetHour + "h, ignoré");
         }
 
-        // Replanification pour le lendemain
+        // 5. Replanifier pour le lendemain à la même heure
         scheduleDailyBriefAt(targetHour, tz);
     }, delay, TimeUnit.MILLISECONDS);
-    }
+   }
     private void generateAndSendDailyBrief() {
     HttpURLConnection conn = null;
     try {
