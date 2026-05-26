@@ -439,7 +439,7 @@ public class NotificationService extends NotificationListenerService {
 
     // 1. Throttle géopolitique prioritaire
     if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
-        Log.d(TAG, "[THROTTLE] Notification Géo instantanée bloquée (12 min)");
+        Log.d(TAG, "[THROTTLE] Notification Géo bloquée (12 min) - dernier il y a " + (now - lastGeoTime)/1000 + "s");
         return;
     }
 
@@ -950,7 +950,30 @@ public class NotificationService extends NotificationListenerService {
           scheduleDailyBriefAt(hour, tz);
        }
     }
+
     private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
+    Runnable task = new Runnable() {
+        @Override
+        public void run() {
+            Log.d(TAG, "[DAILY] Exécution programmée pour " + targetHour + "h");
+            
+            String currentDay = DATE_FORMAT.format(Calendar.getInstance(tz).getTime());
+            String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
+            String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
+
+            if (!currentDay.equals(lastSent)) {
+                generateAndSendDailyBrief();
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .edit()
+                    .putString(prefKey, currentDay)
+                    .apply();
+            }
+            
+            // Replanifier pour demain
+            scheduleDailyBriefAt(targetHour, tz);
+        }
+    };
+
     Calendar now = Calendar.getInstance(tz);
     Calendar nextRun = Calendar.getInstance(tz);
     nextRun.set(Calendar.HOUR_OF_DAY, targetHour);
@@ -958,48 +981,16 @@ public class NotificationService extends NotificationListenerService {
     nextRun.set(Calendar.SECOND, 0);
     nextRun.set(Calendar.MILLISECOND, 0);
 
-    String today = DATE_FORMAT.format(nextRun.getTime()); // ← Correction ici
-
     if (nextRun.getTimeInMillis() <= now.getTimeInMillis()) {
-        String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
-        String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
-        
-        if (!today.equals(lastSent)) {
-            Log.d(TAG, "[DAILY] Rattrapage pour " + targetHour + "h : envoi immédiat");
-            generateAndSendDailyBrief();
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                .edit()
-                .putString(prefKey, today)
-                .apply();
-        }
         nextRun.add(Calendar.DAY_OF_YEAR, 1);
     }
 
     long delay = nextRun.getTimeInMillis() - now.getTimeInMillis();
 
-    SimpleDateFormat sdfLog = new SimpleDateFormat("dd/MM HH:mm:ss", Locale.getDefault());
-    sdfLog.setTimeZone(tz);
-    String nextRunStr = sdfLog.format(nextRun.getTime());
-    Log.d(TAG, "[DAILY] Horaire " + targetHour + "h : prochain déclenchement à " + nextRunStr + " (délai " + delay/1000 + " secondes)");
-
-    scheduler.schedule(() -> {
-        Log.d(TAG, "[DAILY] Exécution programmée pour " + targetHour + "h");
-        
-        String currentDay = DATE_FORMAT.format(Calendar.getInstance(tz).getTime());
-        String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
-        String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
-
-        if (!currentDay.equals(lastSent)) {
-            generateAndSendDailyBrief();
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                .edit()
-                .putString(prefKey, currentDay)
-                .apply();
-        }
-        
-        scheduleDailyBriefAt(targetHour, tz); // recursion
-      }, delay, TimeUnit.MILLISECONDS);
+    scheduler.schedule(task, delay, TimeUnit.MILLISECONDS);
     }
+
+
     private void generateAndSendDailyBrief() {
     HttpURLConnection conn = null;
     try {
