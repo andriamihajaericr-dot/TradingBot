@@ -934,7 +934,6 @@ public class NotificationService extends NotificationListenerService {
           scheduleDailyBriefAt(hour, tz);
        }
     }
-    
     private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
     Calendar now = Calendar.getInstance(tz);
     Calendar nextRun = Calendar.getInstance(tz);
@@ -943,13 +942,12 @@ public class NotificationService extends NotificationListenerService {
     nextRun.set(Calendar.SECOND, 0);
     nextRun.set(Calendar.MILLISECOND, 0);
 
-    // Si l'heure cible est déjà passée aujourd'hui, on planifie pour demain pile
+    String today = DATE_FORMAT.format(nextRun.getTime()); // ← Correction ici
+
     if (nextRun.getTimeInMillis() <= now.getTimeInMillis()) {
-        String today = DATE_FORMAT.format(new Date());
         String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
         
-        // Rattrapage unique au démarrage de l'app si jamais envoyé aujourd'hui
         if (!today.equals(lastSent)) {
             Log.d(TAG, "[DAILY] Rattrapage pour " + targetHour + "h : envoi immédiat");
             generateAndSendDailyBrief();
@@ -958,7 +956,6 @@ public class NotificationService extends NotificationListenerService {
                 .putString(prefKey, today)
                 .apply();
         }
-        // On projette la prochaine exécution planifiée à demain pile à l'heure cible
         nextRun.add(Calendar.DAY_OF_YEAR, 1);
     }
 
@@ -969,25 +966,23 @@ public class NotificationService extends NotificationListenerService {
     String nextRunStr = sdfLog.format(nextRun.getTime());
     Log.d(TAG, "[DAILY] Horaire " + targetHour + "h : prochain déclenchement à " + nextRunStr + " (délai " + delay/1000 + " secondes)");
 
-    // Remplacement par scheduleWithFixedDelay ou un scheduler unique pour éviter les décalages de ticks
     scheduler.schedule(() -> {
-        Log.d(TAG, "[DAILY] Exécution programmée pour " + targetHour + "h à " + new Date());
+        Log.d(TAG, "[DAILY] Exécution programmée pour " + targetHour + "h");
         
-        String today = DATE_FORMAT.format(new Date());
+        String currentDay = DATE_FORMAT.format(Calendar.getInstance(tz).getTime());
         String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
 
-        if (!today.equals(lastSent)) {
+        if (!currentDay.equals(lastSent)) {
             generateAndSendDailyBrief();
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 .edit()
-                .putString(prefKey, today)
+                .putString(prefKey, currentDay)
                 .apply();
         }
         
-        // On replanifie récursivement pour le lendemain à la même heure pile
-        scheduleDailyBriefAt(targetHour, tz);
-    }, delay, TimeUnit.MILLISECONDS);
+        scheduleDailyBriefAt(targetHour, tz); // recursion
+      }, delay, TimeUnit.MILLISECONDS);
     }
     private void generateAndSendDailyBrief() {
     HttpURLConnection conn = null;
@@ -1011,7 +1006,7 @@ public class NotificationService extends NotificationListenerService {
         // Date locale pour le message
         SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE);
         sdfDate.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
-        String dateStr = sdfDate.format(new Date());
+        String dateStr = sdfDate.format(Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo")).getTime());
 
         JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
