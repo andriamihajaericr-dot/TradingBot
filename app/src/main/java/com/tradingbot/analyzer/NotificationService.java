@@ -271,7 +271,8 @@ public class NotificationService extends NotificationListenerService {
     "   Le driver tactique ne peut annuler, réduire ou remplacer la directionnalité imposée par le driver suprême.\n" +
     "   Exemple : une annonce BCE HAWKISH (hausse des taux) l'emporte sur un contexte géopolitique de paix avec l'Iran. Dans ce cas, EURUSD reste ACHAT CHOC, et les impacts sur les devises (GBPUSD, AUDUSD, etc.) suivent la règle C (différentiel de taux).\n" +
     "   ⚠️ Cette règle prévaut sur toute interprétation contraire.\n\n" +
-
+    "</HARD_CONSTRAINTS>\n\n" +
+    
     "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
     "   Si l'actualité dit : \"BCE dovish, Schnabel s'inquiète de la croissance européenne\", la réponse DOIT copier l'intégralité des 11 lignes ainsi :\n" +
     "   • 📈 US10Y   : NEUTRE | Pas d'impact direct de ce driver.\n" +
@@ -285,7 +286,7 @@ public class NotificationService extends NotificationListenerService {
     "   • 🇬🇧 GBPUSD : VENTE CHOC 🔴 | Baisse mécanique par différentiel (Dollar Fort écrase la Livre).\n" +
     "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴 | Baisse mécanique par différentiel (Dollar Fort écrase l'Aussie).\n" +
     "   • ₿ BITCOIN  : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
-    "</HARD_CONSTRAINTS>\n\n" +
+    
     "FORMAT DE SORTIE STRICT ET OBLIGATOIRE :\n" +
     "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
     "📊 CONVICTION : [JAUGE_EMOJIS] XX%\n" +
