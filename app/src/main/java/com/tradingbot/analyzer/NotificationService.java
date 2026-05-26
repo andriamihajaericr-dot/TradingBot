@@ -788,7 +788,8 @@ public class NotificationService extends NotificationListenerService {
                   }
 
                   // Dans la section IMPACTS
-                  if (inImpactSection && trimmed.contains("•")) {
+                                    // Dans la section IMPACTS
+                  if (inImpactSection && trimmed.startsWith("•")) {
                       String upperLine = line.toUpperCase(Locale.ROOT);
 
                       boolean isSignificant = upperLine.contains("ACHAT CHOC") || 
@@ -800,7 +801,7 @@ public class NotificationService extends NotificationListenerService {
                           filteredMessage.append(line).append("\n");
                           activeSignalsCount++;
                       }
-                      // On ignore les NEUTRE purs pour Telegram
+                      // Ignorer les NEUTRE pour Telegram
                   }
               }
 
