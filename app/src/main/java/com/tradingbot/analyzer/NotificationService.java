@@ -435,13 +435,18 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
-    // À insérer au début de la méthode processIncomingMacroFeed
+    // 1. Récupération de l'heure exacte de Madagascar
     SimpleDateFormat madaSdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
     madaSdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
     String heureExacteMada = madaSdf.format(new Date()); // Ex: "26/05 20:30"
+    
+    // 2. ON INJECTE LE CONTEXTE EN HAUT DU TEXTE
+    feed = "CONTEXTE TEMPOREL : Nous sommes le " + heureExacteMada + " (Heure de Madagascar).\n\n" + feed;
+        
     long now = System.currentTimeMillis();
     boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
-
+    
+    // ... TOUT LE RESTE DE VOTRE CODE RESTE STRICTEMENT INCHANGÉ ...
     // 1. Throttle géopolitique prioritaire
     if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
         Log.d(TAG, "[THROTTLE] Notification Géo bloquée (12 min) - dernier il y a " + (now - lastGeoTime)/1000 + "s");
