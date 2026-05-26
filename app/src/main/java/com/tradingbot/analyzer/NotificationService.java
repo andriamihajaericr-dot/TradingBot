@@ -915,25 +915,24 @@ public class NotificationService extends NotificationListenerService {
            upperText.contains("GEO");
     }
     private void startDailyBriefScheduler() {
-       TimeZone tz = TimeZone.getTimeZone("Indian/Antananarivo");
+       TimeZone tz = TimeZone.getTimeZone("GMT+03:00");
        int[] targetHours = {12, 16, 17};
        for (int hour : targetHours) {
           scheduleDailyBriefAt(hour, tz);
        }
     }
-
     private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
-     Calendar now = Calendar.getInstance(tz);
-     Calendar nextRun = Calendar.getInstance(tz);
-     nextRun.set(Calendar.HOUR_OF_DAY, targetHour);
-     nextRun.set(Calendar.MINUTE, 0);
-     nextRun.set(Calendar.SECOND, 0);
-     nextRun.set(Calendar.MILLISECOND, 0);
+    Calendar now = Calendar.getInstance(tz);
+    Calendar nextRun = Calendar.getInstance(tz);
+    nextRun.set(Calendar.HOUR_OF_DAY, targetHour);
+    nextRun.set(Calendar.MINUTE, 0);
+    nextRun.set(Calendar.SECOND, 0);
+    nextRun.set(Calendar.MILLISECOND, 0);
 
     // Rattrapage si l'heure est déjà passée aujourd'hui
-     if (nextRun.getTimeInMillis() <= now.getTimeInMillis()) {
-        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
-        String prefKey = "last_daily_report_" + targetHour;
+    if (nextRun.getTimeInMillis() <= now.getTimeInMillis()) {
+        String today = DATE_FORMAT.format(new Date());
+        String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
         if (!today.equals(lastSent)) {
             Log.d(TAG, "[DAILY] Rattrapage pour " + targetHour + "h : envoi immédiat");
@@ -944,12 +943,20 @@ public class NotificationService extends NotificationListenerService {
                 .apply();
         }
         nextRun.add(Calendar.DAY_OF_YEAR, 1);
-      }
+    }
 
-      long delay = nextRun.getTimeInMillis() - now.getTimeInMillis();
-      scheduler.scheduleAtFixedRate(() -> {
-        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
-        String prefKey = "last_daily_report_" + targetHour;
+    long delay = nextRun.getTimeInMillis() - now.getTimeInMillis();
+    
+    // Log de diagnostic
+    SimpleDateFormat sdfLog = new SimpleDateFormat("dd/MM HH:mm:ss", Locale.getDefault());
+    sdfLog.setTimeZone(tz);
+    String nextRunStr = sdfLog.format(nextRun.getTime());
+    Log.d(TAG, "[DAILY] Horaire " + targetHour + "h : prochain déclenchement à " + nextRunStr + " (délai " + delay/1000 + " secondes)");
+
+    scheduler.scheduleAtFixedRate(() -> {
+        Log.d(TAG, "[DAILY] Exécution programmée pour " + targetHour + "h à " + new Date());
+        String today = DATE_FORMAT.format(new Date());
+        String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
         if (!today.equals(lastSent)) {
             generateAndSendDailyBrief();
@@ -960,8 +967,9 @@ public class NotificationService extends NotificationListenerService {
         } else {
             Log.d(TAG, "[DAILY] Rapport déjà envoyé aujourd'hui pour " + targetHour + "h, ignoré");
         }
-        }, delay, 24 * 60 * 60 * 1000L, TimeUnit.MILLISECONDS);
-      }
+    }, delay, 24 * 60 * 60 * 1000L, TimeUnit.MILLISECONDS);
+        }
+
    private void generateAndSendDailyBrief() {
     HttpURLConnection conn = null;
     try {
