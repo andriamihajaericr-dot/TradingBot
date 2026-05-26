@@ -53,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
         Button saveBtn = findViewById(R.id.saveBtn);
         Button permBtn = findViewById(R.id.permBtn);
         Button testBtn = findViewById(R.id.testBtn);
+        Button exportLogsBtn = findViewById(R.id.exportLogsBtn);
 
         // Chargement initial des configurations enregistrées
         loadSavedKeys();
@@ -83,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
                 addLog("❌ [TEST] Erreur lors de l'appel : " + e.getMessage());
             }
         });
-
+        exportLogsBtn.setOnClickListener(v -> exportLogs());
         // 4. Interrupteur d'activation globale du Bot
         botSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
             if (isChecked && !isPermissionGranted()) {
