@@ -732,27 +732,39 @@ public class NotificationService extends NotificationListenerService {
                 messages.put(new JSONObject().put("role", "user").put("content", "Flux brut reçu : " + feed + "\nMémoire contextuelle ordonnée par importance :\n" + history));
                 payload.put("messages", messages);
 
-                OutputStream os = conn.getOutputStream();
-                os.write(payload.toString().getBytes("UTF-8"));
-                os.flush();
-                os.close();
+                // Protection automatique de l'OutputStream (Try-with-resources)
+               try (OutputStream os = conn.getOutputStream()) {
+                   os.write(payload.toString().getBytes("UTF-8"));
+                   os.flush();
+               } // Le flux d'écriture se ferme automatiquement ici, même si un crash réseau survient
 
-                if (conn.getResponseCode() == 200) {
-                    BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                    StringBuilder r = new StringBuilder();
-                    String l;
-                    while ((l = br.readLine()) != null) r.append(l);
-                    br.close();
+               if (conn.getResponseCode() == 200) {
+               StringBuilder r = new StringBuilder();
+    
+               // Protection automatique de l'InputStream
+               try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+                  String l;
+                     while ((l = br.readLine()) != null) {
+                       r.append(l);
+                     }
+               } // Le BufferedReader et conn.getInputStream() se ferment automatiquement ICI
 
-                    String aiResult = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-                    
-                    if (aiResult.isEmpty() || aiResult.length() < 50) {
-                        throw new Exception("Invalid API response");
-                    }
+               // Extraction du JSON sécurisée
+               String aiResult = new JSONObject(r.toString())
+                .getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content");
+    
+              if (aiResult == null || aiResult.isEmpty() || aiResult.length() < 50) {
+                 throw new Exception("Invalid API response");
+              }
 
-                    StringBuilder filteredMessage = new StringBuilder();
-                    String[] lines = aiResult.split("\n");
-                    int activeSignalsCount = 0;
+              StringBuilder filteredMessage = new StringBuilder();
+              String[] lines = aiResult.split("\n");
+              int activeSignalsCount = 0;
+    
+                // ... reste de votre logique de filtrage
 
                     for (String line : lines) {
                         String trimmed = line.trim();
