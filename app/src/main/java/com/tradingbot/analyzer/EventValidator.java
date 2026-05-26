@@ -148,7 +148,7 @@ public class EventValidator {
         if (result.confidence < 70) {   // Augmenté de 65 → 70
             result.confidence  = 0;
             result.isConfirmed = false;
-            logToMain("[VALIDATOR] ❌ Confiance insuffisante : " + result.confidence + "%");
+            MainActivity.instance.addLog("[VALIDATOR] ❌ Rejeté – " + (title != null ? title.substring(0, Math.min(40, title.length())) : "?") + "… (confiance " + result.confidence + "%)");
         } else {
             result.isConfirmed = true;
             logToMain("[VALIDATOR] ⚡ Breaking News retenu : " + result.confidence + "%");
