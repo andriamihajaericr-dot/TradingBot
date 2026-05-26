@@ -444,7 +444,6 @@ public class NotificationService extends NotificationListenerService {
             
         long now = System.currentTimeMillis();
     boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
-    
     // ... TOUT LE RESTE DE VOTRE CODE RESTE STRICTEMENT INCHANGÉ ...
     // 1. Throttle géopolitique prioritaire
     if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
