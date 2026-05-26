@@ -286,9 +286,10 @@ public class NotificationService extends NotificationListenerService {
     "   • 🇬🇧 GBPUSD : VENTE CHOC 🔴 | Baisse mécanique par différentiel (Dollar Fort écrase la Livre).\n" +
     "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴 | Baisse mécanique par différentiel (Dollar Fort écrase l'Aussie).\n" +
     "   • ₿ BITCOIN  : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
-    
+    // Dans votre SYSTEM_PROMPT actuel, modifiez le bloc "FORMAT DE SORTIE" :
     "FORMAT DE SORTIE STRICT ET OBLIGATOIRE :\n" +
     "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
+    "🕒 [Insère ici la date et l'heure exactes fournies dans le CONTEXTE TEMPOREL] (Mada)\n" + // <-- Ligne ajoutée/corrigée
     "📊 CONVICTION : [JAUGE_EMOJIS] XX%\n" +
     "🎯 VECTEUR CIBLE : [HAWKISH / DOVISH / GÉO / LIQUIDITÉ / CHINE / TARIFS]\n" +
     "📢 FAIT MARQUANT : [Analyse pro de la situation en français. Mentionner l'arbitrage si écrasement d'un driver récent ou divergence.]\n\n" +
@@ -434,6 +435,10 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
+    // À insérer au début de la méthode processIncomingMacroFeed
+    SimpleDateFormat madaSdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
+    madaSdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
+    String heureExacteMada = madaSdf.format(new Date()); // Ex: "26/05 20:30"
     long now = System.currentTimeMillis();
     boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
 
