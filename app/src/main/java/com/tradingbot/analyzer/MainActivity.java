@@ -195,6 +195,21 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void writeLogToFile(String message) {
+    try {
+        File logFile = new File(getExternalFilesDir(null), "Fonda_IOF_bot_logs.txt");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+        String timestamp = sdf.format(new Date());
+        String line = "[" + timestamp + "] " + message + "\n";
+
+        FileWriter fw = new FileWriter(logFile, true); // true = append
+        fw.write(line);
+        fw.close();
+    } catch (IOException e) {
+        Log.e(TAG, "Erreur écriture log fichier", e);
+    }
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
