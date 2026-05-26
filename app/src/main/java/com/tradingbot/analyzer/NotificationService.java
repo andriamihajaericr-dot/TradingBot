@@ -751,7 +751,8 @@ public class NotificationService extends NotificationListenerService {
                } // Le BufferedReader et conn.getInputStream() se ferment automatiquement ICI
 
                // Extraction du JSON sécurisée
-               String aiResult = new JSONObject(r.toString())
+                  // Extraction du JSON sécurisée
+              String aiResult = new JSONObject(r.toString())
                 .getJSONArray("choices")
                 .getJSONObject(0)
                 .getJSONObject("message")
@@ -761,69 +762,84 @@ public class NotificationService extends NotificationListenerService {
                  throw new Exception("Invalid API response");
               }
 
+              // ====================== FILTRAGE INTELLIGENT ======================
               StringBuilder filteredMessage = new StringBuilder();
               String[] lines = aiResult.split("\n");
               int activeSignalsCount = 0;
-    
-                // ... reste de votre logique de filtrage
+              boolean inImpactSection = false;
 
-                    for (String line : lines) {
-                        String trimmed = line.trim();
-                        if (trimmed.isEmpty()) continue;
+              for (String line : lines) {
+                  String trimmed = line.trim();
+                  if (trimmed.isEmpty()) continue;
 
-                        if (trimmed.startsWith("🚨") || 
-                            trimmed.startsWith("📊") || 
-                            trimmed.startsWith("🎯") || 
-                            trimmed.startsWith("📢") || 
-                            trimmed.startsWith("🏁") ||
-                            trimmed.startsWith("--- IMPACTS")) {
-                            filteredMessage.append(line).append("\n");
-                            continue;
-                        }
+                  // Toujours garder les headers
+                  if (trimmed.startsWith("🚨") || 
+                      trimmed.startsWith("📊") || 
+                      trimmed.startsWith("🎯") || 
+                      trimmed.startsWith("📢") || 
+                      trimmed.startsWith("🏁") ||
+                      trimmed.startsWith("--- IMPACTS")) {
+                      
+                      filteredMessage.append(line).append("\n");
+                      if (trimmed.startsWith("--- IMPACTS")) {
+                          inImpactSection = true;
+                      }
+                      continue;
+                  }
 
-                        if (trimmed.contains("•")) {
-                            String upperLine = line.toUpperCase(Locale.ROOT);
-                            if (upperLine.contains("ACHAT CHOC") || 
-                            upperLine.contains("VENTE CHOC") || 
-                            upperLine.contains("INCLINATION ACHAT") || 
-                            upperLine.contains("INCLINATION VENTE")) {
-                                
-                                filteredMessage.append(line).append("\n");
-                                activeSignalsCount++;
-                            }
-                        }
-                    }
+                  // Dans la section IMPACTS
+                  if (inImpactSection && trimmed.contains("•")) {
+                      String upperLine = line.toUpperCase(Locale.ROOT);
 
-                    if (activeSignalsCount > 0) {
-                        if (aiResult.contains("CONVICTION") && 
-                            (aiResult.contains("⚪⚪⚪⚪⚪") || aiResult.contains("20%") || aiResult.contains("30%"))) {
-                            eventDb.markEventAsSynced(fingerprint, "LOW_CONVICTION");
-                            return true;
-                        }
-                        String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n"
-                                + "🕒 " + timeString + " (Mada)\n"
-                                + "📡 Source : " + source + "\n"
-                                + filteredMessage.toString().trim();
+                      boolean isSignificant = upperLine.contains("ACHAT CHOC") || 
+                                             upperLine.contains("VENTE CHOC") || 
+                                             upperLine.contains("INCLINATION ACHAT") || 
+                                             upperLine.contains("INCLINATION VENTE");
 
-                        if (finalPayload.length() < 200) {
-                            eventDb.markEventAsSynced(fingerprint, "TOO_SHORT");
-                            return true;
-                        }
-                        Log.d(TAG, "📤 Envoi Telegram pour fingerprint=" + fingerprint + ", signaux=" + activeSignalsCount);
-                        
-                        sendTelegramSecure(finalPayload, this);
-                        
-                        lastAnalysisTime = System.currentTimeMillis();
-                        if (isGeoEvent) {
-                            lastGeoTime = System.currentTimeMillis();
-                        }
-                        
-                        eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
-                        return true;
-                    } else {
-                        eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
-                        return true;
-                    }
+                      if (isSignificant) {
+                          filteredMessage.append(line).append("\n");
+                          activeSignalsCount++;
+                      }
+                      // On ignore les NEUTRE purs pour Telegram
+                  }
+              }
+
+              // ====================== ENVOI TELEGRAM ======================
+              if (activeSignalsCount > 0) {
+                  if (aiResult.contains("CONVICTION") && 
+                      (aiResult.contains("⚪⚪⚪⚪⚪") || aiResult.contains("20%") || aiResult.contains("30%"))) {
+                      eventDb.markEventAsSynced(fingerprint, "LOW_CONVICTION");
+                      return true;
+                  }
+
+                  String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n"
+                          + "🕒 " + timeString + " (Mada)\n"
+                          + "📡 Source : " + source + "\n"
+                          + filteredMessage.toString().trim();
+
+                  if (finalPayload.length() < 200) {
+                      eventDb.markEventAsSynced(fingerprint, "TOO_SHORT");
+                      return true;
+                  }
+
+                  Log.d(TAG, "📤 Envoi Telegram pour fingerprint=" + fingerprint + ", signaux impactants=" + activeSignalsCount);
+                  
+                  sendTelegramSecure(finalPayload, this);
+                  
+                  lastAnalysisTime = System.currentTimeMillis();
+                  if (isGeoEvent) {
+                      lastGeoTime = System.currentTimeMillis();
+                  }
+                  
+                  eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
+                  return true;
+
+              } else {
+                  // Aucun signal fort → on marque comme filtré
+                  eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                  Log.d(TAG, "Tous les actifs neutres → pas d'envoi Telegram");
+                  return true;
+              }
 
                 } else {
                     throw new Exception("API Error: " + conn.getResponseCode());
