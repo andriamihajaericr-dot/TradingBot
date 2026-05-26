@@ -357,9 +357,31 @@ public class NotificationService extends NotificationListenerService {
 
         Bundle extras = sbn.getNotification().extras;
         String title = extras.getString(Notification.EXTRA_TITLE, "");
-        String text = extras.getString(Notification.EXTRA_TEXT, "");
-        String unifiedFeed = (title + " " + text).trim();
 
+        // Priorité décroissante : BigText > SubText > Summary > Text
+        String bigText    = extras.getString(Notification.EXTRA_BIG_TEXT, "");
+        String subText    = extras.getString(Notification.EXTRA_SUB_TEXT, "");
+        String summary    = extras.getString(Notification.EXTRA_SUMMARY_TEXT, "");
+        String text       = extras.getString(Notification.EXTRA_TEXT, "");
+
+        // On prend le plus long contenu disponible
+        String body = bigText.length() > text.length() ? bigText : text;
+        if (subText.length() > body.length())   body = subText;
+        if (summary.length() > body.length())   body = summary;
+        String unifiedFeed = (title + " " + body).trim();
+        // Dégroupe les notifications groupées (bundles Investing.com)
+        CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+        if (lines != null && lines.length > 0) {
+        StringBuilder bundled = new StringBuilder(title).append(" ");
+          for (CharSequence line : lines) {
+           if (line != null) bundled.append(line).append(" ");
+          }
+        String bundledFeed = bundled.toString().trim();
+        if (bundledFeed.length() > unifiedFeed.length()) {
+           unifiedFeed = bundledFeed;
+            }
+        }
+        
         if (unifiedFeed.length() < 10) return;
 
         String packageName = sbn.getPackageName().toLowerCase();
