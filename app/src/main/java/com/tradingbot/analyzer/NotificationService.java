@@ -760,7 +760,8 @@ public class NotificationService extends NotificationListenerService {
                             eventDb.markEventAsSynced(fingerprint, "TOO_SHORT");
                             return true;
                         }
-
+                        Log.d(TAG, "📤 Envoi Telegram pour fingerprint=" + fingerprint + ", signaux=" + activeSignalsCount);
+                        
                         sendTelegramSecure(finalPayload, this);
                         
                         lastAnalysisTime = System.currentTimeMillis();
