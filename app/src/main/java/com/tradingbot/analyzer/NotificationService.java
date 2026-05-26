@@ -289,7 +289,7 @@ public class NotificationService extends NotificationListenerService {
     // Dans votre SYSTEM_PROMPT actuel, modifiez le bloc "FORMAT DE SORTIE" :
     "FORMAT DE SORTIE STRICT ET OBLIGATOIRE :\n" +
     "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
-    "🕒 [Insère ici la date et l'heure exactes fournies dans le CONTEXTE TEMPOREL] (Mada)\n" + // <-- Ligne ajoutée/corrigée
+    "🕒 [Insère ici la date et l'heure fournies dans le CONTEXTE TEMPOREL au début du message] (Mada)\n"
     "📊 CONVICTION : [JAUGE_EMOJIS] XX%\n" +
     "🎯 VECTEUR CIBLE : [HAWKISH / DOVISH / GÉO / LIQUIDITÉ / CHINE / TARIFS]\n" +
     "📢 FAIT MARQUANT : [Analyse pro de la situation en français. Mentionner l'arbitrage si écrasement d'un driver récent ou divergence.]\n\n" +
