@@ -286,7 +286,6 @@ public class NotificationService extends NotificationListenerService {
     "   • 🇬🇧 GBPUSD : VENTE CHOC 🔴 | Baisse mécanique par différentiel (Dollar Fort écrase la Livre).\n" +
     "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴 | Baisse mécanique par différentiel (Dollar Fort écrase l'Aussie).\n" +
     "   • ₿ BITCOIN  : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
-    // Dans votre SYSTEM_PROMPT actuel, modifiez le bloc "FORMAT DE SORTIE" :
     "FORMAT DE SORTIE STRICT ET OBLIGATOIRE :\n" +
     "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
     "🕒 [Insère ici la date et l'heure fournies dans le CONTEXTE TEMPOREL au début du message] (Mada)\n" +
