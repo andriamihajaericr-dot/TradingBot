@@ -210,6 +210,22 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, "Erreur écriture log fichier", e);
     }
     }
+    private void exportLogs() {
+    File logFile = new File(getExternalFilesDir(null), "Fonda_IOF_bot_logs.txt");
+    if (!logFile.exists()) {
+        Toast.makeText(this, "Aucun log trouvé", Toast.LENGTH_SHORT).show();
+        return;
+    }
+    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+    shareIntent.setType("text/plain");
+    shareIntent.putExtra(Intent.EXTRA_STREAM, androidx.core.content.FileProvider.getUriForFile(
+        this,
+        getPackageName() + ".fileprovider",
+        logFile
+    ));
+    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    startActivity(Intent.createChooser(shareIntent, "Partager les logs"));
+    }
 
     @Override
     protected void onDestroy() {
