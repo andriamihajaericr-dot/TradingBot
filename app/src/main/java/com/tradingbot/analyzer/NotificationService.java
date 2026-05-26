@@ -1014,7 +1014,6 @@ public class NotificationService extends NotificationListenerService {
     }
 }
 
-
     private void startMonthlyReportScheduler() {
         Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
         nextRun.set(Calendar.DAY_OF_MONTH, nextRun.getActualMaximum(Calendar.DAY_OF_MONTH));
