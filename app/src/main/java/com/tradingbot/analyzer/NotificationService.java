@@ -880,24 +880,24 @@ public class NotificationService extends NotificationListenerService {
            upperText.contains("GÉO")          ||
            upperText.contains("GEO");
     }
-private void startDailyBriefScheduler() {
-    TimeZone tz = TimeZone.getTimeZone("Indian/Antananarivo");
-    int[] targetHours = {12, 16, 17};
-    for (int hour : targetHours) {
-        scheduleDailyBriefAt(hour, tz);
+    private void startDailyBriefScheduler() {
+       TimeZone tz = TimeZone.getTimeZone("Indian/Antananarivo");
+       int[] targetHours = {12, 16, 17};
+       for (int hour : targetHours) {
+          scheduleDailyBriefAt(hour, tz);
+       }
     }
-}
 
-private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
-    Calendar now = Calendar.getInstance(tz);
-    Calendar nextRun = Calendar.getInstance(tz);
-    nextRun.set(Calendar.HOUR_OF_DAY, targetHour);
-    nextRun.set(Calendar.MINUTE, 0);
-    nextRun.set(Calendar.SECOND, 0);
-    nextRun.set(Calendar.MILLISECOND, 0);
+    private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
+     Calendar now = Calendar.getInstance(tz);
+     Calendar nextRun = Calendar.getInstance(tz);
+     nextRun.set(Calendar.HOUR_OF_DAY, targetHour);
+     nextRun.set(Calendar.MINUTE, 0);
+     nextRun.set(Calendar.SECOND, 0);
+     nextRun.set(Calendar.MILLISECOND, 0);
 
     // Rattrapage si l'heure est déjà passée aujourd'hui
-    if (nextRun.getTimeInMillis() <= now.getTimeInMillis()) {
+     if (nextRun.getTimeInMillis() <= now.getTimeInMillis()) {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
         String prefKey = "last_daily_report_" + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
@@ -910,10 +910,10 @@ private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
                 .apply();
         }
         nextRun.add(Calendar.DAY_OF_YEAR, 1);
-    }
+      }
 
-    long delay = nextRun.getTimeInMillis() - now.getTimeInMillis();
-    scheduler.scheduleAtFixedRate(() -> {
+      long delay = nextRun.getTimeInMillis() - now.getTimeInMillis();
+      scheduler.scheduleAtFixedRate(() -> {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
         String prefKey = "last_daily_report_" + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
@@ -926,7 +926,92 @@ private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
         } else {
             Log.d(TAG, "[DAILY] Rapport déjà envoyé aujourd'hui pour " + targetHour + "h, ignoré");
         }
-    }, delay, 24 * 60 * 60 * 1000L, TimeUnit.MILLISECONDS);
+        }, delay, 24 * 60 * 60 * 1000L, TimeUnit.MILLISECONDS);
+      }
+   private void generateAndSendDailyBrief() {
+    HttpURLConnection conn = null;
+    try {
+        Log.d(TAG, "[DAILY] Génération du rapport journalier...");
+
+        String apiKey = getGroqApiKey();
+        if (apiKey.isEmpty()) {
+            Log.e(TAG, "[DAILY] Clé Groq manquante, abandon");
+            return;
+        }
+
+        long nowSec = System.currentTimeMillis() / 1000;
+        String dailyDrivers = eventDb.getDailyMacroDrivers(nowSec);
+        if (dailyDrivers == null || dailyDrivers.isEmpty()) {
+            Log.d(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h, rapport ignoré");
+            return;
+        }
+        Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser");
+
+        // Date locale pour le message
+        SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE);
+        sdfDate.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+        String dateStr = sdfDate.format(new Date());
+
+        JSONObject payload = new JSONObject();
+        payload.put("model", GROQ_MODEL);
+        payload.put("temperature", 0.1);
+
+        JSONArray messages = new JSONArray();
+        messages.put(new JSONObject()
+            .put("role", "system")
+            .put("content", "Tu es un analyste macroéconomique senior. Rédige un briefing concis et structuré des chocs macroéconomiques enregistrés ces dernières 24 heures. Mentionne les drivers les plus importants et leurs implications sur les actifs (US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, USDCAD, GBPUSD, AUDUSD, BITCOIN). Sois factuel, pas de blabla, mais ajoute une touche d'analyse probabiliste (ex: '70% de chance que...')."));
+        messages.put(new JSONObject()
+            .put("role", "user")
+            .put("content", "DONNÉES DES DERNIÈRES 24H :\n" + dailyDrivers));
+        payload.put("messages", messages);
+
+        URL url = new URL(GROQ_URL);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(15000);
+        conn.setDoOutput(true);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(payload.toString().getBytes("UTF-8"));
+            os.flush();
+        }
+
+        int responseCode = conn.getResponseCode();
+        if (responseCode == 200) {
+            StringBuilder r = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = br.readLine()) != null) r.append(line);
+            }
+            String summary = new JSONObject(r.toString())
+                    .getJSONArray("choices")
+                    .getJSONObject(0)
+                    .getJSONObject("message")
+                    .getString("content");
+
+            if (summary != null && !summary.trim().isEmpty()) {
+                String message = "📊 *RAPPORT MACRO PÉRIODIQUE* – " + dateStr + "\n\n" + summary;
+                sendTelegramSecure(message, this);
+                Log.d(TAG, "[DAILY] Rapport envoyé avec succès");
+            } else {
+                Log.w(TAG, "[DAILY] Réponse Groq vide, rapport ignoré");
+            }
+        } else {
+            Log.e(TAG, "[DAILY] Erreur HTTP " + responseCode);
+            // Lire le flux d'erreur pour diagnostic
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "UTF-8"))) {
+                String line;
+                while ((line = br.readLine()) != null) Log.e(TAG, "[DAILY] Error: " + line);
+            } catch (Exception ignored) {}
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "[DAILY] Erreur lors de la génération du rapport", e);
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
 }
 
 
