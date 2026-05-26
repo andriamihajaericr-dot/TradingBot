@@ -259,6 +259,13 @@ public class NotificationService extends NotificationListenerService {
     "   - Tu dois obligatoirement copier-coller la liste complète des 11 actifs dans l'ordre exact du format de sortie. Aucune ligne ne peut être omise ou supprimée, sous aucun prétexte.\n" +
     "   - Si un actif n'est pas directement touché ou doit rester neutre par application de la CONTRAINTE 7, sa mention réglementaire stricte doit être : `NEUTRE | Pas d'impact direct de ce driver.` (ou la raison spécifique exigée par la contrainte 7).\n" +
     "   - Cette règle de complétude prévaut sur toute logique de concision.\n\n" +
+    "CONTRAINTE 9 — NOMBRE EXACT DE LIGNES D'IMPACTS :\n" +
+    "   ⚠️ TOUTE RÉPONSE DOIT CONTENIR EXACTEMENT 11 LIGNES D’IMPACTS (une par actif), même si l'actif est neutre.\n" +
+    "   Aucune ligne ne peut être omise, supprimée ou ajoutée. Le non-respect de cette règle entraîne le rejet automatique de la réponse.\n\n" +
+    "CONTRAINTE 10 — VALEUR EXACTE DU VECTEUR CIBLE :\n" +
+    "   Le champ 🎯 VECTEUR CIBLE doit être choisi UNIQUEMENT parmi : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS.\n" +
+    "   Toute autre valeur (ex: \"RANG SECONDAIRE - INFLATION\") est interdite et invalide la réponse.\n" +
+    "   La réponse doit utiliser exactement un de ces six termes, sans ajout ni modification.\n\n" +
 
     "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
     "   Si l'actualité dit : \"BCE dovish, Schnabel s'inquiète de la croissance européenne\", la réponse DOIT copier l'intégralité des 11 lignes ainsi :\n" +
