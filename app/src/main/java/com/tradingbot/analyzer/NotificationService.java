@@ -49,6 +49,8 @@ public class NotificationService extends NotificationListenerService {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private EventDatabase eventDb;
     private volatile boolean isSyncing = false;
+    private static final String PREF_LAST_DAILY_REPORT = "last_daily_report_";
+    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
     // Volatile pour la cohérence multi-thread (Point 7)
     private volatile long lastSpeechTime = 0;
@@ -878,64 +880,55 @@ public class NotificationService extends NotificationListenerService {
            upperText.contains("GÉO")          ||
            upperText.contains("GEO");
     }
-
-    private void startDailyBriefScheduler() {
-        Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
-        nextRun.set(Calendar.HOUR_OF_DAY, 7);
-        nextRun.set(Calendar.MINUTE, 0);
-        nextRun.set(Calendar.SECOND, 0);
-        if (nextRun.getTimeInMillis() <= System.currentTimeMillis()) nextRun.add(Calendar.DAY_OF_YEAR, 1);
-        scheduler.scheduleAtFixedRate(this::generateAndSendDailyBrief, nextRun.getTimeInMillis() - System.currentTimeMillis(), 24L * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
+private void startDailyBriefScheduler() {
+    TimeZone tz = TimeZone.getTimeZone("Indian/Antananarivo");
+    int[] targetHours = {12, 16, 17};
+    for (int hour : targetHours) {
+        scheduleDailyBriefAt(hour, tz);
     }
+}
 
-    private void generateAndSendDailyBrief() {
-        HttpURLConnection conn = null;
-        try {
-            String apiKey = getGroqApiKey();
-            if (apiKey.isEmpty()) return;
+private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
+    Calendar now = Calendar.getInstance(tz);
+    Calendar nextRun = Calendar.getInstance(tz);
+    nextRun.set(Calendar.HOUR_OF_DAY, targetHour);
+    nextRun.set(Calendar.MINUTE, 0);
+    nextRun.set(Calendar.SECOND, 0);
+    nextRun.set(Calendar.MILLISECOND, 0);
 
-            long now = System.currentTimeMillis() / 1000;
-            String dailyDrivers = eventDb.getDailyMacroDrivers(now);
-            if (dailyDrivers.isEmpty()) return;
-
-            JSONObject payload = new JSONObject();
-            payload.put("model", GROQ_MODEL);
-            payload.put("temperature", 0.1);
-
-            JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", "Rédige un briefing matinal synthétique des chocs macroéconomiques enregistrés la veille."));
-            messages.put(new JSONObject().put("role", "user").put("content", "DONNÉES HIER :\n" + dailyDrivers));
-            payload.put("messages", messages);
-
-            URL url = new URL(GROQ_URL);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(10000);
-            conn.setDoOutput(true);
-
-            OutputStream os = conn.getOutputStream();
-            os.write(payload.toString().getBytes("UTF-8"));
-            os.flush();
-            os.close();
-
-            if (conn.getResponseCode() == 200) {
-                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                StringBuilder r = new StringBuilder();
-                String l;
-                while ((l = br.readLine()) != null) r.append(l);
-                br.close();
-
-                String summary = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-                sendTelegramSecure("🌅 *DAILY BRIEF STRATÉGIQUE*\n\n" + summary, this);
-            }
-        } catch (Exception e) { Log.e(TAG, "Erreur Daily Brief", e); }
-        finally {
-            if (conn != null) conn.disconnect();
+    // Rattrapage si l'heure est déjà passée aujourd'hui
+    if (nextRun.getTimeInMillis() <= now.getTimeInMillis()) {
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        String prefKey = "last_daily_report_" + targetHour;
+        String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
+        if (!today.equals(lastSent)) {
+            Log.d(TAG, "[DAILY] Rattrapage pour " + targetHour + "h : envoi immédiat");
+            generateAndSendDailyBrief();
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .edit()
+                .putString(prefKey, today)
+                .apply();
         }
+        nextRun.add(Calendar.DAY_OF_YEAR, 1);
     }
+
+    long delay = nextRun.getTimeInMillis() - now.getTimeInMillis();
+    scheduler.scheduleAtFixedRate(() -> {
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        String prefKey = "last_daily_report_" + targetHour;
+        String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
+        if (!today.equals(lastSent)) {
+            generateAndSendDailyBrief();
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .edit()
+                .putString(prefKey, today)
+                .apply();
+        } else {
+            Log.d(TAG, "[DAILY] Rapport déjà envoyé aujourd'hui pour " + targetHour + "h, ignoré");
+        }
+    }, delay, 24 * 60 * 60 * 1000L, TimeUnit.MILLISECONDS);
+}
+
 
     private void startMonthlyReportScheduler() {
         Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
