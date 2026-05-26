@@ -133,6 +133,15 @@
             android:backgroundTint="#1f2937"
             android:textColor="#E5E7EB" 
             android:layout_marginBottom="20dp"/>
+        <Button
+           android:id="@+id/exportLogsBtn"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="📤 Exporter les logs"
+           android:textAllCaps="false"
+           android:backgroundTint="#1f2937"
+           android:textColor="#E5E7EB" 
+           android:layout_marginBottom="20dp"/>
 
         <TextView 
             android:layout_width="match_parent" 
