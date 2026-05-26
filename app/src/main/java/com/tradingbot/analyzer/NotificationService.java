@@ -502,7 +502,7 @@ public class NotificationService extends NotificationListenerService {
     if (saved && isDeviceOnline()) {
         triggerQueueSynchronization();
        }
-    // ====================== AJOUT ICI ======================
+    // ====================== AJOUT ICI DRIVER NOUVEAU DETECTE======================
     if (weight >= 4 || (vr.isConfirmed && vr.confidence >= 70)) {
       Log.d(TAG, "[DAILY TRIGGER] Driver majeur détecté (weight=" + weight + 
                 ", confidence=" + vr.confidence + ") → génération immédiate du rapport");
