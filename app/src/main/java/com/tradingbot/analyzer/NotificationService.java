@@ -950,30 +950,7 @@ public class NotificationService extends NotificationListenerService {
           scheduleDailyBriefAt(hour, tz);
        }
     }
-
     private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
-    Runnable task = new Runnable() {
-        @Override
-        public void run() {
-            Log.d(TAG, "[DAILY] Exécution programmée pour " + targetHour + "h");
-            
-            String currentDay = DATE_FORMAT.format(Calendar.getInstance(tz).getTime());
-            String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
-            String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
-
-            if (!currentDay.equals(lastSent)) {
-                generateAndSendDailyBrief();
-                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                    .edit()
-                    .putString(prefKey, currentDay)
-                    .apply();
-            }
-            
-            // Replanifier pour demain
-            scheduleDailyBriefAt(targetHour, tz);
-        }
-    };
-
     Calendar now = Calendar.getInstance(tz);
     Calendar nextRun = Calendar.getInstance(tz);
     nextRun.set(Calendar.HOUR_OF_DAY, targetHour);
@@ -987,10 +964,30 @@ public class NotificationService extends NotificationListenerService {
 
     long delay = nextRun.getTimeInMillis() - now.getTimeInMillis();
 
-    scheduler.schedule(task, delay, TimeUnit.MILLISECONDS);
+    SimpleDateFormat sdfLog = new SimpleDateFormat("dd/MM HH:mm:ss", Locale.getDefault());
+    sdfLog.setTimeZone(tz);
+    String nextRunStr = sdfLog.format(nextRun.getTime());
+    Log.d(TAG, "[DAILY] Horaire " + targetHour + "h : prochain déclenchement à " + nextRunStr);
+
+    scheduler.schedule(() -> {
+        Log.d(TAG, "[DAILY] Exécution pour " + targetHour + "h");
+
+        String currentDay = DATE_FORMAT.format(Calendar.getInstance(tz).getTime());
+        String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
+        String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
+
+        if (!currentDay.equals(lastSent)) {
+            generateAndSendDailyBrief();
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .edit()
+                .putString(prefKey, currentDay)
+                .apply();
+        }
+
+        // Replanification pour le lendemain
+        scheduleDailyBriefAt(targetHour, tz);
+    }, delay, TimeUnit.MILLISECONDS);
     }
-
-
     private void generateAndSendDailyBrief() {
     HttpURLConnection conn = null;
     try {
