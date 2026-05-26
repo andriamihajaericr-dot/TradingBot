@@ -266,6 +266,11 @@ public class NotificationService extends NotificationListenerService {
     "   Le champ 🎯 VECTEUR CIBLE doit être choisi UNIQUEMENT parmi : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS.\n" +
     "   Toute autre valeur (ex: \"RANG SECONDAIRE - INFLATION\") est interdite et invalide la réponse.\n" +
     "   La réponse doit utiliser exactement un de ces six termes, sans ajout ni modification.\n\n" +
+    "CONTRAINTE 11 — HIÉRARCHIE ABSOLUE DES DRIVERS :\n" +
+    "   En cas de coexistence d'un driver de RANG SUPRÊME (politique monétaire, décision de banque centrale, CPI, NFP, FOMC, BCE, BoE, BoJ, RBA, BoC) et d'un driver de RANG TACTIQUE (géopolitique, tarifs douaniers, sentiment consommateur, rumeur), le driver de RANG SUPRÊME prévaut.\n" +
+    "   Le driver tactique ne peut annuler, réduire ou remplacer la directionnalité imposée par le driver suprême.\n" +
+    "   Exemple : une annonce BCE HAWKISH (hausse des taux) l'emporte sur un contexte géopolitique de paix avec l'Iran. Dans ce cas, EURUSD reste ACHAT CHOC, et les impacts sur les devises (GBPUSD, AUDUSD, etc.) suivent la règle C (différentiel de taux).\n" +
+    "   ⚠️ Cette règle prévaut sur toute interprétation contraire.\n\n" +
 
     "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
     "   Si l'actualité dit : \"BCE dovish, Schnabel s'inquiète de la croissance européenne\", la réponse DOIT copier l'intégralité des 11 lignes ainsi :\n" +
