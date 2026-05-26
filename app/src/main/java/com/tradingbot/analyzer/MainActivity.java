@@ -192,6 +192,7 @@ public class MainActivity extends AppCompatActivity {
             if (mainScrollView != null) {
                 mainScrollView.post(() -> mainScrollView.fullScroll(View.FOCUS_DOWN));
             }
+            writeLogToFile(message);
         });
     }
 
