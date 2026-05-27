@@ -443,53 +443,6 @@ public class NotificationService extends NotificationListenerService {
         feed = "CONTEXTE TEMPOREL : Nous sommes le " + heureExacteMada + " (Heure de Madagascar).\n\n" + feed;
             
         long now = System.currentTimeMillis();
-    boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
-    // ... TOUT LE RESTE DE VOTRE CODE RESTE STRICTEMENT INCHANGÉ ...
-    // 1. Throttle géopolitique prioritaire
-    if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
-        Log.d(TAG, "[THROTTLE] Notification Géo bloquée (12 min) - dernier il y a " + (now - lastGeoTime)/1000 + "s");
-        return;
-    }
-
-    // 2. Throttle global uniquement pour les événements non-géo
-    if (!isGeoEvent && (now - lastAnalysisTime < GLOBAL_THROTTLE_MS)) {
-        Log.d(TAG, "[THROTTLE] Notification instantanée bloquée (global - 8 min)");
-        return;
-    }
-
-    List<String> targetAssets = filterActiveAssets(feed);
-    EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
-
-    boolean isFomcPivot = feed.toUpperCase().contains("FOMC") || feed.toUpperCase().contains("FED ");
-    int weight = assignDriverWeight(feed);
-
-    if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 70) {
-        weight = Math.max(weight, 4);
-    }
-
-    String hash = generateSecureHash(title + text);
-        
-    Log.d(TAG, "🟢 Nouvelle notification : source=" + source + ", title=" + title + ", hash=" + hash);
-        
-    if (!vr.isConfirmed && weight < 4 && !isFomcPivot && !detectDriverDeviation(feed)) {
-        eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
-                String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
-        return;
-    }
-
-    if (!vr.isConfirmed && weight < 4) return;
-
-    EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
-private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
-        // 1. Récupération de l'heure exacte de Madagascar au format dd/MM HH:mm
-        SimpleDateFormat madaSdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
-        madaSdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
-        String heureExacteMada = madaSdf.format(new Date()); // Donne par exemple: "26/05 20:30"
-        
-        // 2. Injection du contexte temporel au début de la variable feed avant l'analyse
-        feed = "CONTEXTE TEMPOREL : Nous sommes le " + heureExacteMada + " (Heure de Madagascar).\n\n" + feed;
-            
-        long now = System.currentTimeMillis();
         boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
 
         // 1. Throttle géopolitique prioritaire
@@ -507,7 +460,7 @@ private void processIncomingMacroFeed(String source, String title, String text, 
         List<String> targetAssets = filterActiveAssets(feed);
         EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
 
-        // Détection élargie de TOUTES les actualités majeures (Suprêmes et Secondaires) à ne jamais bloquer silencieusement
+        // Détection élargie de TOUTES les actualités majeures (Suprêmes, Secondaires et Tertiaires)
         String upFeed = feed.toUpperCase(Locale.ROOT);
         boolean isSupremeNews = upFeed.contains("FOMC") || 
                                 upFeed.contains("FED ") || 
@@ -526,7 +479,9 @@ private void processIncomingMacroFeed(String source, String title, String text, 
                                 upFeed.contains("INFLATION") ||
                                 upFeed.contains("INTEREST RATE") ||
                                 upFeed.contains("POWELL") ||
-                                upFeed.contains("LAGARDE");
+                                upFeed.contains("LAGARDE") ||
+                                upFeed.contains("PMI") ||
+                                upFeed.contains("ISM");
 
         int weight = assignDriverWeight(feed);
 
@@ -538,14 +493,14 @@ private void processIncomingMacroFeed(String source, String title, String text, 
             
         Log.d(TAG, "🟢 Nouvelle notification : source=" + source + ", title=" + title + ", hash=" + hash);
             
-        // PROTECTION AJUSTÉE : Si ce n'est pas confirmé, que le poids < 4, ET que ce n'est pas une news majeure (isSupremeNews), alors on filtre en Soft-Data.
-        if (!vr.isConfirmed && weight < 4 && !isSupremeNews && !detectDriverDeviation(feed)) {
+        // MODIFICATION STRATÉGIQUE : Le filtre s'applique uniquement si weight < 3 (Poids 1). Le poids 3 passe sans blocage !
+        if (!vr.isConfirmed && weight < 3 && !isSupremeNews && !detectDriverDeviation(feed)) {
             eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
                     String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
             return;
         }
 
-        if (!vr.isConfirmed && weight < 4) return;
+        if (!vr.isConfirmed && weight < 3) return;
 
         EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
 
@@ -560,8 +515,11 @@ private void processIncomingMacroFeed(String source, String title, String text, 
 
         if (vr.geoContext.isEmpty() && !(upFeed.contains("FOMC") || upFeed.contains("FED "))) {
             if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
-                Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
-                return;
+                // Mesure de sécurité pour que le poids 3 majeur ne soit pas écrasé par un faux neutre
+                if (weight < 3) {
+                    Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
+                    return;
+                }
             }
         }
 
@@ -571,9 +529,9 @@ private void processIncomingMacroFeed(String source, String title, String text, 
             triggerQueueSynchronization();
         }
 
-        // ====================== ENVOI IMMÉDIAT DU RAPPORT PÉRIODIQUE ======================
-        if (weight >= 4 || (vr.isConfirmed && vr.confidence >= 70)) {
-            Log.d(TAG, "[DAILY TRIGGER] Driver majeur détecté (weight=" + weight + 
+        // Enclenchement immédiat du briefing si poids fort (>=4) ou si l'analyse confirme une opportunité claire (>=3 avec confirmation)
+        if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
+            Log.d(TAG, "[DAILY TRIGGER] Driver qualifié détecté (weight=" + weight + 
                     ", confidence=" + vr.confidence + ") → génération immédiate du rapport");
             exec.submit(this::generateAndSendDailyBrief);
         }
@@ -581,13 +539,17 @@ private void processIncomingMacroFeed(String source, String title, String text, 
 
     private int assignDriverWeight(String text) {
         String u = text.toUpperCase();
+        
+        // CORRECTION ACTIFS CRUCIAUX : Ajout de la détection des synonymes/surnoms institutionnels
         if (u.contains("CPI")            || u.contains("INFLATION")       || u.contains("NFP")          ||
             u.contains("NON-FARM PAYROLLS") || u.contains("FOMC")           || u.contains("INTEREST RATE") ||
             u.contains("RBA")            || u.contains("BOC")             || u.contains("BOJ")           ||
             u.contains("BOE")            || u.contains("ECB")             || u.contains("BCE")           ||
             u.contains("LAGARDE")        || u.contains("BAILEY")          || u.contains("MACKLEM")       ||
-            u.contains("BULLOCK")        || u.contains("UEDA")            ||
+            u.contains("BULLOCK")        || u.contains("UEDA")            || u.contains("CABLE")         || 
+            u.contains("STERLING")       || u.contains("AUSSIE")          || u.contains("LOONIE")        ||
             u.contains("WARSH")          || u.contains("POWELL")) return 5;
+            
         if (u.contains("GDP")                || u.contains("PIB")                    ||
             u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT RATE")        ||
             u.contains("STOCKS")             || u.contains("JOBLESS")                ||
@@ -600,11 +562,17 @@ private void processIncomingMacroFeed(String source, String title, String text, 
             u.contains("CHICAGO PMI")        || u.contains("BEIGE BOOK")             ||
             u.contains("PERSONAL SPENDING")  || u.contains("PERSONAL INCOME")        ||
             u.contains("HOUSING STARTS")     || u.contains("BUILDING PERMITS")       ||
+            u.contains("WTI")                || u.contains("BRENT")                  || 
+            u.contains("CRUDE OIL")          || u.contains("XAUUSD")                 ||
             u.contains("HOME SALES")         || u.contains("CHALLENGER")) return 4;
+            
         if (u.contains("PMI")               || u.contains("ISM")                  ||
             u.contains("MICHIGAN")          || u.contains("CONSUMER CONFIDENCE")   ||
             u.contains("CONSUMER SENTIMENT")|| u.contains("IMPORT PRICE")          ||
+            u.contains("NAS100")            || u.contains("SPX")                  ||
+            u.contains("US500")             || u.contains("USTECH")                ||
             u.contains("EXPORT PRICE")      || u.contains("NATURAL GAS")) return 3;
+            
         return 1;
     }
 
