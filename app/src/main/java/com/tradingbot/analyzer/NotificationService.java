@@ -1052,46 +1052,61 @@ public class NotificationService extends NotificationListenerService {
         } else {
             Log.d(TAG, "[DAILY] Rapport déjà envoyé aujourd'hui pour " + targetHour + "h, ignoré");
         }
-
         // 5. Replanifier pour le lendemain à la même heure
         scheduleDailyBriefAt(targetHour, tz);
     }, delay, TimeUnit.MILLISECONDS);
    }
-    private void generateAndSendDailyBrief() {
+    
+   private void generateAndSendDailyBrief() {
     HttpURLConnection conn = null;
     try {
-        Log.d(TAG, "[DAILY] Génération du rapport journalier...");
-
         String apiKey = getGroqApiKey();
-        if (apiKey.isEmpty()) {
-            Log.e(TAG, "[DAILY] Clé Groq manquante, abandon");
-            return;
-        }
+        if (apiKey.isEmpty()) return;
 
         long nowSec = System.currentTimeMillis() / 1000;
-        String dailyDrivers = eventDb.getDailyMacroDrivers(nowSec);
+        String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
+
         if (dailyDrivers == null || dailyDrivers.isEmpty()) {
             Log.d(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h, rapport ignoré");
             return;
         }
+
         Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser");
 
-        // Date locale pour le message
-        SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE);
+        // Date locale pour le message (Mada UTC+3)
+        SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
         sdfDate.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
         String dateStr = sdfDate.format(Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo")).getTime());
 
+        // PROMPT SYSTEME STRUCTURÉ DU BRIEFING DAILY
+        String DAILY_SYSTEM_PROMPT =
+            "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif. Analyse avec rigueur absolue.\n\n" +
+            "══════════════════════════════════════════════\n" +
+            " RÈGLES DE FORMAT (MODE DAILY COMPLET)\n" +
+            "══════════════════════════════════════════════\n" +
+            "- Tu dois obligatoirement analyser le résumé des drivers des dernières 24 heures.\n" +
+            "- Tu dois afficher TOUS les 11 actifs de la matrice sans aucune omission, un par ligne, dans l'ordre strict suivant :\n" +
+            "  • 📈 US10Y, • 💻 NASDAQ, • 📊 SP500, • 🏆 GOLD, • 🛢️ USOIL, • 🇪🇺 EURUSD, • 🇯🇵 USDJPY, • 🇨🇦 USDCAD, • 🇬🇧 GBPUSD, • 🇦🇺 AUDUSD, • ₿ BITCOIN\n" +
+            "- Pour chaque actif, attribue une probabilité ou tendance logique basée UNIQUEMENT sur les événements réels fournis.\n" +
+            "- Les indices NASDAQ et SP500 doivent obligatoirement évoluer dans la même direction.\n" +
+            "- Interdiction absolue d'ajouter du blabla, des conseils de trading ou des paragraphes explicatifs en dehors de la structure.\n\n" +
+            "FORMAT DE SORTIE IMPÉRATIF :\n" +
+            "📊 RAPPORT MACRO PÉRIODIQUE – [Date/Heure]\n\n" +
+            "Briefing Macroéconomique - [Date/Heure] (Heure de Madagascar)\n\n" +
+            "Résumé des Chocs Macroéconomiques des Dernières 24 Heures\n" +
+            "[Insère ici une liste à puces synthétique des faits marquants réels sans fioriture]\n\n" +
+            "Implications sur les Actifs\n" +
+            "[Insère ici les 11 actifs avec leur pourcentage de probabilité directionnelle et une explication quantitative d'une ligne maximum]";
+
         JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
-        payload.put("temperature", 0.1);
+        payload.put("temperature", 0.1); // Verrouillage de la créativité pour éviter les dérives
 
         JSONArray messages = new JSONArray();
-        messages.put(new JSONObject()
-            .put("role", "system")
-            .put("content", "Tu es un analyste macroéconomique senior. Rédige un briefing concis et structuré des chocs macroéconomiques enregistrés ces dernières 24 heures. Mentionne les drivers les plus importants et leurs implications sur les actifs (US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, USDCAD, GBPUSD, AUDUSD, BITCOIN). Sois factuel, pas de blabla, mais ajoute une touche d'analyse probabiliste (ex: '70% de chance que...')."));
-        messages.put(new JSONObject()
-            .put("role", "user")
-            .put("content", "DONNÉES DES DERNIÈRES 24H :\n" + dailyDrivers));
+        messages.put(new JSONObject().put("role", "system").put("content", DAILY_SYSTEM_PROMPT));
+        messages.put(new JSONObject().put("role", "user").put("content", 
+            "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n" +
+            "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers));
         payload.put("messages", messages);
 
         URL url = new URL(GROQ_URL);
@@ -1113,35 +1128,30 @@ public class NotificationService extends NotificationListenerService {
             StringBuilder r = new StringBuilder();
             try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
                 String line;
-                while ((line = br.readLine()) != null) r.append(line);
+                while ((line = br.readLine()) != null) {
+                    r.append(line);
+                }
             }
-            String summary = new JSONObject(r.toString())
-                    .getJSONArray("choices")
-                    .getJSONObject(0)
-                    .getJSONObject("message")
-                    .getString("content");
+            
+            JSONObject jsonResponse = new JSONObject(r.toString());
+            String aiResult = jsonResponse.getJSONArray("choices")
+                                         .getJSONObject(0)
+                                         .getJSONObject("message")
+                                         .getString("content");
 
-            if (summary != null && !summary.trim().isEmpty()) {
-                String message = "📊 *RAPPORT MACRO PÉRIODIQUE* – " + dateStr + "\n\n" + summary;
-                sendTelegramSecure(message, this);
-                Log.d(TAG, "[DAILY] Rapport envoyé avec succès");
-            } else {
-                Log.w(TAG, "[DAILY] Réponse Groq vide, rapport ignoré");
-            }
+            // Envoi direct et sécurisé sur Telegram
+            sendTelegramSecure(aiResult, this);
+            Log.d(TAG, "[DAILY] Rapport envoyé avec succès.");
+            
         } else {
-            Log.e(TAG, "[DAILY] Erreur HTTP " + responseCode);
-            // Lire le flux d'erreur pour diagnostic
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "UTF-8"))) {
-                String line;
-                while ((line = br.readLine()) != null) Log.e(TAG, "[DAILY] Error: " + line);
-            } catch (Exception ignored) {}
+            Log.e(TAG, "[DAILY] Erreur API Groq: " + responseCode);
         }
     } catch (Exception e) {
-        Log.e(TAG, "[DAILY] Erreur lors de la génération du rapport", e);
+        Log.e(TAG, "[DAILY] Échec critique du briefing journalier", e);
     } finally {
         if (conn != null) conn.disconnect();
     }
-}
+   }
 
     private void startMonthlyReportScheduler() {
         Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
