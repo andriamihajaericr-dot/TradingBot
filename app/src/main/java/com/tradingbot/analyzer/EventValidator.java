@@ -4,6 +4,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import android.util.Log;
+import android.content.Context;
 
 public class EventValidator {
 
