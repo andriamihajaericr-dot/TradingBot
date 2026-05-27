@@ -44,6 +44,16 @@ public class NotificationService extends NotificationListenerService {
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
+    
+    private String getMadaFormattedDateTime() {
+      SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
+      sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo")); // Fuseau officiel Mada (GMT+3)
+    return sdf.format(new Date());
+    }
+
+    private Calendar getMadaCalendar() {
+      return Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+    }
 
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
