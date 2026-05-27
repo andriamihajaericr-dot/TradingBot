@@ -1373,6 +1373,17 @@ public class NotificationService extends NotificationListenerService {
             }
         });
     }
+    // ── AJOUT DE COMPATIBILITÉ CHRONOLOGIQUE (MADA) ──
+    private String getMadaFormattedDateTime() {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+            // On récupère dynamiquement le fuseau horaire depuis votre utilitaire existant
+            sdf.setTimeZone(getMadaCalendar().getTimeZone());
+            return sdf.format(new Date());
+        } catch (Exception e) {
+            return "N/A";
+        }
+    }
 
     @Override
     public void onDestroy() {
@@ -1382,3 +1393,4 @@ public class NotificationService extends NotificationListenerService {
         Log.d(TAG, "[SERVICE] Service arrêté");
     }
 }
+
