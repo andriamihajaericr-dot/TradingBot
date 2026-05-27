@@ -65,12 +65,12 @@ public class EventValidator {
         }
         // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
         String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
-        
-        // On vérifie seulement si on est dans un contexte où la DB est accessible
-        if (!detectedType.startsWith("GEO") && eventDatabase != null) {
+        // On vérifie seulement si on est dans un contexte où la DB est accessible via MainActivity.instance
+        EventDatabase db = (MainActivity.instance != null) ? getDatabase(MainActivity.instance) : null;
+        if (!detectedType.startsWith("GEO") && db != null) {
             try {
                 long currentSeconds = timestamp / 1000;
-                if (eventDatabase.isDriverActiveRecently(detectedType, currentSeconds)) {
+                if (db.isDriverActiveRecently(detectedType, currentSeconds)) {
                     result.confidence  = 0;
                     result.isConfirmed = false;
                     result.reason      = "Driver déjà actif récemment (Inertie Macro)";
