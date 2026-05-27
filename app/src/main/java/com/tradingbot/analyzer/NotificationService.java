@@ -397,16 +397,17 @@ public class NotificationService extends NotificationListenerService {
         if (subText.length() > body.length())   body = subText;
         if (summary.length() > body.length())   body = summary;
         String unifiedFeed = (title + " " + body).trim();
+        
         // Dégroupe les notifications groupées (bundles Investing.com)
         CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
         if (lines != null && lines.length > 0) {
-        StringBuilder bundled = new StringBuilder(title).append(" ");
-          for (CharSequence line : lines) {
-           if (line != null) bundled.append(line).append(" ");
-          }
-        String bundledFeed = bundled.toString().trim();
-        if (bundledFeed.length() > unifiedFeed.length()) {
-           unifiedFeed = bundledFeed;
+            StringBuilder bundled = new StringBuilder(title).append(" ");
+            for (CharSequence line : lines) {
+                if (line != null) bundled.append(line).append(" ");
+            }
+            String bundledFeed = bundled.toString().trim();
+            if (bundledFeed.length() > unifiedFeed.length()) {
+                unifiedFeed = bundledFeed;
             }
         }
         
@@ -452,7 +453,61 @@ public class NotificationService extends NotificationListenerService {
             lastSpeaker = currentSpeaker;
         }
 
-        processIncomingMacroFeed(sourceName, title, text, unifiedFeed, packageName, sbn.getPostTime());
+        // ── PIPELINE DE FILTRAGE ET VALIDATION MACRO ──
+        
+        // 1. Soumission et validation temporelle face au calendrier via EventValidator
+        List<String> enrichedAssets = new ArrayList<>();
+        EventValidator.ValidationResult validationResult = EventValidator.validate(title, body, currentTime, enrichedAssets);
+
+        // 2. Catégorisation et extraction du type de driver via EconomicEventDetector
+        EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
+
+        // Si le validateur confirme l'urgence ou la légitimité de la news, on persiste en DB
+        if (validationResult.isConfirmed) {
+            String fingerprint = generateSecureHash(packageName + "_" + title + "_" + body + "_" + (sbn.getPostTime() / 60000));
+            
+            // Conversion propre de la matrice d'actifs
+            StringBuilder assetsSb = new StringBuilder();
+            for (int i = 0; i < enrichedAssets.size(); i++) {
+                assetsSb.append(enrichedAssets.get(i));
+                if (i < enrichedAssets.size() - 1) assetsSb.append(",");
+            }
+            String assetsString = assetsSb.toString();
+
+            // Calcul du poids de dominance (driver_weight) pour le filtrage SQLite
+            int driverWeight = 1;
+            if (detection.eventType != null) {
+                if (detection.eventType.equals("FED-MONETARY-POLICY") || detection.eventType.equals("INFLATION-DATA")) {
+                    driverWeight = 5;
+                } else if (detection.eventType.startsWith("GEO") || detection.eventType.equals("CENTRAL-BANK-RATE") || detection.eventType.equals("EMPLOYMENT-REPORT")) {
+                    driverWeight = 4;
+                } else if (detection.eventType.equals("ECONOMIC-GROWTH-DATA")) {
+                    driverWeight = 2;
+                }
+            }
+
+            // Insertion synchronisée en base de données avec statut "pending"
+            boolean saved = eventDb.saveEvent(
+                    fingerprint,
+                    packageName,
+                    sourceName,
+                    detection.eventType,
+                    title,
+                    body,
+                    assetsString,
+                    "PENDING",
+                    sbn.getPostTime() / 1000,
+                    "pending", // Remplacement définitif de "attente"
+                    driverWeight
+            );
+
+            if (saved) {
+                Log.d(TAG, "[VALIDATEUR] Événement macro validé inséré en base : " + detection.eventType + " [Poids: " + driverWeight + "]");
+            }
+        }
+
+        // Envoi vers votre logique de traitement IA (Ici 'body' remplace intelligemment 'text')
+        processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime());
     }
 
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
