@@ -7,7 +7,7 @@ public class EconomicEventDetector {
     public static class DetectedEvent {
         public String eventType;
         public String description;
-        public String impact; // Contient la chaîne combinée (ex: "Haute Volatilité (Biais Haussier)")
+        public String impact; // Chaîne combinée descriptive (ex: "Haute Volatilité (Biais Haussier)")
 
         public DetectedEvent(String eventType, String description, String impact) {
             this.eventType   = eventType;
@@ -16,7 +16,7 @@ public class EconomicEventDetector {
         }
 
         /**
-         * Extrait l'impact brut (Utile pour EventDatabase et les filtres de poids)
+         * Extrait l'impact brut normalisé pour l'alignement avec EventDatabase
          */
         public String getRawImpact() {
             if (impact == null) return "NEUTRE";
@@ -27,7 +27,7 @@ public class EconomicEventDetector {
         }
 
         /**
-         * Extrait le biais directionnel de manière isolée pour l'analyse algorithmique
+         * Extrait le biais directionnel de manière isolée pour les décisions algorithmiques
          */
         public String getDirectionalBias() {
             if (impact == null) return "NEUTRE";
@@ -38,8 +38,8 @@ public class EconomicEventDetector {
     }
 
     public static DetectedEvent detectEvent(String title, String text) {
-        // Utilisation constante de Locale.US
-        String unified = (title + " " + text).toUpperCase(Locale.US).trim();
+        // Ajout d'un espace de sécurité final pour valider les mots-clés courts comme "FED " ou "CPI "
+        String unified = (title + " " + text).toUpperCase(Locale.US).trim() + " ";
 
         String eventType   = "CORE-MACRO";
         String description = "Analyse Flash Institutionnelle";
@@ -48,13 +48,13 @@ public class EconomicEventDetector {
         // ── 1. CLASSIFICATION HIÉRARCHIQUE (Du plus spécifique au plus général) ──
 
         // Fed & Politique Monétaire US
-        if (containsAny(unified, "FEDERAL RESERVE", "FED CHAIR", "FOMC", "FED ", "POWELL", "WARSH", "BARKIN", "GOOLSBEE",
-                       "HAMMACK", "WALLER", "WILLIAMS", "KUGLER")) {
+        if (containsAny(unified, "FEDERAL RESERVE", "FED CHAIR", "FOMC MINUTES", "FOMC", "FED ", "POWELL", "WARSH", "BARKIN", "GOOLSBEE",
+                       "HAMMACK", "WALLER", "WILLIAMS", "KUGLER", "RATE STANDS")) {
             eventType   = "FED-MONETARY-POLICY";
             description = "Décision / Discours Réserve Fédérale (USA)";
             impact      = "Haute Volatilité";
 
-        // Inflation US
+        // Inflation US (Placer impérativement CORE avant les versions génériques)
         } else if (containsAny(unified, "CORE CPI", "CORE PCE", "CPI ", "PCE", "PPI", "INFLATION")) {
             eventType   = "INFLATION-DATA";
             description = "Données d'Inflation (CPI / PCE / PPI)";
@@ -74,7 +74,7 @@ public class EconomicEventDetector {
             impact      = "Haute Volatilité";
 
         // Géopolitique — Moyen-Orient
-        } else if (containsAny(unified, "HORMUZ STRAIT", "ISRAEL", "IRAN", "HEZBOLLAH", "HOUTHI", "HORMUZ", "GAZA", "LEBANON")) {
+        } else if (containsAny(unified, "HORMUZ STRAIT", "RED SEA", "ISRAEL", "IRAN", "HEZBOLLAH", "HOUTHI", "HORMUZ", "GAZA", "LEBANON")) {
             eventType   = "GEO-MIDDLE-EAST";
             description = "Événement Géopolitique — Moyen-Orient";
             impact      = "Choc Géopolitique USOIL/GOLD";
@@ -98,7 +98,7 @@ public class EconomicEventDetector {
             impact      = "Moyenne Volatilité";
         }
 
-        // ── 2. EXTRACTION DU BIAIS FONDAMENTAL ──
+        // ── 2. EXTRACTION ET ACCUMULATION DU BIAIS DIRECTIONNEL FONDAMENTAL ──
         if (containsAny(unified, "HIGHER THAN EXPECTED", "BEATS ESTIMATES", "ABOVE FORECAST",
                        "ABOVE EXPECTATIONS", "BETTER THAN EXPECTED", "HAWKISH")) {
             if (impact.equals("Neutre")) {
