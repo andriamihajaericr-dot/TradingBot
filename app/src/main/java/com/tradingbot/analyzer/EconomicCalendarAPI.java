@@ -7,7 +7,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.*;
 import java.net.*;
-import java.util.TimeZone;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -21,6 +20,9 @@ public class EconomicCalendarAPI {
     private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
     private static final String FF_URL_NEXT_WEEK = "https://nfs.faireconomy.media/ff_calendar_nextweek.json";
 
+    // Contexte global optionnel pour garantir la compatibilité ascendante avec EventValidator
+    private static Context globalAppContext = null;
+
     public static class CalendarEvent {
         public String       timestamp      = "";
         public String       country        = "Global";
@@ -33,28 +35,48 @@ public class EconomicCalendarAPI {
     }
 
     /**
-     * POINT D'ENTRÉE PRINCIPAL (Sécurisé avec passage de Context)
+     * Permet d'initialiser optionnellement le contexte depuis votre Application class ou NotificationService
+     */
+    public static void init(Context context) {
+        if (context != null) {
+            globalAppContext = context.getApplicationContext();
+        }
+    }
+
+    /**
+     * SURCHARGE DE COMPATIBILITÉ : Permet à EventValidator.preloadCalendar() de compiler sans modification
+     */
+    public static List<CalendarEvent> fetchUpcomingEvents(int hoursAhead) {
+        return fetchUpcomingEvents(globalAppContext, hoursAhead);
+    }
+
+    /**
+     * POINT D'ENTRÉE PRINCIPAL (Pipeline de données à 3 niveaux)
      */
     public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
-        Context appContext = context.getApplicationContext();
+        Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
 
-        // ── Niveau 1 : FMP ────────────────────────────────────────
-        List<CalendarEvent> events = fetchFromFMP(appContext, hoursAhead);
-        if (!events.isEmpty()) {
-            Log.d(TAG, "FMP : " + events.size() + " événements chargés.");
-            return events;
+        // ── Niveau 1 : FMP (Si le contexte est disponible pour lire la clé API) ──
+        if (targetContext != null) {
+            List<CalendarEvent> events = fetchFromFMP(targetContext, hoursAhead);
+            if (!events.isEmpty()) {
+                Log.d(TAG, "FMP : " + events.size() + " événements chargés avec succès.");
+                return events;
+            }
+        } else {
+            Log.w(TAG, "Aucun contexte fourni pour fetchUpcomingEvents — Sauts vers l'étape ForexFactory.");
         }
 
-        // ── Niveau 2 : ForexFactory ───────────────────────────────
-        Log.w(TAG, "FMP indisponible ou clé manquante — tentative ForexFactory.");
-        events = fetchFromForexFactory(hoursAhead);
+        // ── Niveau 2 : ForexFactory ──
+        Log.w(TAG, "FMP indisponible, clé manquante ou erreur réseau — tentative ForexFactory.");
+        List<CalendarEvent> events = fetchFromForexFactory(hoursAhead);
         if (!events.isEmpty()) {
             Log.d(TAG, "ForexFactory : " + events.size() + " événements chargés.");
             return events;
         }
 
-        // ── Niveau 3 : Fallback institutionnel statique ───────────
-        Log.w(TAG, "Toutes sources indisponibles — activation du fallback.");
+        // ── Niveau 3 : Fallback institutionnel statique exhaustif ──
+        Log.w(TAG, "Toutes sources en ligne indisponibles — activation du fallback de secours.");
         return generateInstitutionalExhaustiveFallback();
     }
 
@@ -65,7 +87,7 @@ public class EconomicCalendarAPI {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String apiKey = prefs.getString(PREF_MACRO_KEY, "");
             if (apiKey.isEmpty()) {
-                Log.w(TAG, "macro_api_key non configurée — FMP ignoré.");
+                Log.w(TAG, "macro_api_key absente des SharedPreferences — FMP ignoré.");
                 return events;
             }
 
@@ -73,7 +95,7 @@ public class EconomicCalendarAPI {
             sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
             
             long nowMs = System.currentTimeMillis();
-            long pastMs = nowMs - (24 * 60 * 60 * 1000L); // Recul de 24h fixes pour inclure le passé récent
+            long pastMs = nowMs - (24 * 60 * 60 * 1000L); // Fenêtre de sécurité de 24h passées
             long futureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000L);
 
             String fromDate = sdf.format(new Date(pastMs));
@@ -118,8 +140,8 @@ public class EconomicCalendarAPI {
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Échec FMP", e);
-        } finally { // Correction de la coquille de syntaxe ici
+            Log.e(TAG, "Échec critique FMP", e);
+        } finally {
             if (conn != null) conn.disconnect();
         }
         return events;
@@ -140,13 +162,13 @@ public class EconomicCalendarAPI {
         try {
             long nowMs = System.currentTimeMillis();
             long futureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000);
-            long pastThresholdMs = nowMs - (24 * 60 * 60 * 1000); // Seuil de 24h pour capter les révisions récentes
+            long pastThresholdMs = nowMs - (24 * 60 * 60 * 1000); 
 
             URL url = new URL(urlString);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Accept", "application/json");
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(10000);
 
@@ -187,7 +209,7 @@ public class EconomicCalendarAPI {
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Échec ForexFactory [" + urlString + "]", e);
+            Log.e(TAG, "Échec de lecture ForexFactory [" + urlString + "]", e);
         } finally {
             if (conn != null) conn.disconnect();
         }
@@ -199,7 +221,7 @@ public class EconomicCalendarAPI {
         String ind = indicator.toLowerCase(Locale.US);
         String cty = country.toLowerCase(Locale.US);
 
-        assets.add("US10Y"); // Pivot obligatoire pour l'analyse macro intermarché
+        assets.add("US10Y"); // Matrice intermarché pivot
 
         if (cty.contains("united states") || cty.contains("us ")) {
             if (ind.contains("fomc") || ind.contains("interest rate") ||
@@ -348,7 +370,12 @@ public class EconomicCalendarAPI {
 
     private static String formatValue(String value) {
         if (value == null || value.isEmpty() || value.equalsIgnoreCase("null")) return "N/A";
-        return value.trim();
+        String trimmed = value.trim();
+        // Corrige les valeurs décimales tronquées (ex: .3% -> 0.3%)
+        if (trimmed.startsWith(".")) {
+            trimmed = "0" + trimmed;
+        }
+        return trimmed;
     }
 
     private static boolean isTrackedCurrency(String currency) {
