@@ -70,15 +70,13 @@ public class EconomicCalendarAPI {
 
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
             sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-            Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
             
-            // FMP gère nativement l'historique récent si on recule d'un jour
-            cal.add(Calendar.DAY_OF_YEAR, -1);
-            String fromDate = sdf.format(cal.getTime());
-            
-            cal.add(Calendar.DAY_OF_YEAR, 1); // retour à aujourd'hui
-            cal.add(Calendar.HOUR_OF_DAY, hoursAhead);
-            String toDate = sdf.format(cal.getTime());
+            long nowMs = System.currentTimeMillis();
+            long pastMs = nowMs - (24 * 60 * 60 * 1000L); // Recul de 24h fixes pour inclure le passé récent
+            long futureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000L);
+
+            String fromDate = sdf.format(new Date(pastMs));
+            String toDate = sdf.format(new Date(futureMs));
 
             String urlString = FMP_URL + "?from=" + fromDate + "&to=" + toDate + "&apikey=" + apiKey;
             URL url = new URL(urlString);
@@ -109,7 +107,7 @@ public class EconomicCalendarAPI {
                     CalendarEvent event = new CalendarEvent();
                     event.country    = currencyToCountry(currency);
                     event.indicator  = eventName.isEmpty() ? "Macro Release" : eventName;
-                    event.importance = impact;
+                    event.importance = impact.toUpperCase(Locale.US);
                     event.forecast   = formatValue(obj.optString("estimate", "N/A"));
                     event.previous   = formatValue(obj.optString("previous", "N/A"));
                     event.actual     = formatValue(obj.optString("actual",   "N/A"));
@@ -120,7 +118,7 @@ public class EconomicCalendarAPI {
             }
         } catch (Exception e) {
             Log.e(TAG, "Échec FMP", e);
-        } nullify {
+        } finally { // Correction de la coquille de syntaxe ici
             if (conn != null) conn.disconnect();
         }
         return events;
@@ -141,8 +139,7 @@ public class EconomicCalendarAPI {
         try {
             long nowMs = System.currentTimeMillis();
             long futureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000);
-            // CORRECTION BUG 2 : Inclusion des publications des dernières 24 heures pour l'analyse d'impact continu
-            long pastThresholdMs = nowMs - (24 * 60 * 60 * 1000);
+            long pastThresholdMs = nowMs - (24 * 60 * 60 * 1000); // Seuil de 24h pour capter les révisions récentes
 
             URL url = new URL(urlString);
             conn = (HttpURLConnection) url.openConnection();
@@ -174,7 +171,6 @@ public class EconomicCalendarAPI {
                     String dateStr = obj.optString("date", "");
                     long eventMs = convertForexFactoryDateToMs(dateStr);
                     
-                    // CORRECTION FENÊTRE TEMPORELLE
                     if (eventMs < pastThresholdMs || eventMs > futureMs) continue;
 
                     CalendarEvent event = new CalendarEvent();
@@ -202,7 +198,7 @@ public class EconomicCalendarAPI {
         String ind = indicator.toLowerCase(Locale.US);
         String cty = country.toLowerCase(Locale.US);
 
-        assets.add("US10Y"); // Fondement intermarché obligé
+        assets.add("US10Y"); // Pivot obligatoire pour l'analyse macro intermarché
 
         if (cty.contains("united states") || cty.contains("us ")) {
             if (ind.contains("fomc") || ind.contains("interest rate") ||
