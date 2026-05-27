@@ -374,8 +374,8 @@ public class NotificationService extends NotificationListenerService {
         startMonthlyReportScheduler();
         registerNetworkCallback();
         
-        // Votre nettoyage automatique existant
-        scheduler.scheduleAtFixedRate(EventValidator::cleanupOldFingerprints, 30, 30, TimeUnit.MINUTES);
+        // Planification unifiée : purge SQLite + nettoyage RAM + préchargement toutes les 12 heures
+        scheduler.scheduleAtFixedRate(this::syncCalendarAndPurge, 15, 12 * 60, TimeUnit.MINUTES);
     }
 
     @Override
