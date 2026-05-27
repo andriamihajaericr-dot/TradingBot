@@ -13,10 +13,9 @@ public class EventValidator {
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
     private static final long DUPLICATE_WINDOW_MS = 45 * 60 * 1000L; // 45 minutes
 
-    // Ajouter en haut de la classe
-    private static EventDatabase eventDatabase;
-    public static void init(EventDatabase db) {
-       eventDatabase = db;
+    // Élimination de la méthode init() risquée, récupération à la volée du Singleton sécurisé
+    private static EventDatabase getDatabase(Context context) {
+        return EventDatabase.getInstance(context);
     }
     // ─────────────────────────────────────────────────────────────
     //  RÉSULTAT DE VALIDATION
