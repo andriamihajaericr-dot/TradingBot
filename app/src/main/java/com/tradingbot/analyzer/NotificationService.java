@@ -380,7 +380,6 @@ public class NotificationService extends NotificationListenerService {
     }
 
     @Override
-    @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
 
