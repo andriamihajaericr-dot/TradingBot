@@ -997,7 +997,7 @@ public class NotificationService extends NotificationListenerService {
     }
     private void startDailyBriefScheduler() {
        TimeZone tz = TimeZone.getTimeZone("GMT+03:00");
-       int[] targetHours = {12, 16, 17};
+       int[] targetHours = {8, 9, 12, 16, 17};
        for (int hour : targetHours) {
           scheduleDailyBriefAt(hour, tz);
        }
