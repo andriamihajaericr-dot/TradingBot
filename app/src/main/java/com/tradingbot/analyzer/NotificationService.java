@@ -522,9 +522,10 @@ public class NotificationService extends NotificationListenerService {
                 }
             }
         }
-
+        // SÉCURISATION DATE BASE DE DONNÉES : On utilise le temps machine absolu (divisé par 1000 pour avoir des secondes)
+        long timestampSec = System.currentTimeMillis() / 1000;
         boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
-                String.join(", ", targetAssets), initialImpact, postTime/1000, "pending", weight);
+                String.join(", ", targetAssets), initialImpact, timestampSec, "pending", weight);
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
         }
