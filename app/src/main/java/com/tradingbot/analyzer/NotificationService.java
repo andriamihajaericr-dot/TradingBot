@@ -1338,7 +1338,43 @@ public class NotificationService extends NotificationListenerService {
             if (manager != null) manager.createNotificationChannel(channel);
         }
     }
-    
+    // ── NOUVELLE MÉTHODE DE MAINTENANCE PÉRIODIQUE ──
+    private void syncCalendarAndPurge() {
+        if (isSyncing) return;
+        isSyncing = true;
+        
+        exec.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Log.d(TAG, "[MAINTENANCE] Démarrage de la synchronisation et de la purge périodique...");
+                    
+                    // Configuration du timestamp actuel en secondes
+                    long nowSeconds = System.currentTimeMillis() / 1000;
+
+                    // 1. Purge SQLite (Règle des 48h / 45 jours via votre instance eventDb)
+                    if (eventDb != null) {
+                        eventDb.purgeOldEvents(nowSeconds);
+                        Log.d(TAG, "[MAINTENANCE] Base de données SQLite purgée.");
+                    }
+
+                    // 2. Nettoyage de la table des empreintes pour éviter les fuites RAM
+                    EventValidator.cleanupOldFingerprints();
+                    Log.d(TAG, "[MAINTENANCE] Table des empreintes mémoires RAM nettoyée.");
+
+                    // 3. Re-synchronisation du calendrier pour les prochaines 24 heures
+                    EventValidator.preloadCalendar();
+                    Log.d(TAG, "[MAINTENANCE] Calendrier économique mis à jour.");
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "[MAINTENANCE] Erreur lors de la maintenance périodique", e);
+                } finally {
+                    isSyncing = false;
+                }
+            }
+        });
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
