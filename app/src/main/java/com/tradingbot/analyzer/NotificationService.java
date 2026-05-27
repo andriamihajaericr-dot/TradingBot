@@ -352,12 +352,30 @@ public class NotificationService extends NotificationListenerService {
     public void onCreate() {
         super.onCreate();
         eventDb = EventDatabase.getInstance(this);
+        
+        // ── MISE À JOUR : Liaison du contexte pour l'extraction de la clé macro_api_key ──
+        EconomicCalendarAPI.init(this);
         EventValidator.init(eventDb); 
-        EventValidator.preloadCalendar(); 
+        
+        // ── MISE À JOUR : Déportation du préchargement réseau dans un thread d'arrière-plan ──
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    EventValidator.preloadCalendar(); 
+                    Log.d(TAG, "[SERVICE] Calendrier économique préchargé avec succès.");
+                } catch (Exception e) {
+                    Log.e(TAG, "[SERVICE] Erreur lors du préchargement du calendrier", e);
+                }
+            }
+        }).start();
+
         createNotificationChannel();
         startDailyBriefScheduler();
         startMonthlyReportScheduler();
         registerNetworkCallback();
+        
+        // Votre nettoyage automatique existant
         scheduler.scheduleAtFixedRate(EventValidator::cleanupOldFingerprints, 30, 30, TimeUnit.MINUTES);
     }
 
