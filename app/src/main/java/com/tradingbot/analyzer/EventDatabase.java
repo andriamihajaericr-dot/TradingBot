@@ -160,34 +160,51 @@ public class EventDatabase extends SQLiteOpenHelper {
         return sb.toString();
     }
 
-    public String getDailyMacroDrivers(long currentUnixTime) {
-        SQLiteDatabase db = this.getReadableDatabase();
-        StringBuilder sb = new StringBuilder();
-        long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
+    public String getDailyMacroSummary(long currentUnixTime) {
+    SQLiteDatabase db = this.getReadableDatabase();
+    StringBuilder sb = new StringBuilder();
+    long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
 
-        // FIX #5 : driver_weight comparé via rawQuery avec littéral entier (évite le binding String sur INTEGER)
-        String selection = "unix_timestamp >= ? AND (impact LIKE ? OR impact LIKE ? OR driver_weight >= 4)";
-        String[] whereArgs = new String[]{
-                String.valueOf(twentyFourHoursAgo),
-                "%DRIVER%",
-                "%PIVOT%"
-        };
+    // Ajustement : driver_weight >= 3 pour capturer les PMI/ISM dans le rapport
+    String selection = "unix_timestamp >= ? AND (impact LIKE ? OR impact LIKE ? OR driver_weight >= 3)";
+    String[] whereArgs = new String[]{
+            String.valueOf(twentyFourHoursAgo),
+            "%DRIVER%",
+            "%PIVOT%"
+    };
 
-        Cursor cursor = null;
-        try {
-            cursor = db.query(TABLE_EVENTS, new String[]{"feed_content", "impact"}, selection, whereArgs, null, null, "unix_timestamp ASC");
-            if (cursor != null && cursor.moveToFirst()) {
-                do {
-                    sb.append("- ").append(cursor.getString(0)).append(" (").append(cursor.getString(1)).append(")\n");
-                } while (cursor.moveToNext());
-            }
-        } catch (Exception e) {
-            Log.e("EventDatabase", "Erreur construction Daily Drivers", e);
-        } finally {
-            if (cursor != null) cursor.close();
+    Cursor cursor = null;
+    try {
+        // CORRECTION : On récupère source et title en plus pour donner la matière exacte à l'IA
+        cursor = db.query(TABLE_EVENTS, new String[]{"source", "title", "feed_content", "impact"}, selection, whereArgs, null, null, "unix_timestamp ASC");
+        if (cursor != null && cursor.moveToFirst()) {
+            do {
+                String src = cursor.getString(0);
+                String title = cursor.getString(1);
+                String content = cursor.getString(2);
+                String impact = cursor.getString(3);
+
+                // Nettoyage de l'en-tête temporel pour économiser les tokens de l'IA
+                if (content.contains("\n\n")) {
+                    String[] parts = content.split("\n\n", 2);
+                    if (parts.length > 1) content = parts[1]; 
+                }
+
+                // Formatage quantitatif hautement lisible pour Groq/Gemini
+                sb.append("--- ALERTE MACRO ---\n");
+                sb.append("Source: ").append(src).append("\n");
+                sb.append("Titre: ").append(title).append("\n");
+                sb.append("Contenu: ").append(content).append("\n");
+                sb.append("Impact calculé: ").append(impact).append("\n\n");
+            } while (cursor.moveToNext());
         }
-        return sb.toString();
+    } catch (Exception e) {
+        Log.e("EventDatabase", "Erreur construction Daily Macro Summary", e);
+    } finally {
+        if (cursor != null) cursor.close();
     }
+    return sb.toString();
+}
 
     public String getMonthlyMacroRegistry(long currentUnixTime) {
         SQLiteDatabase db = this.getReadableDatabase();
