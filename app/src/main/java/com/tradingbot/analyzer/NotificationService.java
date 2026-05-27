@@ -46,9 +46,7 @@ public class NotificationService extends NotificationListenerService {
     }
     
     private String getMadaFormattedDateTime() {
-      SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
-      sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo")); // Fuseau officiel Mada (GMT+3)
-    return sdf.format(new Date());
+      return Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
     }
 
     private Calendar getMadaCalendar() {
