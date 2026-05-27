@@ -355,7 +355,7 @@ public class NotificationService extends NotificationListenerService {
         
         // ── MISE À JOUR : Liaison du contexte pour l'extraction de la clé macro_api_key ──
         EconomicCalendarAPI.init(this);
-        EventValidator.init(eventDb); 
+        //EventValidator.init(eventDb); 
         // ── MISE À JOUR : Déportation du préchargement réseau dans un thread d'arrière-plan ──
         new Thread(new Runnable() {
             @Override
