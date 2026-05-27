@@ -444,11 +444,7 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
-        // 1. Récupération de l'heure exacte de Madagascar au format dd/MM HH:mm
-        SimpleDateFormat madaSdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
-        madaSdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
-        String heureExacteMada = madaSdf.format(new Date()); // Donne par exemple: "26/05 20:30"
-        
+        String heureExacteMada = getMadaFormattedDateTime();
         // 2. Injection du contexte temporel au début de la variable feed avant l'analyse
         feed = "CONTEXTE TEMPOREL : Nous sommes le " + heureExacteMada + " (Heure de Madagascar).\n\n" + feed;
             
