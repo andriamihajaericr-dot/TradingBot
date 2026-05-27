@@ -480,34 +480,103 @@ public class NotificationService extends NotificationListenerService {
     if (!vr.isConfirmed && weight < 4) return;
 
     EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
+private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
+        // 1. Récupération de l'heure exacte de Madagascar au format dd/MM HH:mm
+        SimpleDateFormat madaSdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
+        madaSdf.setTimeZone(TimeZone.getTimeZone("GMT+3"));
+        String heureExacteMada = madaSdf.format(new Date()); // Donne par exemple: "26/05 20:30"
+        
+        // 2. Injection du contexte temporel au début de la variable feed avant l'analyse
+        feed = "CONTEXTE TEMPOREL : Nous sommes le " + heureExacteMada + " (Heure de Madagascar).\n\n" + feed;
+            
+        long now = System.currentTimeMillis();
+        boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
 
-    String initialImpact;
-    if (!vr.geoContext.isEmpty()) {
-        initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
-    } else if (isFomcPivot) {
-        initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRAL | " + detected.description + " | " + detected.impact;
-    } else {
-        initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
-    }
-
-    if (vr.geoContext.isEmpty() && !isFomcPivot) {
-        if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
-            Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
+        // 1. Throttle géopolitique prioritaire
+        if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
+            Log.d(TAG, "[THROTTLE] Notification Géo bloquée (12 min) - dernier il y a " + (now - lastGeoTime)/1000 + "s");
             return;
         }
-    }
 
-    boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
-            String.join(", ", targetAssets), initialImpact, postTime/1000, "pending", weight);
-    if (saved && isDeviceOnline()) {
-        triggerQueueSynchronization();
-       }
-    // ====================== AJOUT ICI DRIVER NOUVEAU DETECTE======================
-    if (weight >= 4 || (vr.isConfirmed && vr.confidence >= 70)) {
-      Log.d(TAG, "[DAILY TRIGGER] Driver majeur détecté (weight=" + weight + 
-                ", confidence=" + vr.confidence + ") → génération immédiate du rapport");
-      exec.submit(this::generateAndSendDailyBrief);
-    }
+        // 2. Throttle global uniquement pour les événements non-géo
+        if (!isGeoEvent && (now - lastAnalysisTime < GLOBAL_THROTTLE_MS)) {
+            Log.d(TAG, "[THROTTLE] Notification instantanée bloquée (global - 8 min)");
+            return;
+        }
+
+        List<String> targetAssets = filterActiveAssets(feed);
+        EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
+
+        // Détection élargie de TOUTES les actualités majeures (Suprêmes et Secondaires) à ne jamais bloquer silencieusement
+        String upFeed = feed.toUpperCase(Locale.ROOT);
+        boolean isSupremeNews = upFeed.contains("FOMC") || 
+                                upFeed.contains("FED ") || 
+                                upFeed.contains("CPI")  || 
+                                upFeed.contains("PCE")  || 
+                                upFeed.contains("NFP")  || 
+                                upFeed.contains("BCE")  || 
+                                upFeed.contains("ECB")  || 
+                                upFeed.contains("BOJ")  || 
+                                upFeed.contains("BOE")  || 
+                                upFeed.contains("RBA")  || 
+                                upFeed.contains("BOC")  || 
+                                upFeed.contains("PIB")  || 
+                                upFeed.contains("GDP")  || 
+                                upFeed.contains("OPEC") ||
+                                upFeed.contains("INFLATION") ||
+                                upFeed.contains("INTEREST RATE") ||
+                                upFeed.contains("POWELL") ||
+                                upFeed.contains("LAGARDE");
+
+        int weight = assignDriverWeight(feed);
+
+        if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 70) {
+            weight = Math.max(weight, 4);
+        }
+
+        String hash = generateSecureHash(title + text);
+            
+        Log.d(TAG, "🟢 Nouvelle notification : source=" + source + ", title=" + title + ", hash=" + hash);
+            
+        // PROTECTION AJUSTÉE : Si ce n'est pas confirmé, que le poids < 4, ET que ce n'est pas une news majeure (isSupremeNews), alors on filtre en Soft-Data.
+        if (!vr.isConfirmed && weight < 4 && !isSupremeNews && !detectDriverDeviation(feed)) {
+            eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
+                    String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
+            return;
+        }
+
+        if (!vr.isConfirmed && weight < 4) return;
+
+        EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
+
+        String initialImpact;
+        if (!vr.geoContext.isEmpty()) {
+            initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
+        } else if (isSupremeNews && (upFeed.contains("FOMC") || upFeed.contains("FED "))) {
+            initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRAL | " + detected.description + " | " + detected.impact;
+        } else {
+            initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
+        }
+
+        if (vr.geoContext.isEmpty() && !(upFeed.contains("FOMC") || upFeed.contains("FED "))) {
+            if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
+                Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
+                return;
+            }
+        }
+
+        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
+                String.join(", ", targetAssets), initialImpact, postTime/1000, "pending", weight);
+        if (saved && isDeviceOnline()) {
+            triggerQueueSynchronization();
+        }
+
+        // ====================== ENVOI IMMÉDIAT DU RAPPORT PÉRIODIQUE ======================
+        if (weight >= 4 || (vr.isConfirmed && vr.confidence >= 70)) {
+            Log.d(TAG, "[DAILY TRIGGER] Driver majeur détecté (weight=" + weight + 
+                    ", confidence=" + vr.confidence + ") → génération immédiate du rapport");
+            exec.submit(this::generateAndSendDailyBrief);
+        }
     }
 
     private int assignDriverWeight(String text) {
@@ -519,18 +588,18 @@ public class NotificationService extends NotificationListenerService {
             u.contains("LAGARDE")        || u.contains("BAILEY")          || u.contains("MACKLEM")       ||
             u.contains("BULLOCK")        || u.contains("UEDA")            ||
             u.contains("WARSH")          || u.contains("POWELL")) return 5;
-        if (u.contains("GDP")                || u.contains("PIB")                   ||
-            u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT RATE")       ||
-            u.contains("STOCKS")             || u.contains("JOBLESS")               ||
-            u.contains("ADP")                || u.contains("JOLTS")                 ||
-            u.contains("JOB OPENINGS")       || u.contains("PPI")                   ||
-            u.contains("PRODUCER PRICE")     || u.contains("DURABLE GOODS")         ||
-            u.contains("TRADE BALANCE")      || u.contains("CURRENT ACCOUNT")       ||
+        if (u.contains("GDP")                || u.contains("PIB")                    ||
+            u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT RATE")        ||
+            u.contains("STOCKS")             || u.contains("JOBLESS")                ||
+            u.contains("ADP")                || u.contains("JOLTS")                  ||
+            u.contains("JOB OPENINGS")       || u.contains("PPI")                    ||
+            u.contains("PRODUCER PRICE")     || u.contains("DURABLE GOODS")          ||
+            u.contains("TRADE BALANCE")      || u.contains("CURRENT ACCOUNT")        ||
             u.contains("INDUSTRIAL PRODUCTION") || u.contains("CAPACITY UTILIZATION") ||
-            u.contains("PHILLY FED")         || u.contains("EMPIRE STATE")          ||
-            u.contains("CHICAGO PMI")        || u.contains("BEIGE BOOK")            ||
-            u.contains("PERSONAL SPENDING")  || u.contains("PERSONAL INCOME")       ||
-            u.contains("HOUSING STARTS")     || u.contains("BUILDING PERMITS")      ||
+            u.contains("PHILLY FED")         || u.contains("EMPIRE STATE")           ||
+            u.contains("CHICAGO PMI")        || u.contains("BEIGE BOOK")             ||
+            u.contains("PERSONAL SPENDING")  || u.contains("PERSONAL INCOME")        ||
+            u.contains("HOUSING STARTS")     || u.contains("BUILDING PERMITS")       ||
             u.contains("HOME SALES")         || u.contains("CHALLENGER")) return 4;
         if (u.contains("PMI")               || u.contains("ISM")                  ||
             u.contains("MICHIGAN")          || u.contains("CONSUMER CONFIDENCE")   ||
