@@ -20,7 +20,6 @@ public class EconomicCalendarAPI {
     private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
     private static final String FF_URL_NEXT_WEEK = "https://nfs.faireconomy.media/ff_calendar_nextweek.json";
 
-    // Contexte global optionnel pour garantir la compatibilité ascendante avec EventValidator
     private static Context globalAppContext = null;
 
     public static class CalendarEvent {
@@ -34,9 +33,6 @@ public class EconomicCalendarAPI {
         public List<String> affectedAssets = new ArrayList<>();
     }
 
-    /**
-     * Permet d'initialiser optionnellement le contexte depuis votre Application class ou NotificationService
-     */
     public static void init(Context context) {
         if (context != null) {
             globalAppContext = context.getApplicationContext();
@@ -44,39 +40,37 @@ public class EconomicCalendarAPI {
     }
 
     /**
-     * SURCHARGE DE COMPATIBILITÉ : Permet à EventValidator.preloadCalendar() de compiler sans modification
+     * Surcharge essentielle pour préserver la compatibilité avec EventValidator.preloadCalendar()
      */
     public static List<CalendarEvent> fetchUpcomingEvents(int hoursAhead) {
         return fetchUpcomingEvents(globalAppContext, hoursAhead);
     }
 
     /**
-     * POINT D'ENTRÉE PRINCIPAL (Pipeline de données à 3 niveaux)
+     * Point d'entrée principal ré-optimisé
      */
     public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
         Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
 
-        // ── Niveau 1 : FMP (Si le contexte est disponible pour lire la clé API) ──
+        // Niveau 1 : FMP (Source Primaire)
         if (targetContext != null) {
             List<CalendarEvent> events = fetchFromFMP(targetContext, hoursAhead);
             if (!events.isEmpty()) {
-                Log.d(TAG, "FMP : " + events.size() + " événements chargés avec succès.");
+                Log.d(TAG, "FMP : " + events.size() + " événements chargés.");
                 return events;
             }
-        } else {
-            Log.w(TAG, "Aucun contexte fourni pour fetchUpcomingEvents — Sauts vers l'étape ForexFactory.");
         }
 
-        // ── Niveau 2 : ForexFactory ──
-        Log.w(TAG, "FMP indisponible, clé manquante ou erreur réseau — tentative ForexFactory.");
+        // Niveau 2 : ForexFactory (Source Secondaire)
+        Log.w(TAG, "FMP indisponible ou clé absente — Transition vers ForexFactory.");
         List<CalendarEvent> events = fetchFromForexFactory(hoursAhead);
         if (!events.isEmpty()) {
             Log.d(TAG, "ForexFactory : " + events.size() + " événements chargés.");
             return events;
         }
 
-        // ── Niveau 3 : Fallback institutionnel statique exhaustif ──
-        Log.w(TAG, "Toutes sources en ligne indisponibles — activation du fallback de secours.");
+        // Niveau 3 : Sécurité institutionnelle statique de dernier recours
+        Log.w(TAG, "Alerte : Blackout réseau complet — Chargement du Fallback Statique.");
         return generateInstitutionalExhaustiveFallback();
     }
 
@@ -87,7 +81,7 @@ public class EconomicCalendarAPI {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String apiKey = prefs.getString(PREF_MACRO_KEY, "");
             if (apiKey.isEmpty()) {
-                Log.w(TAG, "macro_api_key absente des SharedPreferences — FMP ignoré.");
+                Log.w(TAG, "macro_api_key non configurée dans l'application.");
                 return events;
             }
 
@@ -95,7 +89,7 @@ public class EconomicCalendarAPI {
             sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
             
             long nowMs = System.currentTimeMillis();
-            long pastMs = nowMs - (24 * 60 * 60 * 1000L); // Fenêtre de sécurité de 24h passées
+            long pastMs = nowMs - (24 * 60 * 60 * 1000L); // Tampon arrière stable de 24h
             long futureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000L);
 
             String fromDate = sdf.format(new Date(pastMs));
@@ -105,6 +99,8 @@ public class EconomicCalendarAPI {
             URL url = new URL(urlString);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
+            // Correction : Injection du User-Agent pour contourner l'erreur HTTP 403
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TradingBot/1.0");
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(10000);
 
@@ -118,19 +114,20 @@ public class EconomicCalendarAPI {
                 JSONArray array = new JSONArray(response.toString());
                 for (int i = 0; i < array.length(); i++) {
                     JSONObject obj  = array.getJSONObject(i);
-                    String impact   = obj.optString("impact", "LOW");
-                    String eventName = obj.optString("event", "");
+                    String impact   = obj.optString("impact", "LOW").toUpperCase(Locale.US).trim();
+                    String eventName = obj.optString("event", "").trim();
 
-                    if (impact.equalsIgnoreCase("LOW")) continue;
-                    if (impact.equalsIgnoreCase("MEDIUM") && !isMediumHighImpact(eventName)) continue;
+                    if (impact.equals("LOW")) continue;
+                    if (impact.equals("MEDIUM") && !isMediumHighImpact(eventName)) continue;
 
-                    String currency = obj.optString("currency", "");
+                    String currency = obj.optString("currency", "").toUpperCase(Locale.US).trim();
                     if (!isTrackedCurrency(currency)) continue;
 
                     CalendarEvent event = new CalendarEvent();
                     event.country    = currencyToCountry(currency);
-                    event.indicator  = eventName.isEmpty() ? "Macro Release" : eventName;
-                    event.importance = impact.toUpperCase(Locale.US);
+                    // Standardisation de l'indicateur pour fiabiliser la clé du Validator
+                    event.indicator  = eventName.isEmpty() ? "MACRO RELEASE" : eventName.toUpperCase(Locale.US);
+                    event.importance = impact;
                     event.forecast   = formatValue(obj.optString("estimate", "N/A"));
                     event.previous   = formatValue(obj.optString("previous", "N/A"));
                     event.actual     = formatValue(obj.optString("actual",   "N/A"));
@@ -138,9 +135,11 @@ public class EconomicCalendarAPI {
                     event.affectedAssets = mapIndicatorToAssetsIntermarket(event.indicator, event.country);
                     events.add(event);
                 }
+            } else {
+                Log.e(TAG, "Erreur Serveur FMP : HTTP " + conn.getResponseCode());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Échec critique FMP", e);
+            Log.e(TAG, "Échec de traitement FMP", e);
         } finally {
             if (conn != null) conn.disconnect();
         }
@@ -168,7 +167,7 @@ public class EconomicCalendarAPI {
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Accept", "application/json");
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TradingBot/1.0");
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(10000);
 
@@ -183,12 +182,12 @@ public class EconomicCalendarAPI {
                 for (int i = 0; i < array.length(); i++) {
                     JSONObject obj = array.getJSONObject(i);
 
-                    String impact = obj.optString("impact", "Low");
-                    String eventName = obj.optString("title", "");
-                    if (impact.equalsIgnoreCase("Low")) continue;
-                    if (impact.equalsIgnoreCase("Medium") && !isMediumHighImpact(eventName)) continue;
+                    String impact = obj.optString("impact", "Low").toUpperCase(Locale.US).trim();
+                    String eventName = obj.optString("title", "").trim();
+                    if (impact.equals("LOW")) continue;
+                    if (impact.equals("MEDIUM") && !isMediumHighImpact(eventName)) continue;
 
-                    String currency = obj.optString("country", "");
+                    String currency = obj.optString("country", "").toUpperCase(Locale.US).trim();
                     if (!isTrackedCurrency(currency)) continue;
 
                     String dateStr = obj.optString("date", "");
@@ -198,8 +197,9 @@ public class EconomicCalendarAPI {
 
                     CalendarEvent event = new CalendarEvent();
                     event.country    = currencyToCountry(currency);
-                    event.indicator  = eventName.isEmpty() ? "Macro Release" : eventName;
-                    event.importance = impact.toUpperCase(Locale.US);
+                    // Standardisation stricte pour l'appariement d'EventValidator
+                    event.indicator  = eventName.isEmpty() ? "MACRO RELEASE" : eventName.toUpperCase(Locale.US);
+                    event.importance = impact;
                     event.forecast   = formatValue(obj.optString("forecast", "N/A"));
                     event.previous   = formatValue(obj.optString("previous", "N/A"));
                     event.actual     = formatValue(obj.optString("actual",   "N/A"));
@@ -207,9 +207,11 @@ public class EconomicCalendarAPI {
                     event.affectedAssets = mapIndicatorToAssetsIntermarket(event.indicator, event.country);
                     events.add(event);
                 }
+            } else {
+                Log.e(TAG, "Erreur Serveur ForexFactory : HTTP " + conn.getResponseCode());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Échec de lecture ForexFactory [" + urlString + "]", e);
+            Log.e(TAG, "Échec ForexFactory URL: " + urlString, e);
         } finally {
             if (conn != null) conn.disconnect();
         }
@@ -221,7 +223,7 @@ public class EconomicCalendarAPI {
         String ind = indicator.toLowerCase(Locale.US);
         String cty = country.toLowerCase(Locale.US);
 
-        assets.add("US10Y"); // Matrice intermarché pivot
+        assets.add("US10Y"); // Pivot macro global obligatoire
 
         if (cty.contains("united states") || cty.contains("us ")) {
             if (ind.contains("fomc") || ind.contains("interest rate") ||
@@ -271,7 +273,7 @@ public class EconomicCalendarAPI {
         } else if (cty.contains("eurozone") || cty.contains("ecb")) {
             assets.add("EURUSD");
         }
-        return new ArrayList<>(new LinkedHashSet<>(assets));
+        return new ArrayList<>(new LinkedHashSet<>(assets)); // Élimination des doublons de matrice
     }
 
     private static List<CalendarEvent> generateInstitutionalExhaustiveFallback() {
@@ -279,12 +281,12 @@ public class EconomicCalendarAPI {
         long nowSeconds = System.currentTimeMillis() / 1000;
 
         String[][] drivers = {
-            {"United States", "FOMC Interest Rate Decision",      "High",   "4.75%",  "5.00%"},
-            {"United States", "Core CPI Inflation MoM",           "High",   "0.2%",   "0.3%"},
-            {"United States", "Non-Farm Payrolls Employment",     "High",   "160K",   "185K"},
-            {"United States", "Core PCE Price Index YoY",         "High",   "2.6%",   "2.7%"},
-            {"United States", "ISM Manufacturing PMI",            "High",   "49.1",   "48.2"},
-            {"United States", "Gross Domestic Product (GDP) QoQ", "High",   "2.1%",   "2.5%"}
+            {"United States", "FOMC INTEREST RATE DECISION",      "HIGH",   "4.75%",  "5.00%"},
+            {"United States", "CORE CPI INFLATION MOM",           "HIGH",   "0.2%",   "0.3%"},
+            {"United States", "NON-FARM PAYROLLS EMPLOYMENT",     "HIGH",   "160K",   "185K"},
+            {"United States", "CORE PCE PRICE INDEX YOY",         "HIGH",   "2.6%",   "2.7%"},
+            {"United States", "ISM MANUFACTURING PMI",            "HIGH",   "49.1",   "48.2"},
+            {"United States", "GROSS DOMESTIC PRODUCT (GDP) QOQ", "HIGH",   "2.1%",   "2.5%"}
         };
 
         for (int i = 0; i < drivers.length; i++) {
@@ -371,9 +373,8 @@ public class EconomicCalendarAPI {
     private static String formatValue(String value) {
         if (value == null || value.isEmpty() || value.equalsIgnoreCase("null")) return "N/A";
         String trimmed = value.trim();
-        // Corrige les valeurs décimales tronquées (ex: .3% -> 0.3%)
         if (trimmed.startsWith(".")) {
-            trimmed = "0" + trimmed;
+            trimmed = "0" + trimmed; // Standardisation pour éviter l'échec de parsing (.3% -> 0.3%)
         }
         return trimmed;
     }
