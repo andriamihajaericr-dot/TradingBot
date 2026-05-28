@@ -445,7 +445,6 @@ public class NotificationService extends NotificationListenerService {
 
     // ── 1. PRÉ-ANALYSE SÉCURISÉE DU DRIVER MACRO ──
     EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
-    
     boolean isSupremeRank = false;
     if (detection.eventType != null) {
         if (detection.eventType.equals("FED-MONETARY-POLICY") || detection.eventType.equals("INFLATION-DATA")) {
