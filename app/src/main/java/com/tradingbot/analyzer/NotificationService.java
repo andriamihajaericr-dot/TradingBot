@@ -469,9 +469,19 @@ public class NotificationService extends NotificationListenerService {
         lastSpeechTime = currentTime;
         lastSpeaker = currentSpeaker;
     }
+     enrichedAssets = new ArrayList<>();
+String scanBody = (title + " " + body).toUpperCase(Locale.ROOT);
 
-    // ── 3. VALIDATION ET ENRICHISSEMENT DES ACTIFS VIA LE CALENDRIER ──
-    List<String> enrichedAssets = new ArrayList<>();
+if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO")) enrichedAssets.add("EURUSD");
+if (scanBody.contains("USDJPY") || scanBody.contains("JPY")  || scanBody.contains("YEN"))  enrichedAssets.add("USDJPY");
+if (scanBody.contains("GBPUSD") || scanBody.contains("GBP/") || scanBody.contains("POUND")) enrichedAssets.add("GBPUSD");
+if (scanBody.contains("AUDUSD") || scanBody.contains("AUD/"))                                enrichedAssets.add("AUDUSD");
+if (scanBody.contains("USDCAD") || scanBody.contains("CAD/"))                                enrichedAssets.add("USDCAD");
+if (scanBody.contains("GOLD")   || scanBody.contains("XAU"))                                 enrichedAssets.add("GOLD");
+if (scanBody.contains("USOIL")  || scanBody.contains("CRUDE") || scanBody.contains("WTI"))   enrichedAssets.add("USOIL");
+if (scanBody.contains("NASDAQ") || scanBody.contains("NAS100")|| scanBody.contains("USTECH")) enrichedAssets.add("NASDAQ");
+if (scanBody.contains("SP500")  || scanBody.contains("S&P")   || scanBody.contains("SPX"))   enrichedAssets.add("SP500");
+if (scanBody.contains("BITCOIN")|| scanBody.contains("BTC"))                                 enrichedAssets.add("BITCOIN");
     EventValidator.ValidationResult validationResult = EventValidator.validate(title, body, currentTime, enrichedAssets);
 
     // Arbitrage du droit d'écriture en base SQLite
