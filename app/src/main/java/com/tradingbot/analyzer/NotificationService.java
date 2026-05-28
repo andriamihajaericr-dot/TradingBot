@@ -644,25 +644,33 @@ public class NotificationService extends NotificationListenerService {
             + "ACTIFS PRÉ-QUALIFIÉS : " + enrichedAssets.toString();
            // 4. Construction du payload JSON standard pour Groq
     final JSONObject jsonPayload = new JSONObject();
-    try {
+    try { 
+        EventDatabase db = EventDatabase.getInstance(NotificationService.this);
+        List<String> historique = db.obtenirTexteEvenementsRecents();
+        // On passe 'userContent' (votre notification) et l'historique récent à la fabrique de prompt
+        String promptFinalEnvoye = construirePromptFinal(userContent, historique);
+        // ───────────────────────────────────────────────────────────────────────
+
         jsonPayload.put("model", GROQ_MODEL);
         jsonPayload.put("temperature", 0.0); // Strict
 
         JSONArray messages = new JSONArray();
 
-        // Bloc SYSTEM : Injection des règles globales du Hedge Fund
+        // Bloc SYSTEM : Injection du prompt combiné dynamique (Règles + Alerte de Crise)
         JSONObject systemMessage = new JSONObject();
         systemMessage.put("role", "system");
-        systemMessage.put("content", SYSTEM_PROMPT);
+        // ON REMPLACE 'SYSTEM_PROMPT' PAR VOTRE PROMPT DYNAMIQUE 'promptFinalEnvoye'
+        systemMessage.put("content", promptFinalEnvoye); 
         messages.put(systemMessage);
 
-        // Bloc USER : Injection du flux d'actualité brut
+        // Bloc USER : Injection du flux d'actualité brut ou contexte temporel
         JSONObject userMessage = new JSONObject();
         userMessage.put("role", "user");
         userMessage.put("content", userContent);
         messages.put(userMessage);
 
         jsonPayload.put("messages", messages);
+        
     } catch (Exception e) {
         Log.e(TAG, "[GROQ] Erreur lors de la sérialisation du JSON", e);
         return;
@@ -692,32 +700,37 @@ public class NotificationService extends NotificationListenerService {
                 conn.setReadTimeout(15000);
 
                 // Écriture du flux réseau vers le serveur de Groq
-                try 
-                { EventDatabase db = EventDatabase.getInstance(NotificationService.this);
-        List<String> historique = db.obtenirTexteEvenementsRecents();
-        // On passe 'userContent' (votre notification) et l'historique récent à la fabrique de prompt
-        String promptFinalEnvoye = construirePromptFinal(userContent, historique);
-        // ───────────────────────────────────────────────────────────────────────
+                try (java.io.OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    os.write(input, 0, input.length);
+                    os.flush();
+                }
 
-        jsonPayload.put("model", GROQ_MODEL);
-        jsonPayload.put("temperature", 0.0); // Strict
+                // Analyse du code de réponse HTTP
+                int status = conn.getResponseCode();
+                if (status == java.net.HttpURLConnection.HTTP_OK) {
+                    try (java.io.BufferedReader br = new java.io.BufferedReader(
+                            new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                        
+                        StringBuilder response = new StringBuilder();
+                        String responseLine;
+                        while ((responseLine = br.readLine()) != null) {
+                            response.append(responseLine.trim());
+                        }
 
-        JSONArray messages = new JSONArray();
+                        // Extraction du rapport macroéconomique formaté par l'IA
+                        JSONObject jsonResponse = new JSONObject(response.toString());
+                        String aiReport = jsonResponse.getJSONArray("choices")
+                                .getJSONObject(0)
+                                .getJSONObject("message")
+                                .getString("content");
 
-        // Bloc SYSTEM : Injection du prompt combiné dynamique (Règles + Alerte de Crise)
-        JSONObject systemMessage = new JSONObject();
-        systemMessage.put("role", "system");
-        // ON REMPLACE 'SYSTEM_PROMPT' PAR VOTRE PROMPT DYNAMIQUE 'promptFinalEnvoye'
-        systemMessage.put("content", promptFinalEnvoye); 
-        messages.put(systemMessage);
-
-        // Bloc USER : Injection du flux d'actualité brut ou contexte temporel
-        JSONObject userMessage = new JSONObject();
-        userMessage.put("role", "user");
-        userMessage.put("content", userContent);
-        messages.put(userMessage);
-
-        jsonPayload.put("messages", messages);
+                        // 6. Routage final du rapport strict vers votre canal Telegram sécurisé
+                        sendTelegramSecure(aiReport, NotificationService.this);
+                    }
+                } else {
+                    Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
+                }
 
             } catch (Exception e) {
                 Log.e(TAG, "[GROQ] Échec critique lors de l'exécution réseau", e);
