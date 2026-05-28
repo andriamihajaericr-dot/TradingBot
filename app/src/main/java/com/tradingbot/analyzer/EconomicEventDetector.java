@@ -16,30 +16,36 @@ public class EconomicEventDetector {
         }
 
         /**
-         * Extrait l'impact brut normalisé pour l'alignement avec EventDatabase
+         * Extrait l'impact brut normalisé pour l'alignement strict avec EventDatabase
          */
         public String getRawImpact() {
             if (impact == null) return "NEUTRE";
-            if (impact.contains("Haute Volatilité")) return "HIGH";
-            if (impact.contains("Moyenne Volatilité")) return "MEDIUM";
-            if (impact.contains("Choc Géopolitique")) return "HIGH";
+            if (impact.contains("Haute Volatilité") || impact.contains("Choc Géopolitique") || impact.contains("Forte Impulsion")) {
+                return "HIGH";
+            }
+            if (impact.contains("Moyenne Volatilité")) {
+                return "MEDIUM";
+            }
             return "LOW";
         }
 
         /**
-         * Extrait le biais directionnel de manière isolée pour les décisions algorithmiques
+         * Extrait le biais directionnel de manière isolée pour les décisions algorithmiques de l'IA
          */
         public String getDirectionalBias() {
             if (impact == null) return "NEUTRE";
-            if (impact.contains("Biais Haussier")) return "HAWKISH";
-            if (impact.contains("Biais Baissier")) return "DOVISH";
+            if (impact.contains("Biais Haussier") || impact.contains("HAWKISH")) return "HAWKISH";
+            if (impact.contains("Biais Baissier") || impact.contains("DOVISH")) return "DOVISH";
             return "NEUTRE";
         }
     }
 
     public static DetectedEvent detectEvent(String title, String text) {
-        // Ajout d'un espace de sécurité final pour valider les mots-clés courts comme "FED " ou "CPI "
-        String unified = (title + " " + text).toUpperCase(Locale.US).trim() + " ";
+        // Remplacement de sécurité des sauts de ligne et forçage de casse universel via Locale.ROOT
+        String cleanTitle = (title != null) ? title : "";
+        String cleanText = (text != null) ? text : "";
+        String combined = (cleanTitle + " " + cleanText + " ").toUpperCase(Locale.ROOT);
+        String unified  = combined.replaceAll("[\\r\\n]+", " ");
 
         String eventType   = "CORE-MACRO";
         String description = "Analyse Flash Institutionnelle";
@@ -47,51 +53,51 @@ public class EconomicEventDetector {
 
         // ── 1. CLASSIFICATION HIÉRARCHIQUE (Du plus spécifique au plus général) ──
 
-        // Fed & Politique Monétaire US
-        if (containsAny(unified, "FEDERAL RESERVE", "FED CHAIR", "FOMC MINUTES", "FOMC", "FED ", "POWELL", "WARSH", "BARKIN", "GOOLSBEE",
-                       "HAMMACK", "WALLER", "WILLIAMS", "KUGLER", "RATE STANDS")) {
+        // Fed & Politique Monétaire US (Rang Suprême - Poids 5)
+        if (containsAny(unified, "FEDERAL RESERVE", "FED CHAIR", "FOMC MINUTES", "FOMC", "FED ", "POWELL", 
+                       "WARSH", "BARKIN", "GOOLSBEE", "HAMMACK", "WALLER", "WILLIAMS", "KUGLER", "RATE STANDS")) {
             eventType   = "FED-MONETARY-POLICY";
             description = "Décision / Discours Réserve Fédérale (USA)";
             impact      = "Haute Volatilité";
 
-        // Inflation US (Placer impérativement CORE avant les versions génériques)
+        // Inflation US (Rang Suprême - Poids 5)
         } else if (containsAny(unified, "CORE CPI", "CORE PCE", "CPI ", "PCE", "PPI", "INFLATION")) {
             eventType   = "INFLATION-DATA";
             description = "Données d'Inflation (CPI / PCE / PPI)";
             impact      = "Haute Volatilité";
 
-        // Emploi US
+        // Rapport sur l'Emploi US (Poids 4)
         } else if (containsAny(unified, "NON-FARM PAYROLLS", "JOBLESS CLAIMS", "INITIAL CLAIMS", "NFP", "PAYROLLS", "UNEMPLOYMENT", "ADP", "JOLTS")) {
             eventType   = "EMPLOYMENT-REPORT";
             description = "Données du Marché de l'Emploi US";
             impact      = "Haute Volatilité";
 
-        // Banques Centrales Étrangères
+        // Banques Centrales Étrangères (Poids 4 - Protection EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD)
         } else if (containsAny(unified, "INTEREST RATE", "RATE DECISION", "ECB", "LAGARDE", "BOE", "BAILEY", "BOJ", "UEDA",
                        "BOC", "MACKLEM", "RBA", "BULLOCK")) {
             eventType   = "CENTRAL-BANK-RATE";
             description = "Taux / Politique Monétaire Banque Centrale";
             impact      = "Haute Volatilité";
 
-        // Géopolitique — Moyen-Orient
+        // Géopolitique — Moyen-Orient (Sécurisation USOIL/GOLD - Poids 4)
         } else if (containsAny(unified, "HORMUZ STRAIT", "RED SEA", "ISRAEL", "IRAN", "HEZBOLLAH", "HOUTHI", "HORMUZ", "GAZA", "LEBANON")) {
             eventType   = "GEO-MIDDLE-EAST";
             description = "Événement Géopolitique — Moyen-Orient";
             impact      = "Choc Géopolitique USOIL/GOLD";
 
-        // Géopolitique — Europe de l'Est
+        // Géopolitique — Europe de l'Est (Poids 4)
         } else if (containsAny(unified, "UKRAINE", "RUSSIA", "PUTIN", "ZELENSKY", "NATO")) {
             eventType   = "GEO-EUROPE-EST";
             description = "Événement Géopolitique — Europe de l'Est";
             impact      = "Choc Géopolitique EUR/USOIL";
 
-        // Géopolitique — Asie-Pacifique
+        // Géopolitique — Asie-Pacifique (Sécurisation AUD/NASDAQ - Poids 4)
         } else if (containsAny(unified, "TAIWAN STRAIT", "XI JINPING", "CHINA", "TAIWAN", "TSMC")) {
             eventType   = "GEO-ASIA-PACIFIC";
             description = "Événement Géopolitique — Asie-Pacifique";
             impact      = "Choc Géopolitique AUD/NASDAQ";
 
-        // Macro secondaire
+        // Macro secondaire (Poids 2)
         } else if (containsAny(unified, "RETAIL SALES", "CONSUMER CONFIDENCE", "CONSUMER SENTIMENT", "GDP", "PMI", "ISM", "MICHIGAN")) {
             eventType   = "ECONOMIC-GROWTH-DATA";
             description = "Données Macroéconomiques Secondaires";
@@ -118,7 +124,7 @@ public class EconomicEventDetector {
         else if (containsAny(unified, "SHOCK", "SURPRISE", "BREAKING", "EMERGENCY")) {
             if (impact.equals("Neutre")) {
                 impact = "Forte Impulsion Neutre";
-            } else if (!impact.contains("Choc")) {
+            } else if (!impact.contains("Choc") && !impact.contains("Forte Impulsion")) {
                 impact = "Forte Impulsion - " + impact;
             }
         }
