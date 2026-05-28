@@ -1561,7 +1561,7 @@ public class NotificationService extends NotificationListenerService {
     }
     private void startDailyBriefScheduler() {
        TimeZone tz = TimeZone.getTimeZone("GMT+03:00");
-       int[] targetHours = {8, 9, 12, 16, 17};
+       int[] targetHours = {7,8, 9, 12,13, 16, 17};
        for (int hour : targetHours) {
           scheduleDailyBriefAt(hour, tz);
        }
@@ -1651,7 +1651,7 @@ public class NotificationService extends NotificationListenerService {
 "                    FORMAT OBLIGATOIRE (STRICT)\n" +
 "═══════════════════════════════════════════════════════════════\n\n" +
 
-"📊 RAPPORT MACRO PÉRIODIQUE – [Date et heure exacte de Madagascar, ex: 28/05 18:50]\n\n" +
+"📊 RAPPORT DRIVER PÉRIODIQUE – [Date et heure exacte de Madagascar, ex: 28/05 18:50]\n\n" +
 
 "🚨 DRIVERS PRINCIPAUX (classés par importance macroéconomique, maximum 5) :\n\n" +
 "- [Nom du Driver] : [Description courte de l'impact, une phrase]. Probabilité d'impact : XX% | Conviction : [jauge selon paliers ci-dessous]\n\n" +
