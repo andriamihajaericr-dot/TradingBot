@@ -49,7 +49,21 @@ public class NotificationService extends NotificationListenerService {
     private Calendar getMadaCalendar() {
       return Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
     }
-
+    private long calculateMillisUntilNextMadaMidnight() {
+    Calendar madaNow = getMadaCalendar(); 
+    
+    Calendar madaMidnight = (Calendar) madaNow.clone();
+    madaMidnight.set(Calendar.HOUR_OF_DAY, 0);
+    madaMidnight.set(Calendar.MINUTE, 0);
+    madaMidnight.set(Calendar.SECOND, 0);
+    madaMidnight.set(Calendar.MILLISECOND, 0);
+    
+    if (madaNow.after(madaMidnight)) {
+        madaMidnight.add(Calendar.DAY_OF_MONTH, 1);
+    }
+    
+    return madaMidnight.getTimeInMillis() - madaNow.getTimeInMillis();
+    }
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private EventDatabase eventDb;
@@ -486,7 +500,40 @@ public class NotificationService extends NotificationListenerService {
         registerNetworkCallback();
         
         // Planification unifiée : purge SQLite + nettoyage RAM + préchargement toutes les 12 heures
-        scheduler.scheduleAtFixedRate(this::syncCalendarAndPurge, 15, 12 * 60, TimeUnit.MINUTES);
+        // Calcul du délai initial requis pour atteindre le tout prochain minuit à Madagascar
+    long initialDelayMillis = calculateMillisUntilNextMadaMidnight();
+    // Périodicité stricte de 24 heures pour s'exécuter à chaque minuit
+    long period24HoursMillis = 24 * 60 * 60 * 1000L; 
+
+    scheduler.scheduleAtFixedRate(new Runnable() {
+        @Override
+        public void run() {
+            if (isSyncing) return;
+            isSyncing = true;
+            try {
+                Log.d(TAG, "🕒 [MAINTENANCE] Déclenchement automatique de minuit (Heure de Madagascar)...");
+                
+                // 1. Purge SQLite des événements ayant dépassé la fenêtre de validité de 48 heures
+                long thresholdSeconds = (System.currentTimeMillis() - (48 * 60 * 60 * 1000L)) / 1000;
+                eventDb.purgeOldEvents(thresholdSeconds); 
+                Log.d(TAG, "[MAINTENANCE] Base de données SQLite purgée des données > 48h.");
+
+                // 2. Nettoyage de la table des empreintes pour éviter les fuites RAM
+                EventValidator.cleanupOldFingerprints();
+                Log.d(TAG, "[MAINTENANCE] Table des empreintes mémoires RAM nettoyée.");
+
+                // 3. Re-synchronisation du calendrier pour la nouvelle journée
+                EventValidator.preloadCalendar();
+                Log.d(TAG, "[MAINTENANCE] Calendrier économique mis à jour.");
+                
+            } catch (Exception e) {
+                Log.e(TAG, "[MAINTENANCE] Erreur lors de la maintenance à minuit", e);
+            } finally {
+                isSyncing = false;
+            }
+        }
+    }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
+
     }
 
  @Override
