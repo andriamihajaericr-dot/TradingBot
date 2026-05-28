@@ -580,7 +580,6 @@ public class NotificationService extends NotificationListenerService {
         processAnalysisWithAI(title, body, enrichedAssets);
 
     } // <--- C'est la fin existante de votre méthode onNotificationPosted
- 
 
     // ── 6. ROUTAGE IMMÉDIAT VERS LE PIPELINE D'ANALYSE IA (Groq / Llama) ──
     processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime());
