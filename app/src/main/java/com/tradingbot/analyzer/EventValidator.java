@@ -399,9 +399,10 @@ public class EventValidator {
             lowerText.contains("pentagon confirmed")) {
             score += 10;
         }
-
+        // ── ANTI-FAUX POSITIF TWITTER (Spécifique rumeurs politiques) ──
+        boolean hasOfficialConfirmation = lowerText.contains("confirmed") || lowerText.contains("announced");
         if (isTrumpIran && !hasFactualAction && !hasOfficialConfirmation) {
-            score = Math.min(score, 55); 
+        score = Math.min(score, 55); // Bloque sous le seuil d'activation de 65%
         }
 
         if (!geoZoneFound && !hasFactualAction) score = 0;
