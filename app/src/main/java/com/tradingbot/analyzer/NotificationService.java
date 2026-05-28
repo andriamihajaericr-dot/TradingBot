@@ -285,11 +285,22 @@ public class NotificationService extends NotificationListenerService {
     "   Le champ 🎯 VECTEUR CIBLE doit être choisi UNIQUEMENT parmi : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS.\n" +
     "   Toute autre valeur est interdite.\n" +
     "   La réponse doit utiliser exactement un de ces six termes, sans ajout ni modification.\n\n" +
-
-    "CONTRAINTE 11 — HIÉRARCHIE ABSOLUE DES DRIVERS :\n" +
-    "   En cas de coexistence d'un driver de RANG SUPRÊME (politique monétaire, décision de banque centrale, CPI, NFP, FOMC, BCE, BoE, BoJ, RBA, BoC) et d'un driver de RANG TACTIQUE (géopolitique, tarifs douaniers, sentiment consommateur, rumeur), le driver de RANG SUPRÊME prévaut.\n" +
-    "   Le driver tactique ne peut annuler, réduire ou remplacer la directionnalité imposée par le driver suprême.\n" +
-    "   ⚠️ Cette règle prévaut sur toute interprétation contraire.\n\n" +
+    "CONTRAINTE 11 — HIÉRARCHIE ABSOLUE ET EXCEPTION DE CRISE :\n" +
+    "   - En règle générale, le RANG SUPRÊME (Politique Monétaire, CPI, PCE) l'emporte sur le RANG TACTIQUE (GÉO).\n" +
+    "   - ⚠️ EXCEPTION ABSOLUE (RÉGIME DE GUERRE) : Si le flux fait état d'une ESCALADE MILITAIRE DIRECTE ou MENACE SUR L'OFFRE (ex: Hormuz, frappes US-Iran), le driver GÉO devient PRIORITAIRE sur l'Inflation pour l'Or et le Pétrole.\n" +
+    "   - Alignement obligatoire de la matrice des 11 actifs dans ce cas précis :\n" +
+    "     * 🏆 GOLD    : ACHAT CHOC 🟢 [Flux refuge dominant]\n" +
+    "     * 🛢️ USOIL   : ACHAT CHOC 🟢 [Prime de risque sur l'offre]\n" +
+    "     * 📈 US10Y   : ACHAT CHOC 🟢 [PCE Hawkish / Taux sous pression]\n" +
+    "     * 💻 NASDAQ  : VENTE CHOC 🔴 [Double flux négatif : Taux hauts + Risk-Off]\n" +
+    "     * 📊 SP500   : VENTE CHOC 🔴 [Strictement identique au NASDAQ]\n" +
+    "     * ₿ BITCOIN  : VENTE CHOC 🔴 [Capitulation des actifs spéculatifs]\n" +
+    "     * 🇪🇺 EURUSD  : VENTE CHOC 🔴 [Dollar fort + Proximité du choc géo]\n" +
+    "     * 🇬🇧 GBPUSD  : VENTE CHOC 🔴 [Dollar fort par arbitrage]\n" +
+    "     * 🇦🇺 AUDUSD  : VENTE CHOC 🔴 [Liquidation de la devise cyclique/commodity non-pétrole]\n" +
+    "     * 🇯🇵 USDJPY  : NEUTRE ou VENTE CHOC 🔴 [Arbitrage complexe : Dollar Fort vs Yen Refuge. Justifier dans le Fait Marquant].\n" +
+    "     * 🇨🇦 USDCAD  : NEUTRE ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
+    "   - Le modèle doit mentionner l'expression exacte : 'Régime de dominance géopolitique (Safe-Haven) sur l'inflation' dans le FAIT MARQUANT.\n\n"
     "</HARD_CONSTRAINTS>\n\n" +
 
     "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
