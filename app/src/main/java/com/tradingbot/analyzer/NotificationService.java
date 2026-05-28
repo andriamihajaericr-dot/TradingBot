@@ -444,17 +444,18 @@ public class NotificationService extends NotificationListenerService {
     else if (upperFeed.contains("UEDA"))       currentSpeaker = "UEDA";
 
     // ── 1. PRÉ-ANALYSE SÉCURISÉE DU DRIVER MACRO ──
-    EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
+    // ── 1. RÉUTILISATION SÉCURISÉE DE LA DETECTION DE L'ÉVÉNEMENT ──
+    // On utilise l'instance déjà existante ou on met à jour sa valeur sans la redéclarer
+    detection = EconomicEventDetector.detectEvent(title, body);
+    
     boolean isSupremeRank = false;
-    if (detection.eventType != null) {
+    if (detection != null && detection.eventType != null) {
         if (detection.eventType.equals("FED-MONETARY-POLICY") || detection.eventType.equals("INFLATION-DATA")) {
             isSupremeRank = true;
         }
     }
     
-    // Protection contre les NullPointerException sur currentSpeaker
     String speakerToken = (currentSpeaker != null) ? currentSpeaker.trim() : "";
-    
     if (speakerToken.equals("WARSH") || speakerToken.equals("WALLER")) {
         isSupremeRank = true;
     }
@@ -462,19 +463,18 @@ public class NotificationService extends NotificationListenerService {
     // ── 2. GESTION DU VERROU ANTI-SPAM DES DISCOURS ──
     if (!speakerToken.isEmpty()) {
         if (!isSupremeRank) {
-            // Anti-spam standard pour les speakers secondaires (Filtre de 60 secondes)
             if (speakerToken.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
                 Log.d(TAG, "Doublon de notification filtré (" + speakerToken + ") pour éviter le spam.");
                 return;
             }
         }
-        // On met à jour l'historique des discours pour TOUS les speakers autorisés à franchir le filtre
         lastSpeechTime = currentTime;
         lastSpeaker = speakerToken;
     }
 
-    // ── 3. EXTRACTION NATIVE ET SÉCURISÉE DES ACTIFS ──
-    enrichedAssets = new ArrayList<>();
+    // ── 3. EXTRACTION NATIVE ET DÉCLARATION DE ENRICHEDASSETS ──
+    // CORRECTION : Ajout de "List<String>" devant pour déclarer correctement la variable
+    List<String> enrichedAssets = new ArrayList<>();
     String scanBody = ((title != null ? title : "") + " " + (body != null ? body : "")).toUpperCase(Locale.ROOT);
 
     if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO")) enrichedAssets.add("EURUSD");
@@ -488,7 +488,7 @@ public class NotificationService extends NotificationListenerService {
     if (scanBody.contains("SP500")  || scanBody.contains("S&P")   || scanBody.contains("SPX"))   enrichedAssets.add("SP500");
     if (scanBody.contains("BITCOIN")|| scanBody.contains("BTC"))                                 enrichedAssets.add("BITCOIN");
 
-    // L'extraction native s'exécute AVANT la validation, garantissant sa présence
+    // Envoi au validateur
     EventValidator.ValidationResult validationResult = EventValidator.validate(title, body, currentTime, enrichedAssets);
 
     // Arbitrage du droit d'écriture en base SQLite
@@ -497,7 +497,6 @@ public class NotificationService extends NotificationListenerService {
     if (forceSave) {
         String fingerprint = generateSecureHash(packageName + "_" + title + "_" + body + "_" + (sbn.getPostTime() / 60000));
         
-        // CORRECTION : Extraction de secours autonome (AssetExtractor supprimé)
         if (enrichedAssets.isEmpty()) {
             if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO")) enrichedAssets.add("EURUSD");
             if (scanBody.contains("USDJPY") || scanBody.contains("JPY")  || scanBody.contains("YEN"))  enrichedAssets.add("USDJPY");
@@ -511,7 +510,7 @@ public class NotificationService extends NotificationListenerService {
             if (scanBody.contains("BITCOIN")|| scanBody.contains("BTC"))                                 enrichedAssets.add("BITCOIN");
         }
 
-        // Conversion de la liste d'actifs en chaîne CSV propre pour SQLite
+        // Conversion en chaîne CSV pour SQLite
         StringBuilder assetsSb = new StringBuilder();
         for (int i = 0; i < enrichedAssets.size(); i++) {
             assetsSb.append(enrichedAssets.get(i));
@@ -521,7 +520,7 @@ public class NotificationService extends NotificationListenerService {
 
         // ── 4. CALCUL DU POIDS DE DOMINANCE (DRIVER WEIGHT) ──
         int driverWeight = 1;
-        if (detection.eventType != null) {
+        if (detection != null && detection.eventType != null) {
             if (isSupremeRank) {
                 driverWeight = 5;
             } else if (detection.eventType.startsWith("GEO") || detection.eventType.equals("CENTRAL-BANK-RATE") || detection.eventType.equals("EMPLOYMENT-REPORT")) {
