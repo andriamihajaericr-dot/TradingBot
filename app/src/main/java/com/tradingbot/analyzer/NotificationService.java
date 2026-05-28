@@ -491,24 +491,25 @@ public class NotificationService extends NotificationListenerService {
 
  @Override
  public void onNotificationPosted(StatusBarNotification sbn) {
+    // 1. Vérification de l'état d'activation du bot
     if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
 
     Bundle extras = sbn.getNotification().extras;
     String title = extras.getString(Notification.EXTRA_TITLE, "");
 
-    // Priorité décroissante : BigText > SubText > Summary > Text
+    // Priorité décroissante pour l'extraction du texte : BigText > SubText > Summary > Text
     String bigText    = extras.getString(Notification.EXTRA_BIG_TEXT, "");
     String subText    = extras.getString(Notification.EXTRA_SUB_TEXT, "");
     String summary    = extras.getString(Notification.EXTRA_SUMMARY_TEXT, "");
     String text       = extras.getString(Notification.EXTRA_TEXT, "");
 
-    // Extraction du contenu textuel le plus riche
+    // Sélection du contenu textuel le plus riche et complet
     String body = bigText.length() > text.length() ? bigText : text;
     if (subText.length() > body.length())   body = subText;
     if (summary.length() > body.length())   body = summary;
     String unifiedFeed = (title + " " + body).trim();
     
-    // Dégroupe les notifications complexes (ex: structures packagées Investing.com)
+    // Dégroupe les notifications complexes (ex: structures multi-lignes d'Investing.com)
     CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
     if (lines != null && lines.length > 0) {
         StringBuilder bundled = new StringBuilder(title).append(" ");
@@ -521,8 +522,10 @@ public class NotificationService extends NotificationListenerService {
         }
     }
     
+    // Filtre de taille minimale pour éviter de traiter des notifications vides ou corrompues
     if (unifiedFeed.length() < 10) return;
 
+    // 2. Identification stricte de la source du flux macro
     String packageName = sbn.getPackageName().toLowerCase();
     String sourceName = "Source Institutionnelle";
 
@@ -533,6 +536,7 @@ public class NotificationService extends NotificationListenerService {
     } else if (packageName.equals("com.twitter.android") || packageName.contains("twitter") || packageName.contains("periscope")) {
         sourceName = "X / Twitter";
     } else {
+        // Ignore toutes les autres applications non configurées dans le périmètre du bot
         return;
     }
 
@@ -540,6 +544,7 @@ public class NotificationService extends NotificationListenerService {
     long currentTime = System.currentTimeMillis();
     String currentSpeaker = "";
 
+    // Détection de l'intervenant (Central Bank Speakers)
     if (upperFeed.contains("WARSH"))           currentSpeaker = "WARSH";
     else if (upperFeed.contains("POWELL"))     currentSpeaker = "POWELL";
     else if (upperFeed.contains("BARKIN"))     currentSpeaker = "BARKIN";
@@ -553,12 +558,16 @@ public class NotificationService extends NotificationListenerService {
     else if (upperFeed.contains("MACKLEM"))    currentSpeaker = "MACKLEM";
     else if (upperFeed.contains("BULLOCK"))    currentSpeaker = "BULLOCK";
     else if (upperFeed.contains("UEDA"))       currentSpeaker = "UEDA";
-        // ── 1. DÉCLARATION CORRECTE ET UNIQUE DE L'ÉVÉNEMENT DÉTECTÉ ──
+    
+    // 3. Détection sécurisée du type d'événement macro (Anti-Crash)
     EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
     
     boolean isSupremeRank = false;
+    String eventTypeStr = "UNKNOWN";
+    
     if (detection != null && detection.eventType != null) {
-        if (detection.eventType.equals("FED-MONETARY-POLICY") || detection.eventType.equals("INFLATION-DATA")) {
+        eventTypeStr = detection.eventType;
+        if (eventTypeStr.equals("FED-MONETARY-POLICY") || eventTypeStr.equals("INFLATION-DATA")) {
             isSupremeRank = true;
         }
     }
@@ -568,7 +577,7 @@ public class NotificationService extends NotificationListenerService {
         isSupremeRank = true;
     }
 
-    // ── 2. GESTION DU VERROU ANTI-SPAM DES DISCOURS ──
+    // 4. Gestion du verrou anti-spam (60 secondes) pour les discours denses
     if (!speakerToken.isEmpty()) {
         if (!isSupremeRank) {
             if (speakerToken.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
@@ -580,7 +589,7 @@ public class NotificationService extends NotificationListenerService {
         lastSpeaker = speakerToken;
     }
 
-    // ── 3. EXTRACTION NATIVE ET DÉCLARATION DE ENRICHEDASSETS ──
+    // 5. Extraction native des actifs financiers cibles
     List<String> enrichedAssets = new ArrayList<>();
     String scanBody = ((title != null ? title : "") + " " + (body != null ? body : "")).toUpperCase(Locale.ROOT);
 
@@ -595,29 +604,32 @@ public class NotificationService extends NotificationListenerService {
     if (scanBody.contains("SP500")  || scanBody.contains("S&P")   || scanBody.contains("SPX"))   enrichedAssets.add("SP500");
     if (scanBody.contains("BITCOIN")|| scanBody.contains("BTC"))                                 enrichedAssets.add("BITCOIN");
 
-    // Envoi au validateur
+    // Fallback d'affectation intelligent (Contraintes d'isolation des Banques Centrales Étrangères)
+    if (enrichedAssets.isEmpty()) {
+        if (upperFeed.contains("ECB") || upperFeed.contains("BCE") || upperFeed.contains("LAGARDE")) {
+            // Règle d'exclusion : On cible uniquement la devise concernée, NEUTRE sur les indices US
+            enrichedAssets.add("EURUSD");
+        } else if (upperFeed.contains("BOJ") || upperFeed.contains("YEN") || upperFeed.contains("UEDA")) {
+            // Règle d'exclusion : On cible uniquement l'actif lié à la Banque du Japon
+            enrichedAssets.add("USDJPY");
+        } else {
+            // Allocation par défaut pour les événements génériques sans mot-clé explicite
+            enrichedAssets.add("NASDAQ");
+            enrichedAssets.add("SP500");
+            enrichedAssets.add("US10Y");
+        }
+    }
+
+    // 6. Validation du flux par le validateur de pertinence
     EventValidator.ValidationResult validationResult = EventValidator.validate(title, body, currentTime, enrichedAssets);
 
-    // Arbitrage du droit d'écriture en base SQLite
+    // Arbitrage du droit d'écriture immédiat en base de données local SQLite
     boolean forceSave = validationResult.isConfirmed || isSupremeRank;
 
     if (forceSave) {
         String fingerprint = generateSecureHash(packageName + "_" + title + "_" + body + "_" + (sbn.getPostTime() / 60000));
         
-        if (enrichedAssets.isEmpty()) {
-            if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO")) enrichedAssets.add("EURUSD");
-            if (scanBody.contains("USDJPY") || scanBody.contains("JPY")  || scanBody.contains("YEN"))  enrichedAssets.add("USDJPY");
-            if (scanBody.contains("GBPUSD") || scanBody.contains("GBP/") || scanBody.contains("POUND")) enrichedAssets.add("GBPUSD");
-            if (scanBody.contains("AUDUSD") || scanBody.contains("AUD/"))                                enrichedAssets.add("AUDUSD");
-            if (scanBody.contains("USDCAD") || scanBody.contains("CAD/"))                                enrichedAssets.add("USDCAD");
-            if (scanBody.contains("GOLD")   || scanBody.contains("XAU"))                                 enrichedAssets.add("GOLD");
-            if (scanBody.contains("USOIL")  || scanBody.contains("CRUDE") || scanBody.contains("WTI"))   enrichedAssets.add("USOIL");
-            if (scanBody.contains("NASDAQ") || scanBody.contains("NAS100")|| scanBody.contains("USTECH")) enrichedAssets.add("NASDAQ");
-            if (scanBody.contains("SP500")  || scanBody.contains("S&P")   || scanBody.contains("SPX"))   enrichedAssets.add("SP500");
-            if (scanBody.contains("BITCOIN")|| scanBody.contains("BTC"))                                 enrichedAssets.add("BITCOIN");
-        }
-
-        // Conversion en chaîne CSV pour SQLite
+        // Sérialisation propre de la liste des actifs au format CSV pour SQLite
         StringBuilder assetsSb = new StringBuilder();
         for (int i = 0; i < enrichedAssets.size(); i++) {
             assetsSb.append(enrichedAssets.get(i));
@@ -625,56 +637,43 @@ public class NotificationService extends NotificationListenerService {
         }
         String assetsString = assetsSb.toString();
 
-        // ── 4. CALCUL DU POIDS DE DOMINANCE (DRIVER WEIGHT) ──
-        int driverWeight = 1;
-        if (detection != null && detection.eventType != null) {
+        // 7. Calcul du poids de dominance macroéconomique (Driver Weight)
+        int driverWeight = 1; // Valeur par défaut pour les événements d'intensité standard
+        if (!eventTypeStr.equals("UNKNOWN")) {
             if (isSupremeRank) {
                 driverWeight = 5;
-            } else if (detection.eventType.startsWith("GEO") || detection.eventType.equals("CENTRAL-BANK-RATE") || detection.eventType.equals("EMPLOYMENT-REPORT")) {
+            } else if (eventTypeStr.startsWith("GEO") || eventTypeStr.equals("CENTRAL-BANK-RATE") || eventTypeStr.equals("EMPLOYMENT-REPORT")) {
                 driverWeight = 4;
-            } else if (detection.eventType.equals("ECONOMIC-GROWTH-DATA")) {
+            } else if (eventTypeStr.equals("ECONOMIC-GROWTH-DATA")) {
                 driverWeight = 2;
             }
         }
 
-        // ── 5. PERSISTANCE SYNCHRONE DANS VOTRE BASE DE DONNÉES LOCALES ──
+        // 8. Sauvegarde synchrone dans la base SQLite locale
         boolean saved = eventDb.saveEvent(
                 fingerprint,
                 packageName,
                 sourceName,
-                detection.eventType,
+                eventTypeStr,
                 title,
                 body,
                 assetsString,
-                "pending",                 // Statut de traitement interne standardisé (minuscules)
-                sbn.getPostTime() / 1000,  // Horodatage Unix en secondes
-                "pending",                 // Statut d'affichage unifié (Remplacement de "attente")
+                "pending",                 // Statut de traitement interne mis à jour
+                sbn.getPostTime() / 1000,  // Conversion de l'horodatage en secondes (Unix Timestamp)
+                "pending",                 // Statut d'affichage unifié (Remplacement validé d'attente)
                 driverWeight
         );
 
         if (saved) {
-            Log.d(TAG, "[VALIDATEUR] Événement macro validé inséré en base : " + detection.eventType + " [Poids: " + driverWeight + "]");
+            Log.d(TAG, "[VALIDATEUR] Événement macro validé inséré en base : " + eventTypeStr + " [Poids: " + driverWeight + "]");
         }
-        // ... (Fin de votre bloc de calcul du driverWeight) ...
-        // int driverWeight = 1;
-        if (detection != null && detection.eventType != null) {
-            if (isSupremeRank) {
-                driverWeight = 5;
-            } else if (detection.eventType.startsWith("GEO") || detection.eventType.equals("CENTRAL-BANK-RATE") || detection.eventType.equals("EMPLOYMENT-REPORT")) {
-                driverWeight = 4;
-            } else if (detection.eventType.equals("ECONOMIC-GROWTH-DATA")) {
-                driverWeight = 2;
-            }
-        }
-
-        // ── AJOUT DE L'APPEL IA ──
-        processAnalysisWithAI(title, body, enrichedAssets);
-
-    } // <--- C'est la fin existante de votre méthode onNotificationPosted
-
-    // ── 6. ROUTAGE IMMÉDIAT VERS LE PIPELINE D'ANALYSE IA (Groq / Llama) ──
-    processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime());
     }
+
+    // 9. Routage unique vers le pipeline d'analyse asynchrone (Groq / Telegram)
+    // Évite tout doublon d'exécution en centralisant l'appel ici
+    processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime());
+ }
+
         
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
         String heureExacteMada = getMadaFormattedDateTime();
