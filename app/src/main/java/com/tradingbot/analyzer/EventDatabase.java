@@ -269,4 +269,33 @@ public class EventDatabase extends SQLiteOpenHelper {
             if (cursor != null) cursor.close();
         }
     }
+
+    /**
+     * Récupère l'intégralité du contenu textuel des notifications des 30 dernières minutes
+     */
+    public List<String> obtenirTexteEvenementsRecents() {
+        List<String> historique = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        
+        // 30 minutes converties en secondes (car votre base stocke en unix_timestamp au format secondes)
+        long trenteMinutesEnSec = (System.currentTimeMillis() / 1000L) - (30 * 60);
+        
+        try {
+            cursor = db.rawQuery(
+                "SELECT description FROM " + TABLE_EVENTS + " WHERE unix_timestamp >= ? ORDER BY unix_timestamp DESC",
+                new String[]{String.valueOf(trenteMinutesEnSec)}
+            );
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    historique.add(cursor.getString(0));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e("EventDatabase", "Erreur lors de la récupération de l'historique récent des 30 min", e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return historique;
+    }
 }
