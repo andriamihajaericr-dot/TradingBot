@@ -565,7 +565,7 @@ public class NotificationService extends NotificationListenerService {
             Log.d(TAG, "[VALIDATEUR] Événement macro validé inséré en base : " + detection.eventType + " [Poids: " + driverWeight + "]");
         }
         // ... (Fin de votre bloc de calcul du driverWeight) ...
-        int driverWeight = 1;
+        // int driverWeight = 1;
         if (detection != null && detection.eventType != null) {
             if (isSupremeRank) {
                 driverWeight = 5;
