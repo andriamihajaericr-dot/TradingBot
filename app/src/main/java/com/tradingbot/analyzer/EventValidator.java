@@ -62,7 +62,20 @@ public class EventValidator {
         // On extrait les actifs immédiatement via AssetExtractor pour s'assurer que la liste
         // soit enrichie même si l'événement subit un arrêt précoce ou un forçage (forceSave)
         try {
-            List<String> rawExtracted = AssetExtractor.extractAssets(title + " " + content);
+            // Extraction native directe sans classe externe
+        List<String> rawExtracted = new ArrayList<>();
+        String textToScan = (title + " " + content).toUpperCase(Locale.ROOT);
+
+        if (textToScan.contains("EURUSD") || textToScan.contains("EUR/") || textToScan.contains("EURO")) rawExtracted.add("EURUSD");
+        if (textToScan.contains("USDJPY") || textToScan.contains("JPY")  || textToScan.contains("YEN"))  rawExtracted.add("USDJPY");
+        if (textToScan.contains("GBPUSD") || textToScan.contains("GBP/") || textToScan.contains("POUND")) rawExtracted.add("GBPUSD");
+        if (textToScan.contains("AUDUSD") || textToScan.contains("AUD/"))                                rawExtracted.add("AUDUSD");
+        if (textToScan.contains("USDCAD") || textToScan.contains("CAD/"))                                rawExtracted.add("USDCAD");
+        if (textToScan.contains("GOLD")   || textToScan.contains("XAU"))                                 rawExtracted.add("GOLD");
+        if (textToScan.contains("USOIL")  || textToScan.contains("CRUDE") || textToScan.contains("WTI"))   rawExtracted.add("USOIL");
+        if (textToScan.contains("NASDAQ") || textToScan.contains("NAS100")|| textToScan.contains("USTECH")) rawExtracted.add("NASDAQ");
+        if (textToScan.contains("SP500")  || textToScan.contains("S&P")   || textToScan.contains("SPX"))   rawExtracted.add("SP500");
+        if (textToScan.contains("BITCOIN")|| textToScan.contains("BTC"))                                 rawExtracted.add("BITCOIN");
             if (rawExtracted != null) {
                 for (String asset : rawExtracted) {
                     if (asset != null && !detectedAssets.contains(asset)) {
