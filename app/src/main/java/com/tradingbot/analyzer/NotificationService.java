@@ -348,59 +348,73 @@ public class NotificationService extends NotificationListenerService {
         @Override
         public void run() {
             try {
-                // Construction du payload JSON standard pour Groq
-                JSONObject jsonPayload = new JSONObject();
-                jsonPayload.put("model", "llama-3.3-70b-versatile"); // Modèle
-                jsonPayload.put("temperature", 0.0);                 // Strict
+                // 1. Construction du payload JSON standard pour Groq
+JSONObject jsonPayload = new JSONObject();
+jsonPayload.put("model", "llama-3.3-70b-versatile"); // Modèle
+jsonPayload.put("temperature", 0.0);                 // Mode Strict
 
-                JSONArray messages = new JSONArray();
+JSONArray messages = new JSONArray();
 
-                // APPEL SIMPLE ICI : On utilise directement la variable globale du haut !
-                JSONObject systemMessage = new JSONObject();
-                systemMessage.put("role", "system");
-                systemMessage.put("content", SYSTEM_PROMPT); // <── Un appel simple, ultra propre
-                messages.put(systemMessage);
+// Bloc SYSTEM : On injecte la variable de règle globale
+JSONObject systemMessage = new JSONObject();
+systemMessage.put("role", "system");
+systemMessage.put("content", SYSTEM_PROMPT); 
+messages.put(systemMessage);
 
-                // Bloc USER
-                JSONObject userMessage = new JSONObject();
-                userMessage.put("role", "user");
-                userMessage.put("content", userContent);
-                messages.put(userMessage);
+// Bloc USER : On injecte les actualités reçues
+JSONObject userMessage = new JSONObject();
+userMessage.put("role", "user");
+userMessage.put("content", userContent);
+messages.put(userMessage);
 
-                jsonPayload.put("messages", messages);
+jsonPayload.put("messages", messages);
 
-                // Initialisation d'OkHttp
-                okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
-                okhttp3.RequestBody requestBody = okhttp3.RequestBody.create(
-                        jsonPayload.toString(),
-                        okhttp3.MediaType.parse("application/json; charset=utf-8")
-                );
+// 2. Initialisation d'OkHttp avec la syntaxe moderne
+okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .build();
 
-                okhttp3.Request request = new okhttp3.Request.Builder()
-                        .url("https://api.groq.com/openai/v1/chat/completions")
-                        .addHeader("Authorization", "Bearer VOTRE_CLE_API_GROQ")
-                        .post(requestBody)
-                        .build();
+// Définition du type de contenu (JSON)
+okhttp3.MediaType mediaType = okhttp3.MediaType.parse("application/json; charset=utf-8");
 
-                okhttp3.Response response = client.newCall(request).execute();
-                if (response.isSuccessful() && response.body() != null) {
-                    String rawResponse = response.body().string();
+// CORRECTION CRITIQUE : Syntaxe d'initialisation du RequestBody pour les versions récentes d'OkHttp
+okhttp3.RequestBody requestBody = okhttp3.RequestBody.create(jsonPayload.toString(), mediaType);
 
-                    // Extraction du rapport formaté généré par l'IA
-                    JSONObject jsonResponse = new JSONObject(rawResponse);
-                    String aiReport = jsonResponse.getJSONArray("choices")
-                            .getJSONObject(0)
-                            .getJSONObject("message")
-                            .getString("content");
+// Récupération sécurisée de votre clé Groq depuis l'application
+android.content.SharedPreferences prefs = getSharedPreferences("BotPrefs", MODE_PRIVATE);
+String apiKey = prefs.getString("groq_key", "");
 
-                    // 5. Envoi final du rapport strict vers votre canal Telegram
-                    sendReportToTelegram(aiReport);
-                } else {
-                    Log.e("MACRO_AI", "Erreur HTTP Groq : " + response.code() + " " + response.message());
-                }
-            } catch (Exception e) {
-                Log.e("MACRO_AI", "Exception critique dans processAnalysisWithAI", e);
-            }
+// 3. Préparation de la requête HTTP POST
+okhttp3.Request request = new okhttp3.Request.Builder()
+        .url("https://api.api.groq.com/openai/v1/chat/completions")
+        .addHeader("Authorization", "Bearer " + apiKey)
+        .addHeader("Content-Type", "application/json")
+        .post(requestBody)
+        .build();
+
+// 4. Exécution synchrone (Doit impérativement tourner dans un Thread secondaire)
+try (okhttp3.Response response = client.newCall(request).execute()) {
+    if (response.isSuccessful() && response.body() != null) {
+        String rawResponse = response.body().string();
+
+        // Extraction du rapport formaté généré par l'IA
+        JSONObject jsonResponse = new JSONObject(rawResponse);
+        String aiReport = jsonResponse.getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content");
+
+        // 5. Envoi final du rapport strict vers votre canal Telegram
+        sendReportToTelegram(aiReport);
+    } else {
+        Log.e("MACRO_AI", "Erreur de réponse Groq Code HTTP : " + response.code());
+    }
+} catch (java.io.IOException e) {
+    Log.e("MACRO_AI", "Échec de connexion réseau avec Groq", e);
+} catch (Exception e) {
+    Log.e("MACRO_AI", "Erreur d'analyse JSON du payload", e);
+}
         }
     }).start();
     }
