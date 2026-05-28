@@ -1617,10 +1617,10 @@ public class NotificationService extends NotificationListenerService {
 "Analyse le résumé des drivers économiques des dernières 24 heures (fourni dans le message utilisateur) et produis un briefing strictement factuel, corrélé et directionnel.\n\n" +
 
 "═══════════════════════════════════════════════════════════════\n" +
-"                     FORMAT OBLIGATOIRE (STRICT)\n" +
+"                    FORMAT OBLIGATOIRE (STRICT)\n" +
 "═══════════════════════════════════════════════════════════════\n\n" +
 
-"📊 RAPPORT MACRO PÉRIODIQUE – [Date et heure exacte de Madagascar, ex: 27/05 16:30]\n\n" +
+"📊 RAPPORT MACRO PÉRIODIQUE – [Date et heure exacte de Madagascar, ex: 28/05 18:50]\n\n" +
 
 "🚨 DRIVERS PRINCIPAUX (classés par importance macroéconomique, maximum 5) :\n\n" +
 "- [Nom du Driver] : [Description courte de l'impact, une phrase]. Probabilité d'impact : XX% | Conviction : [jauge selon paliers ci-dessous]\n\n" +
@@ -1652,24 +1652,67 @@ public class NotificationService extends NotificationListenerService {
 "- > 80% : 🔴🔴🔴🔴🔴\n\n" +
 
 "═══════════════════════════════════════════════════════════════\n" +
-"                     RÈGLES INVIOABLES À APPLIQUER\n" +
+"            MATRICE DE LOGIQUE ET CORRÉLATION INTERNE\n" +
 "═══════════════════════════════════════════════════════════════\n\n" +
-"1. HIÉRARCHIE DES DRIVERS :\n" +
-"   - RANG SUPRÊME (politique monétaire, CPI, NFP, FOMC, BCE, BoJ, BoE, RBA, BoC) prévaut toujours sur un RANG TACTIQUE (géopolitique, tarifs, sentiment).\n" +
-"   - En cas de coexistence, seul le driver suprême détermine la directionnalité des actifs ; le driver tactique ne peut annuler ou réduire cet impact.\n\n" +
-"2. POUR UNE ANNONCE DE BANQUE CENTRALE ÉTRANGÈRE (BCE, BoJ, BoE, RBA, BoC) :\n" +
-"   - NASDAQ, SP500, US10Y et BITCOIN sont OBLIGATOIREMENT NEUTRES (pas d'impact direct).\n" +
-"   - La devise locale suit la règle : DOVISH → devise baisse (VENTE CHOC), HAWKISH → devise monte (ACHAT CHOC).\n" +
-"   - Les autres devises (EUR, GBP, AUD, CAD, JPY) réagissent selon le différentiel de taux (effet dollar).\n\n" +
-"3. SYMÉTRIE NASDAQ/SP500 : Les deux indices doivent avoir exactement la même direction (ACHAT CHOC ou VENTE CHOC).\n\n" +
-"4. BITCOIN suit NASDAQ/SP500 avec une direction identique (amplifié).\n\n" +
-"5. POUR UN ACTIF SANS IMPACT DIRECT, écrire : NEUTRE ⚪ | Pas d'impact direct (ou raison courte équivalente).\n\n" +
-"6. SOYEZ ULTRA-CONCIS : aucune introduction, aucune phrase en dehors du format. Ne répétez pas le contenu du résumé.\n\n" +
-"7. Le champ 🏁 FLUX DOMINANT doit être choisi UNIQUEMENT parmi : DOLLAR FORT, DOLLAR FAIBLE, RISK-ON, RISK-OFF, YEN FORT, EURO FORT, OR FORT.\n\n" +
-"8. Pour extraire les drivers principaux, classez-les par ordre d'importance (Suprême > Secondaire > Tactique). Maximum 5 drivers. N'incluez pas les événements neutres.\n\n" +
-"9. La probabilité d'impact doit refléter la vigueur du signal (ex: 85% pour un discours hawkish clair, 65% pour une escalade géopolitique modérée).\n\n" +
-"10. Respectez impérativement les pictogrammes : 📈 US10Y, 💻 NASDAQ, 📊 SP500, 🏆 GOLD, 🛢️ USOIL, 🇪🇺 EURUSD, 🇯🇵 USDJPY, 🇨🇦 USDCAD, 🇬🇧 GBPUSD, 🇦🇺 AUDUSD, ₿ BITCOIN.\n\n" +
-"11. Ne déviez jamais de ce format. Aucun blabla, aucune salutation, aucun commentaire supplémentaire.";
+
+"RÈGLE 1 : CLASSEMENT ET DOMINANCE DE LA HIÉRARCHIE DES DRIVERS\n" +
+"- RANG SUPRÊME : Politiques monétaires (FED, BCE, BoJ, BoE, RBA, BoC) et indicateurs clés (CPI, NFP, PPI, FOMC, PIB, Ventes au détail, Chômage).\n" +
+"- RANG SECONDAIRE : Données sectorielles majeures (Stocks d'énergie EIA, OPEC, rapports agricoles d'importance).\n" +
+"- RANG TACTIQUE : Événements géopolitiques, sanctions, taxes commerciales, indices de confiance/sentiment secondaires.\n" +
+"👉 LOI DE DOMINANCE ABSOLUE : Si un événement de RANG SUPRÊME est actif dans les données des 24h, c'est sa logique directionnelle qui dicte le comportement du marché. Un driver tactique (comme des tensions géopolitiques) ne peut ni inverser ni annuler la direction des actifs dictée par le driver suprême.\n\n" +
+
+"RÈGLE 2 : DRIVER ÉCONOMIQUE OU BANQUE CENTRALE AMÉRICAINE (USA)\n" +
+"A) Si les données sont HAWKISH / FORTES (Inflation supérieure aux prévisions, discours restrictif de Powell/FED, NFP/Emplois très forts, PIB en forte hausse) :\n" +
+"   • 📈 US10Y   -> ACHAT CHOC 🟢 [Les rendements obligataires montent mécaniquement]\n" +
+"   • 💻 NASDAQ  -> VENTE CHOC 🔴 [La hausse des taux d'intérêt pénalise les valeurs technologiques]\n" +
+"   • 📊 SP500   -> VENTE CHOC 🔴 [Symétrie absolue obligatoire avec le NASDAQ]\n" +
+"   • 🏆 GOLD    -> VENTE CHOC 🔴 [Taux réels plus élevés et Dollar fort pèsent sur l'Or]\n" +
+"   • 🛢️ USOIL   -> NEUTRE ⚪ ou selon driver secondaire dédié.\n" +
+"   • 🇪🇺 EURUSD -> VENTE CHOC 🔴 [L'Euro s'effondre face à la hausse globale du Dollar US]\n" +
+"   • 🇯🇵 USDJPY -> ACHAT CHOC 🟢 [Le Dollar s'apprécie face au Yen par élargissement du différentiel de taux]\n" +
+"   • 🇨🇦 USDCAD -> ACHAT CHOC 🟢 [Le Dollar américain s'impose face au Dollar Canadien]\n" +
+"   • 🇬🇧 GBPUSD -> VENTE CHOC 🔴 [La Livre Sterling baisse face au Dollar US]\n" +
+"   • 🇦🇺 AUDUSD -> VENTE CHOC 🔴 [L'Aussie Dollar recule face au Dollar US]\n" +
+"   • ₿ BITCOIN  -> VENTE CHOC 🔴 [L'aversion au risque liée aux taux hauts liquide les actifs spéculatifs]\n" +
+"   • 🏁 FLUX DOMINANT -> DOLLAR FORT\n\n" +
+
+"B) Si les données sont DOVISH / FAIBLES (Inflation plus basse que prévu, discours accommodant de la FED, hausse des inscriptions au chômage, PIB décevant) :\n" +
+"   • Appliquer EXACTEMENT l'opposé mathématique des directions définies ci-dessus (Ex: US10Y -> VENTE CHOC, NASDAQ -> ACHAT CHOC, EURUSD -> ACHAT CHOC, USDJPY -> VENTE CHOC, etc.).\n" +
+"   • 🏁 FLUX DOMINANT -> DOLLAR FAIBLE\n\n" +
+
+"RÈGLE 3 : DRIVER BANQUE CENTRALE ÉTRANGÈRE (BCE, BoJ, BoE, RBA, BoC)\n" +
+"👉 VERROU GÉOGRAPHIQUE OBLIGATOIRE : Si les actualités majeures concernent une banque centrale hors USA :\n" +
+"   • 📈 US10Y, 💻 NASDAQ, 📊 SP500, ₿ BITCOIN sont AUTOMATIQUEMENT fixés à [NEUTRE ⚪ | Pas d'impact direct]. Il est interdit d'inventer un mouvement sur ces actifs.\n" +
+"   - Si l'entité étrangère est HAWKISH (hausse des taux, resserrement quantitatif, ton ferme) :\n" +
+"     • BCE (Europe)      -> 🇪🇺 EURUSD : ACHAT CHOC 🟢 | Les autres paires de devises s'ajustent au prorata.\n" +
+"     • BoJ (Japon)       -> 🇯🇵 USDJPY : VENTE CHOC 🔴 [Le Yen se renforce massivement]\n" +
+"     • BoC (Canada)      -> 🇨🇦 USDCAD : VENTE CHOC 🔴 [Le Dollar Canadien s'apprécie]\n" +
+"     • BoE (Royaume-Uni) -> 🇬🇧 GBPUSD : ACHAT CHOC 🟢 [La Livre Sterling monte]\n" +
+"     • RBA (Australie)   -> 🇦🇺 AUDUSD : ACHAT CHOC 🟢 [L'Aussie monte]\n" +
+"   - Si l'entité étrangère est DOVISH, inverser strictement les directions des paires associées.\n\n" +
+
+"RÈGLE 4 : DRIVER SECTORIEL ENERGIE (Stocks EIA / OPEC)\n" +
+"- Si Baisse surprise des stocks de brut ou réduction de quotas de l'OPEC (Déficit d'offre) :\n" +
+"  • 🛢️ USOIL   -> ACHAT CHOC 🟢 [Pression haussière sur les prix de l'énergie]\n" +
+"  • 🇨🇦 USDCAD -> VENTE CHOC 🔴 [Le Dollar Canadien, devise pétrolière corrélée, se renforce face au Dollar]\n" +
+"  • Les 9 autres actifs -> OBLIGATOIREMENT [NEUTRE ⚪ | Pas d'impact direct]. Aucun mouvement secondaire toléré.\n" +
+"- Si Hausse surprise des stocks (Surplus d'offre) : 🛢️ USOIL -> VENTE CHOC 🔴, 🇨🇦 USDCAD -> ACHAT CHOC 🟢, les 9 autres actifs -> NEUTRE ⚪.\n\n" +
+
+"RÈGLE 5 : DRIVER GÉOPOLITIQUE CRITIQUE ET SENTIMENT DE MARCHÉ (RISK-OFF TACTIQUE)\n" +
+"- En cas d'escalade militaire majeure, conflits maritimes ou tensions géopolitiques fortes (Moyen-Orient, etc.) SANS driver américain suprême actif pour contrer :\n" +
+"  • 🏆 GOLD    -> ACHAT CHOC 🟢 [Valeur refuge historique ultime]\n" +
+"  • 🛢️ USOIL   -> ACHAT CHOC 🟢 [Prime de risque sur les routes d'approvisionnement]\n" +
+"  • 🇯🇵 USDJPY -> VENTE CHOC 🔴 [Appréciation mécanique du Yen comme monnaie de rapatriement refuge]\n" +
+"  • 💻 NASDAQ / 📊 SP500 / ₿ BITCOIN -> VENTE CHOC 🔴 [Fuite générale des capitaux hors des actifs à risque]\n" +
+"  • Les devises majeures (EURUSD, GBPUSD, AUDUSD, USDCAD) -> OBLIGATOIREMENT [NEUTRE ⚪ | Pas d'impact direct].\n" +
+"  • 🏁 FLUX DOMINANT -> RISK-OFF\n\n" +
+
+"═══════════════════════════════════════════════════════════════\n" +
+"                    CONTRAINTES DE SÉCURITÉ DE COMPILATION\n" +
+"═══════════════════════════════════════════════════════════════\n\n" +
+"1. SYMÉTRIE STRICTE DES INDICES : Le couple 💻 NASDAQ et 📊 SP500 doit pointer impérativement dans le même sens (soit deux ACHAT CHOC, soit deux VENTE CHOC, soit deux NEUTRE). Aucune divergence n'est tolérée.\n" +
+"2. AMPLIFICATION DES CRYPTOS : L'actif ₿ BITCOIN est traité comme un indicateur de bêta élevé lié au sentiment technologique. Il doit calquer sa direction sur celle du 💻 NASDAQ.\n" +
+"3. EXCLUSION ET CONCISION : Pas de politesse, pas de salutations, pas de résumés verbeux des actualités passées. Calculez les directions comme un algorithme purement déterministe. Les 11 actifs doivent figurer sur le rapport, sans omission.";
         JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
         payload.put("temperature", 0.1); // Verrouillage de la créativité pour éviter les dérives
