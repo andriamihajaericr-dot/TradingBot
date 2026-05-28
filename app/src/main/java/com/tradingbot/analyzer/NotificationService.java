@@ -44,6 +44,25 @@ public class NotificationService extends NotificationListenerService {
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
+    // Intégrez cette méthode juste après getGroqApiKey() par exemple :
+    private void processAnalysisWithAI(String title, String body, List<String> enrichedAssets) {
+        // 1. Récupération des préférences en utilisant vos constantes de classe existantes
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        
+        // 2. Extraction sécurisée des tokens configurés
+        String activeApiKey = prefs.getString(PREF_GROQ_KEY, "");
+        String telegramChatId = prefs.getString(PREF_TG_CHAT_ID, "");
+        String telegramToken = prefs.getString(PREF_TG_TOKEN, "");
+
+        if (activeApiKey.isEmpty()) {
+            Log.e(TAG, "❌ Traitement IA avorté : Aucune clé API configurée dans les préférences.");
+            return;
+        }
+
+        Log.d(TAG, "🔑 Clés d'authentification validées. Préparation du prompt macro pour l'IA...");
+        
+        // 3. Suite logique : instanciation d'un thread / exec.execute pour envoyer la requête HTTP asynchrone à GROQ_URL
+    }
 
     private Calendar getMadaCalendar() {
       return Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
@@ -544,7 +563,23 @@ public class NotificationService extends NotificationListenerService {
         if (saved) {
             Log.d(TAG, "[VALIDATEUR] Événement macro validé inséré en base : " + detection.eventType + " [Poids: " + driverWeight + "]");
         }
- }
+        // ... (Fin de votre bloc de calcul du driverWeight) ...
+        int driverWeight = 1;
+        if (detection != null && detection.eventType != null) {
+            if (isSupremeRank) {
+                driverWeight = 5;
+            } else if (detection.eventType.startsWith("GEO") || detection.eventType.equals("CENTRAL-BANK-RATE") || detection.eventType.equals("EMPLOYMENT-REPORT")) {
+                driverWeight = 4;
+            } else if (detection.eventType.equals("ECONOMIC-GROWTH-DATA")) {
+                driverWeight = 2;
+            }
+        }
+
+        // ── AJOUT DE L'APPEL IA ──
+        processAnalysisWithAI(title, body, enrichedAssets);
+
+    } // <--- C'est la fin existante de votre méthode onNotificationPosted
+ 
 
     // ── 6. ROUTAGE IMMÉDIAT VERS LE PIPELINE D'ANALYSE IA (Groq / Llama) ──
     processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime());
