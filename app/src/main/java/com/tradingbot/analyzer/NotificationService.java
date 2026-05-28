@@ -342,23 +342,46 @@ public class NotificationService extends NotificationListenerService {
             + "TITRE : " + title + "\n"
             + "CORPS DE LA NOTIFICATION : " + body + "\n"
             + "ACTIFS PRÉ-QUALIFIÉS : " + enrichedAssets.toString();
+           // 4. Construction du payload JSON standard pour Groq
+    final JSONObject jsonPayload = new JSONObject();
+    try {
+        jsonPayload.put("model", GROQ_MODEL);
+        jsonPayload.put("temperature", 0.0); // Strict
 
-    // 4. Threading Asynchrone obligatoire pour Android (Évite le ANR)
+        JSONArray messages = new JSONArray();
+
+        // Bloc SYSTEM : Injection des règles globales du Hedge Fund
+        JSONObject systemMessage = new JSONObject();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", SYSTEM_PROMPT);
+        messages.put(systemMessage);
+
+        // Bloc USER : Injection du flux d'actualité brut
+        JSONObject userMessage = new JSONObject();
+        userMessage.put("role", "user");
+        userMessage.put("content", userContent);
+        messages.put(userMessage);
+
+        jsonPayload.put("messages", messages);
+    } catch (Exception e) {
+        Log.e(TAG, "[GROQ] Erreur lors de la sérialisation du JSON", e);
+        return;
+    }
+
+    // 5. Threading Asynchrone obligatoire pour Android (Évite le blocage de l'application)
     new Thread(new Runnable() {
         @Override
         public void run() {
             java.net.HttpURLConnection conn = null;
             try {
-                // Récupération sécurisée de votre clé Groq depuis l'application
-                android.content.SharedPreferences prefs = getSharedPreferences("BotPrefs", MODE_PRIVATE);
-                String apiKey = prefs.getString("groq_key", "");
-
+                // Récupération sécurisée de la clé Groq
+                String apiKey = getGroqApiKey();
                 if (apiKey.isEmpty()) {
-                    Log.e(TAG, "[GROQ] Clé API absente dans les SharedPreferences. Analyse annulée.");
+                    Log.e(TAG, "[GROQ] Clé API absente. Analyse annulée.");
                     return;
                 }
 
-                // Configuration de la connexion HTTP native
+                // Initialisation de la connexion HTTP native
                 java.net.URL url = new java.net.URL(GROQ_URL);
                 conn = (java.net.HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -368,14 +391,14 @@ public class NotificationService extends NotificationListenerService {
                 conn.setConnectTimeout(15000);
                 conn.setReadTimeout(15000);
 
-                // Écriture du flux JSON (Payload utilisateur + système)
+                // Écriture du flux réseau vers le serveur de Groq
                 try (java.io.OutputStream os = conn.getOutputStream()) {
                     byte[] input = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
                     os.write(input, 0, input.length);
                     os.flush();
                 }
 
-                // Lecture du code de réponse du serveur
+                // Analyse du code de réponse HTTP
                 int status = conn.getResponseCode();
                 if (status == java.net.HttpURLConnection.HTTP_OK) {
                     try (java.io.BufferedReader br = new java.io.BufferedReader(
@@ -387,14 +410,14 @@ public class NotificationService extends NotificationListenerService {
                             response.append(responseLine.trim());
                         }
 
-                        // Extraction du rapport formaté généré par l'IA
+                        // Extraction du rapport macroéconomique formaté par l'IA
                         JSONObject jsonResponse = new JSONObject(response.toString());
                         String aiReport = jsonResponse.getJSONArray("choices")
                                 .getJSONObject(0)
                                 .getJSONObject("message")
                                 .getString("content");
 
-                        // 5. Envoi final du rapport strict vers votre canal Telegram sécurisé
+                        // 6. Routage final du rapport strict vers votre canal Telegram sécurisé
                         sendTelegramSecure(aiReport, NotificationService.this);
                     }
                 } else {
@@ -402,14 +425,16 @@ public class NotificationService extends NotificationListenerService {
                 }
 
             } catch (Exception e) {
-                Log.e(TAG, "[GROQ] Échec critique de l'analyse ou de la connexion", e);
+                Log.e(TAG, "[GROQ] Échec critique lors de l'exécution réseau", e);
             } finally {
                 if (conn != null) {
                     conn.disconnect();
                 }
             }
         }
-    }).start();
+    }).start(); // Ferme et démarre proprement le Thread
+} // Ferme définitivement la méthode processAnalysisWithAI
+
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
