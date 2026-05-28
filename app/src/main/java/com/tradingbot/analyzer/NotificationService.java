@@ -442,11 +442,8 @@ public class NotificationService extends NotificationListenerService {
     else if (upperFeed.contains("MACKLEM"))    currentSpeaker = "MACKLEM";
     else if (upperFeed.contains("BULLOCK"))    currentSpeaker = "BULLOCK";
     else if (upperFeed.contains("UEDA"))       currentSpeaker = "UEDA";
-
-    // ── 1. PRÉ-ANALYSE SÉCURISÉE DU DRIVER MACRO ──
-    // ── 1. RÉUTILISATION SÉCURISÉE DE LA DETECTION DE L'ÉVÉNEMENT ──
-    // On utilise l'instance déjà existante ou on met à jour sa valeur sans la redéclarer
-    detection = EconomicEventDetector.detectEvent(title, body);
+        // ── 1. DÉCLARATION CORRECTE ET UNIQUE DE L'ÉVÉNEMENT DÉTECTÉ ──
+    EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
     
     boolean isSupremeRank = false;
     if (detection != null && detection.eventType != null) {
@@ -473,7 +470,6 @@ public class NotificationService extends NotificationListenerService {
     }
 
     // ── 3. EXTRACTION NATIVE ET DÉCLARATION DE ENRICHEDASSETS ──
-    // CORRECTION : Ajout de "List<String>" devant pour déclarer correctement la variable
     List<String> enrichedAssets = new ArrayList<>();
     String scanBody = ((title != null ? title : "") + " " + (body != null ? body : "")).toUpperCase(Locale.ROOT);
 
