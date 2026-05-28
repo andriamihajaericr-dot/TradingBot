@@ -22,6 +22,7 @@ import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
+import android.content.SharedPreferences;
 import java.util.regex.*;
 
 public class NotificationService extends NotificationListenerService {
