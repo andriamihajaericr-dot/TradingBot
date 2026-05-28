@@ -343,71 +343,62 @@ public class NotificationService extends NotificationListenerService {
             + "CORPS DE LA NOTIFICATION : " + body + "\n"
             + "ACTIFS PRÉ-QUALIFIÉS : " + enrichedAssets.toString();
 
-    // 4. Threading Asynchrone obligatoire pour Android (Évite le ANR - Application Not Responding)
+    // 4. Threading Asynchrone obligatoire pour Android (Évite le ANR)
     new Thread(new Runnable() {
         @Override
         public void run() {
+            java.net.HttpURLConnection conn = null;
             try {
-                // 1. Construction du payload JSON standard pour Groq
-JSONObject jsonPayload = new JSONObject();
-jsonPayload.put("model", "llama-3.3-70b-versatile"); // Modèle
-jsonPayload.put("temperature", 0.0);                 // Mode Strict
+                // Récupération sécurisée de votre clé Groq depuis l'application
+                android.content.SharedPreferences prefs = getSharedPreferences("BotPrefs", MODE_PRIVATE);
+                String apiKey = prefs.getString("groq_key", "");
 
-JSONArray messages = new JSONArray();
+                if (apiKey.isEmpty()) {
+                    Log.e(TAG, "[GROQ] Clé API absente dans les SharedPreferences. Analyse annulée.");
+                    return;
+                }
 
-// Bloc SYSTEM : On injecte la variable de règle globale
-JSONObject systemMessage = new JSONObject();
-systemMessage.put("role", "system");
-systemMessage.put("content", SYSTEM_PROMPT); 
-messages.put(systemMessage);
+                // Configuration de la connexion HTTP native
+                java.net.URL url = new java.net.URL(GROQ_URL);
+                conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
 
-// Bloc USER : On injecte les actualités reçues
-JSONObject userMessage = new JSONObject();
-userMessage.put("role", "user");
-userMessage.put("content", userContent);
-messages.put(userMessage);
+                // Écriture du flux JSON (Payload utilisateur + système)
+                try (java.io.OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    os.write(input, 0, input.length);
+                    os.flush();
+                }
 
-jsonPayload.put("messages", messages);
+                // Lecture du code de réponse du serveur
+                int status = conn.getResponseCode();
+                if (status == java.net.HttpURLConnection.HTTP_OK) {
+                    try (java.io.BufferedReader br = new java.io.BufferedReader(
+                            new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                        
+                        StringBuilder response = new StringBuilder();
+                        String responseLine;
+                        while ((responseLine = br.readLine()) != null) {
+                            response.append(responseLine.trim());
+                        }
 
-// 2. Initialisation d'OkHttp avec la syntaxe moderne
-okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
-        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .build();
+                        // Extraction du rapport formaté généré par l'IA
+                        JSONObject jsonResponse = new JSONObject(response.toString());
+                        String aiReport = jsonResponse.getJSONArray("choices")
+                                .getJSONObject(0)
+                                .getJSONObject("message")
+                                .getString("content");
 
-// Définition du type de contenu (JSON)
-okhttp3.MediaType mediaType = okhttp3.MediaType.parse("application/json; charset=utf-8");
-
-// CORRECTION CRITIQUE : Syntaxe d'initialisation du RequestBody pour les versions récentes d'OkHttp
-okhttp3.RequestBody requestBody = okhttp3.RequestBody.create(jsonPayload.toString(), mediaType);
-
-// Récupération sécurisée de votre clé Groq depuis l'application
-android.content.SharedPreferences prefs = getSharedPreferences("BotPrefs", MODE_PRIVATE);
-String apiKey = prefs.getString("groq_key", "");
-
-// 3. Préparation de la requête HTTP POST
-okhttp3.Request request = new okhttp3.Request.Builder()
-        .url("https://api.api.groq.com/openai/v1/chat/completions")
-        .addHeader("Authorization", "Bearer " + apiKey)
-        .addHeader("Content-Type", "application/json")
-        .post(requestBody)
-        .build();
-
-// 4. Exécution synchrone (Doit impérativement tourner dans un Thread secondaire)
-try (okhttp3.Response response = client.newCall(request).execute()) {
-    if (response.isSuccessful() && response.body() != null) {
-        String rawResponse = response.body().string();
-
-        // Extraction du rapport formaté généré par l'IA
-        JSONObject jsonResponse = new JSONObject(rawResponse);
-        String aiReport = jsonResponse.getJSONArray("choices")
-                .getJSONObject(0)
-                .getJSONObject("message")
-                .getString("content");
-
-        // 5. Envoi final du rapport strict vers votre canal Telegram
-        sendReportToTelegram(aiReport);} else {
-                    Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + responseCode);
+                        // 5. Envoi final du rapport strict vers votre canal Telegram sécurisé
+                        sendTelegramSecure(aiReport, NotificationService.this);
+                    }
+                } else {
+                    Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
                 }
 
             } catch (Exception e) {
@@ -419,7 +410,6 @@ try (okhttp3.Response response = client.newCall(request).execute()) {
             }
         }
     }).start();
-    }
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
