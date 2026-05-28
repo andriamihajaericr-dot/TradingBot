@@ -57,7 +57,6 @@ public class EventValidator {
         if (detectedAssets == null) detectedAssets = new ArrayList<>();
 
         String combined = (title + " " + content).toLowerCase(Locale.ROOT);
-
         // ── EXTRACTION PRIORITAIRE ET SYSTÉMATIQUE DES ACTIFS (Sécurité Rang Suprême) ──
         // On extrait les actifs immédiatement via AssetExtractor pour s'assurer que la liste
         // soit enrichie même si l'événement subit un arrêt précoce ou un forçage (forceSave)
