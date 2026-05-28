@@ -445,6 +445,7 @@ public class NotificationService extends NotificationListenerService {
 
     // ── 1. PRÉ-ANALYSE SÉCURISÉE DU DRIVER MACRO ──
     EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
+    EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
     
     boolean isSupremeRank = false;
     if (detection.eventType != null) {
@@ -452,36 +453,44 @@ public class NotificationService extends NotificationListenerService {
             isSupremeRank = true;
         }
     }
-    if (currentSpeaker.equals("WARSH") || currentSpeaker.equals("WALLER")) {
+    
+    // Protection contre les NullPointerException sur currentSpeaker
+    String speakerToken = (currentSpeaker != null) ? currentSpeaker.trim() : "";
+    
+    if (speakerToken.equals("WARSH") || speakerToken.equals("WALLER")) {
         isSupremeRank = true;
     }
 
     // ── 2. GESTION DU VERROU ANTI-SPAM DES DISCOURS ──
-    if (!currentSpeaker.isEmpty()) {
+    if (!speakerToken.isEmpty()) {
         if (!isSupremeRank) {
             // Anti-spam standard pour les speakers secondaires (Filtre de 60 secondes)
-            if (currentSpeaker.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
-                Log.d(TAG, "Doublon de notification filtré (" + currentSpeaker + ") pour éviter le spam.");
+            if (speakerToken.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
+                Log.d(TAG, "Doublon de notification filtré (" + speakerToken + ") pour éviter le spam.");
                 return;
             }
         }
-        // Pour les membres du Rang Suprême, on met à jour les chronos de suivi sans JAMAIS bloquer le flux
+        // On met à jour l'historique des discours pour TOUS les speakers autorisés à franchir le filtre
         lastSpeechTime = currentTime;
-        lastSpeaker = currentSpeaker;
+        lastSpeaker = speakerToken;
     }
-     enrichedAssets = new ArrayList<>();
-String scanBody = (title + " " + body).toUpperCase(Locale.ROOT);
 
-if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO")) enrichedAssets.add("EURUSD");
-if (scanBody.contains("USDJPY") || scanBody.contains("JPY")  || scanBody.contains("YEN"))  enrichedAssets.add("USDJPY");
-if (scanBody.contains("GBPUSD") || scanBody.contains("GBP/") || scanBody.contains("POUND")) enrichedAssets.add("GBPUSD");
-if (scanBody.contains("AUDUSD") || scanBody.contains("AUD/"))                                enrichedAssets.add("AUDUSD");
-if (scanBody.contains("USDCAD") || scanBody.contains("CAD/"))                                enrichedAssets.add("USDCAD");
-if (scanBody.contains("GOLD")   || scanBody.contains("XAU"))                                 enrichedAssets.add("GOLD");
-if (scanBody.contains("USOIL")  || scanBody.contains("CRUDE") || scanBody.contains("WTI"))   enrichedAssets.add("USOIL");
-if (scanBody.contains("NASDAQ") || scanBody.contains("NAS100")|| scanBody.contains("USTECH")) enrichedAssets.add("NASDAQ");
-if (scanBody.contains("SP500")  || scanBody.contains("S&P")   || scanBody.contains("SPX"))   enrichedAssets.add("SP500");
-if (scanBody.contains("BITCOIN")|| scanBody.contains("BTC"))                                 enrichedAssets.add("BITCOIN");
+    // ── 3. EXTRACTION NATIVE ET SÉCURISÉE DES ACTIFS ──
+    enrichedAssets = new ArrayList<>();
+    String scanBody = ((title != null ? title : "") + " " + (body != null ? body : "")).toUpperCase(Locale.ROOT);
+
+    if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO")) enrichedAssets.add("EURUSD");
+    if (scanBody.contains("USDJPY") || scanBody.contains("JPY")  || scanBody.contains("YEN"))  enrichedAssets.add("USDJPY");
+    if (scanBody.contains("GBPUSD") || scanBody.contains("GBP/") || scanBody.contains("POUND")) enrichedAssets.add("GBPUSD");
+    if (scanBody.contains("AUDUSD") || scanBody.contains("AUD/"))                                enrichedAssets.add("AUDUSD");
+    if (scanBody.contains("USDCAD") || scanBody.contains("CAD/"))                                enrichedAssets.add("USDCAD");
+    if (scanBody.contains("GOLD")   || scanBody.contains("XAU"))                                 enrichedAssets.add("GOLD");
+    if (scanBody.contains("USOIL")  || scanBody.contains("CRUDE") || scanBody.contains("WTI"))   enrichedAssets.add("USOIL");
+    if (scanBody.contains("NASDAQ") || scanBody.contains("NAS100")|| scanBody.contains("USTECH")) enrichedAssets.add("NASDAQ");
+    if (scanBody.contains("SP500")  || scanBody.contains("S&P")   || scanBody.contains("SPX"))   enrichedAssets.add("SP500");
+    if (scanBody.contains("BITCOIN")|| scanBody.contains("BTC"))                                 enrichedAssets.add("BITCOIN");
+
+    // L'extraction native s'exécute AVANT la validation, garantissant sa présence
     EventValidator.ValidationResult validationResult = EventValidator.validate(title, body, currentTime, enrichedAssets);
 
     // Arbitrage du droit d'écriture en base SQLite
@@ -490,10 +499,18 @@ if (scanBody.contains("BITCOIN")|| scanBody.contains("BTC"))                    
     if (forceSave) {
         String fingerprint = generateSecureHash(packageName + "_" + title + "_" + body + "_" + (sbn.getPostTime() / 60000));
         
-        // SÉCURITÉ : Si le validateur a bloqué l'analyse mais qu'on force l'écriture (Rang Suprême),
-        // enrichedAssets peut être vide. On appelle AssetExtractor en secours pour ne pas perdre la matrice d'actifs.
+        // CORRECTION : Extraction de secours autonome (AssetExtractor supprimé)
         if (enrichedAssets.isEmpty()) {
-            enrichedAssets = AssetExtractor.extractAssets(title + " " + body);
+            if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO")) enrichedAssets.add("EURUSD");
+            if (scanBody.contains("USDJPY") || scanBody.contains("JPY")  || scanBody.contains("YEN"))  enrichedAssets.add("USDJPY");
+            if (scanBody.contains("GBPUSD") || scanBody.contains("GBP/") || scanBody.contains("POUND")) enrichedAssets.add("GBPUSD");
+            if (scanBody.contains("AUDUSD") || scanBody.contains("AUD/"))                                enrichedAssets.add("AUDUSD");
+            if (scanBody.contains("USDCAD") || scanBody.contains("CAD/"))                                enrichedAssets.add("USDCAD");
+            if (scanBody.contains("GOLD")   || scanBody.contains("XAU"))                                 enrichedAssets.add("GOLD");
+            if (scanBody.contains("USOIL")  || scanBody.contains("CRUDE") || scanBody.contains("WTI"))   enrichedAssets.add("USOIL");
+            if (scanBody.contains("NASDAQ") || scanBody.contains("NAS100")|| scanBody.contains("USTECH")) enrichedAssets.add("NASDAQ");
+            if (scanBody.contains("SP500")  || scanBody.contains("S&P")   || scanBody.contains("SPX"))   enrichedAssets.add("SP500");
+            if (scanBody.contains("BITCOIN")|| scanBody.contains("BTC"))                                 enrichedAssets.add("BITCOIN");
         }
 
         // Conversion de la liste d'actifs en chaîne CSV propre pour SQLite
