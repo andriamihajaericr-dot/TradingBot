@@ -46,23 +46,115 @@ public class NotificationService extends NotificationListenerService {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
     // Intégrez cette méthode juste après getGroqApiKey() par exemple :
-    private void processAnalysisWithAI(String title, String body, List<String> enrichedAssets) {
-        // 1. Récupération des préférences en utilisant vos constantes de classe existantes
+    private void processAnalysisWithAI(final String title, final String body, final List<String> enrichedAssets) {
+        // 1. Récupération des préférences via vos constantes de classe existantes
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        
-        // 2. Extraction sécurisée des tokens configurés
         String activeApiKey = prefs.getString(PREF_GROQ_KEY, "");
-        String telegramChatId = prefs.getString(PREF_TG_CHAT_ID, "");
-        String telegramToken = prefs.getString(PREF_TG_TOKEN, "");
-
+        
+        // Validation stricte de la clé avant de lancer le thread
         if (activeApiKey.isEmpty()) {
-            Log.e(TAG, "❌ Traitement IA avorté : Aucune clé API configurée dans les préférences.");
+            Log.e(TAG, "❌ Traitement IA avorté : Aucune clé API configurée dans les paramètres.");
             return;
         }
 
-        Log.d(TAG, "🔑 Clés d'authentification validées. Préparation du prompt macro pour l'IA...");
-        
-        // 3. Suite logique : instanciation d'un thread / exec.execute pour envoyer la requête HTTP asynchrone à GROQ_URL
+        // 2. Exécution asynchrone via votre pool de threads existant (exec)
+        exec.execute(new Runnable() {
+            @Override
+            public void run() {
+                HttpURLConnection conn = null;
+                try {
+                    Log.d(TAG, "🧠 [IA] Analyse du driver macroéconomique en cours...");
+
+                    // Construction de la liste des actifs détectés pour guider l'IA
+                    StringBuilder assetsList = new StringBuilder();
+                    if (enrichedAssets != null && !enrichedAssets.isEmpty()) {
+                        for (String asset : enrichedAssets) {
+                            assetsList.append("- ").append(asset).append("\n");
+                        }
+                    } else {
+                        assetsList.append("- Aucun actif direct (Analyse globale requise)\n");
+                    }
+
+                    // Prompt Système structurant la réponse attendue et forçant le respect de votre matrice
+                    String systemPrompt = "Tu es un expert en macroéconomie globale et analyste de flux financiers. " +
+                            "Ton rôle est de générer un RAPPORT MACRO PÉRIODIQUE strict, concis et actionnable.\n" +
+                            "Tu dois analyser l'impact de l'actualité obligatoirement sur les 11 actifs suivants dans l'ordre :\n" +
+                            "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, USDCAD, GBPUSD, AUDUSD, BITCOIN.\n\n" +
+                            "RÈGLES D'ARBITRAGE STRICTES :\n" +
+                            "1. Si l'actualité ne concerne pas directement un actif, classe-le impérativement en [NEUTRE ⚪] avec une conviction à 0 (⚪⚪⚪⚪⚪).\n" +
+                            "2. Évalue le FLUX DOMINANT final. Si TOUS les actifs sont Neutres ou s'il y a équilibre parfait, le flux DOIT être [NEUTRE (ABSENCE DE FLUX DIRECTED)]. Sinon, utilise RISK-ON / DOLLAR FAIBLE ou RISK-OFF / DOLLAR FORT.\n" +
+                            "3. Respecte le formatage exact avec les ronds de couleur pour la conviction.";
+
+                    String userPrompt = "ALERTE INFO INTERCEPTÉE :\n" +
+                            "Titre : " + (title != null ? title : "N/A") + "\n" +
+                            "Corps : " + (body != null ? body : "N/A") + "\n\n" +
+                            "Actifs pré-identifiés : \n" + 
+                            assetsList.toString() + "\n" +
+                            "Génère le rapport périodique complet maintenant.";
+
+                    // Préparation du corps JSON de la requête (Format compatible OpenAI)
+                    JSONObject jsonBody = new JSONObject();
+                    jsonBody.put("model", GROQ_MODEL);
+                    
+                    JSONArray messages = new JSONArray();
+                    messages.put(new JSONObject().put("role", "system").put("content", systemPrompt));
+                    messages.put(new JSONObject().put("role", "user").put("content", userPrompt));
+                    
+                    jsonBody.put("messages", messages);
+                    jsonBody.put("temperature", 0.1); // Faible température pour éviter les hallucinations de l'IA
+
+                    // Configuration de la connexion HTTP
+                    URL url = new URL(GROQ_URL);
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("POST");
+                    conn.setRequestProperty("Authorization", "Bearer " + activeApiKey);
+                    conn.setRequestProperty("Content-Type", "application/json");
+                    conn.setDoOutput(true);
+                    
+                    // SÉCURITÉ RÉSEAU : Évite le blocage du service en cas de baisse de débit internet
+                    conn.setConnectTimeout(15000); // 15 secondes max pour se connecter
+                    conn.setReadTimeout(15000);    // 15 secondes max pour recevoir la réponse
+
+                    // Envoi de la requête
+                    OutputStream os = conn.getOutputStream();
+                    os.write(jsonBody.toString().getBytes("UTF-8"));
+                    os.close();
+
+                    int responseCode = conn.getResponseCode();
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                        StringBuilder response = new StringBuilder();
+                        String line;
+                        while ((line = in.readLine()) != null) {
+                            response.append(line);
+                        }
+                        in.close();
+
+                        // Extraction du texte généré par le modèle
+                        JSONObject jsonResponse = new JSONObject(response.toString());
+                        String aiReport = jsonResponse.getJSONArray("choices")
+                                .getJSONObject(0)
+                                .getJSONObject("message")
+                                .getString("content");
+
+                        Log.d(TAG, "✅ [IA] Rapport rédigé. Envoi immédiat vers Telegram...");
+
+                        // 3. Transmission sécurisée au canal Telegram configuré
+                        sendTelegramSecure(aiReport, NotificationService.this);
+
+                    } else {
+                        Log.e(TAG, "❌ [IA] Erreur de l'API Groq. Code HTTP : " + responseCode);
+                    }
+
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ [IA] Échec critique lors de la génération ou de la transmission du rapport", e);
+                } finally {
+                    if (conn != null) {
+                        conn.disconnect();
+                    }
+                }
+            }
+        });
     }
 
     private Calendar getMadaCalendar() {
