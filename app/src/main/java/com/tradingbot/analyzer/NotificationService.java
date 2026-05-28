@@ -1979,6 +1979,36 @@ public class NotificationService extends NotificationListenerService {
             return "N/A";
         }
     }
+     public String construirePromptFinal(String evenementActuel, List<String> historiqueRecent) {
+        boolean alerteGéoMajeure = false;
+        
+        // Mots-clés qui déclenchent le mode de crise géopolitique
+        String[] motsClesCrise = {"hormuz", "iran", "frappe militaire", "riposte", "escalade", "blocus"};
+        
+        // On scanne l'événement actuel et l'historique récent
+        String toutLeTexte = evenementActuel.toLowerCase();
+        for (String hist : historiqueRecent) {
+            toutLeTexte += " " + hist.toLowerCase();
+        }
+        
+        for (String mot : motsClesCrise) {
+            if (toutLeTexte.contains(mot)) {
+                alerteGéoMajeure = true;
+                break;
+            }
+        }
+        
+        // Si une crise est détectée, on injecte une directive prioritaire en haut du prompt
+        String directiveDeCrise = "";
+        if (alerteGéoMajeure) {
+            directiveDeCrise = "⚠️ [ALERTE SYSTÈME : RÉGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE ACTIF]. " +
+                               "Le risque de guerre au Moyen-Orient/Hormuz est prioritaire. " +
+                               "L'Or (GOLD) doit refléter le flux refuge (Safe-Haven) indépendamment de la force du Dollar ou du PCE.\n\n";
+        }
+        
+        return directiveDeCrise + SYSTEM_PROMPT + "\n\nFlux à analyser : " + evenementActuel;
+       }
+    }
 
     @Override
     public void onDestroy() {
