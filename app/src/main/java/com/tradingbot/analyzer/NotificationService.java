@@ -570,7 +570,7 @@ public class NotificationService extends NotificationListenerService {
     }
     
     // Filtre de taille minimale pour éviter de traiter des notifications vides ou corrompues
-    if (unifiedFeed.length() < 10) return;
+    if (unifiedFeed.length() < 6) return;
 
     // 2. Identification stricte de la source du flux macro
     String packageName = sbn.getPackageName().toLowerCase();
