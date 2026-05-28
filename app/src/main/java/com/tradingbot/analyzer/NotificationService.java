@@ -350,15 +350,15 @@ public class NotificationService extends NotificationListenerService {
             try {
                 // Construction du payload JSON standard pour Groq
                 JSONObject jsonPayload = new JSONObject();
-                jsonPayload.put("model", "llama3-70b-8192"); // Votre modèle ultra-performant sur Groq
-                jsonPayload.put("temperature", 0.0);         // Température 0 absolue pour détruire toute "créativité" superflue
+                jsonPayload.put("model", "llama-3.3-70b-versatile"); // Modèle
+                jsonPayload.put("temperature", 0.0);                 // Strict
 
                 JSONArray messages = new JSONArray();
 
-                // Bloc SYSTEM
+                // APPEL SIMPLE ICI : On utilise directement la variable globale du haut !
                 JSONObject systemMessage = new JSONObject();
                 systemMessage.put("role", "system");
-                systemMessage.put("content", systemPrompt);
+                systemMessage.put("content", SYSTEM_PROMPT); // <── Un appel simple, ultra propre
                 messages.put(systemMessage);
 
                 // Bloc USER
