@@ -406,15 +406,17 @@ try (okhttp3.Response response = client.newCall(request).execute()) {
                 .getString("content");
 
         // 5. Envoi final du rapport strict vers votre canal Telegram
-        sendReportToTelegram(aiReport);
-    } else {
-        Log.e("MACRO_AI", "Erreur de réponse Groq Code HTTP : " + response.code());
-    }
-} catch (java.io.IOException e) {
-    Log.e("MACRO_AI", "Échec de connexion réseau avec Groq", e);
-} catch (Exception e) {
-    Log.e("MACRO_AI", "Erreur d'analyse JSON du payload", e);
-}
+        sendReportToTelegram(aiReport);} else {
+                    Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + responseCode);
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "[GROQ] Échec critique de l'analyse ou de la connexion", e);
+            } finally {
+                if (conn != null) {
+                    conn.disconnect();
+                }
+            }
         }
     }).start();
     }
