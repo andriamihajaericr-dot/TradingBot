@@ -368,8 +368,8 @@ public class NotificationService extends NotificationListenerService {
     // Volatile pour la cohérence multi-thread (Point 7)
     private volatile long lastSpeechTime = 0;
     private volatile String lastSpeaker = "";
-    
-    private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets) {
+
+    private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, String fingerprint) {
     // 1. Intégration de votre SYSTEM_PROMPT (Le moule et les contraintes strictes)
     String systemPrompt = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
     "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
