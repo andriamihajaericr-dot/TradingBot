@@ -912,8 +912,9 @@ private static final String DAILY_SYSTEM_PROMPT =
             }
         }).start();
     }
-    @Override
-    public void onNotificationPosted(StatusBarNotification sbn) {
+
+@Override
+public void onNotificationPosted(StatusBarNotification sbn) {
     // 1. Vérification de l'état d'activation du bot
     if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
 
@@ -1112,7 +1113,9 @@ private static final String DAILY_SYSTEM_PROMPT =
 
     // 9. Pipeline final
     processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime(), fingerprint);
-} 
+}
+
+
 
     @Override
     public void onCreate() {
