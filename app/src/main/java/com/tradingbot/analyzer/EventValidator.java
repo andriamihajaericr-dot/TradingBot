@@ -12,7 +12,7 @@ public class EventValidator {
         new ConcurrentHashMap<>();
     
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
-    private static final long DUPLICATE_WINDOW_MS = 45 * 60 * 1000L; // 45 minutes
+    private static final long DUPLICATE_WINDOW_MS = 30 * 60 * 1000L; // 45 minutes
     private static final String TAG = "EventValidator";
 
     private static EventDatabase getDatabase(Context context) {
@@ -91,9 +91,9 @@ public class EventValidator {
         if (isRecentDuplicate(title, content)) {
             result.confidence  = 0;
             result.isConfirmed = false;
-            result.reason      = "Doublon récent détecté (45min)";
+            result.reason      = "Doublon récent détecté (30min)";
             result.assetsEnriched = !detectedAssets.isEmpty();
-            logToMain("[VALIDATOR] 🔄 Doublon identifié (Enrichissement préservé)");
+            logToMain("🔄 Doublon identifié (Enrichissement préservé)");
             return result;
         }
 
@@ -108,7 +108,7 @@ public class EventValidator {
                     result.isConfirmed = false;
                     result.reason      = "Driver déjà actif récemment (Inertie Macro)";
                     result.assetsEnriched = !detectedAssets.isEmpty();
-                    logToMain("[VALIDATOR] ⏳ Driver " + detectedType + " déjà actif — ignoré");
+                    logToMain("[⏳ Driver " + detectedType + " déjà actif — ignoré");
                     return result;
                 }
             } catch (Exception e) {
@@ -122,7 +122,7 @@ public class EventValidator {
             result.isConfirmed = false;
             result.reason      = "Rejeté — Marqueur de rumeur ou non-confirmé détecté";
             String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-            logToMain("[VALIDATOR] ❌ Rumeur/Non-confirmé rejeté – " + shortTitle + "…");
+            logToMain("❌ Rumeur/Non-confirmé rejeté – " + shortTitle + "…");
             return result;
         }
 
@@ -132,7 +132,7 @@ public class EventValidator {
             result.isConfirmed = false;
             result.reason      = "Bruit macroéconomique (Opinion/Éditorial pur)";
             String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-            logToMain("[VALIDATOR] ❌ Rejeté – Contenu éditorial – " + shortTitle + "…");
+            logToMain("❌ Rejeté – Contenu éditorial – " + shortTitle + "…");
             return result;
         }
 
@@ -174,7 +174,7 @@ public class EventValidator {
             }
             result.assetsEnriched = !detectedAssets.isEmpty();
             String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
-            logToMain("[VALIDATOR] 🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
+            logToMain("🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
             return result;
         }
 
@@ -190,7 +190,7 @@ public class EventValidator {
         } else {
             result.isConfirmed = true;
             String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-            logToMain("[VALIDATOR] ⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
+            logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
         }
 
         result.assetsEnriched = !detectedAssets.isEmpty();
