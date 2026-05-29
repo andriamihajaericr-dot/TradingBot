@@ -57,24 +57,25 @@ public class EventValidator {
         if (detectedAssets == null) detectedAssets = new ArrayList<>();
 
         String combined = (title + " " + content).toLowerCase(Locale.ROOT);
+        String upperCombined = (title + " " + content).toUpperCase(Locale.ROOT);
+        
         // ── EXTRACTION PRIORITAIRE ET SYSTÉMATIQUE DES ACTIFS (Sécurité Rang Suprême) ──
-        // On extrait les actifs immédiatement via AssetExtractor pour s'assurer que la liste
-        // soit enrichie même si l'événement subit un arrêt précoce ou un forçage (forceSave)
         try {
-            // Extraction native directe sans classe externe
-        List<String> rawExtracted = new ArrayList<>();
-        String textToScan = (title + " " + content).toUpperCase(Locale.ROOT);
+            List<String> rawExtracted = new ArrayList<>();
+            String textToScan = upperCombined;
 
-        if (textToScan.contains("EURUSD") || textToScan.contains("EUR/") || textToScan.contains("EURO")) rawExtracted.add("EURUSD");
-        if (textToScan.contains("USDJPY") || textToScan.contains("JPY")  || textToScan.contains("YEN"))  rawExtracted.add("USDJPY");
-        if (textToScan.contains("GBPUSD") || textToScan.contains("GBP/") || textToScan.contains("POUND")) rawExtracted.add("GBPUSD");
-        if (textToScan.contains("AUDUSD") || textToScan.contains("AUD/"))                                rawExtracted.add("AUDUSD");
-        if (textToScan.contains("USDCAD") || textToScan.contains("CAD/"))                                rawExtracted.add("USDCAD");
-        if (textToScan.contains("GOLD")   || textToScan.contains("XAU"))                                 rawExtracted.add("GOLD");
-        if (textToScan.contains("USOIL")  || textToScan.contains("CRUDE") || textToScan.contains("WTI"))   rawExtracted.add("USOIL");
-        if (textToScan.contains("NASDAQ") || textToScan.contains("NAS100")|| textToScan.contains("USTECH")) rawExtracted.add("NASDAQ");
-        if (textToScan.contains("SP500")  || textToScan.contains("S&P")   || textToScan.contains("SPX"))   rawExtracted.add("SP500");
-        if (textToScan.contains("BITCOIN")|| textToScan.contains("BTC"))                                 rawExtracted.add("BITCOIN");
+            if (textToScan.contains("EURUSD") || textToScan.contains("EUR/") || textToScan.contains("EURO")) rawExtracted.add("EURUSD");
+            if (textToScan.contains("USDJPY") || textToScan.contains("JPY")  || textToScan.contains("YEN"))  rawExtracted.add("USDJPY");
+            if (textToScan.contains("GBPUSD") || textToScan.contains("GBP/") || textToScan.contains("POUND")) rawExtracted.add("GBPUSD");
+            if (textToScan.contains("AUDUSD") || textToScan.contains("AUD/"))                                rawExtracted.add("AUDUSD");
+            if (textToScan.contains("USDCAD") || textToScan.contains("CAD/"))                                rawExtracted.add("USDCAD");
+            if (textToScan.contains("GOLD")   || textToScan.contains("XAU"))                                 rawExtracted.add("GOLD");
+            if (textToScan.contains("USOIL")  || textToScan.contains("CRUDE") || textToScan.contains("WTI") || textToScan.contains("PETROLE") || textToScan.contains("BRENT")) rawExtracted.add("USOIL");
+            if (textToScan.contains("NASDAQ") || textToScan.contains("NAS100")|| textToScan.contains("USTECH") || textToScan.contains("TECH")) rawExtracted.add("NASDAQ");
+            if (textToScan.contains("SP500")  || textToScan.contains("S&P")   || textToScan.contains("SPX"))   rawExtracted.add("SP500");
+            if (textToScan.contains("BITCOIN")|| textToScan.contains("BTC"))                                 rawExtracted.add("BITCOIN");
+            if (textToScan.contains("US10Y")  || textToScan.contains("TREASURY") || textToScan.contains("YIELD") || textToScan.contains("10-YEAR")) rawExtracted.add("US10Y");
+
             if (rawExtracted != null) {
                 for (String asset : rawExtracted) {
                     if (asset != null && !detectedAssets.contains(asset)) {
@@ -159,7 +160,7 @@ public class EventValidator {
         }
 
         // ── ÉTAPE 5 : Géopolitique ───────────────────────────────────────
-        GeoAssessment geo = assessGeopoliticalEvent(combined);
+        GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
         if (geo.confidence >= 65) {
             result.isConfirmed = true;
             result.confidence  = geo.confidence;
@@ -235,7 +236,7 @@ public class EventValidator {
         List<String> impactedAssets = new ArrayList<>();
     }
 
-    private static GeoAssessment assessGeopoliticalEvent(String text) {
+    private static GeoAssessment assessGeopoliticalEvent(String text, String upperText) {
         GeoAssessment geo = new GeoAssessment();
         int score = 0;
         String lowerText = text.toLowerCase(Locale.ROOT);
@@ -284,10 +285,10 @@ public class EventValidator {
 
         if (hasFactualAction) score += 32;
 
-        // ── C. Zone géographique à impact marché direct ──────────────
+        // ── C. Zone géographique à impact marché direct (Enrichi) ──────────────
         boolean geoZoneFound = false;
 
-        // Zone 1 : Moyen-Orient
+        // Zone 1 : Moyen-Orient + Hormuz (priorité maximale)
         boolean isMoyenOrient =
             lowerText.contains("israel")       ||
             lowerText.contains("iran")         ||
@@ -298,30 +299,36 @@ public class EventValidator {
             lowerText.contains("houthi")       ||
             lowerText.contains("yemen")        ||
             lowerText.contains("red sea")      ||
-            lowerText.contains("strait of hormuz") ||
+            upperText.contains("HORMUZ")       ||
+            upperText.contains("ORMUZ")        ||
             lowerText.contains("persian gulf") ||
             lowerText.contains("saudi")        ||
             lowerText.contains("tel aviv")     ||
             lowerText.contains("jerusalem")    ||
             lowerText.contains("beirut")       ||
             lowerText.contains("tehran")       ||
-            lowerText.contains("middle east");
+            lowerText.contains("middle east")  ||
+            lowerText.contains("moyen-orient");
 
         boolean isTrumpIran = lowerText.contains("trump") && lowerText.contains("iran");
 
         if (isMoyenOrient) {
-            if (hasFactualAction) {
+            if (upperText.contains("HORMUZ") || upperText.contains("ORMUZ")) {
+                geo.contextLabel = "Détroit d'Hormuz - Menace sur l'offre pétrole";
+                score += 40;
+                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN", "EURUSD", "US10Y"));
+            } else if (hasFactualAction) {
                 geo.contextLabel = "Moyen-Orient - Action Militaire";
-                score += 26;
-                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN", "EURUSD", "AUDUSD"));
+                score += 35;
+                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN", "EURUSD", "AUDUSD", "US10Y"));
             } else if (isTrumpIran) {
                 geo.contextLabel = "Moyen-Orient - Déclaration Trump/Iran";
-                score += 11;   
+                score += 18;   
                 geo.impactedAssets.addAll(Arrays.asList("GOLD", "USOIL", "USDJPY", "NASDAQ", "SP500"));
             } else {
                 geo.contextLabel = "Moyen-Orient / Pétrole";
-                score += 17;
-                geo.impactedAssets.addAll(Arrays.asList("GOLD", "USOIL", "USDJPY"));
+                score += 22;
+                geo.impactedAssets.addAll(Arrays.asList("GOLD", "USOIL", "USDJPY", "US10Y"));
             }
             geoZoneFound = true;
         }
@@ -365,34 +372,10 @@ public class EventValidator {
             geoZoneFound = true;
         }
 
-        // Zone 4 : Amérique Latine / Commerce
-        boolean isAmeriqueLatine =
-            lowerText.contains("mexico")       ||
-            lowerText.contains("tariff")       ||
-            lowerText.contains("trade war")    ||
-            lowerText.contains("opec")         ||
-            lowerText.contains("venezuela");
-
-        if (isAmeriqueLatine && !geoZoneFound) {
-            geo.contextLabel = "Commerce / OPEC / Amériques";
-            geo.impactedAssets.addAll(Arrays.asList("USDCAD", "USOIL", "NASDAQ", "SP500"));
-            score += 15;
-            geoZoneFound = true;
-        }
-
-        // Zone 5 : Autres
-        boolean isAutresZones = lowerText.contains("africa") || lowerText.contains("sudan") || lowerText.contains("coup") || lowerText.contains("civil war");
-        if (isAutresZones && !geoZoneFound) {
-            geo.contextLabel = "Géopolitique Émergent";
-            geo.impactedAssets.addAll(Arrays.asList("GOLD", "USOIL"));
-            score += 10;
-            geoZoneFound = true;
-        }
-
         if (!geoZoneFound && hasFactualAction) {
             geo.contextLabel = "Événement Géo Non Régionalisé";
-            geo.impactedAssets.addAll(Arrays.asList("GOLD", "USDJPY"));
-            score += 8;
+            geo.impactedAssets.addAll(Arrays.asList("GOLD", "USDJPY", "USOIL"));
+            score += 12;
         }
 
         // ── D. Entité précise ────────────────────────────────────────
@@ -411,20 +394,20 @@ public class EventValidator {
             lowerText.contains("pentagon confirmed")) {
             score += 10;
         }
-        // ── ANTI-FAUX POSITIF TWITTER (Spécifique rumeurs politiques) ──
+
         boolean hasOfficialConfirmation = lowerText.contains("confirmed") || lowerText.contains("announced");
         if (isTrumpIran && !hasFactualAction && !hasOfficialConfirmation) {
-        score = Math.min(score, 55); // Bloque sous le seuil d'activation de 65%
+            score = Math.min(score, 55);
         }
 
-        if (!geoZoneFound && !hasFactualAction) score = 0;
+        if (!geoZoneFound && !hasFactualAction) score = Math.max(0, score - 15);
 
         geo.confidence = Math.min(100, score);
         return geo;
     }
 
     // ─────────────────────────────────────────────────────────────
-    //  CALENDRIER ÉCONOMIQUE
+    //  CALENDRIER ÉCONOMIQUE (inchangé)
     // ─────────────────────────────────────────────────────────────
     private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(String title, String content, long timestamp) {
         String combined = (title + " " + content).toLowerCase(Locale.ROOT);
@@ -487,7 +470,7 @@ public class EventValidator {
     }
 
     // ─────────────────────────────────────────────────────────────
-    //  UTILITAIRES SÉCURISÉS
+    //  UTILITAIRES SÉCURISÉS (inchangés)
     // ─────────────────────────────────────────────────────────────
     private static String createEventKey(String indicator, String timestamp) {
         if (indicator == null || timestamp == null) {
