@@ -1032,7 +1032,7 @@ public class NotificationService extends NotificationListenerService {
 
     // 9. Routage unique vers le pipeline d'analyse asynchrone (Groq / Telegram)
     // Évite tout doublon d'exécution en centralisant l'appel ici
-    processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime());
+    processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime(), fingerprint);
  }
 
         
