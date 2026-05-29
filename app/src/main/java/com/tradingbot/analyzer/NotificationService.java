@@ -2060,7 +2060,8 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
         return directiveDeCrise + SYSTEM_PROMPT + "\n\nFlux à analyser : " + evenementActuel;
     }
 
-   public String construirPromptQuotidienSystem(String registreDeLaJournee) {
+     // Méthode de vérification géographique des mots-clés
+public String construirePromptQuotidienSystem(String registreDeLaJournee, String promptDeBase) {
     boolean alerteGéoMajeure = false;
     String[] motsClesCrise = {"hormuz", "iran", "frappe militaire", "riposte", "escalade", "blocus"};
     
@@ -2074,14 +2075,14 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
     
     String directiveDeCrise = "";
     if (alerteGéoMajeure) {
-        directiveDeCrise = "⚠️ [ALERTE SYSTÈME : CLÔTURE EN RÉGIME DE MARCHÉ MODE CRISE GÉOPOLITIQUE]. " +
-                           "La journée a été marquée par des risques de guerre au Moyen-Orient/Hormuz. " +
-                           "L'Or (GOLD) doit impérativement être classé en [ACHAT CHOC 🟢] au titre de flux refuge (Safe-Haven), " +
-                           "faisant plier la logique classique de l'inflation forte ou du PCE.\n\n";
+        directiveDeCrise = "⚠️ [ALERTE SYSTÈME CRITIQUE : REGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE]. " +
+                           "Le résumé des actualités indique une crise militaire imminente ou un blocus au Moyen-Orient/Hormuz. " +
+                           "L'Or (GOLD) agit comme refuge systémique mondial (Safe-Haven) et doit impérativement être classé en [ACHAT CHOC 🟢]. " +
+                           "Cette directive prend le pas et ANNULE l'effet baissier classique d'un dollar fort ou d'une inflation de rang suprême pour cet actif.\n\n";
     }
     
-    return directiveDeCrise + DAILY_SYSTEM_PROMPT;
-    }
+    return directiveDeCrise + promptDeBase;
+}
 
     @Override
     public void onDestroy() {
