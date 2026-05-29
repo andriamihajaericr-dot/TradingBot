@@ -2033,4 +2033,3 @@ public class NotificationService extends NotificationListenerService {
         Log.d(TAG, "[SERVICE] Service arrêté");
     }
 }
-
