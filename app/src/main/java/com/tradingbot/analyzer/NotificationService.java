@@ -2070,7 +2070,7 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
     }
 
      // Méthode de vérification géographique des mots-clés
-public String construirePromptQuotidienSystem(String registreDeLaJournee, String promptDeBase) {
+     public String construirePromptQuotidienSystem(String registreDeLaJournee, String promptDeBase) {
     boolean alerteGéoMajeure = false;
     String[] motsClesCrise = {"hormuz", "iran", "frappe militaire", "riposte", "escalade", "blocus"};
     
@@ -2082,15 +2082,18 @@ public String construirePromptQuotidienSystem(String registreDeLaJournee, String
         }
     }
     
-    String directiveDeCrise = "";
+    // Si un mot-clé de crise est détecté, on injecte une directive d'activation en tête de prompt
     if (alerteGéoMajeure) {
-        directiveDeCrise = "⚠️ [ALERTE SYSTÈME CRITIQUE : REGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE]. " +
-                           "Le résumé des actualités indique une crise militaire imminente ou un blocus au Moyen-Orient/Hormuz. " +
-                           "L'Or (GOLD) agit comme refuge systémique mondial (Safe-Haven) et doit impérativement être classé en [ACHAT CHOC 🟢]. " +
-                           "Cette directive prend le pas et ANNULE l'effet baissier classique d'un dollar fort ou d'une inflation de rang suprême pour cet actif.\n\n";
+        String alerteFlash = 
+            "⚠️ [ALERTE SYSTÈME CRITIQUE : EXCEPTION DE CRISE ACTIVE].\n" +
+            "Le registre des dernières 24h fait état d'une ESCALADE MILITAIRE DIRECTE ou d'une MENACE SUR L'OFFRE au Moyen-Orient/Hormuz.\n" +
+            "CONSIGNE : Tu te trouves dans le cas d'exception absolue décrit à la RÈGLE 5. Active immédiatement la matrice géopolitique prioritaire (Régime de dominance géopolitique sur l'inflation) pour l'alignement des 11 actifs et le fait marquant.\n\n";
+        
+        return alerteFlash + promptDeBase;
     }
     
-    return directiveDeCrise + promptDeBase;
+    // Sinon, on renvoie le prompt standard (la hiérarchie normale s'applique)
+    return promptDeBase;
 }
 
     @Override
