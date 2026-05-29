@@ -1008,7 +1008,8 @@ public class NotificationService extends NotificationListenerService {
     EventValidator.ValidationResult validationResult = EventValidator.validate(title, body, currentTime, enrichedAssets);
 
     // Arbitrage du droit d'écriture immédiat en base de données local SQLite
-    boolean forceSave = validationResult.isConfirmed || isSupremeRank;
+    // forceSave devient vrai si c'est un rang suprême OU si la source est une application macro officielle
+boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sourceName.equals("Investing.com") || sourceName.equals("X / Twitter");
 
     // 🌟 DÉPLACEZ LA GÉNÉRATION DU FINGERPRINT ICI (HORS DU IF) :
     String fingerprint = generateSecureHash(packageName + "_" + title + "_" + body + "_" + (sbn.getPostTime() / 60000));
