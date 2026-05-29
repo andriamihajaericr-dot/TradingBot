@@ -1790,15 +1790,24 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
 "  • 🇨🇦 USDCAD -> VENTE CHOC 🔴 [Le Dollar Canadien, devise pétrolière corrélée, se renforce face au Dollar]\n" +
 "  • Les 9 autres actifs -> OBLIGATOIREMENT [NEUTRE ⚪ | Pas d'impact direct]. Aucun mouvement secondaire toléré.\n" +
 "- Si Hausse surprise des stocks (Surplus d'offre) : 🛢️ USOIL -> VENTE CHOC 🔴, 🇨🇦 USDCAD -> ACHAT CHOC 🟢, les 9 autres actifs -> NEUTRE ⚪.\n\n" +
-
-"RÈGLE 5 : DRIVER GÉOPOLITIQUE CRITIQUE ET SENTIMENT DE MARCHÉ (RISK-OFF TACTIQUE)\n" +
-"- En cas d'escalade militaire majeure, conflits maritimes ou tensions géopolitiques fortes (Moyen-Orient, etc.) SANS driver américain suprême actif pour contrer :\n" +
-"  • 🏆 GOLD    -> ACHAT CHOC 🟢 [Valeur refuge historique ultime]\n" +
-"  • 🛢️ USOIL   -> ACHAT CHOC 🟢 [Prime de risque sur les routes d'approvisionnement]\n" +
-"  • 🇯🇵 USDJPY -> VENTE CHOC 🔴 [Appréciation mécanique du Yen comme monnaie de rapatriement refuge]\n" +
-"  • 💻 NASDAQ / 📊 SP500 / ₿ BITCOIN -> VENTE CHOC 🔴 [Fuite générale des capitaux hors des actifs à risque]\n" +
-"  • Les devises majeures (EURUSD, GBPUSD, AUDUSD, USDCAD) -> OBLIGATOIREMENT [NEUTRE ⚪ | Pas d'impact direct].\n" +
-"  • 🏁 FLUX DOMINANT -> RISK-OFF\n\n" +
+            
+"RÈGLE 5 : DRIVER GÉOPOLITIQUE CRITIQUE ET SENTIMENT DE MARCHÉ (RÉGIME DE GUERRE ET RISK-OFF)\n" +
+"- En cas d'escalade militaire directe, conflits maritimes ou menaces graves sur l'offre (Moyen-Orient, Hormuz, Iran, frappes militaires, ripostes, blocus) :\n" +
+"  👉 Ce driver devient STRICTEMENT PRIORITAIRE sur l'inflation ou le PCE pour l'Or et le Pétrole, brisant la hiérarchie standard.\n" +
+"  👉 Tu as l'obligation absolue d'aligner la matrice des 11 actifs selon la configuration de crise suivante :\n" +
+"     • 📈 US10Y   : ACHAT CHOC 🟢 [PCE Hawkish / Taux sous pression]\n" +
+"     • 💻 NASDAQ  : VENTE CHOC 🔴 [Double flux négatif : Taux hauts + Risk-Off]\n" +
+"     • 📊 SP500   : VENTE CHOC 🔴 [Strictement identique au NASDAQ]\n" +
+"     • 🏆 GOLD    : ACHAT CHOC 🟢 [Flux refuge dominant (Safe-Haven)]\n" +
+"     • 🛢️ USOIL   : ACHAT CHOC 🟢 [Prime de risque majeure sur l'offre]\n" +
+"     • 🇪🇺 EURUSD : VENTE CHOC 🔴 [Dollar fort + Proximité du choc géopolitique]\n" +
+"     • 🇯🇵 USDJPY : NEUTRE ⚪ ou VENTE CHOC 🔴 [Arbitrage complexe : Dollar Fort vs Yen Refuge. Justifier dans le Fait Marquant]\n" +
+"     • 🇨🇦 USDCAD : NEUTRE ⚪ ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage]\n" +
+"     • 🇬🇧 GBPUSD : VENTE CHOC 🔴 [Dollar fort par arbitrage international]\n" +
+"     • 🇦🇺 AUDUSD : VENTE CHOC 🔴 [Liquidation de la devise cyclique/commodity non-pétrole]\n" +
+"     • ₿ BITCOIN  : VENTE CHOC 🔴 [Capitulation stricte des actifs spéculatifs]\n" +
+"  - 🏁 FLUX DOMINANT : CRISE GÉOPOLITIQUE / RISK-OFF\n" +
+"  - OBLIGATION TEXTUELLE : Tu DOIS impérativement mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans la section des faits marquants.\n\n" +
 
 "═══════════════════════════════════════════════════════════════\n" +
 "                    CONTRAINTES DE SÉCURITÉ DE COMPILATION\n" +
