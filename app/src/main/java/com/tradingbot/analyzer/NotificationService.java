@@ -982,13 +982,17 @@ public class NotificationService extends NotificationListenerService {
     }
 
     // 6. Validation du flux par le validateur de pertinence
+    // 6. Validation du flux par le validateur de pertinence
     EventValidator.ValidationResult validationResult = EventValidator.validate(title, body, currentTime, enrichedAssets);
 
     // Arbitrage du droit d'écriture immédiat en base de données local SQLite
     boolean forceSave = validationResult.isConfirmed || isSupremeRank;
 
+    // 🌟 DÉPLACEZ LA GÉNÉRATION DU FINGERPRINT ICI (HORS DU IF) :
+    String fingerprint = generateSecureHash(packageName + "_" + title + "_" + body + "_" + (sbn.getPostTime() / 60000));
+
     if (forceSave) {
-        String fingerprint = generateSecureHash(packageName + "_" + title + "_" + body + "_" + (sbn.getPostTime() / 60000));
+        // La variable 'fingerprint' est maintenant accessible ici sans problème
         
         // Sérialisation propre de la liste des actifs au format CSV pour SQLite
         StringBuilder assetsSb = new StringBuilder();
@@ -999,7 +1003,7 @@ public class NotificationService extends NotificationListenerService {
         String assetsString = assetsSb.toString();
 
         // 7. Calcul du poids de dominance macroéconomique (Driver Weight)
-        int driverWeight = 1; // Valeur par défaut pour les événements d'intensité standard
+        int driverWeight = 1; 
         if (!eventTypeStr.equals("UNKNOWN")) {
             if (isSupremeRank) {
                 driverWeight = 5;
@@ -1019,21 +1023,21 @@ public class NotificationService extends NotificationListenerService {
                 title,
                 body,
                 assetsString,
-                "pending",                 // Statut de traitement interne mis à jour
-                sbn.getPostTime() / 1000,  // Conversion de l'horodatage en secondes (Unix Timestamp)
-                "pending",                 // Statut d'affichage unifié (Remplacement validé d'attente)
+                "pending",                  
+                sbn.getPostTime() / 1000,  
+                "pending",                  
                 driverWeight
         );
 
         if (saved) {
             Log.d(TAG, "[VALIDATEUR] Événement macro validé inséré en base : " + eventTypeStr + " [Poids: " + driverWeight + "]");
         }
-    }
+    } // <--- FIN DU IF
 
     // 9. Routage unique vers le pipeline d'analyse asynchrone (Groq / Telegram)
-    // Évite tout doublon d'exécution en centralisant l'appel ici
+    // 🌟 Désormais, 'fingerprint' est parfaitement reconnu ici !
     processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime(), fingerprint);
- }
+}
 
         
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime, String fingerprint) {
