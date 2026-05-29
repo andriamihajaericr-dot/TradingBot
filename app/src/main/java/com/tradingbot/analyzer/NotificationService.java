@@ -643,53 +643,49 @@ public class NotificationService extends NotificationListenerService {
             + "CORPS DE LA NOTIFICATION : " + body + "\n"
             + "ACTIFS PRÉ-QUALIFIÉS : " + enrichedAssets.toString();
            // 4. Construction du payload JSON standard pour Groq
+    // 4. Construction du payload JSON standard pour Groq
     final JSONObject jsonPayload = new JSONObject();
-    try { 
+    try {
+        // Extraction de l'historique de crise
         EventDatabase db = EventDatabase.getInstance(NotificationService.this);
         List<String> historique = db.obtenirTexteEvenementsRecents();
-        // On passe 'userContent' (votre notification) et l'historique récent à la fabrique de prompt
         String promptFinalEnvoye = construirePromptFinal(userContent, historique);
-        // ───────────────────────────────────────────────────────────────────────
 
         jsonPayload.put("model", GROQ_MODEL);
         jsonPayload.put("temperature", 0.0); // Strict
 
         JSONArray messages = new JSONArray();
 
-        // Bloc SYSTEM : Injection du prompt combiné dynamique (Règles + Alerte de Crise)
+        // Bloc SYSTEM : Injection du prompt combiné dynamique
         JSONObject systemMessage = new JSONObject();
         systemMessage.put("role", "system");
-        // ON REMPLACE 'SYSTEM_PROMPT' PAR VOTRE PROMPT DYNAMIQUE 'promptFinalEnvoye'
         systemMessage.put("content", promptFinalEnvoye); 
         messages.put(systemMessage);
 
-        // Bloc USER : Injection du flux d'actualité brut ou contexte temporel
+        // Bloc USER : Injection du flux d'actualité brut
         JSONObject userMessage = new JSONObject();
         userMessage.put("role", "user");
         userMessage.put("content", userContent);
         messages.put(userMessage);
 
         jsonPayload.put("messages", messages);
-        
     } catch (Exception e) {
         Log.e(TAG, "[GROQ] Erreur lors de la sérialisation du JSON", e);
         return;
     }
 
-    // 5. Threading Asynchrone obligatoire pour Android (Évite le blocage de l'application)
+    // 5. Threading Asynchrone obligatoire pour Android
     new Thread(new Runnable() {
         @Override
         public void run() {
             java.net.HttpURLConnection conn = null;
             try {
-                // Récupération sécurisée de la clé Groq
                 String apiKey = getGroqApiKey();
                 if (apiKey.isEmpty()) {
                     Log.e(TAG, "[GROQ] Clé API absente. Analyse annulée.");
                     return;
                 }
 
-                // Initialisation de la connexion HTTP native
                 java.net.URL url = new java.net.URL(GROQ_URL);
                 conn = (java.net.HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -699,14 +695,12 @@ public class NotificationService extends NotificationListenerService {
                 conn.setConnectTimeout(15000);
                 conn.setReadTimeout(15000);
 
-                // Écriture du flux réseau vers le serveur de Groq
                 try (java.io.OutputStream os = conn.getOutputStream()) {
                     byte[] input = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
                     os.write(input, 0, input.length);
                     os.flush();
                 }
 
-                // Analyse du code de réponse HTTP
                 int status = conn.getResponseCode();
                 if (status == java.net.HttpURLConnection.HTTP_OK) {
                     try (java.io.BufferedReader br = new java.io.BufferedReader(
@@ -718,7 +712,6 @@ public class NotificationService extends NotificationListenerService {
                             response.append(responseLine.trim());
                         }
 
-                        // Extraction du rapport macroéconomique formaté par l'IA
                         JSONObject jsonResponse = new JSONObject(response.toString());
                         String aiReport = jsonResponse.getJSONArray("choices")
                                 .getJSONObject(0)
@@ -740,9 +733,8 @@ public class NotificationService extends NotificationListenerService {
                 }
             }
         }
-    }).start(); // Ferme et démarre proprement le Thread
-} // Ferme définitivement la méthode processAnalysisWithAI
-
+    }).start();
+} // <--- CETTE ACCOLADE FERME PROPREMENT processAnalysisWithAI()
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
