@@ -2050,6 +2050,34 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
         return directiveDeCrise + SYSTEM_PROMPT + "\n\nFlux à analyser : " + evenementActuel;
     }
 
+   public String construirePromptQuotidienFinal(String registreDeLaJournee) {
+    boolean alerteGéoMajeure = false;
+    
+    // Mots-clés identiques pour une cohérence absolue du modèle
+    String[] motsClesCrise = {"hormuz", "iran", "frappe militaire", "riposte", "escalade", "blocus"};
+    
+    String toutLeTexte = (registreDeLaJournee != null) ? registreDeLaJournee.toLowerCase() : "";
+    
+    for (String mot : motsClesCrise) {
+        if (toutLeTexte.contains(mot)) {
+            alerteGéoMajeure = true;
+            break;
+        }
+    }
+    
+    String directiveDeCrise = "";
+    if (alerteGéoMajeure) {
+        directiveDeCrise = "⚠️ [ALERTE SYSTÈME : CLÔTURE EN RÉGIME DE MARCHÉ MODE CRISE GÉOPOLITIQUE]. " +
+                           "La journée a été marquée par des risques de guerre au Moyen-Orient/Hormuz. " +
+                           "L'Or (GOLD) doit impérativement être classé en [ACHAT CHOC 🟢] au titre de flux refuge (Safe-Haven), " +
+                           "faisant plier la logique classique de l'inflation forte ou du PCE.\n\n";
+    }
+    
+    // OBLIGATOIRE : On combine la directive, le moule DAILY_SYSTEM_PROMPT, 
+    // et on injecte le registre pour que Groq puisse analyser les données !
+    return directiveDeCrise + DAILY_SYSTEM_PROMPT + "\n\nREGISTRE DES ÉVÉNEMENTS DE LA JOURNÉE À ANALYSER :\n" + registreDeLaJournee;
+   }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
