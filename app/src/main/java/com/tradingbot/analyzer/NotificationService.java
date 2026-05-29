@@ -634,57 +634,40 @@ public class NotificationService extends NotificationListenerService {
     // 2. Génération dynamique de l'horodatage actuel au format de Madagascar (EAT)
     java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
     sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
-    String currentMadaTime = sdf.format(new java.util.Date());
+    String currentMadaTime = sdf.format(new java.util.Date(ts));
 
-    // 3. Préparation des données utilisateur dynamiques (Le flux brut)
+    // 3. Préparation du contenu utilisateur
     String userContent = "CONTEXTE TEMPOREL : " + currentMadaTime + "\n"
             + "SOURCE DE LA NEWS : " + sourceName + "\n"
             + "TITRE : " + title + "\n"
             + "CORPS DE LA NOTIFICATION : " + body + "\n"
             + "ACTIFS PRÉ-QUALIFIÉS : " + enrichedAssets.toString();
-           // 4. Construction du payload JSON standard pour Groq
-    // 4. Construction du payload JSON standard pour Groq
+
     final JSONObject jsonPayload = new JSONObject();
     try {
-        // Extraction de l'historique de crise
         EventDatabase db = EventDatabase.getInstance(NotificationService.this);
         List<String> historique = db.obtenirTexteEvenementsRecents();
         String promptFinalEnvoye = construirePromptFinal(userContent, historique);
 
         jsonPayload.put("model", GROQ_MODEL);
-        jsonPayload.put("temperature", 0.0); // Strict
+        jsonPayload.put("temperature", 0.02); // Légère flexibilité recommandée pour éviter les blocages JSON
 
         JSONArray messages = new JSONArray();
-
-        // Bloc SYSTEM : Injection du prompt combiné dynamique
-        JSONObject systemMessage = new JSONObject();
-        systemMessage.put("role", "system");
-        systemMessage.put("content", promptFinalEnvoye); 
-        messages.put(systemMessage);
-
-        // Bloc USER : Injection du flux d'actualité brut
-        JSONObject userMessage = new JSONObject();
-        userMessage.put("role", "user");
-        userMessage.put("content", userContent);
-        messages.put(userMessage);
-
+        messages.put(new JSONObject().put("role", "system").put("content", promptFinalEnvoye));
+        messages.put(new JSONObject().put("role", "user").put("content", userContent));
         jsonPayload.put("messages", messages);
     } catch (Exception e) {
         Log.e(TAG, "[GROQ] Erreur lors de la sérialisation du JSON", e);
         return;
-    }
-
-    // 5. Threading Asynchrone obligatoire pour Android
+    } 
+    // 5. Exécution Asynchrone
     new Thread(new Runnable() {
         @Override
         public void run() {
             java.net.HttpURLConnection conn = null;
             try {
                 String apiKey = getGroqApiKey();
-                if (apiKey.isEmpty()) {
-                    Log.e(TAG, "[GROQ] Clé API absente. Analyse annulée.");
-                    return;
-                }
+                if (apiKey.isEmpty()) return;
 
                 java.net.URL url = new java.net.URL(GROQ_URL);
                 conn = (java.net.HttpURLConnection) url.openConnection();
@@ -700,41 +683,73 @@ public class NotificationService extends NotificationListenerService {
                     os.write(input, 0, input.length);
                     os.flush();
                 }
-
                 int status = conn.getResponseCode();
                 if (status == java.net.HttpURLConnection.HTTP_OK) {
+                    StringBuilder response = new StringBuilder();
                     try (java.io.BufferedReader br = new java.io.BufferedReader(
                             new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                        
-                        StringBuilder response = new StringBuilder();
-                        String responseLine;
-                        while ((responseLine = br.readLine()) != null) {
-                            response.append(responseLine.trim());
+                        String line;
+                        while ((line = br.readLine()) != null) {
+                            response.append(line);
+                        }
+                    }
+
+                    JSONObject jsonResponse = new JSONObject(response.toString());
+                    String aiReport = jsonResponse.getJSONArray("choices")
+                            .getJSONObject(0)
+                            .getJSONObject("message")
+                            .getString("content");
+
+                    if (aiReport == null || aiReport.length() < 50) return;
+
+                    // ─── INTEGRATION DU FILTRAGE INTELLIGENT DE SÉCURITÉ ───
+                    StringBuilder filteredMessage = new StringBuilder();
+                    String[] lines = aiReport.split("\n");
+                    int activeSignalsCount = 0;
+                    boolean inImpactSection = false;
+                    for (String line : lines) {
+                        String trimmed = line.trim();
+                        if (trimmed.isEmpty()) continue;
+
+                        if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || 
+                            trimmed.startsWith("🎯") || trimmed.startsWith("📢") || 
+                            trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
+                            filteredMessage.append(line).append("\n");
+                            if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
+                            continue;
                         }
 
-                        JSONObject jsonResponse = new JSONObject(response.toString());
-                        String aiReport = jsonResponse.getJSONArray("choices")
-                                .getJSONObject(0)
-                                .getJSONObject("message")
-                                .getString("content");
+                        if (inImpactSection && trimmed.startsWith("•")) {
+                            String upperLine = line.toUpperCase(Locale.ROOT);
+                            boolean isSignificant = upperLine.contains("ACHAT CHOC") || 
+                                                    upperLine.contains("VENTE CHOC") || 
+                                                    upperLine.contains("INCLINATION ACHAT") || 
+                                                    upperLine.contains("INCLINATION VENTE");
 
-                        // 6. Routage final du rapport strict vers votre canal Telegram sécurisé
-                        sendTelegramSecure(aiReport, NotificationService.this);
+                            if (isSignificant) {
+                                filteredMessage.append(line).append("\n");
+                                activeSignalsCount++;
+                            }
+                        }
                     }
-                } else {
-                    Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
+                    EventDatabase eventDb = EventDatabase.getInstance(NotificationService.this);
+                    
+                    if (activeSignalsCount > 0) {
+                        String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n" + filteredMessage.toString().trim();
+                        sendTelegramSecure(finalPayload, NotificationService.this);
+                        eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
+                    } else {
+                        eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                    }
                 }
-
             } catch (Exception e) {
-                Log.e(TAG, "[GROQ] Échec critique lors de l'exécution réseau", e);
+                Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau", e);
             } finally {
-                if (conn != null) {
-                    conn.disconnect();
-                }
+                if (conn != null) conn.disconnect();
             }
         }
     }).start();
-} // <--- CETTE ACCOLADE FERME PROPREMENT processAnalysisWithAI()
+}
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
