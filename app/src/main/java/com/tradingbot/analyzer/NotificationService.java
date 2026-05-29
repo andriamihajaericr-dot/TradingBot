@@ -1926,7 +1926,7 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
 "1. SYMÉTRIE STRICTE DES INDICES : Le couple 💻 NASDAQ et 📊 SP500 doit pointer impérativement dans le même sens (soit deux ACHAT CHOC, soit deux VENTE CHOC, soit deux NEUTRE). Aucune divergence n'est tolérée.\n" +
 "2. AMPLIFICATION DES CRYPTOS : L'actif ₿ BITCOIN est traité comme un indicateur de bêta élevé lié au sentiment technologique. Il doit calquer sa direction sur celle du 💻 NASDAQ.\n" +
 "3. EXCLUSION ET CONCISION : Pas de politesse, pas de salutations, pas de résumés verbeux des actualités passées. Calculez les directions comme un algorithme purement déterministe. Les 11 actifs doivent figurer sur le rapport, sans omission.";
-        String systemPromptFinal = construirePromptQuotidienSystem(dailyDrivers, baseSystemPrompt);
+        String systemPromptFinal = construirePromptQuotidienSystem(dailyDrivers, DAILY_SYSTEM_PROMPT);
 
         JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
