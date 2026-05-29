@@ -1685,7 +1685,7 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
    }
     
    private void generateAndSendDailyBrief() {
-    HttpURLConnection conn = null;
+   HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
         if (apiKey.isEmpty()) return;
@@ -1693,7 +1693,7 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
         long nowSec = System.currentTimeMillis() / 1000;
         String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
 
-        if (dailyDrivers == null || dailyDrivers.isEmpty()) {
+        if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
             Log.d(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h, rapport ignoré");
             return;
         }
@@ -1704,7 +1704,6 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
         SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
         sdfDate.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
         String dateStr = sdfDate.format(Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo")).getTime());
-
         // PROMPT SYSTEME STRUCTURÉ DU BRIEFING DAILY
         String DAILY_SYSTEM_PROMPT =
 "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif d'élite.\n" +
@@ -1807,12 +1806,14 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
 "1. SYMÉTRIE STRICTE DES INDICES : Le couple 💻 NASDAQ et 📊 SP500 doit pointer impérativement dans le même sens (soit deux ACHAT CHOC, soit deux VENTE CHOC, soit deux NEUTRE). Aucune divergence n'est tolérée.\n" +
 "2. AMPLIFICATION DES CRYPTOS : L'actif ₿ BITCOIN est traité comme un indicateur de bêta élevé lié au sentiment technologique. Il doit calquer sa direction sur celle du 💻 NASDAQ.\n" +
 "3. EXCLUSION ET CONCISION : Pas de politesse, pas de salutations, pas de résumés verbeux des actualités passées. Calculez les directions comme un algorithme purement déterministe. Les 11 actifs doivent figurer sur le rapport, sans omission.";
+        String systemPromptFinal = construirePromptQuotidienSystem(dailyDrivers, baseSystemPrompt);
+
         JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
-        payload.put("temperature", 0.1); // Verrouillage de la créativité pour éviter les dérives
+        payload.put("temperature", 0.02); // Verrouillage pour éliminer les hallucinations de syntaxe
 
         JSONArray messages = new JSONArray();
-        messages.put(new JSONObject().put("role", "system").put("content", DAILY_SYSTEM_PROMPT));
+        messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
         messages.put(new JSONObject().put("role", "user").put("content", 
             "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n" +
             "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers));
@@ -1823,19 +1824,19 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
         conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-        conn.setConnectTimeout(10000);
-        conn.setReadTimeout(15000);
+        conn.setConnectTimeout(15000); // Augmenté à 15s pour la stabilité à Madagascar
+        conn.setReadTimeout(20000);
         conn.setDoOutput(true);
 
         try (OutputStream os = conn.getOutputStream()) {
-            os.write(payload.toString().getBytes("UTF-8"));
+            os.write(payload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
             os.flush();
         }
 
         int responseCode = conn.getResponseCode();
-        if (responseCode == 200) {
+        if (responseCode == HttpURLConnection.HTTP_OK) {
             StringBuilder r = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) {
                     r.append(line);
@@ -1848,19 +1849,28 @@ boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sour
                                          .getJSONObject("message")
                                          .getString("content");
 
-            // Envoi direct et sécurisé sur Telegram
-            sendTelegramSecure(aiResult, this);
-            Log.d(TAG, "[DAILY] Rapport envoyé avec succès.");
-            
-        } else {
-            Log.e(TAG, "[DAILY] Erreur API Groq: " + responseCode);
+            if (aiResult != null && aiResult.trim().length() > 50) {
+                // Envoi direct et sécurisé sur Telegram
+                sendTelegramSecure(aiResult.trim(), this);
+                Log.d(TAG, "[DAILY] Rapport envoyé avec succès.");
+            }
+            } else {
+            // FIX TECHNIQUE : Lecture sécurisée du flux d'erreur pour éviter la socket réseau fantôme
+            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                StringBuilder errorResponse = new StringBuilder();
+                String line;
+                while ((line = errorReader.readLine()) != null) {
+                    errorResponse.append(line);
+                }
+                Log.e(TAG, "[DAILY] Erreur API Groq HTTP " + responseCode + " : " + errorResponse.toString());
+            }
         }
     } catch (Exception e) {
         Log.e(TAG, "[DAILY] Échec critique du briefing journalier", e);
     } finally {
         if (conn != null) conn.disconnect();
     }
-   }
+}
 
     private void startMonthlyReportScheduler() {
         Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
