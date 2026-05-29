@@ -968,7 +968,14 @@ public class NotificationService extends NotificationListenerService {
     // 5. Extraction native des actifs financiers cibles
     List<String> enrichedAssets = new ArrayList<>();
     String scanBody = ((title != null ? title : "") + " " + (body != null ? body : "")).toUpperCase(Locale.ROOT);
-
+    if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO") ||
+    scanBody.contains("GERMAN") || scanBody.contains("GERMANY") || scanBody.contains("DEUTSCH") ||
+    scanBody.contains("FRENCH") || scanBody.contains("FRANCE") ||
+    scanBody.contains("ITALIAN")|| scanBody.contains("ITALY") ||
+    scanBody.contains("SPANISH")|| scanBody.contains("SPAIN") ||
+    scanBody.contains("ECB")    || scanBody.contains("BCE") || scanBody.contains("LAGARDE")) {
+    enrichedAssets.add("EURUSD");
+    }
     if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO")) enrichedAssets.add("EURUSD");
     if (scanBody.contains("USDJPY") || scanBody.contains("JPY")  || scanBody.contains("YEN"))  enrichedAssets.add("USDJPY");
     if (scanBody.contains("GBPUSD") || scanBody.contains("GBP/") || scanBody.contains("POUND")) enrichedAssets.add("GBPUSD");
