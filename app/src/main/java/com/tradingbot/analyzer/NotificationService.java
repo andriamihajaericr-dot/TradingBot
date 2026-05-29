@@ -300,7 +300,7 @@ public class NotificationService extends NotificationListenerService {
     "     * 🇦🇺 AUDUSD  : VENTE CHOC 🔴 [Liquidation de la devise cyclique/commodity non-pétrole]\n" +
     "     * 🇯🇵 USDJPY  : NEUTRE ou VENTE CHOC 🔴 [Arbitrage complexe : Dollar Fort vs Yen Refuge. Justifier dans le Fait Marquant].\n" +
     "     * 🇨🇦 USDCAD  : NEUTRE ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
-    "   - Le modèle doit mentionner l'expression exacte : 'Régime de dominance géopolitique (Safe-Haven) sur l'inflation' dans le FAIT MARQUANT.\n\n"
+    "   - Le modèle doit mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans le FAIT MARQUANT.\n\n"
     "</HARD_CONSTRAINTS>\n\n" +
 
     "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
