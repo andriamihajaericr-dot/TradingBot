@@ -912,6 +912,207 @@ private static final String DAILY_SYSTEM_PROMPT =
             }
         }).start();
     }
+    @Override
+    public void onNotificationPosted(StatusBarNotification sbn) {
+    // 1. Vérification de l'état d'activation du bot
+    if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
+
+    Bundle extras = sbn.getNotification().extras;
+    String title = extras.getString(Notification.EXTRA_TITLE, "");
+
+    // Priorité décroissante pour l'extraction du texte
+    String bigText    = extras.getString(Notification.EXTRA_BIG_TEXT, "");
+    String subText    = extras.getString(Notification.EXTRA_SUB_TEXT, "");
+    String summary    = extras.getString(Notification.EXTRA_SUMMARY_TEXT, "");
+    String text       = extras.getString(Notification.EXTRA_TEXT, "");
+
+    String body = bigText.length() > text.length() ? bigText : text;
+    if (subText.length() > body.length()) body = subText;
+    if (summary.length() > body.length()) body = summary;
+    String unifiedFeed = (title + " " + body).trim();
+    
+    CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+    if (lines != null && lines.length > 0) {
+        StringBuilder bundled = new StringBuilder(title).append(" ");
+        for (CharSequence line : lines) {
+            if (line != null) bundled.append(line).append(" ");
+        }
+        String bundledFeed = bundled.toString().trim();
+        if (bundledFeed.length() > unifiedFeed.length()) {
+            unifiedFeed = bundledFeed;
+        }
+    }
+    
+    if (unifiedFeed.length() < 6) return;
+
+    String packageName = sbn.getPackageName().toLowerCase();
+    String sourceName = "Source Institutionnelle";
+
+    if (packageName.contains("financialjuice")) sourceName = "FinancialJuice";
+    else if (packageName.contains("investing")) sourceName = "Investing.com";
+    else if (packageName.contains("twitter") || packageName.contains("periscope")) sourceName = "X / Twitter";
+    else return;
+
+    String upperFeed = unifiedFeed.toUpperCase(Locale.ROOT);
+    long currentTime = System.currentTimeMillis();
+    String currentSpeaker = "";
+
+    // Speakers complets
+    if (upperFeed.contains("POWELL") || upperFeed.contains("WARSH") || upperFeed.contains("WALLER") ||
+        upperFeed.contains("BARKIN") || upperFeed.contains("GOOLSBEE") || upperFeed.contains("WILLIAMS") ||
+        upperFeed.contains("KUGLER") || upperFeed.contains("Bostic") || upperFeed.contains("DALY") ||
+        upperFeed.contains("LOGAN") || upperFeed.contains("FED")) currentSpeaker = "FED";
+    else if (upperFeed.contains("LAGARDE") || upperFeed.contains("SCHNABEL") || upperFeed.contains("NAGEL")) 
+        currentSpeaker = "ECB";
+
+    // 3. Détection des drivers (couverture maximale)
+    EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
+    
+    boolean isSupremeRank = false;
+    String eventTypeStr = "UNKNOWN";
+    
+    if (detection != null && detection.eventType != null) {
+        eventTypeStr = detection.eventType;
+    }
+
+    String u = unifiedFeed.toUpperCase(Locale.ROOT);
+
+    // === DRIVERS MACRO (CPI, FOMC, NFP, JOBLESS, etc.) ===
+    if (u.contains("CPI") || u.contains("PCE") || u.contains("PPI") || u.contains("INFLATION") || u.contains("CORE")) {
+        eventTypeStr = "INFLATION-DATA"; isSupremeRank = true;
+    }
+    if (u.contains("FOMC") || u.contains("FED RATE") || u.contains("INTEREST RATE") || u.contains("POWELL")) {
+        eventTypeStr = "FED-MONETARY-POLICY"; isSupremeRank = true;
+    }
+    if (u.contains("NFP") || u.contains("NON-FARM") || u.contains("NONFARM PAYROLLS")) {
+        eventTypeStr = "EMPLOYMENT-REPORT"; isSupremeRank = true;
+    }
+    if (u.contains("JOBLESS CLAIMS") || u.contains("INITIAL CLAIMS") || u.contains("UNEMPLOYMENT")) {
+        eventTypeStr = "JOBLESS-CLAIMS"; isSupremeRank = true;
+    }
+    if (u.contains("GDP") || u.contains("PIB") || u.contains("GROWTH") || u.contains("CROISSANCE")) {
+        eventTypeStr = "ECONOMIC-GROWTH-DATA";
+    }
+    if (u.contains("PMI") || u.contains("ISM")) eventTypeStr = "PMI-ISM";
+
+    // === PÉTROLE ===
+    if (u.contains("OIL") || u.contains("WTI") || u.contains("BRENT") || u.contains("CRUDE") || 
+        u.contains("EIA") || u.contains("OPEC") || u.contains("INVENTORIES") || u.contains("PETROLE")) {
+        eventTypeStr = "OIL-INVENTORY";
+    }
+
+    // === GÉOPOLITIQUE / GUERRE / MOYEN-ORIENT / HORMUZ ===
+    if (u.contains("HORMUZ") || u.contains("ORMUZ") || u.contains("IRAN") || u.contains("ISRAEL") || 
+        u.contains("HEZBOLLAH") || u.contains("HOUTHI") || u.contains("GAZA") || u.contains("LEBANON") || 
+        u.contains("MOYEN-ORIENT") || u.contains("MIDDLE EAST") || u.contains("WAR") || u.contains("STRIKE") || 
+        u.contains("FRAPPE") || u.contains("ESCALADE") || u.contains("CONFLIT") || u.contains("MILITARY") || 
+        u.contains("TAIWAN") || u.contains("UKRAINE") || u.contains("RUSSIA")) {
+        eventTypeStr = "GEOPOLITICAL";
+        isSupremeRank = true;
+    }
+
+    // Mise à jour finale du rang suprême
+    if (currentSpeaker.equals("FED") || eventTypeStr.equals("INFLATION-DATA") || 
+        eventTypeStr.equals("FED-MONETARY-POLICY") || eventTypeStr.equals("EMPLOYMENT-REPORT") || 
+        eventTypeStr.equals("JOBLESS-CLAIMS") || eventTypeStr.equals("GEOPOLITICAL")) {
+        isSupremeRank = true;
+    }
+
+    // 4. Anti-spam
+    String speakerToken = currentSpeaker != null ? currentSpeaker.trim() : "";
+    if (!speakerToken.isEmpty()) {
+        if (!isSupremeRank && speakerToken.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
+            Log.d(TAG, "Doublon filtré (" + speakerToken + ")");
+            return;
+        }
+        lastSpeechTime = currentTime;
+        lastSpeaker = speakerToken;
+    }
+
+    // 5. Extraction des actifs (100% alignée)
+    List<String> enrichedAssets = new ArrayList<>();
+    String scanBody = (title + " " + body).toUpperCase(Locale.ROOT);
+
+    // Devises
+    if (scanBody.contains("EUR") || scanBody.contains("ECB") || scanBody.contains("LAGARDE")) enrichedAssets.add("EURUSD");
+    if (scanBody.contains("JPY") || scanBody.contains("YEN") || scanBody.contains("BOJ")) enrichedAssets.add("USDJPY");
+    if (scanBody.contains("GBP") || scanBody.contains("BOE")) enrichedAssets.add("GBPUSD");
+    if (scanBody.contains("AUD") || scanBody.contains("RBA")) enrichedAssets.add("AUDUSD");
+    if (scanBody.contains("CAD") || scanBody.contains("BOC")) enrichedAssets.add("USDCAD");
+
+    // Actifs principaux
+    if (scanBody.contains("GOLD") || scanBody.contains("XAU")) enrichedAssets.add("GOLD");
+    if (scanBody.contains("NASDAQ") || scanBody.contains("TECH") || scanBody.contains("AI")) enrichedAssets.add("NASDAQ");
+    if (scanBody.contains("SP500") || scanBody.contains("S&P")) enrichedAssets.add("SP500");
+    if (scanBody.contains("BITCOIN") || scanBody.contains("BTC")) enrichedAssets.add("BITCOIN");
+
+    // === PÉTROLE & HORMUZ ===
+    if (scanBody.contains("OIL") || scanBody.contains("WTI") || scanBody.contains("CRUDE") || 
+        scanBody.contains("EIA") || scanBody.contains("HORMUZ") || scanBody.contains("ORMUZ")) {
+        enrichedAssets.add("USOIL");
+        enrichedAssets.add("USDCAD");
+        enrichedAssets.add("GOLD");
+    }
+
+    // === GÉOPOLITIQUE / GUERRE ===
+    if (eventTypeStr.equals("GEOPOLITICAL")) {
+        enrichedAssets.add("GOLD");
+        enrichedAssets.add("USOIL");
+        enrichedAssets.add("USDJPY");
+        enrichedAssets.add("US10Y");
+        enrichedAssets.add("NASDAQ");
+        enrichedAssets.add("SP500");
+    }
+
+    // === MACRO CRITIQUES (CPI, FOMC, NFP, JOBLESS) ===
+    if (eventTypeStr.equals("INFLATION-DATA") || eventTypeStr.equals("FED-MONETARY-POLICY") || 
+        eventTypeStr.equals("EMPLOYMENT-REPORT") || eventTypeStr.equals("JOBLESS-CLAIMS")) {
+        enrichedAssets.add("US10Y");
+        enrichedAssets.add("NASDAQ");
+        enrichedAssets.add("SP500");
+        enrichedAssets.add("GOLD");
+        enrichedAssets.add("EURUSD");
+        enrichedAssets.add("USDJPY");
+        enrichedAssets.add("BITCOIN");
+    }
+
+    // Fallback
+    if (enrichedAssets.isEmpty()) {
+        enrichedAssets.add("NASDAQ");
+        enrichedAssets.add("SP500");
+        enrichedAssets.add("US10Y");
+    }
+
+    // 6. Validation & Sauvegarde
+    EventValidator.ValidationResult validationResult = EventValidator.validate(title, body, currentTime, enrichedAssets);
+
+    boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || 
+                       sourceName.equals("Investing.com") || sourceName.equals("X / Twitter");
+
+    String fingerprint = generateSecureHash(packageName + "_" + title + "_" + body + "_" + (sbn.getPostTime() / 60000));
+
+    if (forceSave) {
+        StringBuilder assetsSb = new StringBuilder();
+        for (int i = 0; i < enrichedAssets.size(); i++) {
+            assetsSb.append(enrichedAssets.get(i));
+            if (i < enrichedAssets.size() - 1) assetsSb.append(",");
+        }
+        String assetsString = assetsSb.toString();
+
+        int driverWeight = isSupremeRank ? 5 : 3;
+
+        boolean saved = eventDb.saveEvent(
+                fingerprint, packageName, sourceName, eventTypeStr, title, body,
+                assetsString, "pending", sbn.getPostTime() / 1000, "pending", driverWeight);
+
+        if (saved) {
+            Log.d(TAG, "[VALIDATEUR] Driver : " + eventTypeStr + " [Poids: " + driverWeight + "]");
+        }
+    }
+
+    // 9. Pipeline final
+    processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime(), fingerprint);
+} 
 
     @Override
     public void onCreate() {
@@ -975,202 +1176,7 @@ private static final String DAILY_SYSTEM_PROMPT =
     }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
 
     }
-
- @Override
- public void onNotificationPosted(StatusBarNotification sbn) {
-    // 1. Vérification de l'état d'activation du bot
-    if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
-
-    Bundle extras = sbn.getNotification().extras;
-    String title = extras.getString(Notification.EXTRA_TITLE, "");
-
-    // Priorité décroissante pour l'extraction du texte : BigText > SubText > Summary > Text
-    String bigText    = extras.getString(Notification.EXTRA_BIG_TEXT, "");
-    String subText    = extras.getString(Notification.EXTRA_SUB_TEXT, "");
-    String summary    = extras.getString(Notification.EXTRA_SUMMARY_TEXT, "");
-    String text       = extras.getString(Notification.EXTRA_TEXT, "");
-
-    // Sélection du contenu textuel le plus riche et complet
-    String body = bigText.length() > text.length() ? bigText : text;
-    if (subText.length() > body.length())   body = subText;
-    if (summary.length() > body.length())   body = summary;
-    String unifiedFeed = (title + " " + body).trim();
-    
-    // Dégroupe les notifications complexes (ex: structures multi-lignes d'Investing.com)
-    CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
-    if (lines != null && lines.length > 0) {
-        StringBuilder bundled = new StringBuilder(title).append(" ");
-        for (CharSequence line : lines) {
-            if (line != null) bundled.append(line).append(" ");
-        }
-        String bundledFeed = bundled.toString().trim();
-        if (bundledFeed.length() > unifiedFeed.length()) {
-            unifiedFeed = bundledFeed;
-        }
-    }
-    
-    // Filtre de taille minimale pour éviter de traiter des notifications vides ou corrompues
-    if (unifiedFeed.length() < 6) return;
-
-    // 2. Identification stricte de la source du flux macro
-    String packageName = sbn.getPackageName().toLowerCase();
-    String sourceName = "Source Institutionnelle";
-
-    if (packageName.contains("com.financialjuice.androidapp") || packageName.contains("financialjuice")) {
-        sourceName = "FinancialJuice";
-    } else if (packageName.contains("com.fusionmedia.investing") || packageName.contains("investing")) {
-        sourceName = "Investing.com";
-    } else if (packageName.contains("com.twitter.android") || packageName.contains("twitter") || packageName.contains("periscope")) {
-        sourceName = "X / Twitter";
-    } else {
-        // Ignore toutes les autres applications non configurées dans le périmètre du bot
-        return;
-    }
-
-    String upperFeed = unifiedFeed.toUpperCase();
-    long currentTime = System.currentTimeMillis();
-    String currentSpeaker = "";
-
-    // Détection de l'intervenant (Central Bank Speakers)
-    if (upperFeed.contains("WARSH"))           currentSpeaker = "WARSH";
-    else if (upperFeed.contains("POWELL"))     currentSpeaker = "POWELL";
-    else if (upperFeed.contains("BARKIN"))     currentSpeaker = "BARKIN";
-    else if (upperFeed.contains("GOOLSBEE"))   currentSpeaker = "GOOLSBEE";
-    else if (upperFeed.contains("HAMMACK"))    currentSpeaker = "HAMMACK";
-    else if (upperFeed.contains("WALLER"))     currentSpeaker = "WALLER";
-    else if (upperFeed.contains("WILLIAMS"))   currentSpeaker = "WILLIAMS";
-    else if (upperFeed.contains("KUGLER"))     currentSpeaker = "KUGLER";
-    else if (upperFeed.contains("LAGARDE"))    currentSpeaker = "LAGARDE";
-    else if (upperFeed.contains("BAILEY"))     currentSpeaker = "BAILEY";
-    else if (upperFeed.contains("MACKLEM"))    currentSpeaker = "MACKLEM";
-    else if (upperFeed.contains("BULLOCK"))    currentSpeaker = "BULLOCK";
-    else if (upperFeed.contains("UEDA"))       currentSpeaker = "UEDA";
-    
-    // 3. Détection sécurisée du type d'événement macro (Anti-Crash)
-    EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
-    
-    boolean isSupremeRank = false;
-    String eventTypeStr = "UNKNOWN";
-    
-    if (detection != null && detection.eventType != null) {
-        eventTypeStr = detection.eventType;
-        if (eventTypeStr.equals("FED-MONETARY-POLICY") || eventTypeStr.equals("INFLATION-DATA")) {
-            isSupremeRank = true;
-        }
-    }
-    
-    String speakerToken = (currentSpeaker != null) ? currentSpeaker.trim() : "";
-    if (speakerToken.equals("WARSH") || speakerToken.equals("WALLER")) {
-        isSupremeRank = true;
-    }
-
-    // 4. Gestion du verrou anti-spam (60 secondes) pour les discours denses
-    if (!speakerToken.isEmpty()) {
-        if (!isSupremeRank) {
-            if (speakerToken.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
-                Log.d(TAG, "Doublon de notification filtré (" + speakerToken + ") pour éviter le spam.");
-                return;
-            }
-        }
-        lastSpeechTime = currentTime;
-        lastSpeaker = speakerToken;
-    }
-
-    // 5. Extraction native des actifs financiers cibles
-    List<String> enrichedAssets = new ArrayList<>();
-    String scanBody = ((title != null ? title : "") + " " + (body != null ? body : "")).toUpperCase(Locale.ROOT);
-    if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO") ||
-    scanBody.contains("GERMAN") || scanBody.contains("GERMANY") || scanBody.contains("DEUTSCH") ||
-    scanBody.contains("FRENCH") || scanBody.contains("FRANCE") ||
-    scanBody.contains("ITALIAN")|| scanBody.contains("ITALY") ||
-    scanBody.contains("SPANISH")|| scanBody.contains("SPAIN") ||
-    scanBody.contains("ECB")    || scanBody.contains("BCE") || scanBody.contains("LAGARDE")) {
-    enrichedAssets.add("EURUSD");
-    }
-    if (scanBody.contains("EURUSD") || scanBody.contains("EUR/") || scanBody.contains("EURO")) enrichedAssets.add("EURUSD");
-    if (scanBody.contains("USDJPY") || scanBody.contains("JPY")  || scanBody.contains("YEN"))  enrichedAssets.add("USDJPY");
-    if (scanBody.contains("GBPUSD") || scanBody.contains("GBP/") || scanBody.contains("POUND")) enrichedAssets.add("GBPUSD");
-    if (scanBody.contains("AUDUSD") || scanBody.contains("AUD/"))                                enrichedAssets.add("AUDUSD");
-    if (scanBody.contains("USDCAD") || scanBody.contains("CAD/"))                                enrichedAssets.add("USDCAD");
-    if (scanBody.contains("GOLD")   || scanBody.contains("XAU"))                                 enrichedAssets.add("GOLD");
-    if (scanBody.contains("USOIL")  || scanBody.contains("CRUDE") || scanBody.contains("WTI"))   enrichedAssets.add("USOIL");
-    if (scanBody.contains("NASDAQ") || scanBody.contains("NAS100")|| scanBody.contains("USTECH")) enrichedAssets.add("NASDAQ");
-    if (scanBody.contains("SP500")  || scanBody.contains("S&P")   || scanBody.contains("SPX"))   enrichedAssets.add("SP500");
-    if (scanBody.contains("BITCOIN")|| scanBody.contains("BTC"))                                 enrichedAssets.add("BITCOIN");
-
-    // Fallback d'affectation intelligent (Contraintes d'isolation des Banques Centrales Étrangères)
-    if (enrichedAssets.isEmpty()) {
-        if (upperFeed.contains("ECB") || upperFeed.contains("BCE") || upperFeed.contains("LAGARDE")) {
-            // Règle d'exclusion : On cible uniquement la devise concernée, NEUTRE sur les indices US
-            enrichedAssets.add("EURUSD");
-        } else if (upperFeed.contains("BOJ") || upperFeed.contains("YEN") || upperFeed.contains("UEDA")) {
-            // Règle d'exclusion : On cible uniquement l'actif lié à la Banque du Japon
-            enrichedAssets.add("USDJPY");
-        } else {
-            // Allocation par défaut pour les événements génériques sans mot-clé explicite
-            enrichedAssets.add("NASDAQ");
-            enrichedAssets.add("SP500");
-            enrichedAssets.add("US10Y");
-        }
-    }
-
-    // 6. Validation du flux par le validateur de pertinence
-    // 6. Validation du flux par le validateur de pertinence
-    EventValidator.ValidationResult validationResult = EventValidator.validate(title, body, currentTime, enrichedAssets);
-
-    // Arbitrage du droit d'écriture immédiat en base de données local SQLite
-    // forceSave devient vrai si c'est un rang suprême OU si la source est une application macro officielle
-boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || sourceName.equals("Investing.com") || sourceName.equals("X / Twitter");
-
-    // 🌟 DÉPLACEZ LA GÉNÉRATION DU FINGERPRINT ICI (HORS DU IF) :
-    String fingerprint = generateSecureHash(packageName + "_" + title + "_" + body + "_" + (sbn.getPostTime() / 60000));
-
-    if (forceSave) {
-        // La variable 'fingerprint' est maintenant accessible ici sans problème
-        
-        // Sérialisation propre de la liste des actifs au format CSV pour SQLite
-        StringBuilder assetsSb = new StringBuilder();
-        for (int i = 0; i < enrichedAssets.size(); i++) {
-            assetsSb.append(enrichedAssets.get(i));
-            if (i < enrichedAssets.size() - 1) assetsSb.append(",");
-        }
-        String assetsString = assetsSb.toString();
-
-        // 7. Calcul du poids de dominance macroéconomique (Driver Weight)
-        int driverWeight = 1; 
-        if (!eventTypeStr.equals("UNKNOWN")) {
-            if (isSupremeRank) {
-                driverWeight = 5;
-            } else if (eventTypeStr.startsWith("GEO") || eventTypeStr.equals("CENTRAL-BANK-RATE") || eventTypeStr.equals("EMPLOYMENT-REPORT")) {
-                driverWeight = 4;
-            } else if (eventTypeStr.equals("ECONOMIC-GROWTH-DATA")) {
-                driverWeight = 2;
-            }
-        }
-
-        // 8. Sauvegarde synchrone dans la base SQLite locale
-        boolean saved = eventDb.saveEvent(
-                fingerprint,
-                packageName,
-                sourceName,
-                eventTypeStr,
-                title,
-                body,
-                assetsString,
-                "pending",                  
-                sbn.getPostTime() / 1000,  
-                "pending",                  
-                driverWeight
-        );
-
-        if (saved) {
-            Log.d(TAG, "[VALIDATEUR] Événement macro validé inséré en base : " + eventTypeStr + " [Poids: " + driverWeight + "]");
-        }
-    } // <--- FIN DU IF
-
-    // 9. Routage unique vers le pipeline d'analyse asynchrone (Groq / Telegram)
-    // 🌟 Désormais, 'fingerprint' est parfaitement reconnu ici !
-    processIncomingMacroFeed(sourceName, title, body, unifiedFeed, packageName, sbn.getPostTime(), fingerprint);
+, title, body, unifiedFeed, packageName, sbn.getPostTime(), fingerprint);
 }
 
         
