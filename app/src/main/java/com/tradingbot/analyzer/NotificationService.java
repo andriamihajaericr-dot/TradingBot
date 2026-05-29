@@ -631,43 +631,48 @@ public class NotificationService extends NotificationListenerService {
     "🏁 FLUX DOMINANT : [Chaîne de caractères exacte issue des règles de directionnalité]"; 
 
     // 2. Génération dynamique de l'horodatage actuel au format de Madagascar (EAT)
+    // Horodatage Madagascar injecté proprement au format
     java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
     sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
     String currentMadaTime = sdf.format(new java.util.Date());
 
-    // 3. Préparation du contenu utilisateur
+    // Sécurisation anti-NullPointerException de la liste des actifs
+    String assetsString = (enrichedAssets != null) ? enrichedAssets.toString() : "[]";
+
     String userContent = "CONTEXTE TEMPOREL : " + currentMadaTime + "\n"
             + "SOURCE DE LA NEWS : " + sourceName + "\n"
             + "TITRE : " + title + "\n"
             + "CORPS DE LA NOTIFICATION : " + body + "\n"
-            + "ACTIFS PRÉ-QUALIFIÉS : " + enrichedAssets.toString();
+            + "ACTIFS PRÉ-QUALIFIÉS : " + assetsString;
 
     final JSONObject jsonPayload = new JSONObject();
-    try {
-        EventDatabase db = EventDatabase.getInstance(NotificationService.this);
-        List<String> historique = db.obtenirTexteEvenementsRecents();
-        String promptFinalEnvoye = construirePromptFinal(userContent, historique);
 
-        jsonPayload.put("model", GROQ_MODEL);
-        jsonPayload.put("temperature", 0.02); // Légère flexibilité recommandée pour éviter les blocages JSON
-
-        JSONArray messages = new JSONArray();
-        messages.put(new JSONObject().put("role", "system").put("content", promptFinalEnvoye));
-        messages.put(new JSONObject().put("role", "user").put("content", userContent));
-        jsonPayload.put("messages", messages);
-    } catch (Exception e) {
-        Log.e(TAG, "[GROQ] Erreur lors de la sérialisation du JSON", e);
-        return;
-    } 
-    // 5. Exécution Asynchrone
+    // Exécution Asynchrone Globale (Réseau + SQLite déportés hors du Main Thread)
     new Thread(new Runnable() {
         @Override
         public void run() {
             java.net.HttpURLConnection conn = null;
             try {
-                String apiKey = getGroqApiKey();
-                if (apiKey.isEmpty()) return;
+                // Extraction de l'historique SQLite sécurisée dans le Thread d'arrière-plan
+                EventDatabase db = EventDatabase.getInstance(NotificationService.this);
+                List<String> historique = db.obtenirTexteEvenementsRecents();
+                String promptFinalEnvoye = construirePromptFinal(userContent, historique);
 
+                jsonPayload.put("model", GROQ_MODEL);
+                jsonPayload.put("temperature", 0.02);
+
+                JSONArray messages = new JSONArray();
+                messages.put(new JSONObject().put("role", "system").put("content", promptFinalEnvoye));
+                messages.put(new JSONObject().put("role", "user").put("content", userContent));
+                jsonPayload.put("messages", messages);
+
+                // Début de la requête réseau vers Groq API
+                String apiKey = getGroqApiKey();
+                if (apiKey.isEmpty()) {
+                    Log.e(TAG, "[GROQ] Clé API absente. Analyse annulée.");
+                    return;
+                }
+                
                 java.net.URL url = new java.net.URL(GROQ_URL);
                 conn = (java.net.HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -682,6 +687,7 @@ public class NotificationService extends NotificationListenerService {
                     os.write(input, 0, input.length);
                     os.flush();
                 }
+
                 int status = conn.getResponseCode();
                 if (status == java.net.HttpURLConnection.HTTP_OK) {
                     StringBuilder response = new StringBuilder();
@@ -692,7 +698,7 @@ public class NotificationService extends NotificationListenerService {
                             response.append(line);
                         }
                     }
-
+                    
                     JSONObject jsonResponse = new JSONObject(response.toString());
                     String aiReport = jsonResponse.getJSONArray("choices")
                             .getJSONObject(0)
@@ -701,54 +707,63 @@ public class NotificationService extends NotificationListenerService {
 
                     if (aiReport == null || aiReport.length() < 50) return;
 
-                    // ─── INTEGRATION DU FILTRAGE INTELLIGENT DE SÉCURITÉ ───
+                    // Filtrage intelligent des signaux d'impacts macroéconomiques
                     StringBuilder filteredMessage = new StringBuilder();
                     String[] lines = aiReport.split("\n");
                     int activeSignalsCount = 0;
                     boolean inImpactSection = false;
+
                     for (String line : lines) {
                         String trimmed = line.trim();
                         if (trimmed.isEmpty()) continue;
-
-                        if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || 
-                            trimmed.startsWith("🎯") || trimmed.startsWith("📢") || 
-                            trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
+                        if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") || trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
                             filteredMessage.append(line).append("\n");
                             if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
                             continue;
                         }
-
                         if (inImpactSection && trimmed.startsWith("•")) {
                             String upperLine = line.toUpperCase(Locale.ROOT);
-                            boolean isSignificant = upperLine.contains("ACHAT CHOC") || 
-                                                    upperLine.contains("VENTE CHOC") || 
-                                                    upperLine.contains("INCLINATION ACHAT") || 
-                                                    upperLine.contains("INCLINATION VENTE");
-
+                            boolean isSignificant = upperLine.contains("ACHAT CHOC") || upperLine.contains("VENTE CHOC") || upperLine.contains("INCLINATION ACHAT") || upperLine.contains("INCLINATION VENTE");
                             if (isSignificant) {
                                 filteredMessage.append(line).append("\n");
                                 activeSignalsCount++;
                             }
                         }
                     }
-                    EventDatabase eventDb = EventDatabase.getInstance(NotificationService.this);
-                    
+
                     if (activeSignalsCount > 0) {
                         String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n" + filteredMessage.toString().trim();
                         sendTelegramSecure(finalPayload, NotificationService.this);
-                        eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
+                        if (eventDb != null && fingerprint != null) {
+                            eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
+                        }
                     } else {
+                        if (eventDb != null && fingerprint != null) {
+                            eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                        }
+                    }
+                } else {
+                    Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
+                    if (eventDb != null && fingerprint != null) {
                         eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau", e);
+                Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
+                if (eventDb != null && fingerprint != null) {
+                    try {
+                        eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                    } catch (Exception ex) {
+                        Log.e(TAG, "Impossible de mettre à jour la base après crash", ex);
+                    }
+                }
             } finally {
                 if (conn != null) conn.disconnect();
             }
         }
     }).start();
 }
+
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
