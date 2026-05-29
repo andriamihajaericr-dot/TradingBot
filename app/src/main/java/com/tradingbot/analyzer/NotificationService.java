@@ -597,7 +597,7 @@ public class NotificationService extends NotificationListenerService {
     "     * 🇯🇵 USDJPY  : NEUTRE ou VENTE CHOC 🔴 [Arbitrage complexe : Dollar Fort vs Yen Refuge. Justifier dans le Fait Marquant].\n" +
     "     * 🇨🇦 USDCAD  : NEUTRE ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
     "   - Le modèle doit mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans le FAIT MARQUANT.\n\n" +
-    "</HARD_CONSTRAINTS>\n\n" ; 
+    "</HARD_CONSTRAINTS>\n\n" +
     "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
     "   Si l'actualité dit : \"BCE dovish, Schnabel s'inquiète de la croissance européenne\", la réponse DOIT copier l'intégralité des 11 lignes ainsi :\n" +
     "   • 📈 US10Y   : NEUTRE | Pas d'impact direct de ce driver.\n" +
