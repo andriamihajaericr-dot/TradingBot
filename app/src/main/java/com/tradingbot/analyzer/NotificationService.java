@@ -1036,7 +1036,7 @@ public class NotificationService extends NotificationListenerService {
  }
 
         
-    private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime) {
+    private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime, String fingerprint) {
         String heureExacteMada = getMadaFormattedDateTime();
         // 2. Injection du contexte temporel au début de la variable feed avant l'analyse
         feed = "CONTEXTE TEMPOREL : Nous sommes le " + heureExacteMada + " (Heure de Madagascar).\n\n" + feed;
