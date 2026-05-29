@@ -2021,7 +2021,6 @@ public class NotificationService extends NotificationListenerService {
         }
         
         return directiveDeCrise + SYSTEM_PROMPT + "\n\nFlux à analyser : " + evenementActuel;
-       }
     }
 
     @Override
