@@ -1179,8 +1179,6 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
 
     }
-, title, body, unifiedFeed, packageName, sbn.getPostTime(), fingerprint);
-}
 
         
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime, String fingerprint) {
