@@ -633,7 +633,7 @@ public class NotificationService extends NotificationListenerService {
     // 2. Génération dynamique de l'horodatage actuel au format de Madagascar (EAT)
     java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
     sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
-    String currentMadaTime = sdf.format(new java.util.Date(ts));
+    String currentMadaTime = sdf.format(new java.util.Date());
 
     // 3. Préparation du contenu utilisateur
     String userContent = "CONTEXTE TEMPOREL : " + currentMadaTime + "\n"
