@@ -1307,12 +1307,30 @@ public void onNotificationPosted(StatusBarNotification sbn) {
             triggerQueueSynchronization();
         }
 
-        // Enclenchement immédiat du briefing si poids fort (>=4) ou si l'analyse confirme une opportunité claire (>=3 avec confirmation)
-        if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
-            Log.d(TAG, "[DAILY TRIGGER] Driver qualifié détecté (weight=" + weight + 
-                    ", confidence=" + vr.confidence + ") → génération immédiate du rapport");
-            exec.submit(this::generateAndSendDailyBrief);
+        // ✅ ENCLENCHEMENT IMMÉDIAT DE L'ANALYSE DU SIGNAL (TEMPS RÉEL)
+if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
+    Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié détecté (Poids=" + weight + 
+            ", Confiance=" + vr.confidence + ") → Envoi immédiat au pipeline d'analyse.");
+    
+    // On récupère l'historique nécessaire pour la méthode 'construirePromptFinal'
+    // (A adapter selon la façon dont votre EventDatabase extrait l'historique dans votre script récent)
+    List<String> historiqueRecent = eventDb.getRecentEventsListForAssets(targetAssets, 5); 
+
+    // On lance l'analyse de cette notification précise dans un thread séparé
+    exec.submit(() -> {
+        try {
+            // 1. On prépare le prompt de crise ou standard grâce à votre méthode magique
+            String promptFinal = construirePromptFinal(unifiedFeed, historiqueRecent);
+            
+            // 2. On exécute le pipeline d'analyse pour cette notification unique
+            // (Note : Ajustez les arguments selon la signature exacte de votre méthode de traitement IA)
+            executeAnalysisPipelineWithPrompt(sourceName, unifiedFeed, promptFinal, targetAssets, sbn.getPostTime(), hash);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur lors de l'analyse en temps réel du driver", e);
         }
+    });
+}
     }
 
     private int assignDriverWeight(String text) {
