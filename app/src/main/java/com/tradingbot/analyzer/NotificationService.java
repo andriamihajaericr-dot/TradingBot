@@ -984,7 +984,10 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         upperFeed.contains("LOGAN") || upperFeed.contains("FED")) currentSpeaker = "FED";
     else if (upperFeed.contains("LAGARDE") || upperFeed.contains("SCHNABEL") || upperFeed.contains("NAGEL")) 
         currentSpeaker = "ECB";
-
+    // === CLASSIFICATION DRIVER / INDIVIDUAL (enrichissement) ===
+    String eventClassification = getEventClassification(title, body);
+    Log.d(TAG, "[CLASSIFICATION] " + eventClassification + " détecté | Source: " + sourceName + " | Type: " + eventTypeStr);
+// ========================================================
     // 3. Détection des drivers (couverture maximale)
     EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
     
