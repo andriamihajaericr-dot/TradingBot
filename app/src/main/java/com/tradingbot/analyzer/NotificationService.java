@@ -1254,7 +1254,8 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 70) {
             weight = Math.max(weight, 4);
         }
-
+        // Enrichissement du type pour distinguer DRIVER vs INDIVIDUAL
+       // String finalEventType = eventClassification.equals("DRIVER") ? "DRIVER" : eventTypeStr;
         String hash = generateSecureHash(title + text);
             
         Log.d(TAG, "🟢 Nouvelle notification : source=" + source + ", title=" + title + ", hash=" + hash);
@@ -1290,8 +1291,18 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         }
         // SÉCURISATION DATE BASE DE DONNÉES : On utilise le temps machine absolu (divisé par 1000 pour avoir des secondes)
         long timestampSec = System.currentTimeMillis() / 1000;
-        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
-                String.join(", ", targetAssets), initialImpact, timestampSec, "pending", weight);
+        // Classification légère DRIVER vs INDIVIDUAL
+        String eventClassification = getEventClassification(title, feed);
+
+        // Sauvegarde avec classification dynamique
+        boolean saved = eventDb.saveEvent(hash, pkg, source, 
+                eventClassification,           // ← Modification légère ici
+                title, feed,
+                String.join(", ", targetAssets), 
+                initialImpact, 
+                timestampSec, 
+                "pending", 
+                weight);
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
         }
