@@ -2157,16 +2157,25 @@ public void onNotificationPosted(StatusBarNotification sbn) {
             return "N/A";
         }
     }
-     public String construirePromptFinal(String evenementActuel, List<String> historiqueRecent) {
+    public String construirePromptFinal(String evenementActuel, List<String> historiqueRecent) {
         boolean alerteGéoMajeure = false;
         
-        // Mots-clés qui déclenchent le mode de crise géopolitique
-        String[] motsClesCrise = {"hormuz", "iran", "frappe militaire", "riposte", "escalade", "blocus"};
+        // Mots-clés qui déclenchent le mode de crise géopolitique (liste enrichie)
+        String[] motsClesCrise = {
+            "hormuz", "ormuz", "détroit d'hormuz", "strait of hormuz",
+            "iran", "israel", "hezbollah", "houthi", "frappe militaire", 
+            "airstrike", "missile", "drone attack", "riposte", "escalade", 
+            "blocus", "blockade", "raid", "invasion"
+        };
         
         // On scanne l'événement actuel et l'historique récent
-        String toutLeTexte = evenementActuel.toLowerCase();
-        for (String hist : historiqueRecent) {
-            toutLeTexte += " " + hist.toLowerCase();
+        String toutLeTexte = (evenementActuel != null ? evenementActuel.toLowerCase() : "");
+        if (historiqueRecent != null) {
+            for (String hist : historiqueRecent) {
+                if (hist != null) {
+                    toutLeTexte += " " + hist.toLowerCase();
+                }
+            }
         }
         
         for (String mot : motsClesCrise) {
@@ -2180,8 +2189,9 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         String directiveDeCrise = "";
         if (alerteGéoMajeure) {
             directiveDeCrise = "⚠️ [ALERTE SYSTÈME : RÉGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE ACTIF]. " +
-                               "Le risque de guerre au Moyen-Orient/Hormuz est prioritaire. " +
-                               "L'Or (GOLD) doit refléter le flux refuge (Safe-Haven) indépendamment de la force du Dollar ou du PCE.\n\n";
+                               "Le risque de guerre au Moyen-Orient ou une menace sur le Détroit d'Hormuz est prioritaire. " +
+                               "L'Or (GOLD) doit refléter le flux refuge (Safe-Haven) indépendamment de la force du Dollar ou du PCE. " +
+                               "Appliquer immédiatement l'exception de la CONTRAINTE 11 (Régime de dominance géopolitique sur l'inflation).\n\n";
         }
         
         return directiveDeCrise + SYSTEM_PROMPT + "\n\nFlux à analyser : " + evenementActuel;
@@ -2189,30 +2199,37 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 
      // Méthode de vérification géographique des mots-clés
      public String construirePromptQuotidienSystem(String registreDeLaJournee, String promptDeBase) {
-    boolean alerteGéoMajeure = false;
-    String[] motsClesCrise = {"hormuz", "iran", "frappe militaire", "riposte", "escalade", "blocus"};
-    
-    String toutLeTexte = (registreDeLaJournee != null) ? registreDeLaJournee.toLowerCase() : "";
-    for (String mot : motsClesCrise) {
-        if (toutLeTexte.contains(mot)) {
-            alerteGéoMajeure = true;
-            break;
-        }
-    }
-    
-    // Si un mot-clé de crise est détecté, on injecte une directive d'activation en tête de prompt
-    if (alerteGéoMajeure) {
-        String alerteFlash = 
-            "⚠️ [ALERTE SYSTÈME CRITIQUE : EXCEPTION DE CRISE ACTIVE].\n" +
-            "Le registre des dernières 24h fait état d'une ESCALADE MILITAIRE DIRECTE ou d'une MENACE SUR L'OFFRE au Moyen-Orient/Hormuz.\n" +
-            "CONSIGNE : Tu te trouves dans le cas d'exception absolue décrit à la RÈGLE 5. Active immédiatement la matrice géopolitique prioritaire (Régime de dominance géopolitique sur l'inflation) pour l'alignement des 11 actifs et le fait marquant.\n\n";
+        boolean alerteGéoMajeure = false;
         
-        return alerteFlash + promptDeBase;
-    }
+        // Liste enrichie des mots-clés de crise
+        String[] motsClesCrise = {
+            "hormuz", "ormuz", "détroit d'hormuz", "strait of hormuz",
+            "iran", "israel", "hezbollah", "houthi", "frappe militaire", 
+            "airstrike", "missile", "drone attack", "riposte", "escalade", 
+            "blocus", "blockade", "raid", "invasion"
+        };
     
-    // Sinon, on renvoie le prompt standard (la hiérarchie normale s'applique)
-    return promptDeBase;
-}
+        String toutLeTexte = (registreDeLaJournee != null) ? registreDeLaJournee.toLowerCase() : "";
+        for (String mot : motsClesCrise) {
+            if (toutLeTexte.contains(mot)) {
+                alerteGéoMajeure = true;
+                break;
+            }
+        }
+    
+        // Si un mot-clé de crise est détecté, on injecte une directive d'activation en tête de prompt
+        if (alerteGéoMajeure) {
+            String alerteFlash = 
+                "⚠️ [ALERTE SYSTÈME CRITIQUE : EXCEPTION DE CRISE ACTIVE].\n" +
+                "Le registre des dernières 24h fait état d'une ESCALADE MILITAIRE DIRECTE ou d'une MENACE SUR L'OFFRE (notamment Hormuz).\n" +
+                "CONSIGNE : Tu te trouves dans le cas d'exception absolue décrit à la CONTRAINTE 11. Active immédiatement la matrice géopolitique prioritaire (Régime de dominance géopolitique sur l'inflation) pour l'alignement des 11 actifs et le fait marquant.\n\n";
+            
+            return alerteFlash + promptDeBase;
+        }
+    
+        // Sinon, on renvoie le prompt standard (la hiérarchie normale s'applique)
+        return promptDeBase;
+    }
 
     @Override
     public void onDestroy() {
