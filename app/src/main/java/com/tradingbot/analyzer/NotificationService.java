@@ -1273,7 +1273,6 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
         }
-
         // Enclenchement immédiat du briefing si poids fort (>=4) ou si l'analyse confirme une opportunité claire (>=3 avec confirmation)
         // ✅ ENCLENCHEMENT IMMÉDIAT DE L'ANALYSE DU SIGNAL (TEMPS RÉEL)
 if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
