@@ -450,6 +450,25 @@ private static final String DAILY_SYSTEM_PROMPT =
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
+    /**
+ * CLASSIFICATION DRIVER vs INDIVIDUAL (enrichissement minimal)
+ * DRIVER = ce qui change vraiment la direction du marché (aligné avec tes définitions)
+ */
+private boolean isDriverEvent(String title, String body) {
+    if (title == null && body == null) return false;
+    String text = (title + " " + body).toLowerCase(Locale.ROOT);
+    return text.contains("rapport") || text.contains("daily") || 
+           text.contains("briefing") || text.contains("résumé macro") ||
+           text.contains("drivers") || text.contains("macro summary") ||
+           text.contains("périodique") || text.contains("driver périodique");
+}
+
+/**
+ * Retourne le type clair pour traçabilité (DRIVER / INDIVIDUAL)
+ */
+private String getEventClassification(String title, String body) {
+    return isDriverEvent(title, body) ? "DRIVER" : "INDIVIDUAL";
+}
     
     private Calendar getMadaCalendar() {
       return Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
