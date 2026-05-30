@@ -1280,11 +1280,13 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                 ", Confiance=" + vr.confidence + ") → Envoi immédiat au pipeline d'analyse.");
         
         // 1. Récupération immédiate de l'historique sur le thread principal pour éviter les décalages de curseur
+        // 1. Récupération immédiate de l'historique sur le thread principal via la méthode native de votre EventDatabase
         List<String> historiqueRecent = new ArrayList<>();
         try {
-            historiqueRecent = eventDb.getRecentEventsListForAssets(targetAssets, 5);
+          // Appel de la vraie méthode existante dans votre EventDatabase
+          historiqueRecent = eventDb.obtenirTexteEvenementsRecents(); 
         } catch (Exception dbEx) {
-            Log.w(TAG, "Impossible de charger l'historique récent pour targetAssets, utilisation d'une liste vide.");
+           Log.w(TAG, "Impossible de charger l'historique récent, utilisation d'une liste vide.", dbEx);
         }
 
         // 2. VERROUILLAGE DU THROTTLE IMMÉDIAT (Sur le thread principal)
