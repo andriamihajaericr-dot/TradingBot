@@ -450,25 +450,6 @@ private static final String DAILY_SYSTEM_PROMPT =
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
-    /**
- * CLASSIFICATION DRIVER vs INDIVIDUAL (enrichissement minimal)
- * DRIVER = ce qui change vraiment la direction du marché (aligné avec tes définitions)
- */
-private boolean isDriverEvent(String title, String body) {
-    if (title == null && body == null) return false;
-    String text = (title + " " + body).toLowerCase(Locale.ROOT);
-    return text.contains("rapport") || text.contains("daily") || 
-           text.contains("briefing") || text.contains("résumé macro") ||
-           text.contains("drivers") || text.contains("macro summary") ||
-           text.contains("périodique") || text.contains("driver périodique");
-}
-
-/**
- * Retourne le type clair pour traçabilité (DRIVER / INDIVIDUAL)
- */
-private String getEventClassification(String title, String body) {
-    return isDriverEvent(title, body) ? "DRIVER" : "INDIVIDUAL";
-}
     
     private Calendar getMadaCalendar() {
       return Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
@@ -984,10 +965,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         upperFeed.contains("LOGAN") || upperFeed.contains("FED")) currentSpeaker = "FED";
     else if (upperFeed.contains("LAGARDE") || upperFeed.contains("SCHNABEL") || upperFeed.contains("NAGEL")) 
         currentSpeaker = "ECB";
-    // === CLASSIFICATION DRIVER / INDIVIDUAL (enrichissement) ===
-    String eventClassification = getEventClassification(title, body);
-    Log.d(TAG, "[CLASSIFICATION] " + eventClassification + " détecté | Source: " + sourceName + " | Type: " + eventTypeStr);
-// ========================================================
+
     // 3. Détection des drivers (couverture maximale)
     EconomicEventDetector.DetectedEvent detection = EconomicEventDetector.detectEvent(title, body);
     
@@ -1254,8 +1232,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 70) {
             weight = Math.max(weight, 4);
         }
-        // Enrichissement du type pour distinguer DRIVER vs INDIVIDUAL
-       // String finalEventType = eventClassification.equals("DRIVER") ? "DRIVER" : eventTypeStr;
+
         String hash = generateSecureHash(title + text);
             
         Log.d(TAG, "🟢 Nouvelle notification : source=" + source + ", title=" + title + ", hash=" + hash);
@@ -1291,46 +1268,18 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         }
         // SÉCURISATION DATE BASE DE DONNÉES : On utilise le temps machine absolu (divisé par 1000 pour avoir des secondes)
         long timestampSec = System.currentTimeMillis() / 1000;
-        // Classification légère DRIVER vs INDIVIDUAL
-        String eventClassification = getEventClassification(title, feed);
-
-        // Sauvegarde avec classification dynamique
-        boolean saved = eventDb.saveEvent(hash, pkg, source, 
-                eventClassification,           // ← Modification légère ici
-                title, feed,
-                String.join(", ", targetAssets), 
-                initialImpact, 
-                timestampSec, 
-                "pending", 
-                weight);
+        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
+                String.join(", ", targetAssets), initialImpact, timestampSec, "pending", weight);
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
         }
 
-        // ✅ ENCLENCHEMENT IMMÉDIAT DE L'ANALYSE DU SIGNAL (TEMPS RÉEL)
-if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
-    Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié détecté (Poids=" + weight + 
-            ", Confiance=" + vr.confidence + ") → Envoi immédiat au pipeline d'analyse.");
-    
-    // On récupère l'historique nécessaire pour la méthode 'construirePromptFinal'
-    // (A adapter selon la façon dont votre EventDatabase extrait l'historique dans votre script récent)
-    List<String> historiqueRecent = eventDb.getRecentEventsListForAssets(targetAssets, 5); 
-
-    // On lance l'analyse de cette notification précise dans un thread séparé
-    exec.submit(() -> {
-        try {
-            // 1. On prépare le prompt de crise ou standard grâce à votre méthode magique
-            String promptFinal = construirePromptFinal(unifiedFeed, historiqueRecent);
-            
-            // 2. On exécute le pipeline d'analyse pour cette notification unique
-            // (Note : Ajustez les arguments selon la signature exacte de votre méthode de traitement IA)
-            executeAnalysisPipelineWithPrompt(sourceName, unifiedFeed, promptFinal, targetAssets, sbn.getPostTime(), hash);
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur lors de l'analyse en temps réel du driver", e);
+        // Enclenchement immédiat du briefing si poids fort (>=4) ou si l'analyse confirme une opportunité claire (>=3 avec confirmation)
+        if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
+            Log.d(TAG, "[DAILY TRIGGER] Driver qualifié détecté (weight=" + weight + 
+                    ", confidence=" + vr.confidence + ") → génération immédiate du rapport");
+            exec.submit(this::generateAndSendDailyBrief);
         }
-    });
-}
     }
 
     private int assignDriverWeight(String text) {
@@ -1861,8 +1810,7 @@ if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.conf
 
         long nowSec = System.currentTimeMillis() / 1000;
         String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
-        Log.d(TAG, "[DAILY] Génération DRIVER PÉRIODIQUE déclenchée avec " + 
-              (dailyDrivers != null ? dailyDrivers.length() : 0) + " caractères de données.");
+
         if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
             Log.d(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h, rapport ignoré");
             return;
