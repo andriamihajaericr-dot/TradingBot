@@ -1182,132 +1182,142 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 
         
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime, String fingerprint) {
-        String heureExacteMada = getMadaFormattedDateTime();
-        // 2. Injection du contexte temporel au début de la variable feed avant l'analyse
-        feed = "CONTEXTE TEMPOREL : Nous sommes le " + heureExacteMada + " (Heure de Madagascar).\n\n" + feed;
-            
-        long now = System.currentTimeMillis();
-        boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
+    String heureExacteMada = getMadaFormattedDateTime();
+    // 2. Injection du contexte temporel au début de la variable feed avant l'analyse
+    feed = "CONTEXTE TEMPOREL : Nous sommes le " + heureExacteMada + " (Heure de Madagascar).\n\n" + feed;
+        
+    long now = System.currentTimeMillis();
+    boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
 
-        // 1. Throttle géopolitique prioritaire
-        if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
-            Log.d(TAG, "[THROTTLE] Notification Géo bloquée (12 min) - dernier il y a " + (now - lastGeoTime)/1000 + "s");
-            return;
-        }
+    // 1. Throttle géopolitique prioritaire
+    if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
+        Log.d(TAG, "[THROTTLE] Notification Géo bloquée (12 min) - dernier il y a " + (now - lastGeoTime)/1000 + "s");
+        return;
+    }
 
-        // 2. Throttle global uniquement pour les événements non-géo
-        if (!isGeoEvent && (now - lastAnalysisTime < GLOBAL_THROTTLE_MS)) {
-            Log.d(TAG, "[THROTTLE] Notification instantanée bloquée (global - 8 min)");
-            return;
-        }
+    // 2. Throttle global uniquement pour les événements non-géo
+    if (!isGeoEvent && (now - lastAnalysisTime < GLOBAL_THROTTLE_MS)) {
+        Log.d(TAG, "[THROTTLE] Notification instantanée bloquée (global - 8 min)");
+        return;
+    }
 
-        List<String> targetAssets = filterActiveAssets(feed);
-        EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
+    List<String> targetAssets = filterActiveAssets(feed);
+    EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
 
-        // Détection élargie de TOUTES les actualités majeures (Suprêmes, Secondaires et Tertiaires)
-        String upFeed = feed.toUpperCase(Locale.ROOT);
-        boolean isSupremeNews = upFeed.contains("FOMC") || 
-                                upFeed.contains("FED ") || 
-                                upFeed.contains("CPI")  || 
-                                upFeed.contains("PCE")  || 
-                                upFeed.contains("NFP")  || 
-                                upFeed.contains("BCE")  || 
-                                upFeed.contains("ECB")  || 
-                                upFeed.contains("BOJ")  || 
-                                upFeed.contains("BOE")  || 
-                                upFeed.contains("RBA")  || 
-                                upFeed.contains("BOC")  || 
-                                upFeed.contains("PIB")  || 
-                                upFeed.contains("GDP")  || 
-                                upFeed.contains("OPEC") ||
-                                upFeed.contains("INFLATION") ||
-                                upFeed.contains("INTEREST RATE") ||
-                                upFeed.contains("POWELL") ||
-                                upFeed.contains("LAGARDE") ||
-                                upFeed.contains("PMI") ||
-                                upFeed.contains("ISM");
+    // Détection élargie de TOUTES les actualités majeures (Suprêmes, Secondaires et Tertiaires)
+    String upFeed = feed.toUpperCase(Locale.ROOT);
+    boolean isSupremeNews = upFeed.contains("FOMC") || 
+                            upFeed.contains("FED ") || 
+                            upFeed.contains("CPI")  || 
+                            upFeed.contains("PCE")  || 
+                            upFeed.contains("NFP")  || 
+                            upFeed.contains("BCE")  || 
+                            upFeed.contains("ECB")  || 
+                            upFeed.contains("BOJ")  || 
+                            upFeed.contains("BOE")  || 
+                            upFeed.contains("RBA")  || 
+                            upFeed.contains("BOC")  || 
+                            upFeed.contains("PIB")  || 
+                            upFeed.contains("GDP")  || 
+                            upFeed.contains("OPEC") ||
+                            upFeed.contains("INFLATION") ||
+                            upFeed.contains("INTEREST RATE") ||
+                            upFeed.contains("POWELL") ||
+                            upFeed.contains("LAGARDE") ||
+                            upFeed.contains("PMI") ||
+                            upFeed.contains("ISM");
 
-        int weight = assignDriverWeight(feed);
+    int weight = assignDriverWeight(feed);
 
-        if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 70) {
-            weight = Math.max(weight, 4);
-        }
+    if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 70) {
+        weight = Math.max(weight, 4);
+    }
 
-        String hash = generateSecureHash(title + text);
-            
-        Log.d(TAG, "🟢 Nouvelle notification : source=" + source + ", title=" + title + ", hash=" + hash);
-            
-        // MODIFICATION STRATÉGIQUE : Le filtre s'applique uniquement si weight < 3 (Poids 1). Le poids 3 passe sans blocage !
-        if (!vr.isConfirmed && weight < 3 && !isSupremeNews && !detectDriverDeviation(feed)) {
-            eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
-                    String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
-            return;
-        }
+    String hash = generateSecureHash(title + text);
+        
+    Log.d(TAG, "🟢 Nouvelle notification : source=" + source + ", title=" + title + ", hash=" + hash);
+        
+    // MODIFICATION STRATÉGIQUE : Le filtre s'applique uniquement si weight < 3 (Poids 1). Le poids 3 passe sans blocage !
+    if (!vr.isConfirmed && weight < 3 && !isSupremeNews && !detectDriverDeviation(feed)) {
+        eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
+                String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
+        return;
+    }
 
-        if (!vr.isConfirmed && weight < 3) return;
+    if (!vr.isConfirmed && weight < 3) return;
 
-        EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
+    EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
 
-        String initialImpact;
-        if (!vr.geoContext.isEmpty()) {
-            initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
-        } else if (isSupremeNews && (upFeed.contains("FOMC") || upFeed.contains("FED "))) {
-            initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRAL | " + detected.description + " | " + detected.impact;
-        } else {
-            initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
-        }
+    String initialImpact;
+    if (!vr.geoContext.isEmpty()) {
+        initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
+    } else if (isSupremeNews && (upFeed.contains("FOMC") || upFeed.contains("FED "))) {
+        initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRAL | " + detected.description + " | " + detected.impact;
+    } else {
+        initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
+    }
 
-        if (vr.geoContext.isEmpty() && !(upFeed.contains("FOMC") || upFeed.contains("FED "))) {
-            if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
-                // Mesure de sécurité pour que le poids 3 majeur ne soit pas écrasé par un faux neutre
-                if (weight < 3) {
-                    Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
-                    return;
-                }
+    if (vr.geoContext.isEmpty() && !(upFeed.contains("FOMC") || upFeed.contains("FED "))) {
+        if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
+            // Mesure de sécurité pour que le poids 3 majeur ne soit pas écrasé par un faux neutre
+            if (weight < 3) {
+                Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
+                return;
             }
         }
-        // SÉCURISATION DATE BASE DE DONNÉES : On utilise le temps machine absolu (divisé par 1000 pour avoir des secondes)
-        long timestampSec = System.currentTimeMillis() / 1000;
-        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
-                String.join(", ", targetAssets), initialImpact, timestampSec, "pending", weight);
-        if (saved && isDeviceOnline()) {
-            triggerQueueSynchronization();
-        }
-        // ✅ BLOC DE DÉCLENCHEMENT EN TEMPS RÉEL (CORRIGÉ SANS ERREUR ET SANS CHANGER LA STRUCTURE)
-    if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
-          Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié détecté (Poids=" + weight + 
-            ", Confiance=" + vr.confidence + ") → Envoi immédiat au pipeline d'analyse.");
-    
-    // Capturer proprement les variables définies en amont dans onNotificationPosted
-    final String currentFeed = unifiedFeed; 
-    final String currentSource = sourceName;
-    final long postTime = sbn.getPostTime();
-    final String currentHash = hash;
-    final List<String> assets = targetAssets;
+    }
+    // SÉCURISATION DATE BASE DE DONNÉES : On utilise le temps machine absolu (divisé par 1000 pour avoir des secondes)
+    long timestampSec = System.currentTimeMillis() / 1000;
+    boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
+            String.join(", ", targetAssets), initialImpact, timestampSec, "pending", weight);
+    if (saved && isDeviceOnline()) {
+        triggerQueueSynchronization();
+    }
 
-    exec.submit(() -> {
+    // ✅ ENCLENCHEMENT DE L'ANALYSE EN TEMPS RÉEL (VÉRIFIÉ ET ROBUSTE)
+    if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
+        Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié détecté (Poids=" + weight + 
+                ", Confiance=" + vr.confidence + ") → Envoi immédiat au pipeline d'analyse.");
+        
+        // 1. Récupération immédiate de l'historique sur le thread principal pour éviter les décalages de curseur
+        List<String> historiqueRecent = new ArrayList<>();
         try {
-            // Extraction de l'historique récent depuis la base de données
-            List<String> historiqueRecent = new ArrayList<>();
-            try {
-                // Utilisation de la méthode générique de votre EventDatabase
-                historiqueRecent = eventDb.getRecentEventsForContext(5); 
-            } catch (Exception dbEx) {
-                Log.w(TAG, "Impossible de charger l'historique spécifique, prompt généré sans historique.");
-            }
-
-            // 1. Construction du prompt dynamique grâce à vos méthodes (Mode Crise vs Mode Normal)
-            String promptFinal = construirePromptFinal(currentFeed, historiqueRecent);
-            
-            // 2. Exécution du pipeline d'analyse avec votre méthode native
-            executeAnalysisPipeline(currentSource, currentFeed, promptFinal, assets, postTime, currentHash);
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur lors du traitement asynchrone du signal de trading", e);
+            historiqueRecent = eventDb.getRecentEventsListForAssets(targetAssets, 5);
+        } catch (Exception dbEx) {
+            Log.w(TAG, "Impossible de charger l'historique récent pour targetAssets, utilisation d'une liste vide.");
         }
-    });
+
+        // 2. VERROUILLAGE DU THROTTLE IMMÉDIAT (Sur le thread principal)
+        // Évite que deux notifications simultanées ne passent le filtre en même temps avant la fin de l'IA
+        if (isGeoEvent) {
+            lastGeoTime = System.currentTimeMillis();
+        } else {
+            lastAnalysisTime = System.currentTimeMillis();
+        }
+
+        // 3. Capture finale des variables locales requises pour le thread asynchrone
+        final String currentFeed = feed;
+        final String currentSource = source;
+        final String currentHash = hash;
+        final long currentPostTime = postTime;
+        final List<String> assets = targetAssets;
+        final List<String> finalHistorique = historiqueRecent;
+
+        // 4. Soumission au pool de threads pour ne pas bloquer l'interface d'Android
+        exec.submit(() -> {
+            try {
+                // Construction du prompt via votre méthode native
+                String promptFinal = construirePromptFinal(currentFeed, finalHistorique);
+                
+                // Exécution du pipeline d'analyse vers Groq/API
+                executeAnalysisPipeline(currentSource, currentFeed, promptFinal, assets, currentPostTime, currentHash);
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur lors du traitement du pipeline d'analyse asynchrone", e);
+            }
+        });
     }
-    }
+}
 
     private int assignDriverWeight(String text) {
         String u = text.toUpperCase();
