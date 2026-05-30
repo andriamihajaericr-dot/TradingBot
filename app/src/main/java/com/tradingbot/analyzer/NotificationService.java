@@ -1842,6 +1842,8 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         if (apiKey.isEmpty()) return;
 
         long nowSec = System.currentTimeMillis() / 1000;
+        Log.d(TAG, "[DAILY] Génération DRIVER PÉRIODIQUE déclenchée avec " + 
+      (dailyDrivers != null ? dailyDrivers.length() : 0) + " caractères de données.");
         String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
 
         if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
