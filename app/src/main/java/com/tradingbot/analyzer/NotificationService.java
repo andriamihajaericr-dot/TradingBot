@@ -950,10 +950,17 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     String packageName = sbn.getPackageName().toLowerCase();
     String sourceName = "Source Institutionnelle";
 
-    if (packageName.contains("financialjuice")) sourceName = "FinancialJuice";
-    else if (packageName.contains("investing")) sourceName = "Investing.com";
-    else if (packageName.contains("twitter") || packageName.contains("periscope")) sourceName = "X / Twitter";
-    else return;
+    if (packageName.contains("financialjuice")) {
+       sourceName = "FinancialJuice";
+    } else if (packageName.contains("tradingeconomics")) {
+       sourceName = "TradingEconomics";
+    } else if (packageName.contains("forex.portal")) {
+       sourceName = "Myfxbook";
+    } else if (packageName.contains("twitter") || pack.contains("periscope")) {
+       sourceName = "X / Twitter";
+    } else {
+       return; // Ignore tout le reste
+    }
 
     String upperFeed = unifiedFeed.toUpperCase(Locale.ROOT);
     long currentTime = System.currentTimeMillis();
