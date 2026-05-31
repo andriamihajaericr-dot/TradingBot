@@ -1272,7 +1272,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     if (saved && isDeviceOnline()) {
         triggerQueueSynchronization();
      }
-    }
+    
     // ✅ ENCLENCHEMENT DE L'ANALYSE EN TEMPS RÉEL (SIGNATURES AJUSTÉES ET CORRIGÉES)
     if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
         Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié détecté (Poids=" + weight + 
