@@ -1328,7 +1328,6 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 }
 
     
-
     private int assignDriverWeight(String text) {
         String u = text.toUpperCase();
         
