@@ -34,6 +34,7 @@ import java.util.regex.*;
 public class NotificationService extends NotificationListenerService {
 
     private static final String TAG = "NotificationService";
+    private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>();
     private static final String CHANNEL_ID = "trading_alerts";
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
