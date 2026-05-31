@@ -1272,9 +1272,8 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     if (saved && isDeviceOnline()) {
         triggerQueueSynchronization();
     }
-
-    // ✅ ENCLENCHEMENT DE L'ANALYSE EN TEMPS RÉEL (ZÉRO ERREUR DE COMPILATION & PORTÉE LOGIQUE VERROUILLÉE)
-    if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
+// ✅ ENCLENCHEMENT DE L'ANALYSE EN TEMPS RÉEL (CORRECTION STRICTE DES TYPES)
+    if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
         Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié détecté (Poids=" + weight + 
                 ", Confiance=" + vr.confidence + ") → Envoi immédiat au pipeline d'analyse.");
         
@@ -1286,14 +1285,16 @@ public void onNotificationPosted(StatusBarNotification sbn) {
             Log.w(TAG, "Impossible de charger l'historique de la DB, utilisation d'une liste vide.");
         }
 
-        // CORRECTION LOGIQUE : Conversion de la List<String> en un String unique pour correspondre à la signature de construirePromptFinal
+        // Conversion de la List<String> en un String unique pour correspondre au registre textuel
         StringBuilder sb = new StringBuilder();
-        for (String ev : listeHistorique) {
-            sb.append(ev).append("\n");
+        if (listeHistorique != null) {
+            for (String ev : listeHistorique) {
+                sb.append(ev).append("\n");
+            }
         }
         String registreJournalierTexte = sb.toString();
 
-        // 2. VERROUILLAGE DU THROTTLE IMMÉDIAT (Sur le thread principal pour bloquer le spam instantanément)
+        // 2. VERROUILLAGE DU THROTTLE IMMÉDIAT (Sur le thread principal)
         if (isGeoEvent) {
             lastGeoTime = System.currentTimeMillis();
         } else {
@@ -1311,10 +1312,10 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         // 4. Soumission au pool de threads (Zéro latence sur l'UI/Système Android)
         exec.submit(() -> {
             try {
-                // Construction sûre du prompt (String, String) -> Pas de plantage !
+                // Construction du prompt en respectant la signature (String, String)
                 String promptFinal = construirePromptFinal(currentFeed, finalRegistre);
                 
-                // Exécution du pipeline natif vers Groq
+                // Exécution du pipeline natif vers Groq avec les types rigoureusement vérifiés
                 executeAnalysisPipeline(currentSource, currentFeed, promptFinal, assets, currentPostTime, currentHash);
                 
             } catch (Exception e) {
