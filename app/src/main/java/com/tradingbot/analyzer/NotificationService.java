@@ -1247,9 +1247,19 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 
     EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
 
+    // --- ENCLENCHEMENT DES CONTRAINTES DE FORCE BRUTE (GÉOPOLITIQUE) ---
     String initialImpact;
     if (!vr.geoContext.isEmpty()) {
+        // 1. Si l'actif USDJPY est ciblé par le flux en pleine crise géo, on réécrit de force sa détection
+        if (targetAssets.contains("USDJPY")) {
+            Log.w(TAG, "⚠️ [CONTRAINTE GÉO] Arbitrage Dollar activé : USDJPY forcé en ACHAT CHOC.");
+            detected.impact = "ACHAT CHOC";
+            detected.description = "Dollar Dominance Absolue (Régime de Crise Géo Asie/Moyen-Orient)";
+        }
+
+        // 2. Construction de l'impact initial géopolitique avec les données écrasées si nécessaire
         initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
+        
     } else if (isSupremeNews && (upFeed.contains("FOMC") || upFeed.contains("FED "))) {
         initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRAL | " + detected.description + " | " + detected.impact;
     } else {
