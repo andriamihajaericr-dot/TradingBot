@@ -155,7 +155,7 @@ public class EventValidator {
             }
             result.assetsEnriched = !detectedAssets.isEmpty();
             String indicatorName = (match.indicator != null && !match.indicator.isEmpty()) ? match.indicator.substring(0, Math.min(40, match.indicator.length())) : "événement";
-            logToMain("[VALIDATOR] ✓ Calendrier confirmé – " + indicatorName);
+            logToMain("✓ Calendrier confirmé – " + indicatorName);
             return result;
         }
 
@@ -186,7 +186,7 @@ public class EventValidator {
             result.confidence  = 0;
             result.isConfirmed = false;
             String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
-            logToMain("[VALIDATOR] ❌ Rejeté – " + shortTitle + "… (confiance " + result.confidence + "%)");
+            logToMain("❌ Rejeté – " + shortTitle + "… (confiance " + result.confidence + "%)");
         } else {
             result.isConfirmed = true;
             String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
