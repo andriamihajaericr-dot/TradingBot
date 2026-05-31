@@ -535,7 +535,7 @@ public class EventValidator {
 
     public static void preloadCalendar() {
         try {
-           // List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(24);
+            List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(24);
             if (events == null) return;
             upcomingEvents.clear();
 
@@ -548,8 +548,6 @@ public class EventValidator {
             logToMain("[VALIDATOR] ⚠️ Échec préchargement calendrier : " + e.getMessage());
         }
     }
-    // Assurez-vous que la Map globale est déclarée ainsi en haut de votre classe :
-private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>();
 
 public static void cleanupOldFingerprints() {
     if (recentFingerprints == null || recentFingerprints.isEmpty()) return;
