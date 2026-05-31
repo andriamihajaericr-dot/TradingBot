@@ -1177,10 +1177,12 @@ public void onNotificationPosted(StatusBarNotification sbn) {
             }
         }
     }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
-
     }
 
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime, String fingerprint) {
+    // 1. Nettoyage automatique des empreintes obsolètes au début de chaque cycle
+    cleanupOldFingerprints();
+
     String heureExacteMada = getMadaFormattedDateTime();
     // 2. Injection du contexte temporel au début de la variable feed avant l'analyse
     feed = "CONTEXTE TEMPOREL : Nous sommes le " + heureExacteMada + " (Heure de Madagascar).\n\n" + feed;
@@ -1188,13 +1190,13 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     long now = System.currentTimeMillis();
     boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
 
-    // 1. Throttle géopolitique prioritaire
+    // Throttle géopolitique prioritaire
     if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
         Log.d(TAG, "[THROTTLE] Notification Géo bloquée (12 min) - dernier il y a " + (now - lastGeoTime)/1000 + "s");
         return;
     }
 
-    // 2. Throttle global uniquement pour les événements non-géo
+    // Throttle global uniquement pour les événements non-géo
     if (!isGeoEvent && (now - lastAnalysisTime < GLOBAL_THROTTLE_MS)) {
         Log.d(TAG, "[THROTTLE] Notification instantanée bloquée (global - 8 min)");
         return;
@@ -1203,28 +1205,18 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     List<String> targetAssets = filterActiveAssets(feed);
     EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
 
-    // Détection élargie de TOUTES les actualités majeures (Suprêmes, Secondaires et Tertiaires)
+    // Détection élargie de TOUTES les actualités majeures
     String upFeed = feed.toUpperCase(Locale.ROOT);
-    boolean isSupremeNews = upFeed.contains("FOMC") || 
-                            upFeed.contains("FED ") || 
-                            upFeed.contains("CPI")  || 
-                            upFeed.contains("PCE")  || 
-                            upFeed.contains("NFP")  || 
-                            upFeed.contains("BCE")  || 
-                            upFeed.contains("ECB")  || 
-                            upFeed.contains("BOJ")  || 
-                            upFeed.contains("BOE")  || 
-                            upFeed.contains("RBA")  || 
-                            upFeed.contains("BOC")  || 
-                            upFeed.contains("PIB")  || 
-                            upFeed.contains("GDP")  || 
-                            upFeed.contains("OPEC") ||
-                            upFeed.contains("INFLATION") ||
-                            upFeed.contains("INTEREST RATE") ||
-                            upFeed.contains("POWELL") ||
-                            upFeed.contains("LAGARDE") ||
-                            upFeed.contains("PMI") ||
-                            upFeed.contains("ISM");
+    boolean isSupremeNews = upFeed.contains("FOMC") || upFeed.contains("FED ") || 
+                            upFeed.contains("CPI")  || upFeed.contains("PCE")  || 
+                            upFeed.contains("NFP")  || upFeed.contains("BCE")  || 
+                            upFeed.contains("ECB")  || upFeed.contains("BOJ")  || 
+                            upFeed.contains("BOE")  || upFeed.contains("RBA")  || 
+                            upFeed.contains("BOC")  || upFeed.contains("PIB")  || 
+                            upFeed.contains("GDP")  || upFeed.contains("OPEC") ||
+                            upFeed.contains("INFLATION") || upFeed.contains("INTEREST RATE") ||
+                            upFeed.contains("POWELL") || upFeed.contains("LAGARDE") ||
+                            upFeed.contains("PMI") || upFeed.contains("ISM");
 
     int weight = assignDriverWeight(feed);
 
@@ -1233,10 +1225,9 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     }
 
     String hash = generateSecureHash(title + text);
-        
     Log.d(TAG, "🟢 Nouvelle notification : source=" + source + ", title=" + title + ", hash=" + hash);
         
-    // MODIFICATION STRATÉGIQUE : Le filtre s'applique uniquement si weight < 3 (Poids 1). Le poids 3 passe sans blocage !
+    // Filtre stratégique anti-bruit
     if (!vr.isConfirmed && weight < 3 && !isSupremeNews && !detectDriverDeviation(feed)) {
         eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
                 String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
@@ -1247,17 +1238,15 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 
     EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
 
-    // --- ENCLENCHEMENT DES CONTRAINTES DE FORCE BRUTE (GÉOPOLITIQUE) ---
+    // --- APPLICATION DE LA CONTRAINTE DE FORCE BRUTE GÉOPOLITIQUE ---
     String initialImpact;
     if (!vr.geoContext.isEmpty()) {
-        // 1. Si l'actif USDJPY est ciblé par le flux en pleine crise géo, on réécrit de force sa détection
+        // Force l'alignement immédiat du USDJPY si présent dans le flux géopolitique
         if (targetAssets.contains("USDJPY")) {
-            Log.w(TAG, "⚠️ [CONTRAINTE GÉO] Arbitrage Dollar activé : USDJPY forcé en ACHAT CHOC.");
+            Log.w(TAG, "⚠️ [CONTRAINTE GÉO] Arbitrage Dollar activé : Force du USDJPY en ACHAT CHOC.");
             detected.impact = "ACHAT CHOC";
             detected.description = "Dollar Dominance Absolue (Régime de Crise Géo Asie/Moyen-Orient)";
         }
-
-        // 2. Construction de l'impact initial géopolitique avec les données écrasées si nécessaire
         initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
         
     } else if (isSupremeNews && (upFeed.contains("FOMC") || upFeed.contains("FED "))) {
@@ -1268,64 +1257,77 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 
     if (vr.geoContext.isEmpty() && !(upFeed.contains("FOMC") || upFeed.contains("FED "))) {
         if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
-            // Mesure de sécurité pour que le poids 3 majeur ne soit pas écrasé par un faux neutre
             if (weight < 3) {
                 Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
                 return;
             }
         }
     }
-    // SÉCURISATION DATE BASE DE DONNÉES : On utilise le temps machine absolu (divisé par 1000 pour avoir des secondes)
+
     long timestampSec = System.currentTimeMillis() / 1000;
     boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
             String.join(", ", targetAssets), initialImpact, timestampSec, "pending", weight);
     if (saved && isDeviceOnline()) {
         triggerQueueSynchronization();
-     }
-    
-    // ✅ ENCLENCHEMENT DE L'ANALYSE EN TEMPS RÉEL (SIGNATURES AJUSTÉES ET CORRIGÉES)
-    if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
-        Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié détecté (Poids=" + weight + 
-                ", Confiance=" + vr.confidence + ") → Envoi immédiat au pipeline d'analyse.");
+    }
+
+    // ✅ PIPELINE ASYNCHRONE SÉCURISÉ
+    if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
+        Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié (Poids=" + weight + ") → Préparation du pipeline.");
         
-        // 1. Extraction directe de l'historique sous forme de List<String> attendue par la signature
         List<String> listeHistorique = new ArrayList<>();
         try {
             listeHistorique = eventDb.obtenirTexteEvenementsRecents();
         } catch (Exception dbEx) {
-            Log.w(TAG, "Impossible de charger l'historique de la DB, utilisation d'une liste vide.");
+            Log.w(TAG, "Impossible de charger l'historique de la DB.", dbEx);
         }
 
-        // 2. VERROUILLAGE DU THROTTLE IMMÉDIAT (Sur le thread principal)
+        // Sauvegarde des états temporels actuels pour un éventuel rollback en cas d'échec API
+        final long previousGeoTime = lastGeoTime;
+        final long previousAnalysisTime = lastAnalysisTime;
+
+        // Verrouillage préventif du Throttle
         if (isGeoEvent) {
             lastGeoTime = System.currentTimeMillis();
         } else {
             lastAnalysisTime = System.currentTimeMillis();
         }
 
-        // 3. Capture propre et finale de toutes les variables requises dans la Lambda asynchrone
+        // Captures finales pour le thread de calcul
         final String currentFeed = feed;
         final String currentSource = source;
         final String currentHash = hash;
         final long currentPostTime = postTime;
         final List<String> assets = targetAssets;
-        final List<String> finalHistorique = listeHistorique; // Capture de la liste brute
+        final List<String> finalHistorique = listeHistorique;
+        final boolean finalIsGeo = isGeoEvent;
 
-        // 4. Soumission au pool de threads (Zéro latence sur l'UI/Système Android)
         exec.submit(() -> {
+            boolean pipelineSucces = false;
             try {
-                // Construction du prompt en respectant la signature exacte : (String, List<String>)
+                // Construction et exécution natives
                 String promptFinal = construirePromptFinal(currentFeed, finalHistorique);
-                
-                // Exécution du pipeline natif vers Groq avec les types rigoureusement vérifiés
                 executeAnalysisPipeline(currentSource, currentFeed, promptFinal, assets, currentPostTime, currentHash);
+                pipelineSucces = true; // L'exécution s'est déroulée sans lever d'exception
                 
             } catch (Exception e) {
-                Log.e(TAG, "Erreur lors du traitement du pipeline d'analyse asynchrone", e);
+                Log.e(TAG, "Erreur critique dans le pipeline d'analyse asynchrone", e);
+            } finally {
+                // 🛡️ CIRCUIT BREAKER : Si l'API ou le réseau a planté, on libère le Throttle immédiatement
+                if (!pipelineSucces) {
+                    Log.w(TAG, "🔄 [ROLLBACK THROTTLE] Échec du traitement. Libération du verrou temporel.");
+                    if (finalIsGeo) {
+                        lastGeoTime = previousGeoTime;
+                    } else {
+                        lastAnalysisTime = previousAnalysisTime;
+                    }
+                }
             }
         });
     }
 }
+
+    
 
     private int assignDriverWeight(String text) {
         String u = text.toUpperCase();
