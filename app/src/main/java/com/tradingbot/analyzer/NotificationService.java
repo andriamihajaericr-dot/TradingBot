@@ -1180,7 +1180,6 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 
     }
 
-        
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime, String fingerprint) {
     String heureExacteMada = getMadaFormattedDateTime();
     // 2. Injection du contexte temporel au début de la variable feed avant l'analyse
@@ -1274,44 +1273,48 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         triggerQueueSynchronization();
     }
 
-    // ✅ ENCLENCHEMENT DE L'ANALYSE EN TEMPS RÉEL (VÉRIFIÉ ET ROBUSTE)
-    if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
+    // ✅ ENCLENCHEMENT DE L'ANALYSE EN TEMPS RÉEL (ZÉRO ERREUR DE COMPILATION & PORTÉE LOGIQUE VERROUILLÉE)
+    if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
         Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié détecté (Poids=" + weight + 
                 ", Confiance=" + vr.confidence + ") → Envoi immédiat au pipeline d'analyse.");
         
-        // 1. Récupération immédiate de l'historique sur le thread principal pour éviter les décalages de curseur
-        // 1. Récupération immédiate de l'historique sur le thread principal via la méthode native de votre EventDatabase
-        List<String> historiqueRecent = new ArrayList<>();
+        // 1. Extraction de l'historique brut textuel existant
+        List<String> listeHistorique = new ArrayList<>();
         try {
-          // Appel de la vraie méthode existante dans votre EventDatabase
-          historiqueRecent = eventDb.obtenirTexteEvenementsRecents(); 
+            listeHistorique = eventDb.obtenirTexteEvenementsRecents();
         } catch (Exception dbEx) {
-           Log.w(TAG, "Impossible de charger l'historique récent, utilisation d'une liste vide.", dbEx);
+            Log.w(TAG, "Impossible de charger l'historique de la DB, utilisation d'une liste vide.");
         }
 
-        // 2. VERROUILLAGE DU THROTTLE IMMÉDIAT (Sur le thread principal)
-        // Évite que deux notifications simultanées ne passent le filtre en même temps avant la fin de l'IA
+        // CORRECTION LOGIQUE : Conversion de la List<String> en un String unique pour correspondre à la signature de construirePromptFinal
+        StringBuilder sb = new StringBuilder();
+        for (String ev : listeHistorique) {
+            sb.append(ev).append("\n");
+        }
+        String registreJournalierTexte = sb.toString();
+
+        // 2. VERROUILLAGE DU THROTTLE IMMÉDIAT (Sur le thread principal pour bloquer le spam instantanément)
         if (isGeoEvent) {
             lastGeoTime = System.currentTimeMillis();
         } else {
             lastAnalysisTime = System.currentTimeMillis();
         }
 
-        // 3. Capture finale des variables locales requises pour le thread asynchrone
+        // 3. Capture propre et finale de toutes les variables requises dans la Lambda asynchrone
         final String currentFeed = feed;
         final String currentSource = source;
         final String currentHash = hash;
         final long currentPostTime = postTime;
         final List<String> assets = targetAssets;
-        final List<String> finalHistorique = historiqueRecent;
+        final String finalRegistre = registreJournalierTexte;
 
-        // 4. Soumission au pool de threads pour ne pas bloquer l'interface d'Android
+        // 4. Soumission au pool de threads (Zéro latence sur l'UI/Système Android)
         exec.submit(() -> {
             try {
-                // Construction du prompt via votre méthode native
-                String promptFinal = construirePromptFinal(currentFeed, finalHistorique);
+                // Construction sûre du prompt (String, String) -> Pas de plantage !
+                String promptFinal = construirePromptFinal(currentFeed, finalRegistre);
                 
-                // Exécution du pipeline d'analyse vers Groq/API
+                // Exécution du pipeline natif vers Groq
                 executeAnalysisPipeline(currentSource, currentFeed, promptFinal, assets, currentPostTime, currentHash);
                 
             } catch (Exception e) {
