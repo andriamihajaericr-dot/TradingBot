@@ -1271,28 +1271,20 @@ public void onNotificationPosted(StatusBarNotification sbn) {
             String.join(", ", targetAssets), initialImpact, timestampSec, "pending", weight);
     if (saved && isDeviceOnline()) {
         triggerQueueSynchronization();
+     }
     }
-// ✅ ENCLENCHEMENT DE L'ANALYSE EN TEMPS RÉEL (CORRECTION STRICTE DES TYPES)
+    // ✅ ENCLENCHEMENT DE L'ANALYSE EN TEMPS RÉEL (SIGNATURES AJUSTÉES ET CORRIGÉES)
     if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
         Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié détecté (Poids=" + weight + 
                 ", Confiance=" + vr.confidence + ") → Envoi immédiat au pipeline d'analyse.");
         
-        // 1. Extraction de l'historique brut textuel existant
+        // 1. Extraction directe de l'historique sous forme de List<String> attendue par la signature
         List<String> listeHistorique = new ArrayList<>();
         try {
             listeHistorique = eventDb.obtenirTexteEvenementsRecents();
         } catch (Exception dbEx) {
             Log.w(TAG, "Impossible de charger l'historique de la DB, utilisation d'une liste vide.");
         }
-
-        // Conversion de la List<String> en un String unique pour correspondre au registre textuel
-        StringBuilder sb = new StringBuilder();
-        if (listeHistorique != null) {
-            for (String ev : listeHistorique) {
-                sb.append(ev).append("\n");
-            }
-        }
-        String registreJournalierTexte = sb.toString();
 
         // 2. VERROUILLAGE DU THROTTLE IMMÉDIAT (Sur le thread principal)
         if (isGeoEvent) {
@@ -1307,13 +1299,13 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         final String currentHash = hash;
         final long currentPostTime = postTime;
         final List<String> assets = targetAssets;
-        final String finalRegistre = registreJournalierTexte;
+        final List<String> finalHistorique = listeHistorique; // Capture de la liste brute
 
         // 4. Soumission au pool de threads (Zéro latence sur l'UI/Système Android)
         exec.submit(() -> {
             try {
-                // Construction du prompt en respectant la signature (String, String)
-                String promptFinal = construirePromptFinal(currentFeed, finalRegistre);
+                // Construction du prompt en respectant la signature exacte : (String, List<String>)
+                String promptFinal = construirePromptFinal(currentFeed, finalHistorique);
                 
                 // Exécution du pipeline natif vers Groq avec les types rigoureusement vérifiés
                 executeAnalysisPipeline(currentSource, currentFeed, promptFinal, assets, currentPostTime, currentHash);
