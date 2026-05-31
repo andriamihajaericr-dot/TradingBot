@@ -956,8 +956,8 @@ public void onNotificationPosted(StatusBarNotification sbn) {
        sourceName = "TradingEconomics";
     } else if (packageName.contains("forex.portal")) {
        sourceName = "Myfxbook";
-    } else if (packageName.contains("twitter") || pack.contains("periscope")) {
-       sourceName = "Twitter";
+    } else if (packageName.contains("twitter") || packageName.contains("periscope")) {
+       sourceName = "X /Twitter";
     } else {
        return; // Ignore tout le reste
     }
@@ -1097,7 +1097,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 
     boolean forceSave = isSupremeRank 
         || sourceName.equals("FinancialJuice") 
-        || sourceName.equals("Twitter")
+        || sourceName.equals("X /Twitter")
         || sourceName.equals("TradingEconomics")
         || sourceName.equals("Myfxbook");
 
