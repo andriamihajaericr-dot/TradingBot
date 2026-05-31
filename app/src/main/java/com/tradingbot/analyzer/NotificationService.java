@@ -1095,8 +1095,11 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     // 6. Validation & Sauvegarde
     EventValidator.ValidationResult validationResult = EventValidator.validate(title, body, currentTime, enrichedAssets);
 
-    boolean forceSave = isSupremeRank || sourceName.equals("FinancialJuice") || 
-                       sourceName.equals("Investing.com") || sourceName.equals("X / Twitter");
+    boolean forceSave = isSupremeRank 
+        || sourceName.equals("FinancialJuice") 
+        || sourceName.equals("X / Twitter")
+        || sourceName.equals("TradingEconomics")
+        || sourceName.equals("Myfxbook");
 
     String fingerprint = generateSecureHash(packageName + "_" + title + "_" + body + "_" + (sbn.getPostTime() / 60000));
 
