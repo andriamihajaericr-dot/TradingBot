@@ -548,11 +548,21 @@ public class EventValidator {
             logToMain("[VALIDATOR] ⚠️ Échec préchargement calendrier : " + e.getMessage());
         }
     }
+    // Assurez-vous que la Map globale est déclarée ainsi en haut de votre classe :
+private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>();
 
-    public static void cleanupOldFingerprints() {
-        if (recentFingerprints == null) return;
-        long now = System.currentTimeMillis();
-        long cleanupThreshold = now - (2 * 60 * 60 * 1000L); // 2 heures
+public static void cleanupOldFingerprints() {
+    if (recentFingerprints == null || recentFingerprints.isEmpty()) return;
+    
+    long now = System.currentTimeMillis();
+    // 2 heures converties explicitement en millisecondes (utilisation du suffixe L pour la sécurité)
+    long cleanupThreshold = now - (2 * 60 * 60 * 1000L); 
+    
+    try {
+        // removeIf est sûr ici grâce à l'utilisation d'une ConcurrentHashMap
         recentFingerprints.entrySet().removeIf(entry -> entry.getValue() < cleanupThreshold);
+    } catch (Exception e) {
+        Log.e("NotificationService", "Erreur lors du nettoyage des fingerprints", e);
     }
+}
 }
