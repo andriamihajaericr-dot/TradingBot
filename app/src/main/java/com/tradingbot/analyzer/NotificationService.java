@@ -1180,6 +1180,18 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
     }
 
+    public static void cleanupOldFingerprints() {
+        if (recentFingerprints == null || recentFingerprints.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        long cleanupThreshold = now - (2 * 60 * 60 * 1000L); // 2 heures
+        
+        try {
+            recentFingerprints.entrySet().removeIf(entry -> entry.getValue() < cleanupThreshold);
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur lors du nettoyage des fingerprints", e);
+        }
+    }
+
     private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime, String fingerprint) {
     // 1. Nettoyage automatique des empreintes obsolètes au début de chaque cycle
     cleanupOldFingerprints();
