@@ -323,3 +323,195 @@ public class NotificationService extends NotificationListenerService {
     "• 🇦🇺 AUDUSD : [Statut] | [Raison]\n" +
     "• ₿ BITCOIN : [Statut] | [Raison]\n" +
     "🏁 FLUX DOMINANT : [Chaîne de caractères]";
+
+// ==========================================
+// BLOC 2/3 : CYCLE DE VIE, CONFIGURATION INITIALE ET PLANIFICATEUR DU RAPPORT MENSUEL (23h55 MADA)
+// ==========================================
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Log.i(TAG, "Initialisation de l'infrastructure du NotificationService...");
+        
+        // Initialisation de la base de données SQLite pour l'historique des drivers
+        try {
+            eventDb = new EventDatabase(this);
+            Log.d(TAG, "Base de données EventDatabase initialisée avec succès.");
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur critique lors de l'initialisation de la base de données : ", e);
+        }
+
+        // Création du canal de notification requis pour le service sous Android O+
+        createNotificationChannel();
+
+        // Lancement immédiat du planificateur de rapport mensuel en arrière-plan
+        scheduleMonthlyReportTask();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Log.i(TAG, "Fermeture du NotificationService, libération des threads...");
+        
+        // Arrêt ordonné des pools d'exécution pour éviter les fuites de mémoire
+        try {
+            scheduler.shutdown();
+            exec.shutdown();
+            if (!scheduler.awaitTermination(3, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+            if (!exec.awaitTermination(3, TimeUnit.SECONDS)) {
+                exec.shutdownNow();
+            }
+            Log.d(TAG, "Pools d'exécuteurs arrêtés proprement.");
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            exec.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @Override
+    public void onListenerConnected() {
+        super.onListenerConnected();
+        Log.i(TAG, "NotificationListenerService connecté au système Android et opérationnel.");
+    }
+
+    @Override
+    public void onListenerDisconnected() {
+        super.onListenerDisconnected();
+        Log.w(TAG, "NotificationListenerService déconnecté du système.");
+    }
+
+    /**
+     * Crée le canal système de notifications pour l'affichage des alertes de trading internes.
+     */
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Trading Alerts Channel",
+                    NotificationManager.IMPORTANCE_DEFAULT
+            );
+            channel.setDescription("Affichage des chocs macroéconomiques et alertes de trading");
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+                Log.d(TAG, "Canal de notification '" + CHANNEL_ID + "' créé.");
+            }
+        }
+    }
+
+    /**
+     * Planifie la tâche de vérification du rapport mensuel toutes les heures.
+     * Cible précisément 23h55 le dernier jour du mois selon l'heure de Madagascar (GMT+3)[cite: 1].
+     */
+    private void scheduleMonthlyReportTask() {
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                // Forçage de la TimeZone sur le fuseau de Madagascar (GMT+3)[cite: 1]
+                TimeZone madaZone = TimeZone.getTimeZone("GMT+3");
+                Calendar now = Calendar.getInstance(madaZone);
+                
+                int currentDay = now.get(Calendar.DAY_OF_MONTH);
+                int lastDayOfMonth = now.getActualMaximum(Calendar.DAY_OF_MONTH);
+                int hour = now.get(Calendar.HOUR_OF_DAY);
+                int minute = now.get(Calendar.MINUTE);
+
+                // Vérification stricte : Dernier jour du mois à 23h55[cite: 1]
+                if (currentDay == lastDayOfMonth && hour == 23 && minute >= 50) {
+                    SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                    String currentMonthKey = new SimpleDateFormat("yyyy-MM", Locale.US).format(now.getTime());
+                    String lastSentMonth = prefs.getString("last_monthly_report_month", "");
+
+                    // Anti-doublon pour s'assurer que le rapport ne s'exécute qu'une seule fois dans la fenêtre
+                    if (!lastSentMonth.equals(currentMonthKey)) {
+                        Log.i(TAG, "Déclenchement du Rapport Mensuel Automatique à 23h55 (Mada)...");
+                        
+                        // Envoi asynchrone pour ne pas impacter le planificateur
+                        exec.execute(() -> executeAndSendMonthlyReport(currentMonthKey));
+                        
+                        prefs.edit().putString("last_monthly_report_month", currentMonthKey).apply();
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur dans la boucle de planification du rapport mensuel : ", e);
+            }
+        }, 0, 5, TimeUnit.MINUTES); // Vérification fine toutes les 5 minutes pour intercepter la fenêtre de 23h55
+    }
+
+    /**
+     * Compile les données historiques du mois et distribue le Rapport Mensuel.
+     */
+    private void executeAndSendMonthlyReport(String monthKey) {
+        Log.i(TAG, "Compilation du rapport macroéconomique mensuel pour la période : " + monthKey);
+        try {
+            // Extraction des chocs marquants stockés dans la base de données
+            String summaryData = eventDb.getHighImpactEventsForMonth(monthKey);
+            
+            if (summaryData == null || summaryData.trim().isEmpty()) {
+                summaryData = "Aucun choc macroéconomique majeur enregistré ou qualifié ce mois-ci.";
+            }
+
+            // Construction du prompt de synthèse destiné à Groq
+            String reportPrompt = "Génère un Rapport Stratégique de Performance Macroéconomique pour le mois : " + monthKey + ".\n"
+                    + "Voici la base brute des événements qualifiés par notre modèle :\n" + summaryData + "\n\n"
+                    + "Instructions de style :\n"
+                    + "- Structure de hedge fund d'élite, ton froid, analytique, ultra-quantitatif.\n"
+                    + "- Synthétise les grandes tendances monétaires, les surprises d'inflation majeures et l'état des régimes géo.\n"
+                    + "- Pas d'introduction polie, commence directement par le titre officiel.";
+
+            // Requête vers Groq
+            String response = queryGroqAPI(reportPrompt, "Tu es l'algorithme d'audit macroéconomique du fonds. Tu synthétises le rapport mensuel.");
+            
+            if (response != null && !response.isEmpty()) {
+                // Envoi de la synthèse finale vers le canal Telegram configuré
+                sendTelegramMessage(response);
+                Log.i(TAG, "Rapport Mensuel envoyé avec succès sur Telegram.");
+            } else {
+                Log.e(TAG, "Échec de génération du rapport mensuel par l'API Groq (Réponse vide).");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur lors de l'exécution du rapport mensuel : ", e);
+        }
+    }
+
+    /**
+     * Point d'entrée principal du Listener Android. Capture les notifications système en temps réel.
+     */
+    @Override
+    public void onNotificationPosted(StatusBarNotification sbn) {
+        if (sbn == null) return;
+
+        // Extraction asynchrone immédiate pour libérer le thread principal d'Android
+        exec.execute(() -> {
+            try {
+                String packageName = sbn.getPackageName();
+                if (packageName == null) return;
+
+                // Verrou de sécurité : Élimination stricte d'Investing.com pour basculer sur FinancialJuice / TradingEconomics[cite: 1]
+                if (packageName.contains("investing") || packageName.contains("com.investing")) {
+                    return; 
+                }
+
+                Bundle extras = sbn.getNotification().extras;
+                if (extras == null) return;
+
+                String title = extras.getString(Notification.EXTRA_TITLE, "");
+                CharSequence textChar = extras.getCharSequence(Notification.EXTRA_TEXT);
+                String text = (textChar != null) ? textChar.toString() : "";
+
+                // Nettoyage rapide des chaînes reçues
+                title = title.trim();
+                text = text.trim();
+
+                if (title.isEmpty() && text.isEmpty()) return;
+
+                // Routage vers le pipeline d'analyse asynchrone sécurisé
+                processIncomingNotification(packageName, title, text);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur lors du traitement asynchrone de la notification entrante : ", e);
+            }
+        });
+    }
