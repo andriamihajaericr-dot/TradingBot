@@ -339,18 +339,18 @@ public String obtenirLeToutDernierDriver() {
     return sb.toString();
 }
     //LISTER LES DONNÉES DE LA BASE DE DONNÉES 
-    public void diagnostiquerTableEvents() {
+public void diagnostiquerTableEvents() {
     SQLiteDatabase db = this.getReadableDatabase();
     Cursor cursor = null;
     try {
-        // On récupère les 5 derniers éléments insérés, sans aucun filtre
         cursor = db.rawQuery(
             "SELECT id, sync_status, source, title, driver_weight FROM " + TABLE_EVENTS + 
             " ORDER BY id DESC LIMIT 5", 
             null
         );
 
-        Log.d("BOT_DIAGNOSTIC", "=== VÉRIFICATION DE LA BASE DE DONNÉES ===");
+        // Utilisé à la place de Log.d pour forcer l'apparition dans la console GitHub Actions
+        System.out.println("=== GITHUB RUNNER DIAGNOSTIC: TABLE EVENTS ===");
         if (cursor != null && cursor.moveToFirst()) {
             int count = 0;
             do {
@@ -361,20 +361,20 @@ public String obtenirLeToutDernierDriver() {
                 String title = cursor.getString(3);
                 int weight = cursor.getInt(4);
 
-                Log.d("BOT_DIAGNOSTIC", "Élément #" + count + " [ID: " + id + "]");
-                Log.d("BOT_DIAGNOSTIC", "   -> Source      : " + source);
-                Log.d("BOT_DIAGNOSTIC", "   -> Statut Sync : " + syncStatus);
-                Log.d("BOT_DIAGNOSTIC", "   -> Poids       : " + weight);
-                Log.d("BOT_DIAGNOSTIC", "   -> Titre       : " + title);
+                System.out.println("Élément #" + count + " [ID: " + id + "]");
+                System.out.println("   -> Source      : " + source);
+                System.out.println("   -> Statut Sync : " + syncStatus);
+                System.out.println("   -> Poids       : " + weight);
+                System.out.println("   -> Titre       : " + title);
             } while (cursor.moveToNext());
         } else {
-            Log.w("BOT_DIAGNOSTIC", "❌ La table TABLE_EVENTS est STRICTEMENT vide. Aucun enregistrement trouvé.");
+            System.out.println("❌ La table TABLE_EVENTS est STRICTEMENT vide sur ce Runner GitHub.");
         }
-        Log.d("BOT_DIAGNOSTIC", "========================================");
+        System.out.println("========================================");
     } catch (Exception e) {
-        Log.e("BOT_DIAGNOSTIC", "Erreur lors du diagnostic", e);
+        System.out.println("Erreur lors du diagnostic : " + e.getMessage());
     } finally {
         if (cursor != null) cursor.close();
     }
-    }
+}
 }
