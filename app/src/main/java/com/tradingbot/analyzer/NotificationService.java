@@ -952,7 +952,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 
     if (packageName.contains("financialjuice")) {
        sourceName = "FinancialJuice";
-    } else if (packageName.contains("tradingeconomics")) {
+    } else if (packageName.contains("nikkei")) {
        sourceName = "TradingEconomics";
     } else if (packageName.contains("forex.portal")) {
        sourceName = "Myfxbook";
