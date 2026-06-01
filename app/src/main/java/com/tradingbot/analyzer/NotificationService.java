@@ -471,6 +471,8 @@ private static final String DAILY_SYSTEM_PROMPT =
     
     return madaMidnight.getTimeInMillis() - madaNow.getTimeInMillis();
     }
+    // === AJOUT À FAIRE ===
+    private final ExecutorService tradingPipelineExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService exec = Executors.newFixedThreadPool(5);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private EventDatabase eventDb;
