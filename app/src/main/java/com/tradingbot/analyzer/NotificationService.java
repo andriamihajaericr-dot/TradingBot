@@ -1137,7 +1137,8 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                 }
 
                 // 🔟 Exécution finale de l'analyse cognitive LLM (Requête API Groq, génération de la matrice et envoi Telegram)
-                processIncomingMacroFeed(finalSourceName, title, bodyTextRaw, finalUnifiedFeed, packageName, postTimeMs, fingerprint, promptAI);
+                // 🔟 Exécution finale de l'analyse cognitive LLM
+                processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint);
 
             } catch (Exception e) {
                 Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
