@@ -34,6 +34,22 @@ jobs:
           gradle-version: '8.1.1'
           cache-disabled: true
 
+      # 🟢 STRATÉGIE 1 : RESTAURATION ET PRÉPARATION DU CACHE DE LA BASE DE DONNÉES
+      # Cette étape cherche une sauvegarde existante sur les serveurs de GitHub.
+      - name: Restaurer la base de données SQLite du Bot
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/databases/trading_bot.db
+            **/databases/trading_bot.db-shm
+            **/databases/trading_bot.db-wal
+          # Clé unique basée sur le commit actuel pour la sauvegarde
+          key: trading-bot-db-${{ github.sha }}
+          # Si aucune clé exacte n'est trouvée, GitHub récupère la sauvegarde la plus récente qui commence par ce préfixe
+          restore-keys: |
+            trading-bot-db-
+
+      # On compile le projet
       - name: Build Debug APK
         run: gradle assembleDebug
 
