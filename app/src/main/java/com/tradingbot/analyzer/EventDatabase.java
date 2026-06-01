@@ -274,17 +274,21 @@ public class EventDatabase extends SQLiteOpenHelper {
     /**
      * Récupère l'intégralité du contenu textuel des notifications des 30 dernières minutes
      */
+    /**
+     * Récupère l'intégralité du contenu textuel des notifications des 30 dernières minutes
+     * CORRECTION : Remplacement de la colonne fictive 'description' par 'feed_content'
+     */
     public List<String> obtenirTexteEvenementsRecents() {
         List<String> historique = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
         
-        // 30 minutes converties en secondes (car votre base stocke en unix_timestamp au format secondes)
+        // 30 minutes converties en secondes
         long trenteMinutesEnSec = (System.currentTimeMillis() / 1000L) - (30 * 60);
         
         try {
             cursor = db.rawQuery(
-                "SELECT description FROM " + TABLE_EVENTS + " WHERE unix_timestamp >= ? ORDER BY unix_timestamp DESC",
+                "SELECT feed_content FROM " + TABLE_EVENTS + " WHERE unix_timestamp >= ? ORDER BY unix_timestamp DESC",
                 new String[]{String.valueOf(trenteMinutesEnSec)}
             );
             if (cursor != null && cursor.moveToFirst()) {
