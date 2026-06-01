@@ -303,4 +303,39 @@ public class EventDatabase extends SQLiteOpenHelper {
         }
         return historique;
     }
+    /**
+ * Extrait l'unique dernier driver macroéconomique de la base de données
+ * pour servir de rappel brut.
+ */
+public String obtenirLeToutDernierDriver() {
+    StringBuilder sb = new StringBuilder();
+    SQLiteDatabase db = this.getReadableDatabase();
+    Cursor cursor = null;
+    try {
+        // Tri décroissant sur le timestamp pour obtenir l'élément le plus récent de toute la table
+        cursor = db.rawQuery(
+            "SELECT unix_timestamp, title, feed_content FROM " + TABLE_EVENTS + 
+            " ORDER BY unix_timestamp DESC LIMIT 1", 
+            null
+        );
+        
+        if (cursor != null && cursor.moveToFirst()) {
+            long ts = cursor.getLong(0);
+            String titre = cursor.getString(1);
+            String contenu = cursor.getString(2);
+            
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.FRANCE);
+            String dateStr = sdf.format(new java.util.Date(ts * 1000L));
+            
+            sb.append("📅 *Événement du ").append(dateStr).append("* \n")
+              .append("🔹 *").append(titre).append("* \n")
+              .append(contenu);
+        }
+    } catch (Exception e) {
+        Log.e("EventDatabase", "Erreur lors de la récupération du dernier driver historique", e);
+    } finally {
+        if (cursor != null) cursor.close();
+    }
+    return sb.toString();
+}
 }
