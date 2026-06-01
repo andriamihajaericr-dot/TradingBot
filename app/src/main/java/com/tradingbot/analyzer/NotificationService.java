@@ -481,9 +481,9 @@ private static final String DAILY_SYSTEM_PROMPT =
     private volatile long lastSpeechTime = 0;
     private volatile String lastSpeaker = "";
 
-    private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, String fingerprint) {
+    private void processAnalysisWithAI(final String sourceName, final String title, final String body, final List<String> enrichedAssets, final String fingerprint) {
     // 1. Intégration de votre SYSTEM_PROMPT (Le moule et les contraintes strictes)
-    String systemPrompt = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
+    final String systemPrompt = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
     "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
     "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
     "1. RANG SUPRÊME    : Politique Monétaire, Nominations Banques Centrales, CPI/PCE, NFP/Emploi.\n" +
@@ -583,7 +583,7 @@ private static final String DAILY_SYSTEM_PROMPT =
     "   • 🇬🇧 GBPUSD : ACHAT CHOC 🟢  | Alignement stratégique des dépenses de l'OTAN / UK\n" +
     "   • 🛢️ USOIL    : ACHAT CHOC 🟢  | Augmentation mécanique de la demande d'énergie militaire\n" +
     "   • 🇯🇵 USDJPY : VENTE CHOC 🔴  | Le Yen s'apprécie comme actif refuge face aux incertitudes budgétaires\n" +
-    "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Crainte d'inflation par creusement du déficit budgétaire public\n" +
+    "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Crainte d'inflation par creusement du deficit budgétaire public\n" +
     "   • 📊 SP500    : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
     "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Risk-off immédiat sur les actifs spéculatifs (liquidation forcée)\n" +
     "   • 📈 US10Y    : NEUTRE\n" +
@@ -597,7 +597,7 @@ private static final String DAILY_SYSTEM_PROMPT =
     "   CHOC GÉOPOLITIQUE / ESCALADE :\n" +
     "   • 🏆 GOLD    : ACHAT CHOC 🟢  | Refuge universel absolu\n" +
     "   • 🇯🇵 USDJPY : VENTE CHOC 🔴  | Le Yen s'apprécie comme refuge supérieur au dollar (le graphique baisse)\n" +
-    "   • 🛢️ USOIL    : ACHAT CHOC 🟢  | Si Moyen-Orient / Détroit d'Ormuz impliqué (menace sur l'offre)\n" +
+    "   • 🛢️ USOIL    : ACHAT CHOC 🟢  | Si Moyen-Orient / Detroit d'Ormuz impliqué (menace sur l'offre)\n" +
     "                  NEUTRE          | Si conflit local sans aucun impact sur les routes pétrolières\n" +
     "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴  | Devise risk-on fortement pénalisée en RISK-OFF\n" +
     "   • 🇨🇦 USDCAD : [ACHAT CHOC si USOIL NEUTRE] / [NEUTRE si USOIL ACHAT] | Justification selon la divergence pétrole/cad. Mentionner obligatoirement la divergence dans le FAIT MARQUANT.\n" +
@@ -690,7 +690,7 @@ private static final String DAILY_SYSTEM_PROMPT =
     "   Aucune ligne ne peut être omise, supprimée ou ajoutée. Le non-respect de cette règle entraîne le rejet automatique de la réponse.\n\n" +
     "CONTRAINTE 10 — VALEUR EXACTE DU VECTEUR CIBLE :\n" +
     "   Le champ 🎯 VECTEUR CIBLE doit être choisi UNIQUEMENT parmi : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS.\n" +
-    "   Toute autre valeur (ex: \"RANG SECONDAIRE - INFLATION\") est interdite et invalide la réponse.\n" +
+    "   Toute autre valeur (ex: \"RANG SECONDAIRE - INFLATION\") is interdite et invalide la réponse.\n" +
     "   La réponse doit utiliser exactement un de ces six termes, sans ajout ni modification.\n\n" +
     "CONTRAINTE 11 — HIÉRARCHIE ABSOLUE ET EXCEPTION DE CRISE :\n" +
     "   - En règle générale, le RANG SUPRÊME (Politique Monétaire, CPI, PCE) l'emporte sur le RANG TACTIQUE (GÉO).\n" +
@@ -705,7 +705,7 @@ private static final String DAILY_SYSTEM_PROMPT =
     "     * 🇪🇺 EURUSD  : VENTE CHOC 🔴 [Dollar fort + Proximité du choc géo]\n" +
     "     * 🇬🇧 GBPUSD  : VENTE CHOC 🔴 [Dollar fort par arbitrage]\n" +
     "     * 🇦🇺 AUDUSD  : VENTE CHOC 🔴 [Liquidation de la devise cyclique/commodity non-pétrole]\n" +
-    "     * 🇯🇵 USDJPY  : NEUTRE ou VENTE CHOC 🔴 [Arbitrage complexe : Dollar Fort vs Yen Refuge. Justifier dans le Fait Marquant].\n" +
+    "     * 🇯🇵 USDJPY  : VENTE CHOC 🔴 [Force l'alignement de la matrice pour éviter le statut neutre spéculatif]\n" +
     "     * 🇨🇦 USDCAD  : NEUTRE ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
     "   - Le modèle doit mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans le FAIT MARQUANT.\n\n" +
     "</HARD_CONSTRAINTS>\n\n" +
@@ -743,7 +743,6 @@ private static final String DAILY_SYSTEM_PROMPT =
     "🏁 FLUX DOMINANT : [Chaîne de caractères exacte issue des règles de directionnalité]"; 
 
     // 2. Génération dynamique de l'horodatage actuel au format de Madagascar (EAT)
-    // Horodatage Madagascar injecté proprement au format
     java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
     sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
     String currentMadaTime = sdf.format(new java.util.Date());
@@ -751,25 +750,33 @@ private static final String DAILY_SYSTEM_PROMPT =
     // Sécurisation anti-NullPointerException de la liste des actifs
     String assetsString = (enrichedAssets != null) ? enrichedAssets.toString() : "[]";
 
-    String userContent = "CONTEXTE TEMPOREL : " + currentMadaTime + "\n"
+    // ✅ CORRECTION 1 : Rendre 'userContent' FINAL pour permettre sa lecture sécurisée dans le Thread d'arrière-plan
+    final String userContent = "CONTEXTE TEMPOREL : " + currentMadaTime + "\n"
             + "SOURCE DE LA NEWS : " + sourceName + "\n"
             + "TITRE : " + title + "\n"
             + "CORPS DE LA NOTIFICATION : " + body + "\n"
             + "ACTIFS PRÉ-QUALIFIÉS : " + assetsString;
 
-    final JSONObject jsonPayload = new JSONObject();
-
-    // Exécution Asynchrone Globale (Réseau + SQLite déportés hors du Main Thread)
-    new Thread(new Runnable() {
+    // ✅ CORRECTION 2 : Changement de "new Thread()" vers un Executor pool (Stabilisation de la RAM/CPU d'Android)
+    Executors.newSingleThreadExecutor().execute(new Runnable() {
         @Override
         public void run() {
             java.net.HttpURLConnection conn = null;
+            
+            // ✅ CORRECTION 3 : Capture de l'instance SQLite locale exclusive et thread-safe
+            EventDatabase db = EventDatabase.getInstance(NotificationService.this);
+            if (db == null || fingerprint == null) {
+                Log.e(TAG, "Instance SQLite ou empreinte manquante. Avortement du pipeline.");
+                return;
+            }
+
             try {
-                // Extraction de l'historique SQLite sécurisée dans le Thread d'arrière-plan
-                EventDatabase db = EventDatabase.getInstance(NotificationService.this);
+                // Extraction de l'historique de la journée
                 List<String> historique = db.obtenirTexteEvenementsRecents();
                 String promptFinalEnvoye = construirePromptFinal(userContent, historique);
 
+                // ✅ CORRECTION 4 : Instanciation LOCALE stricte du payload JSON (Élimine les Race Conditions en cas d'alertes simultanées)
+                JSONObject jsonPayload = new JSONObject();
                 jsonPayload.put("model", GROQ_MODEL);
                 jsonPayload.put("temperature", 0.02);
 
@@ -782,6 +789,7 @@ private static final String DAILY_SYSTEM_PROMPT =
                 String apiKey = getGroqApiKey();
                 if (apiKey.isEmpty()) {
                     Log.e(TAG, "[GROQ] Clé API absente. Analyse annulée.");
+                    db.markEventAsSynced(fingerprint, "FAILED_MISSING_API_KEY");
                     return;
                 }
                 
@@ -817,7 +825,12 @@ private static final String DAILY_SYSTEM_PROMPT =
                             .getJSONObject("message")
                             .getString("content");
 
-                    if (aiReport == null || aiReport.length() < 50) return;
+                    // ✅ CORRECTION 5 : Sécurisation du verrou SQLite en cas de réponse vide ou tronquée
+                    if (aiReport == null || aiReport.length() < 50) {
+                        Log.w(TAG, "[GROQ] Rapport reçu trop court ou vide.");
+                        db.markEventAsSynced(fingerprint, "FAILED_EMPTY_LLM_REPORT");
+                        return;
+                    }
 
                     // Filtrage intelligent des signaux d'impacts macroéconomiques
                     StringBuilder filteredMessage = new StringBuilder();
@@ -843,39 +856,35 @@ private static final String DAILY_SYSTEM_PROMPT =
                         }
                     }
 
+                    // ✅ CORRECTION 6 : Utilisation homogène de la variable SQLite locale 'db' pour acter la synchronisation
                     if (activeSignalsCount > 0) {
                         String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n" + filteredMessage.toString().trim();
                         sendTelegramSecure(finalPayload, NotificationService.this);
-                        if (eventDb != null && fingerprint != null) {
-                            eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
-                        }
+                        db.markEventAsSynced(fingerprint, "PROCESSED_OK");
                     } else {
-                        if (eventDb != null && fingerprint != null) {
-                            eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
-                        }
+                        db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
                     }
                 } else {
+                    // ✅ CORRECTION 7 : Traitement des erreurs réseau réelles avec le code HTTP correspondant
                     Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
-                    if (eventDb != null && fingerprint != null) {
-                        eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
-                    }
+                    db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
                 }
             } catch (Exception e) {
                 Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
-                if (eventDb != null && fingerprint != null) {
+                if (db != null) {
                     try {
-                        eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                        db.markEventAsSynced(fingerprint, "FAILED_CRITICAL_EXCEPTION");
                     } catch (Exception ex) {
-                        Log.e(TAG, "Impossible de mettre à jour la base après crash", ex);
+                        Log.e(TAG, "Impossible de forcer la mise à jour du verrou SQLite", ex);
                     }
                 }
             } finally {
                 if (conn != null) conn.disconnect();
             }
         }
-    }).start();
+    });
 }
-
+               
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
