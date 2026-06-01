@@ -2065,9 +2065,17 @@ Log.d(TAG, "Impact final qualifié : " + initialImpact);
         conn.setReadTimeout(20000);
         conn.setDoOutput(true);
 
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(payload.toString().getBytes(StandardCharsets.UTF_8));
-            os.flush();
+        // === APRÈS ===
+        OutputStream os = null;
+        try {
+          os = conn.getOutputStream();
+          byte[] input = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+          os.write(input, 0, input.length);
+          os.flush();
+        } finally {
+        if (os != null) {
+        try { os.close(); } catch (Exception ignored) {}
+         }
         }
 
         int responseCode = conn.getResponseCode();
