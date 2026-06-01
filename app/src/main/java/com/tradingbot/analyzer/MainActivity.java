@@ -103,6 +103,8 @@ public class MainActivity extends AppCompatActivity {
         // Appliquer l'état sauvegardé du switch au démarrage
         botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
         addLog("📱 Terminal prêt pour l'acquisition.");
+        // ADFICHAGE DONNÉES BASE TEMPORAIRE 
+        EventDatabase.getInstance(this).diagnostiquerTableEvents();
     }
 
     @Override
