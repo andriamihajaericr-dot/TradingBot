@@ -282,7 +282,7 @@ public class NotificationService extends NotificationListenerService {
     "   ⚠️ TOUTE RÉPONSE DOIT CONTENIR EXACTEMENT 11 LIGNES D’IMPACTS (une par actif), même si l'actif est neutre.\n" +
     "   Aucune ligne ne peut être omise, supprimée ou ajoutée. Le non-respect de cette règle entraîne le rejet automatique de la réponse.\n\n" +
 
-    "CONTRAINTE 10 — VALEUR EXACTE DU VECTEUR CIBLE :\n" +
+    "CONTRAINTE 10 — VALEUR EXACTE DU VECTEUR CIBLE :\n" + 
     "   Le champ 🎯 VECTEUR CIBLE doit être choisi UNIQUEMENT parmi : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS.\n" +
     "   Toute autre valeur est interdite.\n" +
     "   La réponse doit utiliser exactement un de ces six termes, sans ajout ni modification.\n\n" +
