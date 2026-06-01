@@ -312,10 +312,10 @@ public String obtenirLeToutDernierDriver() {
     SQLiteDatabase db = this.getReadableDatabase();
     Cursor cursor = null;
     try {
-        // Tri décroissant sur le timestamp pour obtenir l'élément le plus récent de toute la table
+        // ✅ SÉCURITÉ : On cherche le dernier événement validé et synchronisé par le bot
         cursor = db.rawQuery(
             "SELECT unix_timestamp, title, feed_content FROM " + TABLE_EVENTS + 
-            " ORDER BY unix_timestamp DESC LIMIT 1", 
+            " WHERE sync_status = 'synced' ORDER BY unix_timestamp DESC LIMIT 1", 
             null
         );
         
@@ -327,7 +327,7 @@ public String obtenirLeToutDernierDriver() {
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.FRANCE);
             String dateStr = sdf.format(new java.util.Date(ts * 1000L));
             
-            sb.append("📅 *Événement du ").append(dateStr).append("* \n")
+            sb.append("📅 *Dernier état de marché validé (").append(dateStr).append(")* \n")
               .append("🔹 *").append(titre).append("* \n")
               .append(contenu);
         }
