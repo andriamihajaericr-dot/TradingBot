@@ -1862,7 +1862,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
    }
     
    private void generateAndSendDailyBrief() {
-   HttpURLConnection conn = null;
+    HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
         if (apiKey.isEmpty()) return;
@@ -1870,18 +1870,41 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         long nowSec = System.currentTimeMillis() / 1000;
         String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
 
-        if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
-            Log.d(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h, rapport ignoré");
-            return;
-        }
-
-        Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser");
-
         // Date locale pour le message (Mada UTC+3)
         SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
         sdfDate.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
         String dateStr = sdfDate.format(Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo")).getTime());
-        // PROMPT SYSTEME STRUCTURÉ DU BRIEFING DAILY
+
+        // =========================================================================
+        // SÉCURITÉ REPLI AUTOMATIQUE : INTERCEPTION DIRECTE ABSENCE 24H
+        // =========================================================================
+        if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
+            Log.w(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h. Extraction du rappel...");
+            
+            // Récupération sécurisée du tout dernier driver enregistré en base (sans limite de temps)
+            String dernierDriverConnu = eventDb.obtenirLeToutDernierDriver();
+            
+            if (dernierDriverConnu != null && !dernierDriverConnu.trim().isEmpty()) {
+                String messageRappel = "⚠️ *[RAPPEL : AUCUN NOUVEAU DRIVER DEPUIS 24H]*\n" +
+                                       "🕒 Rapport périodique du " + dateStr + " (Mada)\n\n" +
+                                       "Le flux de collecte n'a détecté aucun nouveau catalyseur macroéconomique.\n" +
+                                       "Voici le dernier état de marché enregistré à titre de rappel pour l'équipe :\n\n" +
+                                       dernierDriverConnu;
+                
+                // Envoi direct du bloc brut sur Telegram (Groq est court-circuité)
+                sendTelegramSecure(messageRappel, this);
+                Log.d(TAG, "[DAILY] Rappel de continuité envoyé avec succès sur Telegram.");
+            } else {
+                // Cas où l'application vient d'être installée et la table est 100% vierge
+                sendTelegramSecure("⚪ *RAPPEL SYSTEME :* Base de données entièrement vide. Aucun historique macroéconomique disponible.", this);
+            }
+            return; // 🔥 ARRET STAGE 1 : On quitte proprement la fonction. Rien d'autre n'est exécuté.
+        }
+        // =========================================================================
+
+        Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser");
+
+        // PROMPT SYSTEME STRUCTURÉ DU BRIEFING DAILY (S'exécute uniquement si dailyDrivers n'est pas vide)
         String DAILY_SYSTEM_PROMPT =
 "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif d'élite.\n" +
 "Analyse le résumé des drivers économiques des dernières 24 heures (fourni dans le message utilisateur) et produis un briefing strictement factuel, corrélé et directionnel.\n\n" +
@@ -1954,11 +1977,11 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 "👉 VERROU GÉOGRAPHIQUE OBLIGATOIRE : Si les actualités majeures concernent une banque centrale hors USA :\n" +
 "   • 📈 US10Y, 💻 NASDAQ, 📊 SP500, ₿ BITCOIN sont AUTOMATIQUEMENT fixés à [NEUTRE ⚪ | Pas d'impact direct]. Il est interdit d'inventer un mouvement sur ces actifs.\n" +
 "   - Si l'entité étrangère est HAWKISH (hausse des taux, resserrement quantitatif, ton ferme) :\n" +
-"     • BCE (Europe)      -> 🇪🇺 EURUSD : ACHAT CHOC 🟢 | Les autres paires de devises s'ajustent au prorata.\n" +
-"     • BoJ (Japon)       -> 🇯🇵 USDJPY : VENTE CHOC 🔴 [Le Yen se renforce massivement]\n" +
-"     • BoC (Canada)      -> 🇨🇦 USDCAD : VENTE CHOC 🔴 [Le Dollar Canadien s'apprécie]\n" +
-"     • BoE (Royaume-Uni) -> 🇬🇧 GBPUSD : ACHAT CHOC 🟢 [La Livre Sterling monte]\n" +
-"     • RBA (Australie)   -> 🇦🇺 AUDUSD : ACHAT CHOC 🟢 [L'Aussie monte]\n" +
+"      • BCE (Europe)      -> 🇪🇺 EURUSD : ACHAT CHOC 🟢 | Les autres paires de devises s'ajustent au prorata.\n" +
+"      • BoJ (Japon)       -> 🇯🇵 USDJPY : VENTE CHOC 🔴 [Le Yen se renforce massivement]\n" +
+"      • BoC (Canada)      -> 🇨🇦 USDCAD : VENTE CHOC 🔴 [Le Dollar Canadien s'apprécie]\n" +
+"      • BoE (Royaume-Uni) -> 🇬🇧 GBPUSD : ACHAT CHOC 🟢 [La Livre Sterling monte]\n" +
+"      • RBA (Australie)   -> 🇦🇺 AUDUSD : ACHAT CHOC 🟢 [L'Aussie monte]\n" +
 "   - Si l'entité étrangère est DOVISH, inverser strictement les directions des paires associées.\n\n" +
 
 "RÈGLE 4 : DRIVER SECTORIEL ENERGIE (Stocks EIA / OPEC)\n" +
@@ -1972,17 +1995,17 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 "- En cas d'escalade militaire directe, conflits maritimes ou menaces graves sur l'offre (Moyen-Orient, Hormuz, Iran, frappes militaires, ripostes, blocus) :\n" +
 "  👉 Ce driver devient STRICTEMENT PRIORITAIRE sur l'inflation ou le PCE pour l'Or et le Pétrole, brisant la hiérarchie standard.\n" +
 "  👉 Tu as l'obligation absolue d'aligner la matrice des 11 actifs selon la configuration de crise suivante :\n" +
-"     • 📈 US10Y   : ACHAT CHOC 🟢 [PCE Hawkish / Taux sous pression]\n" +
-"     • 💻 NASDAQ  : VENTE CHOC 🔴 [Double flux négatif : Taux hauts + Risk-Off]\n" +
-"     • 📊 SP500   : VENTE CHOC 🔴 [Strictement identique au NASDAQ]\n" +
-"     • 🏆 GOLD    : ACHAT CHOC 🟢 [Flux refuge dominant (Safe-Haven)]\n" +
-"     • 🛢️ USOIL   : ACHAT CHOC 🟢 [Prime de risque majeure sur l'offre]\n" +
-"     • 🇪🇺 EURUSD : VENTE CHOC 🔴 [Dollar fort + Proximité du choc géopolitique]\n" +
-"     • 🇯🇵 USDJPY : NEUTRE ⚪ ou VENTE CHOC 🔴 [Arbitrage complexe : Dollar Fort vs Yen Refuge. Justifier dans le Fait Marquant]\n" +
-"     • 🇨🇦 USDCAD : NEUTRE ⚪ ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage]\n" +
-"     • 🇬🇧 GBPUSD : VENTE CHOC 🔴 [Dollar fort par arbitrage international]\n" +
-"     • 🇦🇺 AUDUSD : VENTE CHOC 🔴 [Liquidation de la devise cyclique/commodity non-pétrole]\n" +
-"     • ₿ BITCOIN  : VENTE CHOC 🔴 [Capitulation stricte des actifs spéculatifs]\n" +
+"      • 📈 US10Y   : ACHAT CHOC 🟢 [PCE Hawkish / Taux sous pression]\n" +
+"      • 💻 NASDAQ  : VENTE CHOC 🔴 [Double flux négatif : Taux hauts + Risk-Off]\n" +
+"      • 📊 SP500   : VENTE CHOC 🔴 [Strictement identique au NASDAQ]\n" +
+"      • 🏆 GOLD    : ACHAT CHOC 🟢 [Flux refuge dominant (Safe-Haven)]\n" +
+"      • 🛢️ USOIL   : ACHAT CHOC 🟢 [Prime de risque majeure sur l'offre]\n" +
+"      • 🇪🇺 EURUSD : VENTE CHOC 🔴 [Dollar fort + Proximité du choc géopolitique]\n" +
+"      • 🇯🇵 USDJPY : NEUTRE ⚪ ou VENTE CHOC 🔴 [Arbitrage complexe : Dollar Fort vs Yen Refuge. Justifier dans le Fait Marquant]\n" +
+"      • 🇨🇦 USDCAD : NEUTRE ⚪ ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage]\n" +
+"      • 🇬🇧 GBPUSD : VENTE CHOC 🔴 [Dollar fort par arbitrage international]\n" +
+"      • 🇦🇺 AUDUSD : VENTE CHOC 🔴 [Liquidation de la devise cyclique/commodity non-pétrole]\n" +
+"      • ₿ BITCOIN  : VENTE CHOC 🔴 [Capitulation stricte des actifs spéculatifs]\n" +
 "  - 🏁 FLUX DOMINANT : CRISE GÉOPOLITIQUE / RISK-OFF\n" +
 "  - OBLIGATION TEXTUELLE : Tu DOIS impérativement mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans la section des faits marquants.\n\n" +
 
@@ -1992,11 +2015,13 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 "1. SYMÉTRIE STRICTE DES INDICES : Le couple 💻 NASDAQ et 📊 SP500 doit pointer impérativement dans le même sens (soit deux ACHAT CHOC, soit deux VENTE CHOC, soit deux NEUTRE). Aucune divergence n'est tolérée.\n" +
 "2. AMPLIFICATION DES CRYPTOS : L'actif ₿ BITCOIN est traité comme un indicateur de bêta élevé lié au sentiment technologique. Il doit calquer sa direction sur celle du 💻 NASDAQ.\n" +
 "3. EXCLUSION ET CONCISION : Pas de politesse, pas de salutations, pas de résumés verbeux des actualités passées. Calculez les directions comme un algorithme purement déterministe. Les 11 actifs doivent figurer sur le rapport, sans omission.";
+        
+        // Traitement de l'enveloppe de prompt (Filtres géopolitiques complexes de votre script)
         String systemPromptFinal = construirePromptQuotidienSystem(dailyDrivers, DAILY_SYSTEM_PROMPT);
 
         JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
-        payload.put("temperature", 0.02); // Verrouillage pour éliminer les hallucinations de syntaxe
+        payload.put("temperature", 0.02);
 
         JSONArray messages = new JSONArray();
         messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
@@ -2010,19 +2035,19 @@ public void onNotificationPosted(StatusBarNotification sbn) {
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
         conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-        conn.setConnectTimeout(15000); // Augmenté à 15s pour la stabilité à Madagascar
+        conn.setConnectTimeout(15000); 
         conn.setReadTimeout(20000);
         conn.setDoOutput(true);
 
         try (OutputStream os = conn.getOutputStream()) {
-            os.write(payload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            os.write(payload.toString().getBytes(StandardCharsets.UTF_8));
             os.flush();
         }
 
         int responseCode = conn.getResponseCode();
         if (responseCode == HttpURLConnection.HTTP_OK) {
             StringBuilder r = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) {
                     r.append(line);
@@ -2036,27 +2061,26 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                                          .getString("content");
 
             if (aiResult != null && aiResult.trim().length() > 50) {
-                // Envoi direct et sécurisé sur Telegram
                 sendTelegramSecure(aiResult.trim(), this);
-                Log.d(TAG, "[DAILY] Rapport envoyé avec succès.");
+                Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
             }
-            } else {
-            // FIX TECHNIQUE : Lecture sécurisée du flux d'erreur pour éviter la socket réseau fantôme
-            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+        } else {
+            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
                 StringBuilder errorResponse = new StringBuilder();
                 String line;
                 while ((line = errorReader.readLine()) != null) {
                     errorResponse.append(line);
                 }
-                Log.e(TAG, "[DAILY] Erreur API Groq HTTP " + responseCode + " : " + errorResponse.toString());
+                Log.e(TAG, "[DAILY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
             }
         }
     } catch (Exception e) {
-        Log.e(TAG, "[DAILY] Échec critique du briefing journalier", e);
+        Log.e(TAG, "[DAILY] Échec critique lors du traitement du briefing journalier", e);
     } finally {
         if (conn != null) conn.disconnect();
     }
 }
+
 
     private void startMonthlyReportScheduler() {
         Calendar nextRun = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
