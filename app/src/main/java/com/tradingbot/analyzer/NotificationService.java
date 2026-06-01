@@ -299,7 +299,7 @@ public class NotificationService extends NotificationListenerService {
     "     * 🇪🇺 EURUSD  : VENTE CHOC 🔴 [Dollar fort + Proximité du choc géo]\n" +
     "     * 🇬🇧 GBPUSD  : VENTE CHOC 🔴 [Dollar fort par arbitrage]\n" +
     "     * 🇦🇺 AUDUSD  : VENTE CHOC 🔴 [Liquidation de la devise cyclique/commodity non-pétrole]\n" +
-    "     * 🇯🇵 USDJPY  : NEUTRE ou VENTE CHOC 🔴 [Arbitrage complexe : Dollar Fort vs Yen Refuge. Justifier dans le Fait Marquant].\n" +
+    "     * 🇯🇵 USDJPY  : VENTE CHOC 🔴 [Régime de dominance géopolitique – Yen refuge prioritaire]\n" +
     "     * 🇨🇦 USDCAD  : NEUTRE ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
     "   - Le modèle doit mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans le FAIT MARQUANT.\n\n" +
     "</HARD_CONSTRAINTS>\n\n" +
@@ -708,7 +708,7 @@ private static final String DAILY_SYSTEM_PROMPT =
     "     * 🇪🇺 EURUSD  : VENTE CHOC 🔴 [Dollar fort + Proximité du choc géo]\n" +
     "     * 🇬🇧 GBPUSD  : VENTE CHOC 🔴 [Dollar fort par arbitrage]\n" +
     "     * 🇦🇺 AUDUSD  : VENTE CHOC 🔴 [Liquidation de la devise cyclique/commodity non-pétrole]\n" +
-    "     * 🇯🇵 USDJPY  : VENTE CHOC 🔴 [Force l'alignement de la matrice pour éviter le statut neutre spéculatif]\n" +
+    "     * 🇯🇵 USDJPY  : VENTE CHOC 🔴 [Régime de dominance géopolitique – Yen refuge prioritaire]\n" +
     "     * 🇨🇦 USDCAD  : NEUTRE ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
     "   - Le modèle doit mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans le FAIT MARQUANT.\n\n" +
     "</HARD_CONSTRAINTS>\n\n" +
