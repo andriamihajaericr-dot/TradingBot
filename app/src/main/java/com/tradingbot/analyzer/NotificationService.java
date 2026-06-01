@@ -1209,8 +1209,8 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     }
 
 
-
-    private void processIncomingMacroFeed(String source, String title, String text, String feed, String pkg, long postTime, String fingerprint) {
+private void processIncomingMacroFeed(String source, String title, String text, String feed, 
+                                      String pkg, long postTime, String fingerprint, String promptAI) {
     // 1. Nettoyage automatique des empreintes obsolètes au début de chaque cycle
     EventValidator.cleanupOldFingerprints();
 
