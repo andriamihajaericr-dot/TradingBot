@@ -515,3 +515,259 @@ public class NotificationService extends NotificationListenerService {
             }
         });
     }
+// ==========================================
+// BLOC 3/3 : PIPELINE DE QUALIFICATION, DÉTECTION DES DOUBLONS ET TRANSMISSION RÉSEAU (GROQ/TELEGRAM)
+// ==========================================
+
+    /**
+     * Filtre et qualifie la source de la notification avant d'en extraire le contenu utile.
+     */
+    private void processIncomingNotification(String packageName, String title, String text) {
+        String sourceLabel = "";
+        String cleanContent = "";
+
+        // Identification des applications cibles prioritaires
+        if (packageName.contains("financialjuice")) {
+            sourceLabel = "FinancialJuice";
+            cleanContent = text.isEmpty() ? title : title + " - " + text;
+        } else if (packageName.contains("tradingeconomics")) {
+            sourceLabel = "TradingEconomics";
+            cleanContent = text.isEmpty() ? title : title + " - " + text;
+        } else if (packageName.contains("twitter") || packageName.contains("com.twitter.android") || packageName.contains("x.android")) {
+            sourceLabel = "X";
+            // Pour X, le titre contient souvent l'émetteur et le texte contient le tweet
+            cleanContent = title + ": " + text;
+        } else {
+            // Ignorer silencieusement toutes les autres sources non enregistrées
+            return;
+        }
+
+        // Nettoyage des bruits textuels récurrents ou des résidus de notifications tronquées
+        cleanContent = sanitizeNotificationText(cleanContent);
+        if (cleanContent.length() < 10) return; // Trop court pour contenir une info macroéconomique utile
+
+        // Élimination stricte des doublons identiques reçus en rafale (fréquent sur les flux temps réel)
+        if (isDuplicateEvent(cleanContent)) {
+            Log.d(TAG, "Notification ignorée : Doublon détecté via empreinte MD5.");
+            return;
+        }
+
+        final String finalSource = sourceLabel;
+        final String finalContent = cleanContent;
+
+        // ✅ PIPELINE ASYNCHRONE SÉCURISÉ
+        // L'analyse lourde et les appels réseau sont délégués au pool de threads dédié
+        tradingPipelineExecutor.execute(() -> {
+            try {
+                Log.i(TAG, "Analyse en cours via le pipeline pour la source [" + finalSource + "] : " + finalContent);
+
+                // Étape 1 : Construction du prompt d'évaluation de la pertinence macroéconomique
+                String evaluationPrompt = "Analyse la notification suivante de manière brute. "
+                        + "Détermine si elle contient un événement macroéconomique majeur, une décision de banque centrale, "
+                        + "une donnée d'inflation (CPI), d'emploi (NFP), une annonce géopolitique critique ou un tarif douanier.\n\n"
+                        + "Notification : \"" + finalContent + "\"\n\n"
+                        + "Réponds UNIQUEMENT par un entier de 1 à 5 représentant l'indice d'importance du driver :\n"
+                        + "1 = Bruit / Info entreprise / Météo / Faible importance.\n"
+                        + "2 = Événement macro mineur sans impact volatilité.\n"
+                        + "3 = Événement macro validé avec impact potentiel moyen.\n"
+                        + "4 = Choc macroéconomique majeur (CPI, NFP, Décision taux).\n"
+                        + "5 = Crise systémique ou géopolitique majeure (Frappes, escalade militaire, blocage de détroit).\n"
+                        + "Interdiction d'ajouter du texte, donne uniquement le chiffre.";
+
+                String evaluationResponse = queryGroqAPI(evaluationPrompt, "Tu es un filtre de pertinence. Tu réponds par un seul chiffre.");
+                if (evaluationResponse == null) return;
+
+                int priorityScore = 1;
+                try {
+                    priorityScore = Integer.parseInt(evaluationResponse.replaceAll("[^1-5]", "").trim());
+                } catch (NumberFormatException e) {
+                    Log.w(TAG, "Impossible de parser le score de pertinence, fallback à 1. Réponse reçue : " + evaluationResponse);
+                }
+
+                // Application du seuil révisé : On ne traite que les drivers confirmés de score >= 3
+                if (priorityScore < 3) {[cite: 1]
+                    Log.d(TAG, "Notification rejetée par le filtre de pertinence (Score: " + priorityScore + " / Seuil requis: 3).");[cite: 1]
+                    return;
+                }
+
+                Log.i(TAG, "Notification validée par le pipeline (Score: " + priorityScore + "). Génération de la matrice d'impact...");
+
+                // Étape 2 : Soumission au System Prompt immuable pour générer la matrice financière complète
+                String matrixResponse = queryGroqAPI(finalContent, SYSTEM_PROMPT);
+                
+                if (matrixResponse != null && !matrixResponse.isEmpty()) {
+                    // Étape 3 : Routage et diffusion de la matrice vers les canaux d'exécution (Telegram)
+                    sendTelegramMessage(matrixResponse);
+                    
+                    // Étape 4 : Archivage persistant de l'événement en base de données pour la compilation du rapport mensuel
+                    eventDb.insertEvent(finalSource, finalContent, matrixResponse, priorityScore);
+                    Log.i(TAG, "Matrice d'impact diffusée et archivée avec succès.");
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur critique dans le thread d'exécution du pipeline : ", e);
+            }
+        });
+    }
+
+    /**
+     * Nettoie les scories textuelles, les espaces superflus et uniformise les notifications.
+     */
+    private String sanitizeNotificationText(String rawText) {
+        if (rawText == null) return "";
+        // Suppression des indicateurs de texte tronqué, des retours à la ligne excessifs et des espaces multiples
+        return rawText.replaceAll("\\s+", " ")
+                      .replace("...", "")
+                      .replace("…", "")
+                      .replaceAll("(?i)read more", "")
+                      .trim();
+    }
+
+    /**
+     * Vérifie si un message identique a été traité récemment en comparant son empreinte MD5.
+     */
+    private boolean isDuplicateEvent(String content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            byte[] hashBytes = digest.digest(content.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            String currentHash = sb.toString();
+
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String lastHash = prefs.getString("last_notification_hash", "");
+            long lastTime = prefs.getLong("last_notification_time", 0);
+            long now = System.currentTimeMillis();
+
+            // Si le contenu est identique et qu'il s'est écoulé moins de 45 secondes, c'est un doublon
+            if (currentHash.equals(lastHash) && (now - lastTime < 45000L)) {
+                return true;
+            }
+
+            // Mise à jour de l'empreinte de contrôle
+            prefs.edit()
+                 .putString("last_notification_hash", currentHash)
+                 .putLong("last_notification_time", now)
+                 .apply();
+
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur lors du calcul de l'empreinte anti-doublon : ", e);
+        }
+        return false;
+    }
+
+    /**
+     * Gère la communication HTTP POST synchrone avec l'API Groq (exécutée hors du thread principal).
+     */
+    private String queryGroqAPI(String userPrompt, String systemPrompt) {
+        HttpURLConnection conn = null;
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String apiKey = prefs.getString(PREF_GROQ_KEY, "");
+
+            if (apiKey.isEmpty()) {
+                Log.e(TAG, "Clé API Groq manquante dans les SharedPreferences. Requête annulée.");
+                return null;
+            }
+
+            URL url = new URL(GROQ_URL);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(15000);
+            conn.setDoOutput(true);
+
+            // Construction du payload JSON conforme à l'API OpenAI/Groq
+            JSONObject jsonBody = new JSONObject();
+            jsonBody.put("model", GROQ_MODEL);
+            jsonBody.put("temperature", 0.1); // Faible température pour garantir le respect strict des contraintes dures
+
+            JSONArray messages = new JSONArray();
+            messages.put(new JSONObject().put("role", "system").put("content", systemPrompt));
+            messages.put(new JSONObject().put("role", "user").put("content", userPrompt));
+            jsonBody.put("messages", messages);
+
+            // Envoi des données
+            try (OutputStream os = conn.getOutputStream()) {
+                byte[] input = jsonBody.toString().getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+            }
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        response.append(line);
+                    }
+                    
+                    // Extraction du texte de la réponse JSON
+                    JSONObject jsonResponse = new JSONObject(response.toString());
+                    return jsonResponse.getJSONArray("choices")
+                                       .getJSONObject(0)
+                                       .getJSONObject("message")
+                                       .getString("content")
+                                       .trim();
+                }
+            } else {
+                Log.e(TAG, "Erreur API Groq : Code HTTP " + responseCode);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Exception lors de la connexion à l'API Groq : ", e);
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+        return null;
+    }
+
+    /**
+     * Distribue la matrice d'impact générée vers le canal Telegram via l'API Bot.
+     */
+    private void sendTelegramMessage(String message) {
+        HttpURLConnection conn = null;
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String token = prefs.getString(PREF_TG_TOKEN, "");
+            String chatId = prefs.getString(PREF_TG_CHAT_ID, "");
+
+            if (token.isEmpty() || chatId.isEmpty()) {
+                Log.e(TAG, "Identifiants Telegram manquants dans les SharedPreferences. Envoi impossible.");
+                return;
+            }
+
+            String tgUrl = "https://api.telegram.org/bot" + token + "/sendMessage";
+            URL url = new URL(tgUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            conn.setConnectTimeout(6000);
+            conn.setReadTimeout(10000);
+            conn.setDoOutput(true);
+
+            JSONObject jsonBody = new JSONObject();
+            jsonBody.put("chat_id", chatId);
+            jsonBody.put("text", message);
+
+            try (OutputStream os = conn.getOutputStream()) {
+                byte[] input = jsonBody.toString().getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+            }
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                Log.e(TAG, "Erreur API Telegram : Code HTTP " + responseCode);
+            } else {
+                Log.d(TAG, "Message transmis avec succès sur Telegram.");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Exception lors de l'envoi du message Telegram : ", e);
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+}
