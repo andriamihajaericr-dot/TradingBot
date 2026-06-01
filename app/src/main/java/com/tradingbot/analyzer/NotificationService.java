@@ -1252,21 +1252,28 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
 
     // --- APPLICATION DE LA CONTRAINTE DE FORCE BRUTE GÉOPOLITIQUE ---
-    String initialImpact;
-    if (!vr.geoContext.isEmpty()) {
-        // Force l'alignement immédiat du USDJPY si présent dans le flux géopolitique
-        if (targetAssets.contains("USDJPY")) {
-            Log.w(TAG, "⚠️ [CONTRAINTE GÉO] Arbitrage Dollar activé : Force du USDJPY en ACHAT CHOC.");
-            detected.impact = "ACHAT CHOC";
-            detected.description = "Dollar Dominance Absolue (Régime de Crise Géo Asie/Moyen-Orient)";
-        }
-        initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact;
-        
-    } else if (isSupremeNews && (upFeed.contains("FOMC") || upFeed.contains("FED "))) {
-        initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRAL | " + detected.description + " | " + detected.impact;
-    } else {
-        initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
+    // 1. Déclaration unique en amont avec une valeur par défaut (Fallback)
+String initialImpact = ""; 
+
+if (!vr.geoContext.isEmpty()) {
+    // Force l'alignement immédiat du USDJPY si présent dans le flux géopolitique
+    if (targetAssets.contains("USDJPY")) {
+        detected.impact = "ACHAT CHOC";
+        detected.description = "Dollar Dominance Absolue (Régime de Crise Géo Asie/Moyen-Orient)";
     }
+    initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact + " (Poids: " + weight + ")";
+    lastGeoTime = now;
+} else if (isSupremeNews && (upFeed.contains("FOMC") || upFeed.contains("FED "))) {
+    initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRALE | " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
+    lastAnalysisTime = now;
+} else {
+    // ✅ Ta ligne corrigée, propre et parfaitement intégrée au scope
+    initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
+    lastAnalysisTime = now;
+} // <--- L'accolade ferme proprement le bloc 'else'
+
+// 2. Maintenant la variable est accessible ici pour tes logs et ton traitement
+Log.d(TAG, "Impact final qualifié : " + initialImpact);
 
     if (vr.geoContext.isEmpty() && !(upFeed.contains("FOMC") || upFeed.contains("FED "))) {
         if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
