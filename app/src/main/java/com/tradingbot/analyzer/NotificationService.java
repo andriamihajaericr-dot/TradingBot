@@ -1,4 +1,3 @@
-
 package com.tradingbot.analyzer;
 
 import java.util.Locale;
@@ -1129,12 +1128,15 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                 }
 
                 // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
-                String promptAI = systemPrompt;
+                // 9️⃣ Enrichissement dynamique du Prompt Système IA
+                String baseSystemPrompt = SYSTEM_PROMPT;  // Utilise la constante de classe
+
+                String promptAI = baseSystemPrompt;
                 if (ecoResult.isParsed) {
-                    promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
-                               "L'analyseur mathématique déterministe a détecté un écart type. " +
-                               "Direction recommandée : " + ecoResult.directionText + "\n\n" + systemPrompt;
-                }
+                promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
+                    "L'analyseur mathématique déterministe a détecté un écart type. " +
+                    "Direction recommandée : " + ecoResult.directionText + "\n\n" + baseSystemPrompt;
+                 }
 
                 // 🔟 Exécution finale de l'analyse cognitive LLM (Requête API Groq, génération de la matrice et envoi Telegram)
                 // 🔟 Exécution finale de l'analyse cognitive LLM
