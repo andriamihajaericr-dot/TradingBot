@@ -778,12 +778,13 @@ private static final String DAILY_SYSTEM_PROMPT =
                 String promptFinalEnvoye = construirePromptFinal(userContent, historique);
 
                 // ✅ CORRECTION 4 : Instanciation LOCALE stricte du payload JSON (Élimine les Race Conditions en cas d'alertes simultanées)
+                // ✅ CORRECTION 4 : Instanciation LOCALE stricte du payload JSON
                 JSONObject jsonPayload = new JSONObject();
                 jsonPayload.put("model", GROQ_MODEL);
                 jsonPayload.put("temperature", 0.02);
 
                 JSONArray messages = new JSONArray();
-                messages.put(new JSONObject().put("role", "system").put("content", promptFinalEnvoye));
+                messages.put(new JSONObject().put("role", "system").put("content", promptFinalEnvoye));  // ou SYSTEM_PROMPT selon contexte
                 messages.put(new JSONObject().put("role", "user").put("content", userContent));
                 jsonPayload.put("messages", messages);
 
