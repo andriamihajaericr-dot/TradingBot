@@ -338,4 +338,43 @@ public String obtenirLeToutDernierDriver() {
     }
     return sb.toString();
 }
+    //LISTER LES DONNÉES DE LA BASE DE DONNÉES 
+    public void diagnostiquerTableEvents() {
+    SQLiteDatabase db = this.getReadableDatabase();
+    Cursor cursor = null;
+    try {
+        // On récupère les 5 derniers éléments insérés, sans aucun filtre
+        cursor = db.rawQuery(
+            "SELECT id, sync_status, source, title, driver_weight FROM " + TABLE_EVENTS + 
+            " ORDER BY id DESC LIMIT 5", 
+            null
+        );
+
+        Log.d("BOT_DIAGNOSTIC", "=== VÉRIFICATION DE LA BASE DE DONNÉES ===");
+        if (cursor != null && cursor.moveToFirst()) {
+            int count = 0;
+            do {
+                count++;
+                int id = cursor.getInt(0);
+                String syncStatus = cursor.getString(1);
+                String source = cursor.getString(2);
+                String title = cursor.getString(3);
+                int weight = cursor.getInt(4);
+
+                Log.d("BOT_DIAGNOSTIC", "Élément #" + count + " [ID: " + id + "]");
+                Log.d("BOT_DIAGNOSTIC", "   -> Source      : " + source);
+                Log.d("BOT_DIAGNOSTIC", "   -> Statut Sync : " + syncStatus);
+                Log.d("BOT_DIAGNOSTIC", "   -> Poids       : " + weight);
+                Log.d("BOT_DIAGNOSTIC", "   -> Titre       : " + title);
+            } while (cursor.moveToNext());
+        } else {
+            Log.w("BOT_DIAGNOSTIC", "❌ La table TABLE_EVENTS est STRICTEMENT vide. Aucun enregistrement trouvé.");
+        }
+        Log.d("BOT_DIAGNOSTIC", "========================================");
+    } catch (Exception e) {
+        Log.e("BOT_DIAGNOSTIC", "Erreur lors du diagnostic", e);
+    } finally {
+        if (cursor != null) cursor.close();
+    }
+    }
 }
