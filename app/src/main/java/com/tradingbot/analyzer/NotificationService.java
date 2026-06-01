@@ -1285,7 +1285,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     }
 
     // ✅ PIPELINE ASYNCHRONE SÉCURISÉ
-    if (weight >= 4 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
+    if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
         Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié (Poids=" + weight + ") → Préparation du pipeline.");
         
         List<String> listeHistorique = new ArrayList<>();
