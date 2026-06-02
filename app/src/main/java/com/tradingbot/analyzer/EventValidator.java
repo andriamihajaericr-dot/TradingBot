@@ -96,23 +96,26 @@ public static ValidationResult validate(Context context, String title, String co
     }
 
     // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
-    String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
-    EventDatabase db = (context != null) ? EventDatabase.getInstance(context) : null;
-    if (!detectedType.startsWith("GEO") && db != null) {
-        try {
-            long currentSeconds = timestamp / 1000;
-            if (db.isDriverActiveRecently(detectedType, currentSeconds)) {
-                result.confidence  = 0;
-                result.isConfirmed = false;
-                result.reason      = "Driver déjà actif récemment (Inertie Macro)";
-                result.assetsEnriched = !detectedAssets.isEmpty();
-                logToMain("[⏳ Driver " + detectedType + " déjà actif — ignoré");
-                return result;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur inertie macro", e);
+    // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
+String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
+EventDatabase db = (context != null) ? EventDatabase.getInstance(context) : null;
+if (!detectedType.startsWith("GEO") && db != null) {
+    try {
+        long currentSeconds = timestamp / 1000;
+        if (db.isDriverActiveRecently(detectedType, currentSeconds)) {
+            result.isConfirmed = false;
+            result.isInertiaBlock = true;
+            result.reason = "Driver déjà actif récemment (Inertie Macro)";
+            result.assetsEnriched = !detectedAssets.isEmpty();
+            // Récupérer le dernier événement de ce type pour le rappel
+            result.lastEventSummary = db.getLastEventByType(detectedType);
+            logToMain("⏳ Driver " + detectedType + " déjà actif — envoi d'un rappel");
+            return result; // on retourne sans exécuter les autres étapes
         }
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur inertie macro", e);
     }
+}
 
     // ── ÉTAPE 2 : Filtre anti-rumeur absolu ───────────────────────────
     if (containsRumorMarkers(combined)) {
