@@ -73,8 +73,12 @@ public class EconomicAnalyzer {
         }
 
         Log.d(TAG, "Analyse " + currency + " : " + result.marketImpact + " [Poids: " + result.weight + "]");
+        // Envoi dans l'interface
+        if (MainActivity.instance != null) {
+           MainActivity.instance.addLog("[EconomicAnalyzer] " + currency + " | Poids=" + result.weight + " | " + result.directionText);
+           }
         return result;
-    }
+        }
 
     private static String detectCurrency(String upperText) {
         if (upperText.contains("ECB") || upperText.contains("EUROZONE") || 
