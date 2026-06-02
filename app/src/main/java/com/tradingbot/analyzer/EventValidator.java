@@ -498,9 +498,19 @@ private static boolean matchesIndicatorKeywords(String text, String indicator, S
             }
         }
     }
+    
     private static void logToMain(String message) {
-    // On évite toute dépendance à MainActivity
-      Log.d(TAG, "[VALIDATOR] " + message);
+    // Toujours dans Logcat
+    Log.d(TAG, "[VALIDATOR] " + message);
+    
+    // Également dans l'interface si l'activité existe
+    if (MainActivity.instance != null) {
+        try {
+            MainActivity.instance.addLog("[VALIDATOR] " + message);
+        } catch (Exception e) {
+            Log.w(TAG, "Impossible d'ajouter le log à l'UI", e);
+        }
+    }
     }
 
     private static String generateFingerprint(String title, String content) {
