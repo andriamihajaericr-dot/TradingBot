@@ -309,22 +309,29 @@ public class MainActivity extends AppCompatActivity {
     private void exportDatabaseToUri(Uri uri) {
     try {
         File dbFile = getDatabasePath("trading_bot.db");
-        if (dbFile == null || !dbFile.exists()) {
-            Toast.makeText(this, "Aucune base de données", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        FileInputStream fis = new FileInputStream(dbFile);
+        if (dbFile == null || !dbFile.exists()) return;
+
+        // 1. Copie vers l'emplacement choisi par l'utilisateur
+        InputStream fis = new FileInputStream(dbFile);
         OutputStream os = getContentResolver().openOutputStream(uri);
         byte[] buffer = new byte[1024];
         int length;
-        while ((length = fis.read(buffer)) > 0) {
-            os.write(buffer, 0, length);
-        }
-        os.flush();
+        while ((length = fis.read(buffer)) > 0) os.write(buffer, 0, length);
         os.close();
         fis.close();
-        Toast.makeText(this, "Base macro exportée avec succès", Toast.LENGTH_LONG).show();
-        addLog("✅ Base exportée.");
+
+        // 2. Copie automatique vers le dossier privé de l'app (sauvegarde interne)
+        File privateBackupDir = new File(getExternalFilesDir(null), "AutoBackups");
+        if (!privateBackupDir.exists()) privateBackupDir.mkdirs();
+        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        File privateBackupFile = new File(privateBackupDir, "auto_trading_bot_backup_" + timestamp + ".db");
+        fis = new FileInputStream(dbFile);
+        fos = new FileOutputStream(privateBackupFile);
+        while ((length = fis.read(buffer)) > 0) fos.write(buffer, 0, length);
+        fos.close();
+        fis.close();
+
+        Toast.makeText(this, "Base exportée + sauvegarde automatique locale", Toast.LENGTH_LONG).show();
     } catch (Exception e) {
         Log.e(TAG, "Erreur export", e);
         Toast.makeText(this, "Échec export : " + e.getMessage(), Toast.LENGTH_SHORT).show();
