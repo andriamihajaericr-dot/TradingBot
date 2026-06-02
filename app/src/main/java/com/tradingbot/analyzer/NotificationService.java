@@ -1099,10 +1099,23 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                 EventValidator.ValidationResult validationResult = EventValidator.validate(NotificationService.this, title, bodyTextRaw, currentTime, enrichedAssets);
 
                 // Coupe-circuit du Validateur : On bloque les doublons temporels, sauf s'il s'agit d'un choc absolu de poids 4
-                if (validationResult != null && !validationResult.isConfirmed && finalCalculatedWeight < 4) {
-                    Log.d(TAG, "[COUPE-CIRCUIT TIMING] Événement rejeté : " + validationResult.reason);
-                    return;
-                }
+                if (validationResult != null && !validationResult.isConfirmed) {
+    // Cas particulier : inertie macro (driver déjà actif) → on envoie un rappel Telegram
+    if (validationResult.isInertiaBlock) {
+        String reminderMsg = "⏳ *RAPPEL : DRIVER DÉJÀ ACTIF*\n" +
+                             "🔹 " + validationResult.reason + "\n\n" +
+                             "📋 *Dernier événement similaire :*\n" +
+                             validationResult.lastEventSummary;
+        sendTelegramSecure(reminderMsg, this);
+        Log.d(TAG, "[RAPPEL] Driver actif : rappel envoyé.");
+        return; // On arrête le traitement normal
+    }
+    // Pour les autres cas de rejet (doublon, rumeur, faible confiance, etc.)
+    if (finalCalculatedWeight < 4) {
+        Log.d(TAG, "[COUPE-CIRCUIT TIMING] Événement rejeté : " + validationResult.reason);
+        return;
+    }
+}
 
                 // 7️⃣ RÈGLE DE QUALIFICATION MINIMALE DU PIPELINE : Seuil fixé à 3 pour valider les drivers confirmés
                 if (finalCalculatedWeight < 3 && !eventTypeStr.equals("GEOPOLITICAL")) {
