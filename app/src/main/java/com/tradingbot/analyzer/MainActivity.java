@@ -251,48 +251,41 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void importDatabaseFromStorage() {
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-            if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 1002);
-                return;
-            }
+    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+    intent.addCategory(Intent.CATEGORY_OPENABLE);
+    intent.setType("*/*");
+    intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/octet-stream", "application/x-sqlite3"});
+    importDbLauncher.launch(intent);
+     }
+    private void importDatabaseFromUri(Uri uri) {
+    try {
+        // Demander un accès permanent à l'Uri (l'utilisateur devra confirmer)
+        getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        File currentDb = getDatabasePath("trading_bot.db");
+        if (eventDb != null) {
+            eventDb.close();
+            eventDb = null;
         }
 
-        File importDir = new File(Environment.getExternalStorageDirectory(), "Documents/TradingBotBackup");
-        File[] backups = importDir.listFiles((dir, name) -> name.endsWith(".db"));
-
-        if (backups == null || backups.length == 0) {
-            Toast.makeText(this, "Aucune sauvegarde trouvée dans Documents/TradingBotBackup", Toast.LENGTH_LONG).show();
-            return;
+        InputStream is = getContentResolver().openInputStream(uri);
+        FileOutputStream fos = new FileOutputStream(currentDb);
+        byte[] buffer = new byte[1024];
+        int length;
+        while ((length = is.read(buffer)) > 0) {
+            fos.write(buffer, 0, length);
         }
+        fos.flush();
+        fos.close();
+        is.close();
 
-        Arrays.sort(backups, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
-        File latestBackup = backups[0];
-
-        try {
-            File currentDb = getDatabasePath("trading_bot.db");
-            if (eventDb != null) {
-                eventDb.close();
-                eventDb = null;
-            }
-            FileInputStream fis = new FileInputStream(latestBackup);
-            FileOutputStream fos = new FileOutputStream(currentDb);
-            byte[] buffer = new byte[1024];
-            int length;
-            while ((length = fis.read(buffer)) > 0) {
-                fos.write(buffer, 0, length);
-            }
-            fos.flush();
-            fos.close();
-            fis.close();
-
-            eventDb = EventDatabase.getInstance(this);
-            Toast.makeText(this, "Base restaurée depuis " + latestBackup.getName(), Toast.LENGTH_LONG).show();
-            addLog("✅ Base de données importée avec succès.");
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur lors de l'importation", e);
-            Toast.makeText(this, "Échec de l'importation : " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+        eventDb = EventDatabase.getInstance(this);
+        Toast.makeText(this, "Base restaurée avec succès", Toast.LENGTH_LONG).show();
+        addLog("✅ Base de données importée avec succès.");
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur lors de l'importation", e);
+        Toast.makeText(this, "Échec de l'importation : " + e.getMessage(), Toast.LENGTH_LONG).show();
+    }
     }
 
     private void exportDatabaseToStorage() {
