@@ -278,7 +278,6 @@ public class MainActivity extends AppCompatActivity {
         fos.flush();
         fos.close();
         is.close();
-
         eventDb = EventDatabase.getInstance(this);
         Toast.makeText(this, "Base restaurée avec succès", Toast.LENGTH_LONG).show();
         addLog("✅ Base de données importée avec succès.");
