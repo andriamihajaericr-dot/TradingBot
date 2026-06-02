@@ -80,29 +80,19 @@ interface FetchFunction {
      * Point d'entrée principal (Pipeline de données à 3 niveaux)
      */
     public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
-        Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
-
-        // Niveau 1 : FMP (Source de Données Principale)
-        if (targetContext != null) {
-            List<CalendarEvent> events = fetchFromFMP(targetContext, hoursAhead);
-            if (!events.isEmpty()) {
-                Log.d(TAG, "FMP : " + events.size() + " événements chargés.");
-                return events;
-            }
-        }
-
-        // Niveau 2 : ForexFactory (Source de Repli Automatique)
-        Log.w(TAG, "FMP indisponible ou clé absente — Transition vers ForexFactory.");
-        List<CalendarEvent> events = fetchFromForexFactory(hoursAhead);
+    Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
+    if (targetContext != null) {
+        List<CalendarEvent> events = fetchWithRetry(hoursAhead -> fetchFromFMP(targetContext, hoursAhead), hoursAhead);
         if (!events.isEmpty()) {
-            Log.d(TAG, "ForexFactory : " + events.size() + " événements chargés.");
             return events;
         }
-
-        // Niveau 3 : Sécurité institutionnelle de dernier recours (Blackout Réseau)
-        Log.w(TAG, "Alerte : Aucune source en ligne — Activation du Fallback Statique.");
-        return generateInstitutionalExhaustiveFallback();
     }
+    List<CalendarEvent> events = fetchWithRetry(hoursAhead -> fetchFromForexFactory(hoursAhead), hoursAhead);
+    if (!events.isEmpty()) {
+        return events;
+    }
+    return generateInstitutionalExhaustiveFallback();
+}
 
     private static List<CalendarEvent> fetchFromFMP(Context context, int hoursAhead) {
         List<CalendarEvent> events = new ArrayList<>();
