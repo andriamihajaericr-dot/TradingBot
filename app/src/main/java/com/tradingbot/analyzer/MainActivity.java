@@ -235,6 +235,63 @@ public class MainActivity extends AppCompatActivity {
     startActivity(Intent.createChooser(shareIntent, "Partager les logs"));
     }
 
+    private void importDatabaseFromStorage() {
+    // Vérifier la permission de stockage (Android 10 et inférieur)
+    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 1002);
+            return;
+        }
+    }
+    
+    File importDir = new File(Environment.getExternalStorageDirectory(), "Documents/TradingBotBackup");
+    File[] backups = importDir.listFiles((dir, name) -> name.endsWith(".db"));
+    
+    if (backups == null || backups.length == 0) {
+        Toast.makeText(this, "Aucune sauvegarde trouvée dans Documents/TradingBotBackup", Toast.LENGTH_LONG).show();
+        return;
+    }
+    
+    // Trier par date de modification décroissante
+    Arrays.sort(backups, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
+    File latestBackup = backups[0];
+    
+    try {
+        File currentDb = getDatabasePath("trading_bot.db");
+        // Fermer toutes les connexions ouvertes
+        if (eventDb != null) {
+            eventDb.close();
+            eventDb = null;
+        }
+        
+        // Copier le fichier
+        FileInputStream fis = new FileInputStream(latestBackup);
+        FileOutputStream fos = new FileOutputStream(currentDb);
+        byte[] buffer = new byte[1024];
+        int length;
+        while ((length = fis.read(buffer)) > 0) {
+            fos.write(buffer, 0, length);
+        }
+        fos.flush();
+        fos.close();
+        fis.close();
+        
+        // Réouvrir la base
+        eventDb = EventDatabase.getInstance(this);
+        
+        Toast.makeText(this, "Base restaurée depuis " + latestBackup.getName(), Toast.LENGTH_LONG).show();
+        addLog("✅ Base de données importée avec succès.");
+        
+        // Optionnel : relancer le service ou rafraîchir
+        if (NotificationService.instance != null) {
+            // Forcer une resynchronisation si besoin
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur lors de l'importation", e);
+        Toast.makeText(this, "Échec de l'importation : " + e.getMessage(), Toast.LENGTH_LONG).show();
+    }
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
