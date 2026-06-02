@@ -298,16 +298,19 @@ private static ParsedValues extraireChiffres(String texte) {
     return values;
 }
 
-    private static double chercherRegex(String texte, String expression) {
-        try {
-            Pattern pattern = Pattern.compile(expression, Pattern.CASE_INSENSITIVE);
-            Matcher matcher = pattern.matcher(texte);
-            if (matcher.find()) {
-                return Double.parseDouble(matcher.group(1));
-            }
-        } catch (Exception e) {
-            // Échec local de capture pour cette étiquette
+private static double chercherRegex(String texte, String expression) {
+    try {
+        Pattern pattern = Pattern.compile(expression, Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(texte);
+        if (matcher.find()) {
+            String numStr = matcher.group(1);
+            // Supprimer le signe % s'il est présent
+            numStr = numStr.replace("%", "");
+            return Double.parseDouble(numStr);
         }
-        return Double.NaN;
+    } catch (Exception e) {
+        // ignore
     }
+    return Double.NaN;
+}
 }
