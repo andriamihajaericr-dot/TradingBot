@@ -1,6 +1,7 @@
 package com.tradingbot.analyzer;
 
 import android.util.Log;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -8,309 +9,369 @@ public class EconomicAnalyzer {
 
     private static final String TAG = "BOT_ECONOMIC_ANALYZER";
 
-    // Modèle de données retourné après chaque analyse
     public static class EvaluationResult {
-        public int weight = 1;                     // Poids final affecté (1 à 4)
-        public String marketImpact = "NEUTRAL";     // Identifiant pour la matrice de dominance
-        public String directionText = "";          // Message explicatif avec flèches pour Telegram
-        public double deviation = 0.0;             // Écart brut calculé (Actual - Forecast)
-        public boolean isParsed = false;           // Indique si des chiffres ont été extraits
+        public int weight = 1;
+        public String marketImpact = "NEUTRAL";
+        public String directionText = "";
+        public double deviation = 0.0;
+        public boolean isParsed = false;
+        public String currency = "USD";  // Nouveau champ
     }
 
-    // Structure interne pour l'extraction des données numériques
     private static class ParsedValues {
         double actual = Double.NaN;
         double forecast = Double.NaN;
-
-        boolean isValid() {
-            return !Double.isNaN(actual) && !Double.isNaN(forecast);
-        }
+        String currency = "USD";  // Devise détectée
     }
 
     /**
-     * Point d'entrée principal : Analyse le titre et le texte brut d'un événement macroéconomique,
-     * calcule l'écart mathématique exact et configure la matrice d'impact pour les actifs.
+     * Point d'entrée principal avec détection de la devise
      */
     public static EvaluationResult analyserEvenement(String title, String text) {
         EvaluationResult result = new EvaluationResult();
+        if (title == null || text == null) return result;
+
+        String combined = (title + " " + text).toUpperCase(Locale.ROOT);
         
-        if (title == null || text == null) {
-            return result;
-        }
+        // Détection de la devise (priorité aux mentions explicites)
+        String currency = detectCurrency(combined);
+        result.currency = currency;
 
-        String event = title.toUpperCase();
-        String body = text.toUpperCase();
-
-        // 1️⃣ EXTRACTION NUMÉRIQUE AUTOMATIQUE (Actual & Forecast)
         ParsedValues valeurs = extraireChiffres(text);
         
         if (!valeurs.isValid()) {
-            // Si pas de chiffres (ex: Discours de la Fed), on attribue un poids selon l'importance de l'institution
-            traiterEvenementTextuel(event, result);
+            traiterEvenementTextuel(combined, result, currency);
             return result;
         }
 
+        valeurs.currency = currency;
         result.isParsed = true;
         result.deviation = valeurs.actual - valeurs.forecast;
         double absEcart = Math.abs(result.deviation);
 
-        // 2️⃣ DICTIONNAIRE ET SÉCURISATION DES SEUILS PAR INDICATEUR
-
-        // ==========================================
-        // SÉRIE 1 : INDICES DE CROISSANCE / EMPLOI
-        // ==========================================
-        
-        // GDP / Advance GDP (Produit Intérieur Brut)
-        if (event.contains("GDP") || event.contains("PIB")) {
-            attribuerPoids(absEcart, 0.2, 0.5, result);
-            if (result.deviation > 0) {
-                result.marketImpact = "US_GDP_BULLISH";
-                result.directionText = "📈 GDP FORTE: USD ↗️, USOIL ↗️, NASDAQ/SP500 ↗️, GOLD ↘️";
-            } else {
-                result.marketImpact = "US_GDP_BEARISH";
-                result.directionText = "📉 RISQUE RÉCESSION: USD ↘️, GOLD ↗️, INDICES ↘️";
-            }
-        }
-        // NFP / ADPNF / EC (Emplois Non-Agricoles & Coûts d'emploi)
-        else if (event.contains("NFP") || event.contains("NON-FARM") || event.contains("ADP") || event.contains("EMPLOYMENT")) {
-            // Échelle en milliers (k). Ex: Surprise de 30k ou 60k emplois
-            attribuerPoids(absEcart, 25.0, 55.0, result);
-            if (result.deviation > 0) {
-                result.marketImpact = "US_NFP_STRONG";
-                result.directionText = "💪 EMPLOI SOLIDE: USD ↗️, USOIL ↗️, GOLD ↘️, NASDAQ ↘️ (Peur Taux)";
-            } else {
-                result.marketImpact = "US_NFP_WEAK";
-                result.directionText = "⚠️ MARCHE DU TRAVAIL FAIBLE: USD ↘️, GOLD ↗️, NASDAQ/SP500 ↗️";
-            }
-        }
-        // PMI / ISM (Manufacturing, Services, Non-Manufacturing)
-        else if (event.contains("PMI") || event.contains("ISM")) {
-            attribuerPoids(absEcart, 0.6, 1.2, result);
-            if (result.deviation > 0) {
-                result.marketImpact = "US_PMI_EXPANSION";
-                result.directionText = "🏭 EXPANSION PMI: USOIL ↗️, USD ↗️, NASDAQ/SP500 ↗️, GOLD ↘️";
-            } else {
-                result.marketImpact = "US_PMI_CONTRACTION";
-                result.directionText = "🛑 CONTRACTION PMI: USOIL ↘️, USD ↘️, GOLD ↗️";
-            }
-        }
-        // COI (Crude Oil Inventories / Stocks de Pétrole EIA)
-        else if (event.contains("INVENTORIES") && (event.contains("OIL") || event.contains("CRUDE"))) {
-            // Échelle en Millions de barils.
-            attribuerPoids(absEcart, 2.0, 4.5, result);
-            // ATTENTION INVERSÉ : Plus de stocks que prévu = Baisse des cours du brut
-            if (result.deviation > 0) {
-                result.marketImpact = "OIL_INVENTORIES_SURPLUS";
-                result.directionText = "🛢️ SURPLUS DE STOCKS: USOIL ↘️ (Baisse de la demande)";
-            } else {
-                result.marketImpact = "OIL_INVENTORIES_DEFICIT";
-                result.directionText = "🛢️ MANQUE DE STOCKS: USOIL ↗️ (Forte consommation)";
-            }
-        }
-        // IJC (Initial Jobless Claims / Demandes d'allocation chômage)
-        else if (event.contains("JOBLESS CLAIMS") || event.contains("IJC")) {
-            attribuerPoids(absEcart, 10.0, 20.0, result);
-            // ATTENTION INVERSÉ : Plus d'inscriptions au chômage = Mauvais pour l'économie
-            if (result.deviation > 0) {
-                result.marketImpact = "US_IJC_BAD";
-                result.directionText = "⚠️ HAUSSE DES CHÔMEURS: USD ↘️, GOLD ↗️, NASDAQ ↗️";
-            } else {
-                result.marketImpact = "US_IJC_GOOD";
-                result.directionText = "🦅 MOINS DE CHÔMEURS: USD ↗️, GOLD ↘️, USOIL ↗️";
-            }
-        }
-        // ER (Unemployment Rate / Taux de chômage brut)
-        else if (event.contains("UNEMPLOYMENT RATE") || event.contains("ER")) {
-            attribuerPoids(absEcart, 0.1, 0.2, result);
-            // ATTENTION INVERSÉ : Une hausse du taux de chômage affaiblit le Dollar
-            if (result.deviation > 0) {
-                result.marketImpact = "US_UNEMPLOYMENT_HIGH";
-                result.directionText = "🚨 CHÔMAGE EN HAUSSE: USD ↘️, GOLD ↗️, INDICES ↗️ (Dovish)";
-            } else {
-                result.marketImpact = "US_UNEMPLOYMENT_LOW";
-                result.directionText = "🦅 PLEIN EMPLOI: USD ↗️, GOLD ↘️, USOIL ↗️ (Hawkish)";
-            }
-        }
-        // EHS (Existing Home Sales) / BP (Building Permits) / CDG (Core Durable Goods)
-        else if (event.contains("HOME SALES") || event.contains("BUILDING PERMITS") || event.contains("DURABLE GOODS")) {
-            attribuerPoids(absEcart, 1.0, 2.5, result);
-            if (result.deviation > 0) {
-                result.marketImpact = "US_HOUSING_STRONG";
-                result.directionText = "🏠 IMMOBILIER/REVENUS FORTS: USD ↗️, INDICES ↗️";
-            } else {
-                result.marketImpact = "US_HOUSING_WEAK";
-                result.directionText = "📉 IMMOBILIER/REVENUS EN BAISSE: USD ↘️";
-            }
-        }
-
-        // ==========================================
-        // SÉRIE 2 : INDICES D'INFLATION / CONSOMMATION
-        // ==========================================
-        
-        // CPI (Consumer Price Index) / PPI (Producer Price Index) / PCE (Personal Consumption Expenditures)
-        else if (event.contains("CPI") || event.contains("PPI") || event.contains("PCE") || event.contains("INFLATION")) {
-            attribuerPoids(absEcart, 0.1, 0.2, result); // Extrêmement sensible sur les décimales %
-            if (result.deviation > 0) {
-                result.marketImpact = "US_CPI_HAWKISH";
-                result.directionText = "🔥 CHOC D'INFLATION: USD ↗️, USDJPY ↗️, GOLD ↘️, NASDAQ/SP500 ↘️, BTC ↘️";
-            } else {
-                result.marketImpact = "US_CPI_DOVISH";
-                result.directionText = "🍃 INFLATION EN BAISSE: USD ↘️, GOLD ↗️, NASDAQ/SP500 ↗️, BTC ↗️";
-            }
-        }
-        // RS (Retail Sales / Ventes au détail)
-        else if (event.contains("RETAIL SALES") || event.contains("RS")) {
-            attribuerPoids(absEcart, 0.3, 0.7, result);
-            if (result.deviation > 0) {
-                result.marketImpact = "US_RETAIL_STRONG";
-                result.directionText = "🛍️ CONSOMMATION FORTE: USD ↗️, NASDAQ/SP500 ↗️, GOLD ↘️";
-            } else {
-                result.marketImpact = "US_RETAIL_WEAK";
-                result.directionText = "📉 CONSOMMATION EN BERNE: USD ↘️, GOLD ↗️";
-            }
-        }
-        // CBCC (CB Consumer Confidence / Confiance des consommateurs)
-        else if (event.contains("CONSUMER CONFIDENCE") || event.contains("CBCC")) {
-            attribuerPoids(absEcart, 2.0, 5.0, result);
-            if (result.deviation > 0) {
-                result.marketImpact = "US_CONFIDENCE_HIGH";
-                result.directionText = "🧠 MORAL DES MÉNAGES EN HAUSSE: USD ↗️, INDICES ↗️";
-            } else {
-                result.marketImpact = "US_CONFIDENCE_LOW";
-                result.directionText = "📉 MORAL EN BAISSE: USD ↘️, GOLD ↗️";
-            }
-        }
-
-        // ==========================================
-        // SÉRIE 3 : DECISIONS DE TAUX D'INTÉRÊT (Règle brute)
-        // ==========================================
-        else if (event.contains("RATE") || event.contains("FUNDS") || event.contains("INTEREST") || event.contains("IRD")) {
-            result.weight = 4; // Priorité absolue d'office (Choc systémique)
-            if (result.deviation > 0) {
-                result.marketImpact = "RATE_HIKE";
-                result.directionText = "🦅 HAUSSE DES TAUX DIRECTEURS: USD ↗️, GOLD ↘️, INDICES ↘️, BTC ↘️";
-            } else if (result.deviation < 0) {
-                result.marketImpact = "RATE_CUT";
-                result.directionText = "🕊️ BAISSE DES TAUX DIRECTEURS: USD ↘️, GOLD ↗️, INDICES ↗️, BTC ↗️";
-            } else {
-                result.weight = 3; // Taux inchangés mais reste un événement majeur
-                result.marketImpact = "RATE_UNCHANGED";
-                result.directionText = "💤 TAUX INCHANGÉS: Stabilité court terme attendue.";
-            }
-        }
-        
-        // Sécurité par défaut si l'indicateur est inconnu mais contient des valeurs chiffrées
-        else {
+        // Appliquer l'analyse selon la devise
+        if (currency.equals("USD")) {
+            analyserUS(valeurs, result, combined, absEcart);
+        } else if (currency.equals("EUR")) {
+            analyserEUR(valeurs, result, combined, absEcart);
+        } else if (currency.equals("GBP")) {
+            analyserGBP(valeurs, result, combined, absEcart);
+        } else if (currency.equals("JPY")) {
+            analyserJPY(valeurs, result, combined, absEcart);
+        } else if (currency.equals("CAD")) {
+            analyserCAD(valeurs, result, combined, absEcart);
+        } else if (currency.equals("AUD")) {
+            analyserAUD(valeurs, result, combined, absEcart);
+        } else {
+            // Fallback
             attribuerPoids(absEcart, 1.0, 2.0, result);
             result.marketImpact = "UNKNOWN_MACRO";
-            result.directionText = (result.deviation > 0) ? "ℹ️ DONNÉE SUPÉRIEURE AUX ATTENTES" : "ℹ️ DONNÉE INFÉRIEURE AUX ATTENTES";
+            result.directionText = (result.deviation > 0) ? "Donnée supérieure aux attentes" : "Donnée inférieure aux attentes";
         }
 
-        Log.d(TAG, "Analyse complétée : " + result.marketImpact + " [Poids: " + result.weight + "]");
+        Log.d(TAG, "Analyse " + currency + " : " + result.marketImpact + " [Poids: " + result.weight + "]");
         return result;
     }
 
-    /**
-     * Analyse les événements sans données chiffrées directes (Discours, réunions, minutes)
-     */
-    private static void traiterEvenementTextuel(String event, EvaluationResult result) {
-        // FOMC / FED / BCE / BOJ / BOE (Banques Centrales et Organismes)
-        if (event.contains("FOMC") || event.contains("FED") || event.contains("FEDERAL RESERVE") || event.contains("POWELL")) {
-            result.weight = 4; // Alerte critique d'office pour la Fed américaine
+    private static String detectCurrency(String upperText) {
+        if (upperText.contains("ECB") || upperText.contains("EUROZONE") || 
+            (upperText.contains("CPI") && upperText.contains("GERMAN")) ||
+            upperText.contains("FRENCH") || upperText.contains("ITALIAN")) {
+            return "EUR";
+        }
+        if (upperText.contains("BOE") || upperText.contains("UK") || upperText.contains("BRITISH")) {
+            return "GBP";
+        }
+        if (upperText.contains("BOJ") || upperText.contains("JAPAN")) {
+            return "JPY";
+        }
+        if (upperText.contains("BOC") || upperText.contains("CANADA")) {
+            return "CAD";
+        }
+        if (upperText.contains("RBA") || upperText.contains("AUSTRALIA")) {
+            return "AUD";
+        }
+        // Par défaut USD (FED, FOMC, etc.)
+        return "USD";
+    }
+
+    // ==================== ANALYSE PAR DEVISE ====================
+
+    private static void analyserUS(ParsedValues v, EvaluationResult r, String combined, double absEcart) {
+        if (combined.contains("CPI") || combined.contains("PCE") || combined.contains("PPI") || combined.contains("INFLATION")) {
+            attribuerPoids(absEcart, 0.1, 0.2, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_CPI_HAWKISH";
+                r.directionText = "🔥 HAUSSE INFLATION US: USD ↗️, USDJPY ↗️, GOLD ↘️, NASDAQ/SP500 ↘️, BTC ↘️";
+            } else {
+                r.marketImpact = "US_CPI_DOVISH";
+                r.directionText = "🍃 BAISSE INFLATION US: USD ↘️, GOLD ↗️, NASDAQ/SP500 ↗️, BTC ↗️";
+            }
+        } else if (combined.contains("NFP") || combined.contains("NON-FARM") || combined.contains("ADP") || combined.contains("EMPLOYMENT")) {
+            attribuerPoids(absEcart, 25.0, 55.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_NFP_STRONG";
+                r.directionText = "💪 EMPLOI SOLIDE US: USD ↗️, USOIL ↗️, GOLD ↘️, NASDAQ ↘️";
+            } else {
+                r.marketImpact = "US_NFP_WEAK";
+                r.directionText = "⚠️ EMPLOI FAIBLE US: USD ↘️, GOLD ↗️, NASDAQ/SP500 ↗️";
+            }
+        } else if (combined.contains("GDP") || combined.contains("PIB")) {
+            attribuerPoids(absEcart, 0.2, 0.5, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_GDP_BULLISH";
+                r.directionText = "📈 GDP FORTE US: USD ↗️, USOIL ↗️, NASDAQ/SP500 ↗️, GOLD ↘️";
+            } else {
+                r.marketImpact = "US_GDP_BEARISH";
+                r.directionText = "📉 RISQUE RÉCESSION US: USD ↘️, GOLD ↗️, INDICES ↘️";
+            }
+        } else if (combined.contains("PMI") || combined.contains("ISM")) {
+            attribuerPoids(absEcart, 0.6, 1.2, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_PMI_EXPANSION";
+                r.directionText = "🏭 PMI EXPANSION US: USOIL ↗️, USD ↗️, NASDAQ/SP500 ↗️";
+            } else {
+                r.marketImpact = "US_PMI_CONTRACTION";
+                r.directionText = "🛑 PMI CONTRACTION US: USOIL ↘️, USD ↘️, GOLD ↗️";
+            }
+        } else if (combined.contains("JOBLESS CLAIMS") || combined.contains("IJC")) {
+            attribuerPoids(absEcart, 10.0, 20.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_IJC_BAD";
+                r.directionText = "⚠️ HAUSSE CHÔMAGE US: USD ↘️, GOLD ↗️, NASDAQ ↗️";
+            } else {
+                r.marketImpact = "US_IJC_GOOD";
+                r.directionText = "🦅 BAISSE CHÔMAGE US: USD ↗️, GOLD ↘️, USOIL ↗️";
+            }
+        } else if (combined.contains("RETAIL SALES")) {
+            attribuerPoids(absEcart, 0.3, 0.7, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_RETAIL_STRONG";
+                r.directionText = "🛍️ VENTES AU DÉTAIL FORTES US: USD ↗️, NASDAQ/SP500 ↗️";
+            } else {
+                r.marketImpact = "US_RETAIL_WEAK";
+                r.directionText = "📉 VENTES FAIBLES US: USD ↘️, GOLD ↗️";
+            }
+        } else if (combined.contains("CONSUMER CONFIDENCE") || combined.contains("MICHIGAN")) {
+            attribuerPoids(absEcart, 2.0, 5.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_CONFIDENCE_HIGH";
+                r.directionText = "🧠 CONFIANCE HAUTE US: USD ↗️, INDICES ↗️";
+            } else {
+                r.marketImpact = "US_CONFIDENCE_LOW";
+                r.directionText = "📉 CONFIANCE BASSE US: USD ↘️, GOLD ↗️";
+            }
+        } else if (combined.contains("OIL") || combined.contains("EIA") || combined.contains("INVENTORIES")) {
+            attribuerPoids(absEcart, 2.0, 4.5, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "OIL_INVENTORIES_SURPLUS";
+                r.directionText = "🛢️ SURPLUS STOCKS PÉTROLE: USOIL ↘️";
+            } else {
+                r.marketImpact = "OIL_INVENTORIES_DEFICIT";
+                r.directionText = "🛢️ DÉFICIT STOCKS PÉTROLE: USOIL ↗️";
+            }
+        } else {
+            attribuerPoids(absEcart, 1.0, 2.0, r);
+            r.marketImpact = "US_MACRO_OTHER";
+            r.directionText = r.deviation > 0 ? "Donnée US supérieure aux attentes" : "Donnée US inférieure aux attentes";
+        }
+    }
+
+    private static void analyserEUR(ParsedValues v, EvaluationResult r, String combined, double absEcart) {
+        if (combined.contains("CPI") || combined.contains("INFLATION") || combined.contains("HICP")) {
+            attribuerPoids(absEcart, 0.1, 0.2, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "EUR_CPI_HAWKISH";
+                r.directionText = "🔥 HAUSSE INFLATION ZONE EURO: EUR ↗️, GOLD ↗️, USOIL ↗️, EURUSD ↗️";
+            } else {
+                r.marketImpact = "EUR_CPI_DOVISH";
+                r.directionText = "🍃 BAISSE INFLATION ZONE EURO: EUR ↘️, EURUSD ↘️, USOIL ↘️";
+            }
+        } else if (combined.contains("GDP") || combined.contains("PIB")) {
+            attribuerPoids(absEcart, 0.2, 0.5, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "EUR_GDP_BULLISH";
+                r.directionText = "📈 CROISSANCE EURO FORTE: EUR ↗️, EURUSD ↗️, SP500 ↗️ (sentiment global)";
+            } else {
+                r.marketImpact = "EUR_GDP_BEARISH";
+                r.directionText = "📉 RÉCESSION EURO: EUR ↘️, EURUSD ↘️, GOLD ↗️ (refuge)";
+            }
+        } else if (combined.contains("PMI")) {
+            attribuerPoids(absEcart, 0.6, 1.2, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "EUR_PMI_EXPANSION";
+                r.directionText = "🏭 PMI EURO EXPANSION: EUR ↗️, EURUSD ↗️, USOIL ↗️";
+            } else {
+                r.marketImpact = "EUR_PMI_CONTRACTION";
+                r.directionText = "🛑 PMI EURO CONTRACTION: EUR ↘️, EURUSD ↘️, GOLD ↗️";
+            }
+        } else if (combined.contains("RETAIL SALES") || combined.contains("CONSUMER SPENDING")) {
+            attribuerPoids(absEcart, 0.3, 0.7, r);
+            r.marketImpact = r.deviation > 0 ? "EUR_RETAIL_STRONG" : "EUR_RETAIL_WEAK";
+            r.directionText = r.deviation > 0 ? "📈 CONSOMMATION EURO FORTE: EUR ↗️" : "📉 CONSOMMATION EURO FAIBLE: EUR ↘️";
+        } else if (combined.contains("UNEMPLOYMENT") || combined.contains("JOBLESS")) {
+            attribuerPoids(absEcart, 0.1, 0.2, r);
+            r.marketImpact = r.deviation > 0 ? "EUR_UNEMPLOYMENT_HIGH" : "EUR_UNEMPLOYMENT_LOW";
+            r.directionText = r.deviation > 0 ? "⚠️ CHÔMAGE HAUT EURO: EUR ↘️" : "✅ CHÔMAGE BAS EURO: EUR ↗️";
+        } else {
+            attribuerPoids(absEcart, 1.0, 2.0, r);
+            r.marketImpact = "EUR_MACRO_OTHER";
+            r.directionText = r.deviation > 0 ? "Donnée zone euro supérieure aux attentes" : "Donnée zone euro inférieure aux attentes";
+        }
+    }
+
+    private static void analyserGBP(ParsedValues v, EvaluationResult r, String combined, double absEcart) {
+        if (combined.contains("CPI") || combined.contains("INFLATION")) {
+            attribuerPoids(absEcart, 0.1, 0.2, r);
+            r.marketImpact = r.deviation > 0 ? "GBP_CPI_HAWKISH" : "GBP_CPI_DOVISH";
+            r.directionText = r.deviation > 0 ? "🔥 INFLATION UK HAUTE: GBP ↗️, GBPUSD ↗️" : "🍃 INFLATION UK BASSE: GBP ↘️, GBPUSD ↘️";
+        } else if (combined.contains("GDP") || combined.contains("GROWTH")) {
+            attribuerPoids(absEcart, 0.2, 0.5, r);
+            r.marketImpact = r.deviation > 0 ? "GBP_GDP_BULLISH" : "GBP_GDP_BEARISH";
+            r.directionText = r.deviation > 0 ? "📈 CROISSANCE UK FORTE: GBP ↗️" : "📉 RÉCESSION UK: GBP ↘️, GOLD ↗️";
+        } else if (combined.contains("PMI")) {
+            attribuerPoids(absEcart, 0.6, 1.2, r);
+            r.marketImpact = r.deviation > 0 ? "GBP_PMI_EXPANSION" : "GBP_PMI_CONTRACTION";
+            r.directionText = r.deviation > 0 ? "🏭 PMI UK EXPANSION: GBP ↗️" : "🛑 PMI UK CONTRACTION: GBP ↘️";
+        } else {
+            attribuerPoids(absEcart, 1.0, 2.0, r);
+            r.marketImpact = "GBP_MACRO_OTHER";
+            r.directionText = r.deviation > 0 ? "Donnée UK supérieure" : "Donnée UK inférieure";
+        }
+    }
+
+    private static void analyserJPY(ParsedValues v, EvaluationResult r, String combined, double absEcart) {
+        if (combined.contains("CPI") || combined.contains("INFLATION")) {
+            attribuerPoids(absEcart, 0.1, 0.2, r);
+            r.marketImpact = r.deviation > 0 ? "JPY_CPI_HAWKISH" : "JPY_CPI_DOVISH";
+            r.directionText = r.deviation > 0 ? "🔥 INFLATION JAPON HAUTE: JPY ↗️, USDJPY ↘️" : "🍃 INFLATION JAPON BASSE: JPY ↘️, USDJPY ↗️";
+        } else if (combined.contains("GDP")) {
+            attribuerPoids(absEcart, 0.2, 0.5, r);
+            r.marketImpact = r.deviation > 0 ? "JPY_GDP_BULLISH" : "JPY_GDP_BEARISH";
+            r.directionText = r.deviation > 0 ? "📈 CROISSANCE JAPON FORTE: JPY ↗️" : "📉 RÉCESSION JAPON: JPY ↘️";
+        } else if (combined.contains("BOJ") || combined.contains("RATE")) {
+            r.weight = 4;
+            r.marketImpact = r.deviation > 0 ? "BOJ_HAWKISH" : "BOJ_DOVISH";
+            r.directionText = r.deviation > 0 ? "🦅 BOJ HAWKISH: USDJPY ↘️, JPY ↗️" : "🕊️ BOJ DOVISH: USDJPY ↗️, JPY ↘️";
+        } else {
+            attribuerPoids(absEcart, 1.0, 2.0, r);
+            r.marketImpact = "JPY_MACRO_OTHER";
+            r.directionText = r.deviation > 0 ? "Donnée Japon supérieure" : "Donnée Japon inférieure";
+        }
+    }
+
+    private static void analyserCAD(ParsedValues v, EvaluationResult r, String combined, double absEcart) {
+        if (combined.contains("CPI") || combined.contains("INFLATION")) {
+            attribuerPoids(absEcart, 0.1, 0.2, r);
+            r.marketImpact = r.deviation > 0 ? "CAD_CPI_HAWKISH" : "CAD_CPI_DOVISH";
+            r.directionText = r.deviation > 0 ? "🔥 INFLATION CANADA HAUTE: CAD ↗️, USDCAD ↘️" : "🍃 INFLATION CANADA BASSE: CAD ↘️, USDCAD ↗️";
+        } else if (combined.contains("GDP")) {
+            attribuerPoids(absEcart, 0.2, 0.5, r);
+            r.marketImpact = r.deviation > 0 ? "CAD_GDP_BULLISH" : "CAD_GDP_BEARISH";
+            r.directionText = r.deviation > 0 ? "📈 CROISSANCE CANADA FORTE: CAD ↗️, USOIL ↗️" : "📉 RÉCESSION CANADA: CAD ↘️, USOIL ↘️";
+        } else if (combined.contains("EMPLOYMENT") || combined.contains("JOBLESS")) {
+            attribuerPoids(absEcart, 10.0, 20.0, r);
+            r.marketImpact = r.deviation > 0 ? "CAD_JOBS_STRONG" : "CAD_JOBS_WEAK";
+            r.directionText = r.deviation > 0 ? "💪 EMPLOI CANADA FORT: CAD ↗️" : "⚠️ EMPLOI CANADA FAIBLE: CAD ↘️";
+        } else {
+            attribuerPoids(absEcart, 1.0, 2.0, r);
+            r.marketImpact = "CAD_MACRO_OTHER";
+            r.directionText = r.deviation > 0 ? "Donnée Canada supérieure" : "Donnée Canada inférieure";
+        }
+    }
+
+    private static void analyserAUD(ParsedValues v, EvaluationResult r, String combined, double absEcart) {
+        if (combined.contains("CPI") || combined.contains("INFLATION")) {
+            attribuerPoids(absEcart, 0.1, 0.2, r);
+            r.marketImpact = r.deviation > 0 ? "AUD_CPI_HAWKISH" : "AUD_CPI_DOVISH";
+            r.directionText = r.deviation > 0 ? "🔥 INFLATION AUSTRALIE HAUTE: AUD ↗️, AUDUSD ↗️" : "🍃 INFLATION AUSTRALIE BASSE: AUD ↘️, AUDUSD ↘️";
+        } else if (combined.contains("GDP")) {
+            attribuerPoids(absEcart, 0.2, 0.5, r);
+            r.marketImpact = r.deviation > 0 ? "AUD_GDP_BULLISH" : "AUD_GDP_BEARISH";
+            r.directionText = r.deviation > 0 ? "📈 CROISSANCE AUSTRALIE FORTE: AUD ↗️" : "📉 RÉCESSION AUSTRALIE: AUD ↘️";
+        } else if (combined.contains("RBA") || combined.contains("RATE")) {
+            r.weight = 4;
+            r.marketImpact = r.deviation > 0 ? "RBA_HAWKISH" : "RBA_DOVISH";
+            r.directionText = r.deviation > 0 ? "🦅 RBA HAWKISH: AUDUSD ↗️" : "🕊️ RBA DOVISH: AUDUSD ↘️";
+        } else {
+            attribuerPoids(absEcart, 1.0, 2.0, r);
+            r.marketImpact = "AUD_MACRO_OTHER";
+            r.directionText = r.deviation > 0 ? "Donnée Australie supérieure" : "Donnée Australie inférieure";
+        }
+    }
+
+    private static void traiterEvenementTextuel(String text, EvaluationResult result, String currency) {
+        if (text.contains("FOMC") || text.contains("FED") || text.contains("POWELL")) {
+            result.weight = 4;
             result.marketImpact = "FOMC_STATEMENT";
-            result.directionText = "🗣️ ALERTE DISCOURS / MINUTES FED (US): Volatilité extrême imminente.";
-        } else if (event.contains("BCE") || event.contains("ECB") || event.contains("LAGARDE")) {
+            result.directionText = "🗣️ ALERTE FED – Volatilité extrême imminente.";
+        } else if (text.contains("ECB") || text.contains("LAGARDE")) {
             result.weight = 3;
             result.marketImpact = "ECB_STATEMENT";
-            result.directionText = "🇪🇺 DISCOURS BCE: Impact direct sur la paire EURUSD.";
-        } else if (event.contains("BOJ") || event.contains("BANK OF JAPAN")) {
-            result.weight = 4; // Crucial pour contrer la neutralité spéculative sur le USDJPY
+            result.directionText = "🇪🇺 DISCOURS BCE – Impact direct sur EURUSD.";
+        } else if (text.contains("BOJ")) {
+            result.weight = 4;
             result.marketImpact = "BOJ_STATEMENT";
-            result.directionText = "🇯🇵 ALERTE BANQUE DU JAPON (BOJ): Alignement requis pour le USDJPY.";
-        } else if (event.contains("BOE") || event.contains("BANK OF ENGLAND")) {
+            result.directionText = "🇯🇵 ALERTE BOJ – Impact direct sur USDJPY.";
+        } else if (text.contains("BOE") || text.contains("BAILEY")) {
             result.weight = 3;
             result.marketImpact = "BOE_STATEMENT";
-            result.directionText = "🇬🇧 DISCOURS BOE: Impact direct sur la paire GBPUSD.";
+            result.directionText = "🇬🇧 DISCOURS BOE – Impact sur GBPUSD.";
+        } else if (text.contains("BOC") || text.contains("MACKLEM")) {
+            result.weight = 3;
+            result.marketImpact = "BOC_STATEMENT";
+            result.directionText = "🇨🇦 DISCOURS BOC – Impact sur USDCAD et USOIL.";
+        } else if (text.contains("RBA") || text.contains("BULLOCK")) {
+            result.weight = 3;
+            result.marketImpact = "RBA_STATEMENT";
+            result.directionText = "🇦🇺 DISCOURS RBA – Impact sur AUDUSD.";
         } else {
             result.weight = 1;
             result.marketImpact = "RAW_NEWS";
         }
     }
 
-    /**
-     * Calcule dynamiquement le poids en fonction de l'écart absolu constaté et des seuils configurés
-     */
     private static void attribuerPoids(double absEcart, double seuilModere, double seuilViolent, EvaluationResult result) {
-        if (absEcart >= seuilViolent) {
-            result.weight = 4; // Choc Macroéconomique critique -> Envoi immédiat validé !
-        } else if (absEcart >= seuilModere) {
-            result.weight = 3; // Impact Modéré -> Éligible au résumé quotidien et Telegram
-        } else if (absEcart > 0.0) {
-            result.weight = 2; // Conforme ou proche des attentes -> Stockage historique simple
-        } else {
-            result.weight = 1;
-        }
+        if (absEcart >= seuilViolent) result.weight = 4;
+        else if (absEcart >= seuilModere) result.weight = 3;
+        else if (absEcart > 0.0) result.weight = 2;
+        else result.weight = 1;
     }
 
-    /**
-     * Module d'extraction Regex : Isole les nombres rattachés aux étiquettes Actual et Forecast
-     */
-private static ParsedValues extraireChiffres(String texte) {
-    ParsedValues values = new ParsedValues();
-    if (texte == null) return values;
-    
-    // Remplacer les virgules décimales par des points (ex: 2,5% -> 2.5)
-    String texteNettoye = texte.replace(',', '.');
-    // Supprimer les espaces insécables et autres caractères parasites
-    texteNettoye = texteNettoye.replaceAll("[^\\d.\\-\\s%]", " ");
-    
-    // Patterns élargis
-    String[] actualPatterns = {
-        "ACTUAL:\\s*([0-9.\\-]+)",
-        "ACTUAL\\s*[=:]\\s*([0-9.\\-]+)",
-        "ACT\\s*[=:]\\s*([0-9.\\-]+)",
-        "REAL\\s*[=:]\\s*([0-9.\\-]+)",
-        "ACTUAL\\s+VALUE\\s*[=:]\\s*([0-9.\\-]+)"
-    };
-    String[] forecastPatterns = {
-        "FORECAST:\\s*([0-9.\\-]+)",
-        "FORECAST\\s*[=:]\\s*([0-9.\\-]+)",
-        "EXP\\s*[=:]\\s*([0-9.\\-]+)",
-        "EST\\s*[=:]\\s*([0-9.\\-]+)",
-        "EXPECTED\\s*[=:]\\s*([0-9.\\-]+)",
-        "CONSENSUS\\s*[=:]\\s*([0-9.\\-]+)"
-    };
-    
-    for (String pattern : actualPatterns) {
-        double val = chercherRegex(texteNettoye, pattern);
-        if (!Double.isNaN(val)) {
-            values.actual = val;
-            break;
+    private static ParsedValues extraireChiffres(String texte) {
+        ParsedValues values = new ParsedValues();
+        if (texte == null) return values;
+        String texteNettoye = texte.replace(',', '.')
+                                   .replaceAll("[^\\d.\\-\\s%]", " ");
+        String[] actualPatterns = {
+            "ACTUAL:\\s*([0-9.\\-]+)", "ACTUAL\\s*[=:]\\s*([0-9.\\-]+)",
+            "ACT\\s*[=:]\\s*([0-9.\\-]+)", "REAL\\s*[=:]\\s*([0-9.\\-]+)"
+        };
+        String[] forecastPatterns = {
+            "FORECAST:\\s*([0-9.\\-]+)", "FORECAST\\s*[=:]\\s*([0-9.\\-]+)",
+            "EXP\\s*[=:]\\s*([0-9.\\-]+)", "EST\\s*[=:]\\s*([0-9.\\-]+)",
+            "CONSENSUS\\s*[=:]\\s*([0-9.\\-]+)"
+        };
+        for (String p : actualPatterns) {
+            double val = chercherRegex(texteNettoye, p);
+            if (!Double.isNaN(val)) { values.actual = val; break; }
         }
-    }
-    for (String pattern : forecastPatterns) {
-        double val = chercherRegex(texteNettoye, pattern);
-        if (!Double.isNaN(val)) {
-            values.forecast = val;
-            break;
+        for (String p : forecastPatterns) {
+            double val = chercherRegex(texteNettoye, p);
+            if (!Double.isNaN(val)) { values.forecast = val; break; }
         }
+        return values;
     }
-    return values;
-}
 
-private static double chercherRegex(String texte, String expression) {
-    try {
-        Pattern pattern = Pattern.compile(expression, Pattern.CASE_INSENSITIVE);
-        Matcher matcher = pattern.matcher(texte);
-        if (matcher.find()) {
-            String numStr = matcher.group(1);
-            // Supprimer le signe % s'il est présent
-            numStr = numStr.replace("%", "");
-            return Double.parseDouble(numStr);
-        }
-    } catch (Exception e) {
-        // ignore
+    private static double chercherRegex(String texte, String expression) {
+        try {
+            Pattern pattern = Pattern.compile(expression, Pattern.CASE_INSENSITIVE);
+            Matcher matcher = pattern.matcher(texte);
+            if (matcher.find()) {
+                String numStr = matcher.group(1).replace("%", "");
+                return Double.parseDouble(numStr);
+            }
+        } catch (Exception e) { }
+        return Double.NaN;
     }
-    return Double.NaN;
-}
 }
