@@ -57,6 +57,8 @@ public class MainActivity extends AppCompatActivity {
         Button permBtn = findViewById(R.id.permBtn);
         Button testBtn = findViewById(R.id.testBtn);
         Button exportLogsBtn = findViewById(R.id.exportLogsBtn);
+        Button importBtn = findViewById(R.id.importBtn);
+        importBtn.setOnClickListener(v -> importDatabaseFromStorage());
 
         // Chargement initial des configurations enregistrées
         loadSavedKeys();
