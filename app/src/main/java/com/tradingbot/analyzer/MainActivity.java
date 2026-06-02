@@ -53,6 +53,17 @@ public class MainActivity extends AppCompatActivity {
     private ScrollView mainScrollView;
     private EventDatabase eventDb;
 
+    private final ActivityResultLauncher<Intent> importDbLauncher = registerForActivityResult(
+    new ActivityResultContracts.StartActivityForResult(),
+    result -> {
+        if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+            Uri uri = result.getData().getData();
+            if (uri != null) {
+                importDatabaseFromUri(uri);
+            }
+        }
+    });
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
