@@ -1106,7 +1106,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                              "🔹 " + validationResult.reason + "\n\n" +
                              "📋 *Dernier événement similaire :*\n" +
                              validationResult.lastEventSummary;
-        sendTelegramSecure(reminderMsg, this);
+        sendTelegramSecure(reminderMsg, NotificationService.this);
         Log.d(TAG, "[RAPPEL] Driver actif : rappel envoyé.");
         return; // On arrête le traitement normal
     }
