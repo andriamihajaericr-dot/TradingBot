@@ -497,17 +497,9 @@ private static boolean matchesIndicatorKeywords(String text, String indicator, S
             }
         }
     }
-
     private static void logToMain(String message) {
-        if (MainActivity.instance != null) {
-            try {
-                MainActivity.instance.addLog(message);
-            } catch (Exception e) {
-                Log.e(TAG, "Erreur écriture log : " + message, e);
-            }
-        } else {
-            Log.d(TAG, "[RAM-LOG] " + message);
-        }
+    // On évite toute dépendance à MainActivity
+      Log.d(TAG, "[VALIDATOR] " + message);
     }
 
     private static String generateFingerprint(String title, String content) {
