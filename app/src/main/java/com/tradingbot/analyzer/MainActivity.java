@@ -339,7 +339,6 @@ public class MainActivity extends AppCompatActivity {
         }
         fos.close();
         fis2.close();
-
         Toast.makeText(this, "Base exportée + sauvegarde automatique locale", Toast.LENGTH_LONG).show();
         addLog("✅ Base exportée avec copie locale.");
     } catch (Exception e) {
