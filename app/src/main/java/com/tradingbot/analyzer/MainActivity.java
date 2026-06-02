@@ -353,6 +353,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Ne pas fermer la base ici – partagée avec le service
+        instance = null;  // ← Évite les appels après destruction
     }
 }
