@@ -24,14 +24,17 @@ public class EventValidator {
     // ─────────────────────────────────────────────────────────────
     public static class ValidationResult {
         public boolean isConfirmed    = false;
-    public int     confidence     = 0;
+        public int     confidence     = 0;
         public String  forecast       = "N/A";
         public String  previous       = "N/A";
         public String  actual         = "N/A";
         public boolean assetsEnriched = false;
         public String  reason         = "";
         public String  geoContext     = "";   // Description de la zone géopolitique détectée
-
+        
+        // Nouveaux champs pour l'inertie macro
+        public boolean isInertiaBlock = false;
+        public String  lastEventSummary = "";
         public ValidationResult() {}
 
         public ValidationResult(boolean isConfirmed, int confidence, String reason) {
