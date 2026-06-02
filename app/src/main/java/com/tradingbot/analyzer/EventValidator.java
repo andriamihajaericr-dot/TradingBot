@@ -23,8 +23,6 @@ public class EventValidator {
     //  RÉSULTAT DE VALIDATION
     // ─────────────────────────────────────────────────────────────
     public static class ValidationResult {
-        public boolean isInertiaBlock = false;
-        public String lastEventSummary = "";
         public boolean isConfirmed    = false;
         public int     confidence     = 0;
         public String  forecast       = "N/A";
