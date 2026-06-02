@@ -1210,6 +1210,17 @@ public void onNotificationPosted(StatusBarNotification sbn) {
             }
         }
     }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
+    // Dans NotificationService.onCreate(), après la planification de minuit, ajouter :
+
+// Rafraîchissement du calendrier toutes les 6 heures (21600000 ms)
+long sixHoursMillis = 6 * 60 * 60 * 1000L;
+scheduler.scheduleAtFixedRate(new Runnable() {
+    @Override
+    public void run() {
+        Log.d(TAG, "[CALENDAR] Rafraîchissement périodique du calendrier économique...");
+        EventValidator.preloadCalendar();
+    }
+}, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
     }
 
 
