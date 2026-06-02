@@ -81,12 +81,12 @@ interface FetchFunction {
     public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
     Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
     if (targetContext != null) {
-        List<CalendarEvent> events = fetchWithRetry(hoursAhead -> fetchFromFMP(targetContext, hoursAhead), hoursAhead);
+        List<CalendarEvent> events = fetchWithRetry(h -> fetchFromFMP(targetContext, h), hoursAhead);
         if (!events.isEmpty()) {
             return events;
         }
     }
-    List<CalendarEvent> events = fetchWithRetry(hoursAhead -> fetchFromForexFactory(hoursAhead), hoursAhead);
+    List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactory(h), hoursAhead);
     if (!events.isEmpty()) {
         return events;
     }
