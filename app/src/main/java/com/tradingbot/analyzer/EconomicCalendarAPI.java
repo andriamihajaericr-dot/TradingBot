@@ -292,6 +292,12 @@ interface FetchFunction {
         } else if (cty.contains("eurozone") || cty.contains("ecb")) {
             assets.add("EURUSD");
         }
+        else if (ind.contains("building permits") || ind.contains("housing starts") || ind.contains("home sales")) {
+            assets.addAll(Arrays.asList("SP500", "NASDAQ", "US10Y", "USDJPY"));
+        }
+        else if (ind.contains("trade balance") || ind.contains("current account")) {
+            assets.addAll(Arrays.asList("USDJPY", "EURUSD", "GBPUSD"));
+        }
         return new ArrayList<>(new LinkedHashSet<>(assets)); // Protection absolue contre les doublons d'ordonnancement
     }
 
