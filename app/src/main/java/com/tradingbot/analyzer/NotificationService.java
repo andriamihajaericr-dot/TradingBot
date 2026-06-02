@@ -1105,7 +1105,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                 
                 // Log dans l'Ui
                 if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("[SERVICE] Validation : " + (validationResult.isConfirmed ? "CONFIRMÉ" : "REJETÉ") + " - " + validationResult.reason);
+                MainActivity.instance.addLog(finalSourceName + ": " + (validationResult.isConfirmed ? "CONFIRMÉ" : "REJETÉ") + " - " + validationResult.reason);
                 }
                 // Coupe-circuit du Validateur : On bloque les doublons temporels, sauf s'il s'agit d'un choc absolu de poids 4
                 if (validationResult != null && !validationResult.isConfirmed) {
