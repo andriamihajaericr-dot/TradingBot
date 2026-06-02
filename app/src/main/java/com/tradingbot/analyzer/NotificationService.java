@@ -1097,7 +1097,11 @@ public void onNotificationPosted(StatusBarNotification sbn) {
 
                 // 6️⃣ Validation de cohérence temporelle et historique via EventValidator
                 EventValidator.ValidationResult validationResult = EventValidator.validate(NotificationService.this, title, bodyTextRaw, currentTime, enrichedAssets);
-
+                
+                // Log dans l'Ui
+                if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("[SERVICE] Validation : " + (validationResult.isConfirmed ? "CONFIRMÉ" : "REJETÉ") + " - " + validationResult.reason);
+                }
                 // Coupe-circuit du Validateur : On bloque les doublons temporels, sauf s'il s'agit d'un choc absolu de poids 4
                 if (validationResult != null && !validationResult.isConfirmed) {
     // Cas particulier : inertie macro (driver déjà actif) → on envoie un rappel Telegram
