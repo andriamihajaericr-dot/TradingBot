@@ -13,7 +13,7 @@ import java.util.Locale;
 import java.util.ArrayList;
 
 public class EventDatabase extends SQLiteOpenHelper {
-
+    private static final String TAG = "EventDatabase";   // <-- À AJOUTER
     private static final String DATABASE_NAME = "trading_bot.db";
     private static final int DATABASE_VERSION = 3;
     public static final String TABLE_EVENTS = "events";
