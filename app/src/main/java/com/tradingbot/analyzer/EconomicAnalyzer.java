@@ -22,6 +22,9 @@ public class EconomicAnalyzer {
         double actual = Double.NaN;
         double forecast = Double.NaN;
         String currency = "USD";  // Devise détectée
+        boolean isValid() {
+        return !Double.isNaN(actual) && !Double.isNaN(forecast);
+        }
     }
 
     /**
