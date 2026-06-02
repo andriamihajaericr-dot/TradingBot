@@ -24,7 +24,7 @@ public class EventValidator {
     // ─────────────────────────────────────────────────────────────
     public static class ValidationResult {
         public boolean isConfirmed    = false;
-        public int     confidence     = 0;
+    public int     confidence     = 0;
         public String  forecast       = "N/A";
         public String  previous       = "N/A";
         public String  actual         = "N/A";
@@ -44,158 +44,153 @@ public class EventValidator {
     /**
      * Méthode principale de validation et d'enrichissement de la matrice d'actifs
      */
-    public static ValidationResult validate(
-            String title,
-            String content,
-            long timestamp,
-            List<String> detectedAssets
-    ) {
-        ValidationResult result = new ValidationResult();
+public static ValidationResult validate(Context context, String title, String content, long timestamp, List<String> detectedAssets) {
+    ValidationResult result = new ValidationResult();
 
-        if (title == null) title = "";
-        if (content == null) content = "";
-        if (detectedAssets == null) detectedAssets = new ArrayList<>();
+    if (title == null) title = "";
+    if (content == null) content = "";
+    if (detectedAssets == null) detectedAssets = new ArrayList<>();
 
-        String combined = (title + " " + content).toLowerCase(Locale.ROOT);
-        String upperCombined = (title + " " + content).toUpperCase(Locale.ROOT);
-        
-        // ── EXTRACTION PRIORITAIRE ET SYSTÉMATIQUE DES ACTIFS (Sécurité Rang Suprême) ──
-        try {
-            List<String> rawExtracted = new ArrayList<>();
-            String textToScan = upperCombined;
+    String combined = (title + " " + content).toLowerCase(Locale.ROOT);
+    String upperCombined = (title + " " + content).toUpperCase(Locale.ROOT);
+    
+    // ── EXTRACTION PRIORITAIRE ET SYSTÉMATIQUE DES ACTIFS (Sécurité Rang Suprême) ──
+    try {
+        List<String> rawExtracted = new ArrayList<>();
+        String textToScan = upperCombined;
 
-            if (textToScan.contains("EURUSD") || textToScan.contains("EUR/") || textToScan.contains("EURO")) rawExtracted.add("EURUSD");
-            if (textToScan.contains("USDJPY") || textToScan.contains("JPY")  || textToScan.contains("YEN"))  rawExtracted.add("USDJPY");
-            if (textToScan.contains("GBPUSD") || textToScan.contains("GBP/") || textToScan.contains("POUND")) rawExtracted.add("GBPUSD");
-            if (textToScan.contains("AUDUSD") || textToScan.contains("AUD/"))                                rawExtracted.add("AUDUSD");
-            if (textToScan.contains("USDCAD") || textToScan.contains("CAD/"))                                rawExtracted.add("USDCAD");
-            if (textToScan.contains("GOLD")   || textToScan.contains("XAU"))                                 rawExtracted.add("GOLD");
-            if (textToScan.contains("USOIL")  || textToScan.contains("CRUDE") || textToScan.contains("WTI") || textToScan.contains("PETROLE") || textToScan.contains("BRENT")) rawExtracted.add("USOIL");
-            if (textToScan.contains("NASDAQ") || textToScan.contains("NAS100")|| textToScan.contains("USTECH") || textToScan.contains("TECH")) rawExtracted.add("NASDAQ");
-            if (textToScan.contains("SP500")  || textToScan.contains("S&P")   || textToScan.contains("SPX"))   rawExtracted.add("SP500");
-            if (textToScan.contains("BITCOIN")|| textToScan.contains("BTC"))                                 rawExtracted.add("BITCOIN");
-            if (textToScan.contains("US10Y")  || textToScan.contains("TREASURY") || textToScan.contains("YIELD") || textToScan.contains("10-YEAR")) rawExtracted.add("US10Y");
+        if (textToScan.contains("EURUSD") || textToScan.contains("EUR/") || textToScan.contains("EURO")) rawExtracted.add("EURUSD");
+        if (textToScan.contains("USDJPY") || textToScan.contains("JPY")  || textToScan.contains("YEN"))  rawExtracted.add("USDJPY");
+        if (textToScan.contains("GBPUSD") || textToScan.contains("GBP/") || textToScan.contains("POUND")) rawExtracted.add("GBPUSD");
+        if (textToScan.contains("AUDUSD") || textToScan.contains("AUD/"))                                rawExtracted.add("AUDUSD");
+        if (textToScan.contains("USDCAD") || textToScan.contains("CAD/"))                                rawExtracted.add("USDCAD");
+        if (textToScan.contains("GOLD")   || textToScan.contains("XAU"))                                 rawExtracted.add("GOLD");
+        if (textToScan.contains("USOIL")  || textToScan.contains("CRUDE") || textToScan.contains("WTI") || textToScan.contains("PETROLE") || textToScan.contains("BRENT")) rawExtracted.add("USOIL");
+        if (textToScan.contains("NASDAQ") || textToScan.contains("NAS100")|| textToScan.contains("USTECH") || textToScan.contains("TECH")) rawExtracted.add("NASDAQ");
+        if (textToScan.contains("SP500")  || textToScan.contains("S&P")   || textToScan.contains("SPX"))   rawExtracted.add("SP500");
+        if (textToScan.contains("BITCOIN")|| textToScan.contains("BTC"))                                 rawExtracted.add("BITCOIN");
+        if (textToScan.contains("US10Y")  || textToScan.contains("TREASURY") || textToScan.contains("YIELD") || textToScan.contains("10-YEAR")) rawExtracted.add("US10Y");
 
-            if (rawExtracted != null) {
-                for (String asset : rawExtracted) {
-                    if (asset != null && !detectedAssets.contains(asset)) {
-                        detectedAssets.add(asset);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur lors de l'extraction brute des actifs", e);
-        }
-
-        // ── ÉTAPE 1 : Anti-Doublons (très haut dans le flux) ─────────────
-        if (isRecentDuplicate(title, content)) {
-            result.confidence  = 0;
-            result.isConfirmed = false;
-            result.reason      = "Doublon récent détecté (30min)";
-            result.assetsEnriched = !detectedAssets.isEmpty();
-            logToMain("🔄 Doublon identifié (Enrichissement préservé)");
-            return result;
-        }
-
-        // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
-        String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
-        EventDatabase db = (MainActivity.instance != null) ? getDatabase(MainActivity.instance) : null;
-        if (!detectedType.startsWith("GEO") && db != null) {
-            try {
-                long currentSeconds = timestamp / 1000;
-                if (db.isDriverActiveRecently(detectedType, currentSeconds)) {
-                    result.confidence  = 0;
-                    result.isConfirmed = false;
-                    result.reason      = "Driver déjà actif récemment (Inertie Macro)";
-                    result.assetsEnriched = !detectedAssets.isEmpty();
-                    logToMain("[⏳ Driver " + detectedType + " déjà actif — ignoré");
-                    return result;
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Erreur inertie macro", e);
-            }
-        }
-
-        // ── ÉTAPE 2 : Filtre anti-rumeur absolu ───────────────────────────
-        if (containsRumorMarkers(combined)) {
-            result.confidence  = 0;
-            result.isConfirmed = false;
-            result.reason      = "Rejeté — Marqueur de rumeur ou non-confirmé détecté";
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-            logToMain("❌ Rumeur/Non-confirmé rejeté – " + shortTitle + "…");
-            return result;
-        }
-
-        // ── ÉTAPE 3 : Filtre éditorial ───────────────────────────────────
-        if (containsEditorialContent(combined)) {
-            result.confidence  = 0;
-            result.isConfirmed = false;
-            result.reason      = "Bruit macroéconomique (Opinion/Éditorial pur)";
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-            logToMain("❌ Rejeté – Contenu éditorial – " + shortTitle + "…");
-            return result;
-        }
-
-        // ── ÉTAPE 4 : Calendrier économique ──────────────────────────────
-        EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp);
-        if (match != null) {
-            result.isConfirmed = true;
-            result.confidence  = 98;
-            result.forecast    = match.forecast != null ? match.forecast : "N/A";
-            result.previous    = match.previous != null ? match.previous : "N/A";
-            result.actual      = match.actual   != null ? match.actual   : "N/A";
-            result.reason      = "Confirmé par calendrier économique";
-
-            if (match.affectedAssets != null) {
-                for (String asset : match.affectedAssets) {
-                    if (asset != null && !detectedAssets.contains(asset)) {
-                        detectedAssets.add(asset);
-                    }
-                }
-            }
-            result.assetsEnriched = !detectedAssets.isEmpty();
-            String indicatorName = (match.indicator != null && !match.indicator.isEmpty()) ? match.indicator.substring(0, Math.min(40, match.indicator.length())) : "événement";
-            logToMain("✓ Calendrier confirmé – " + indicatorName);
-            return result;
-        }
-
-        // ── ÉTAPE 5 : Géopolitique ───────────────────────────────────────
-        GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
-        if (geo.confidence >= 65) {
-            result.isConfirmed = true;
-            result.confidence  = geo.confidence;
-            result.reason      = "Événement géopolitique confirmé";
-            result.geoContext  = geo.contextLabel;
-
-            for (String asset : geo.impactedAssets) {
+        if (rawExtracted != null) {
+            for (String asset : rawExtracted) {
                 if (asset != null && !detectedAssets.contains(asset)) {
                     detectedAssets.add(asset);
                 }
             }
-            result.assetsEnriched = !detectedAssets.isEmpty();
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
-            logToMain("🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
-            return result;
         }
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur lors de l'extraction brute des actifs", e);
+    }
 
-        // ── ÉTAPE 6 : Breaking News générique ───────────────────────────
-        result.confidence = calculateBreakingNewsConfidence(title, content);
-        result.reason      = "Breaking News (Flux Interbancaire)";
-
-        if (result.confidence < 70) {   
-            result.confidence  = 0;
-            result.isConfirmed = false;
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
-            logToMain("❌ Rejeté – " + shortTitle + "… (confiance " + result.confidence + "%)");
-        } else {
-            result.isConfirmed = true;
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-            logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
-        }
-
+    // ── ÉTAPE 1 : Anti-Doublons (très haut dans le flux) ─────────────
+    if (isRecentDuplicate(title, content)) {
+        result.confidence  = 0;
+        result.isConfirmed = false;
+        result.reason      = "Doublon récent détecté (30min)";
         result.assetsEnriched = !detectedAssets.isEmpty();
+        logToMain("🔄 Doublon identifié (Enrichissement préservé)");
         return result;
     }
+
+    // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
+    String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
+    EventDatabase db = (context != null) ? EventDatabase.getInstance(context) : null;
+    if (!detectedType.startsWith("GEO") && db != null) {
+        try {
+            long currentSeconds = timestamp / 1000;
+            if (db.isDriverActiveRecently(detectedType, currentSeconds)) {
+                result.confidence  = 0;
+                result.isConfirmed = false;
+                result.reason      = "Driver déjà actif récemment (Inertie Macro)";
+                result.assetsEnriched = !detectedAssets.isEmpty();
+                logToMain("[⏳ Driver " + detectedType + " déjà actif — ignoré");
+                return result;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur inertie macro", e);
+        }
+    }
+
+    // ── ÉTAPE 2 : Filtre anti-rumeur absolu ───────────────────────────
+    if (containsRumorMarkers(combined)) {
+        result.confidence  = 0;
+        result.isConfirmed = false;
+        result.reason      = "Rejeté — Marqueur de rumeur ou non-confirmé détecté";
+        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
+        logToMain("❌ Rumeur/Non-confirmé rejeté – " + shortTitle + "…");
+        return result;
+    }
+
+    // ── ÉTAPE 3 : Filtre éditorial ───────────────────────────────────
+    if (containsEditorialContent(combined)) {
+        result.confidence  = 0;
+        result.isConfirmed = false;
+        result.reason      = "Bruit macroéconomique (Opinion/Éditorial pur)";
+        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
+        logToMain("❌ Rejeté – Contenu éditorial – " + shortTitle + "…");
+        return result;
+    }
+
+    // ── ÉTAPE 4 : Calendrier économique ──────────────────────────────
+    EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp);
+    if (match != null) {
+        result.isConfirmed = true;
+        result.confidence  = 98;
+        result.forecast    = match.forecast != null ? match.forecast : "N/A";
+        result.previous    = match.previous != null ? match.previous : "N/A";
+        result.actual      = match.actual   != null ? match.actual   : "N/A";
+        result.reason      = "Confirmé par calendrier économique";
+
+        if (match.affectedAssets != null) {
+            for (String asset : match.affectedAssets) {
+                if (asset != null && !detectedAssets.contains(asset)) {
+                    detectedAssets.add(asset);
+                }
+            }
+        }
+        result.assetsEnriched = !detectedAssets.isEmpty();
+        String indicatorName = (match.indicator != null && !match.indicator.isEmpty()) ? match.indicator.substring(0, Math.min(40, match.indicator.length())) : "événement";
+        logToMain("✓ Calendrier confirmé – " + indicatorName);
+        return result;
+    }
+
+    // ── ÉTAPE 5 : Géopolitique ───────────────────────────────────────
+    GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
+    if (geo.confidence >= 65) {
+        result.isConfirmed = true;
+        result.confidence  = geo.confidence;
+        result.reason      = "Événement géopolitique confirmé";
+        result.geoContext  = geo.contextLabel;
+
+        for (String asset : geo.impactedAssets) {
+            if (asset != null && !detectedAssets.contains(asset)) {
+                detectedAssets.add(asset);
+            }
+        }
+        result.assetsEnriched = !detectedAssets.isEmpty();
+        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
+        logToMain("🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
+        return result;
+    }
+
+    // ── ÉTAPE 6 : Breaking News générique ───────────────────────────
+    result.confidence = calculateBreakingNewsConfidence(title, content);
+    result.reason      = "Breaking News (Flux Interbancaire)";
+
+    if (result.confidence < 70) {   
+        result.confidence  = 0;
+        result.isConfirmed = false;
+        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
+        logToMain("❌ Rejeté – " + shortTitle + "… (confiance " + result.confidence + "%)");
+    } else {
+        result.isConfirmed = true;
+        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
+        logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
+    }
+
+    result.assetsEnriched = !detectedAssets.isEmpty();
+    return result;
+}
 
     private static boolean containsRumorMarkers(String text) {
         if (text == null) return false;
