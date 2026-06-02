@@ -290,44 +290,44 @@ public class MainActivity extends AppCompatActivity {
         fos.close();
         is.close();
         eventDb = EventDatabase.getInstance(this);
-        Toast.makeText(this, "Base restaurée avec succès", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Base macro restaurée avec succès", Toast.LENGTH_LONG).show();
         addLog("✅ Base de données importée avec succès.");
     } catch (Exception e) {
         Log.e(TAG, "Erreur lors de l'importation", e);
         Toast.makeText(this, "Échec de l'importation : " + e.getMessage(), Toast.LENGTH_LONG).show();
     }
     }
-
     private void exportDatabaseToStorage() {
-        try {
-            File dbFile = getDatabasePath("trading_bot.db");
-            if (dbFile == null || !dbFile.exists()) {
-                Toast.makeText(this, "Aucune base", Toast.LENGTH_SHORT).show();
-                return;
-            }
+    Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+    intent.addCategory(Intent.CATEGORY_OPENABLE);
+    intent.setType("application/octet-stream");
+    intent.putExtra(Intent.EXTRA_TITLE, "trading_bot_backup_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date()) + ".db");
+    exportDbLauncher.launch(intent);
+    }
 
-            File exportDir = new File(getExternalFilesDir(null), "TradingBotBackup");
-            if (!exportDir.exists()) exportDir.mkdirs();
-
-            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-            File backupFile = new File(exportDir, "trading_bot_backup_" + timestamp + ".db");
-
-            FileInputStream fis = new FileInputStream(dbFile);
-            FileOutputStream fos = new FileOutputStream(backupFile);
-            byte[] buffer = new byte[1024];
-            int length;
-            while ((length = fis.read(buffer)) > 0) {
-                fos.write(buffer, 0, length);
-            }
-            fos.close();
-            fis.close();
-
-            Toast.makeText(this, "Base sauvegardée dans " + backupFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
-            addLog("✅ Base exportée : " + backupFile.getName());
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur exportation base", e);
-            Toast.makeText(this, "Erreur : " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    private void exportDatabaseToUri(Uri uri) {
+    try {
+        File dbFile = getDatabasePath("trading_bot.db");
+        if (dbFile == null || !dbFile.exists()) {
+            Toast.makeText(this, "Aucune base de données", Toast.LENGTH_SHORT).show();
+            return;
         }
+        FileInputStream fis = new FileInputStream(dbFile);
+        OutputStream os = getContentResolver().openOutputStream(uri);
+        byte[] buffer = new byte[1024];
+        int length;
+        while ((length = fis.read(buffer)) > 0) {
+            os.write(buffer, 0, length);
+        }
+        os.flush();
+        os.close();
+        fis.close();
+        Toast.makeText(this, "Base macro exportée avec succès", Toast.LENGTH_LONG).show();
+        addLog("✅ Base exportée.");
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur export", e);
+        Toast.makeText(this, "Échec export : " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    }
     }
 
     @Override
