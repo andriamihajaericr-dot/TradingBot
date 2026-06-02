@@ -938,17 +938,18 @@ public void onNotificationPosted(StatusBarNotification sbn) {
     // Détection et filtrage immédiat des packages sources autorisés
     String packageName = sbn.getPackageName().toLowerCase(Locale.ROOT);
     String sourceName = "Source Institutionnelle";
-
     if (packageName.contains("financialjuice")) {
-        sourceName = "FinancialJuice";
-    } else if (packageName.contains("nikkei")) {
-        sourceName = "TradingEconomics";
-    } else if (packageName.contains("forex.portal")) {
-        sourceName = "Myfxbook";
-    } else if (packageName.contains("twitter") || packageName.contains("periscope")) {
-        sourceName = "X /Twitter";
-    } else {
-        return; // Ignore immédiatement tout le reste sans allouer de mémoire inutile
+    sourceName = "FinancialJuice";
+} else if (packageName.contains("nikkei")) {
+    sourceName = "TradingEconomics";
+} else if (packageName.contains("forex.portal")) {
+    sourceName = "Myfxbook";
+} else if (packageName.contains("twitter") || packageName.contains("periscope")) {
+    sourceName = "X /Twitter";
+} else if (packageName.contains("chrome") || packageName.equals("com.android.chrome")) {
+    sourceName = "Chrome";
+} else {
+    return; // Ignore immédiatement tout le reste
     }
 
     // Extraction sécurisée des chaînes de caractères brutes fournies par Android
