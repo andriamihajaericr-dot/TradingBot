@@ -1247,10 +1247,8 @@ private void processIncomingMacroFeed(String source, String title, String text, 
         Log.d(TAG, "[THROTTLE] Notification instantanée bloquée (global - 8 min)");
         return;
     }
-
     List<String> targetAssets = filterActiveAssets(feed);
-    EventValidator.ValidationResult vr = EventValidator.validate(title, feed, postTime, targetAssets);
-
+    EventValidator.ValidationResult vr = EventValidator.validate(NotificationService.this, title, feed, postTime, targetAssets);
     // Détection élargie de TOUTES les actualités majeures
     String upFeed = feed.toUpperCase(Locale.ROOT);
     boolean isSupremeNews = upFeed.contains("FOMC") || upFeed.contains("FED ") || 
