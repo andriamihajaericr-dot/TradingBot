@@ -862,6 +862,10 @@ private static final String DAILY_SYSTEM_PROMPT =
                     // ✅ CORRECTION 6 : Utilisation homogène de la variable SQLite locale 'db' pour acter la synchronisation
                     if (activeSignalsCount > 0) {
                         String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n" + filteredMessage.toString().trim();
+                        
+                    if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("[SERVICE] Envoi Telegram pour " + fingerprint);
+                    }
                         sendTelegramSecure(finalPayload, NotificationService.this);
                         db.markEventAsSynced(fingerprint, "PROCESSED_OK");
                     } else {
