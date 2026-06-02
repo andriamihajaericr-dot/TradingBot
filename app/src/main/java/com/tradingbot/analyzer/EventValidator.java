@@ -30,7 +30,7 @@ public class EventValidator {
         public String  actual         = "N/A";
         public boolean assetsEnriched = false;
         public String  reason         = "";
-        public String  geoContext     = "";   // Description de la zone géopolitique détectée
+        public String  geoContext     = "";  // Description de la zone géopolitique détectée
         
         // Nouveaux champs pour l'inertie macro
         public boolean isInertiaBlock = false;
