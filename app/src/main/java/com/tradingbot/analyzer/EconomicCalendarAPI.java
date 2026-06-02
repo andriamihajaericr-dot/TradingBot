@@ -38,6 +38,36 @@ public class EconomicCalendarAPI {
             globalAppContext = context.getApplicationContext();
         }
     }
+    private static final int MAX_RETRIES = 3;
+private static final long INITIAL_BACKOFF_MS = 1000;
+
+private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hoursAhead) {
+    long backoff = INITIAL_BACKOFF_MS;
+    for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            List<CalendarEvent> events = fetcher.fetch(hoursAhead);
+            if (events != null && !events.isEmpty()) {
+                return events;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Tentative " + attempt + " échouée : " + e.getMessage());
+        }
+        if (attempt < MAX_RETRIES) {
+            try {
+                Thread.sleep(backoff);
+                backoff *= 2;
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+    }
+    return new ArrayList<>();
+}
+
+interface FetchFunction {
+    List<CalendarEvent> fetch(int hoursAhead) throws Exception;
+}
 
     /**
      * Surcharge essentielle pour préserver la compatibilité ascendante avec EventValidator.preloadCalendar()
