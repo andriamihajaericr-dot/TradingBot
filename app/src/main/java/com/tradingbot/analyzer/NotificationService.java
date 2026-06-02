@@ -2048,7 +2048,7 @@ Log.d(TAG, "Impact final qualifié : " + initialImpact);
         // Traitement de l'enveloppe de prompt (Filtres géopolitiques complexes de votre script)
         String systemPromptFinal = construirePromptQuotidienSystem(dailyDrivers, DAILY_SYSTEM_PROMPT);
 
-        JSONObject payload = new JSONObject();
+                JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
         payload.put("temperature", 0.02);
 
@@ -2068,17 +2068,11 @@ Log.d(TAG, "Impact final qualifié : " + initialImpact);
         conn.setReadTimeout(20000);
         conn.setDoOutput(true);
 
-        // === APRÈS ===
-        OutputStream os = null;
-        try {
-          os = conn.getOutputStream();
-          byte[] input = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-          os.write(input, 0, input.length);
-          os.flush();
-        } finally {
-        if (os != null) {
-        try { os.close(); } catch (Exception ignored) {}
-         }
+        // ✅ Gestion sécurisée de l'OutputStream
+        try (OutputStream os = conn.getOutputStream()) {
+            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+            os.flush();
         }
 
         int responseCode = conn.getResponseCode();
