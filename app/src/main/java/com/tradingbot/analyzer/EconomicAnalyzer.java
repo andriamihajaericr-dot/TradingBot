@@ -15,15 +15,16 @@ public class EconomicAnalyzer {
         public String directionText = "";
         public double deviation = 0.0;
         public boolean isParsed = false;
-        public String currency = "USD";  // Nouveau champ
+        public String currency = "USD";
     }
 
     private static class ParsedValues {
         double actual = Double.NaN;
         double forecast = Double.NaN;
-        String currency = "USD";  // Devise détectée
+        String currency = "USD";
+
         boolean isValid() {
-        return !Double.isNaN(actual) && !Double.isNaN(forecast);
+            return !Double.isNaN(actual) && !Double.isNaN(forecast);
         }
     }
 
@@ -35,19 +36,16 @@ public class EconomicAnalyzer {
         if (title == null || text == null) return result;
 
         String combined = (title + " " + text).toUpperCase(Locale.ROOT);
-        
-        // Détection de la devise (priorité aux mentions explicites)
         String currency = detectCurrency(combined);
         result.currency = currency;
 
         ParsedValues valeurs = extraireChiffres(text);
-        
+
         if (!valeurs.isValid()) {
             traiterEvenementTextuel(combined, result, currency);
             return result;
         }
 
-        valeurs.currency = currency;
         result.isParsed = true;
         result.deviation = valeurs.actual - valeurs.forecast;
         double absEcart = Math.abs(result.deviation);
@@ -66,45 +64,52 @@ public class EconomicAnalyzer {
         } else if (currency.equals("AUD")) {
             analyserAUD(valeurs, result, combined, absEcart);
         } else {
-            // Fallback
-            attribuerPoids(absEcart, 1.0, 2.0, result);
-            result.marketImpact = "UNKNOWN_MACRO";
-            result.directionText = (result.deviation > 0) ? "Donnée supérieure aux attentes" : "Donnée inférieure aux attentes";
+            // Fallback pour Chine ou autre (via AUD car proxy)
+            analyserAUD(valeurs, result, combined, absEcart);
+        }
+
+        // Log dans l'interface utilisateur
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog("[EconomicAnalyzer] " + currency + " | Poids=" + result.weight + " | " + result.directionText);
         }
 
         Log.d(TAG, "Analyse " + currency + " : " + result.marketImpact + " [Poids: " + result.weight + "]");
-        // Envoi dans l'interface
-        if (MainActivity.instance != null) {
-           MainActivity.instance.addLog("[EconomicAnalyzer] " + currency + " | Poids=" + result.weight + " | " + result.directionText);
-           }
         return result;
-        }
+    }
 
     private static String detectCurrency(String upperText) {
-        if (upperText.contains("ECB") || upperText.contains("EUROZONE") || 
-            (upperText.contains("CPI") && upperText.contains("GERMAN")) ||
-            upperText.contains("FRENCH") || upperText.contains("ITALIAN")) {
+        // Eurozone
+        if (upperText.contains("ECB") || upperText.contains("EUROZONE") ||
+            (upperText.contains("CPI") && (upperText.contains("GERMAN") || upperText.contains("FRENCH") || upperText.contains("ITALIAN"))) ||
+            upperText.contains("IFO") || upperText.contains("ZEW")) {
             return "EUR";
         }
-        if (upperText.contains("BOE") || upperText.contains("UK") || upperText.contains("BRITISH")) {
+        // UK
+        if (upperText.contains("BOE") || upperText.contains("UK") || upperText.contains("BRITISH") ||
+            upperText.contains("AVERAGE EARNINGS") || upperText.contains("CLAIMANT COUNT")) {
             return "GBP";
         }
-        if (upperText.contains("BOJ") || upperText.contains("JAPAN")) {
+        // Japan
+        if (upperText.contains("BOJ") || upperText.contains("JAPAN") || upperText.contains("TANKAN")) {
             return "JPY";
         }
-        if (upperText.contains("BOC") || upperText.contains("CANADA")) {
+        // Canada
+        if (upperText.contains("BOC") || upperText.contains("CANADA") || upperText.contains("IVEY")) {
             return "CAD";
         }
-        if (upperText.contains("RBA") || upperText.contains("AUSTRALIA")) {
+        // Australia
+        if (upperText.contains("RBA") || upperText.contains("AUSTRALIA") || upperText.contains("AUSSIE") ||
+            upperText.contains("NAB") || upperText.contains("WESTPAC") || upperText.contains("CAIXIN")) {
             return "AUD";
         }
-        // Par défaut USD (FED, FOMC, etc.)
+        // Default USD
         return "USD";
     }
 
     // ==================== ANALYSE PAR DEVISE ====================
 
     private static void analyserUS(ParsedValues v, EvaluationResult r, String combined, double absEcart) {
+        // Inflation (CPI, PCE, PPI)
         if (combined.contains("CPI") || combined.contains("PCE") || combined.contains("PPI") || combined.contains("INFLATION")) {
             attribuerPoids(absEcart, 0.1, 0.2, r);
             if (r.deviation > 0) {
@@ -114,7 +119,9 @@ public class EconomicAnalyzer {
                 r.marketImpact = "US_CPI_DOVISH";
                 r.directionText = "🍃 BAISSE INFLATION US: USD ↘️, GOLD ↗️, NASDAQ/SP500 ↗️, BTC ↗️";
             }
-        } else if (combined.contains("NFP") || combined.contains("NON-FARM") || combined.contains("ADP") || combined.contains("EMPLOYMENT")) {
+        }
+        // Emploi : NFP, ADP, JOLTS
+        else if (combined.contains("NFP") || combined.contains("NON-FARM") || combined.contains("PAYROLLS")) {
             attribuerPoids(absEcart, 25.0, 55.0, r);
             if (r.deviation > 0) {
                 r.marketImpact = "US_NFP_STRONG";
@@ -123,7 +130,29 @@ public class EconomicAnalyzer {
                 r.marketImpact = "US_NFP_WEAK";
                 r.directionText = "⚠️ EMPLOI FAIBLE US: USD ↘️, GOLD ↗️, NASDAQ/SP500 ↗️";
             }
-        } else if (combined.contains("GDP") || combined.contains("PIB")) {
+        }
+        else if (combined.contains("ADP")) {
+            attribuerPoids(absEcart, 25.0, 55.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_ADP_STRONG";
+                r.directionText = "💪 ADP SUPÉRIEUR: USD ↗️, NASDAQ/SP500 ↗️, GOLD ↘️";
+            } else {
+                r.marketImpact = "US_ADP_WEAK";
+                r.directionText = "⚠️ ADP INFÉRIEUR: USD ↘️, GOLD ↗️, NASDAQ/SP500 ↘️";
+            }
+        }
+        else if (combined.contains("JOLTS") || combined.contains("JOB OPENINGS")) {
+            attribuerPoids(absEcart, 200.0, 500.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_JOLTS_HIGH";
+                r.directionText = "📊 OFFRE D'EMPLOI ÉLEVÉE US: USD ↗️, GOLD ↘️, NASDAQ/SP500 ↗️";
+            } else {
+                r.marketImpact = "US_JOLTS_LOW";
+                r.directionText = "⚠️ BAISSE DES OFFRES US: USD ↘️, GOLD ↗️, NASDAQ/SP500 ↘️";
+            }
+        }
+        // PIB
+        else if (combined.contains("GDP") || combined.contains("PIB")) {
             attribuerPoids(absEcart, 0.2, 0.5, r);
             if (r.deviation > 0) {
                 r.marketImpact = "US_GDP_BULLISH";
@@ -132,7 +161,9 @@ public class EconomicAnalyzer {
                 r.marketImpact = "US_GDP_BEARISH";
                 r.directionText = "📉 RISQUE RÉCESSION US: USD ↘️, GOLD ↗️, INDICES ↘️";
             }
-        } else if (combined.contains("PMI") || combined.contains("ISM")) {
+        }
+        // PMI / ISM
+        else if (combined.contains("PMI") || combined.contains("ISM")) {
             attribuerPoids(absEcart, 0.6, 1.2, r);
             if (r.deviation > 0) {
                 r.marketImpact = "US_PMI_EXPANSION";
@@ -141,7 +172,9 @@ public class EconomicAnalyzer {
                 r.marketImpact = "US_PMI_CONTRACTION";
                 r.directionText = "🛑 PMI CONTRACTION US: USOIL ↘️, USD ↘️, GOLD ↗️";
             }
-        } else if (combined.contains("JOBLESS CLAIMS") || combined.contains("IJC")) {
+        }
+        // Chômage
+        else if (combined.contains("JOBLESS CLAIMS") || combined.contains("IJC")) {
             attribuerPoids(absEcart, 10.0, 20.0, r);
             if (r.deviation > 0) {
                 r.marketImpact = "US_IJC_BAD";
@@ -150,7 +183,9 @@ public class EconomicAnalyzer {
                 r.marketImpact = "US_IJC_GOOD";
                 r.directionText = "🦅 BAISSE CHÔMAGE US: USD ↗️, GOLD ↘️, USOIL ↗️";
             }
-        } else if (combined.contains("RETAIL SALES")) {
+        }
+        // Ventes au détail
+        else if (combined.contains("RETAIL SALES")) {
             attribuerPoids(absEcart, 0.3, 0.7, r);
             if (r.deviation > 0) {
                 r.marketImpact = "US_RETAIL_STRONG";
@@ -159,7 +194,9 @@ public class EconomicAnalyzer {
                 r.marketImpact = "US_RETAIL_WEAK";
                 r.directionText = "📉 VENTES FAIBLES US: USD ↘️, GOLD ↗️";
             }
-        } else if (combined.contains("CONSUMER CONFIDENCE") || combined.contains("MICHIGAN")) {
+        }
+        // Confiance consommateurs
+        else if (combined.contains("CONSUMER CONFIDENCE") || combined.contains("MICHIGAN")) {
             attribuerPoids(absEcart, 2.0, 5.0, r);
             if (r.deviation > 0) {
                 r.marketImpact = "US_CONFIDENCE_HIGH";
@@ -168,7 +205,53 @@ public class EconomicAnalyzer {
                 r.marketImpact = "US_CONFIDENCE_LOW";
                 r.directionText = "📉 CONFIANCE BASSE US: USD ↘️, GOLD ↗️";
             }
-        } else if (combined.contains("OIL") || combined.contains("EIA") || combined.contains("INVENTORIES")) {
+        }
+        // Production industrielle
+        else if (combined.contains("INDUSTRIAL PRODUCTION") || combined.contains("CAPACITY UTILIZATION")) {
+            attribuerPoids(absEcart, 0.3, 0.7, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_INDUSTRIAL_UP";
+                r.directionText = "🏭 PRODUCTION INDUSTRIELLE FORTE: USD ↗️, USOIL ↗️, NASDAQ/SP500 ↗️";
+            } else {
+                r.marketImpact = "US_INDUSTRIAL_DOWN";
+                r.directionText = "📉 PRODUCTION INDUSTRIELLE FAIBLE: USD ↘️, USOIL ↘️";
+            }
+        }
+        // Biens durables
+        else if (combined.contains("DURABLE GOODS")) {
+            attribuerPoids(absEcart, 0.5, 1.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_DURABLE_STRONG";
+                r.directionText = "📦 COMMANDES DE BIENS DURABLES FORTES: USD ↗️, NASDAQ ↗️";
+            } else {
+                r.marketImpact = "US_DURABLE_WEAK";
+                r.directionText = "📦 COMMANDES FAIBLES: USD ↘️";
+            }
+        }
+        // Mises en chantier / permis de construire
+        else if (combined.contains("HOUSING STARTS") || combined.contains("BUILDING PERMITS")) {
+            attribuerPoids(absEcart, 50.0, 150.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_HOUSING_STRONG";
+                r.directionText = "🏠 MARCHÉ IMMOBILIER FORT: USD ↗️, NASDAQ ↗️";
+            } else {
+                r.marketImpact = "US_HOUSING_WEAK";
+                r.directionText = "🏠 MARCHÉ IMMOBILIER FAIBLE: USD ↘️, GOLD ↗️";
+            }
+        }
+        // Balance commerciale
+        else if (combined.contains("TRADE BALANCE")) {
+            attribuerPoids(absEcart, 2.0, 5.0, r);
+            if (r.deviation < 0) { // déficit plus élevé (négatif plus grand) -> USD faible
+                r.marketImpact = "US_TRADE_DEFICIT_WIDENS";
+                r.directionText = "📉 DÉFICIT COMMERCIAL CREUX: USD ↘️, GOLD ↗️";
+            } else {
+                r.marketImpact = "US_TRADE_IMPROVES";
+                r.directionText = "📈 DÉFICIT COMMERCIAL SE RESSERRE: USD ↗️";
+            }
+        }
+        // Stocks pétrole
+        else if (combined.contains("OIL") || combined.contains("EIA") || combined.contains("INVENTORIES")) {
             attribuerPoids(absEcart, 2.0, 4.5, r);
             if (r.deviation > 0) {
                 r.marketImpact = "OIL_INVENTORIES_SURPLUS";
@@ -177,7 +260,8 @@ public class EconomicAnalyzer {
                 r.marketImpact = "OIL_INVENTORIES_DEFICIT";
                 r.directionText = "🛢️ DÉFICIT STOCKS PÉTROLE: USOIL ↗️";
             }
-        } else {
+        }
+        else {
             attribuerPoids(absEcart, 1.0, 2.0, r);
             r.marketImpact = "US_MACRO_OTHER";
             r.directionText = r.deviation > 0 ? "Donnée US supérieure aux attentes" : "Donnée US inférieure aux attentes";
@@ -212,6 +296,24 @@ public class EconomicAnalyzer {
                 r.marketImpact = "EUR_PMI_CONTRACTION";
                 r.directionText = "🛑 PMI EURO CONTRACTION: EUR ↘️, EURUSD ↘️, GOLD ↗️";
             }
+        } else if (combined.contains("IFO")) {
+            attribuerPoids(absEcart, 0.5, 1.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "EUR_IFO_UP";
+                r.directionText = "📈 INDICATEUR IFO ALLEMAGNE FORT: EUR ↗️, EURUSD ↗️";
+            } else {
+                r.marketImpact = "EUR_IFO_DOWN";
+                r.directionText = "📉 INDICATEUR IFO FAIBLE: EUR ↘️, EURUSD ↘️";
+            }
+        } else if (combined.contains("ZEW")) {
+            attribuerPoids(absEcart, 5.0, 15.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "EUR_ZEW_UP";
+                r.directionText = "📈 SENTIMENT ZEW EN HAUSSE: EUR ↗️";
+            } else {
+                r.marketImpact = "EUR_ZEW_DOWN";
+                r.directionText = "📉 SENTIMENT ZEW EN BAISSE: EUR ↘️";
+            }
         } else if (combined.contains("RETAIL SALES") || combined.contains("CONSUMER SPENDING")) {
             attribuerPoids(absEcart, 0.3, 0.7, r);
             r.marketImpact = r.deviation > 0 ? "EUR_RETAIL_STRONG" : "EUR_RETAIL_WEAK";
@@ -220,10 +322,18 @@ public class EconomicAnalyzer {
             attribuerPoids(absEcart, 0.1, 0.2, r);
             r.marketImpact = r.deviation > 0 ? "EUR_UNEMPLOYMENT_HIGH" : "EUR_UNEMPLOYMENT_LOW";
             r.directionText = r.deviation > 0 ? "⚠️ CHÔMAGE HAUT EURO: EUR ↘️" : "✅ CHÔMAGE BAS EURO: EUR ↗️";
+        } else if (combined.contains("INDUSTRIAL PRODUCTION")) {
+            attribuerPoids(absEcart, 0.5, 1.0, r);
+            r.marketImpact = r.deviation > 0 ? "EUR_INDUSTRIAL_UP" : "EUR_INDUSTRIAL_DOWN";
+            r.directionText = r.deviation > 0 ? "🏭 PRODUCTION INDUSTRIELLE EUROPÉENNE FORTE: EUR ↗️" : "📉 PRODUCTION INDUSTRIELLE EUROPÉENNE FAIBLE: EUR ↘️";
+        } else if (combined.contains("TRADE BALANCE")) {
+            attribuerPoids(absEcart, 1.0, 2.0, r);
+            r.marketImpact = r.deviation > 0 ? "EUR_TRADE_SURPLUS" : "EUR_TRADE_DEFICIT";
+            r.directionText = r.deviation > 0 ? "📈 EXCÉDENT COMMERCIAL EURO: EUR ↗️" : "📉 DÉFICIT COMMERCIAL EURO: EUR ↘️";
         } else {
             attribuerPoids(absEcart, 1.0, 2.0, r);
             r.marketImpact = "EUR_MACRO_OTHER";
-            r.directionText = r.deviation > 0 ? "Donnée zone euro supérieure aux attentes" : "Donnée zone euro inférieure aux attentes";
+            r.directionText = r.deviation > 0 ? "Donnée zone euro supérieure" : "Donnée zone euro inférieure";
         }
     }
 
@@ -240,6 +350,14 @@ public class EconomicAnalyzer {
             attribuerPoids(absEcart, 0.6, 1.2, r);
             r.marketImpact = r.deviation > 0 ? "GBP_PMI_EXPANSION" : "GBP_PMI_CONTRACTION";
             r.directionText = r.deviation > 0 ? "🏭 PMI UK EXPANSION: GBP ↗️" : "🛑 PMI UK CONTRACTION: GBP ↘️";
+        } else if (combined.contains("AVERAGE EARNINGS")) {
+            attribuerPoids(absEcart, 0.2, 0.5, r);
+            r.marketImpact = r.deviation > 0 ? "GBP_EARNINGS_UP" : "GBP_EARNINGS_DOWN";
+            r.directionText = r.deviation > 0 ? "💰 SALAIRES EN HAUSSE UK: GBP ↗️ (pression BoE)" : "💰 SALAIRES EN BAISSE UK: GBP ↘️";
+        } else if (combined.contains("CLAIMANT COUNT")) {
+            attribuerPoids(absEcart, 5.0, 15.0, r);
+            r.marketImpact = r.deviation > 0 ? "GBP_CLAIMANTS_UP" : "GBP_CLAIMANTS_DOWN";
+            r.directionText = r.deviation > 0 ? "⚠️ HAUSSE DEMANDEURS D'EMPLOI UK: GBP ↘️" : "✅ BAISSE DEMANDEURS D'EMPLOI UK: GBP ↗️";
         } else {
             attribuerPoids(absEcart, 1.0, 2.0, r);
             r.marketImpact = "GBP_MACRO_OTHER";
@@ -256,10 +374,14 @@ public class EconomicAnalyzer {
             attribuerPoids(absEcart, 0.2, 0.5, r);
             r.marketImpact = r.deviation > 0 ? "JPY_GDP_BULLISH" : "JPY_GDP_BEARISH";
             r.directionText = r.deviation > 0 ? "📈 CROISSANCE JAPON FORTE: JPY ↗️" : "📉 RÉCESSION JAPON: JPY ↘️";
-        } else if (combined.contains("BOJ") || combined.contains("RATE")) {
-            r.weight = 4;
-            r.marketImpact = r.deviation > 0 ? "BOJ_HAWKISH" : "BOJ_DOVISH";
-            r.directionText = r.deviation > 0 ? "🦅 BOJ HAWKISH: USDJPY ↘️, JPY ↗️" : "🕊️ BOJ DOVISH: USDJPY ↗️, JPY ↘️";
+        } else if (combined.contains("TANKAN")) {
+            attribuerPoids(absEcart, 2.0, 5.0, r);
+            r.marketImpact = r.deviation > 0 ? "JPY_TANKAN_UP" : "JPY_TANKAN_DOWN";
+            r.directionText = r.deviation > 0 ? "📈 ENQUÊTE TANKAN JAPON ORIENTÉE HAUSSE: JPY ↗️, USDJPY ↘️" : "📉 ENQUÊTE TANKAN EN BAISSE: JPY ↘️, USDJPY ↗️";
+        } else if (combined.contains("INDUSTRIAL PRODUCTION") || combined.contains("TRADE BALANCE")) {
+            attribuerPoids(absEcart, 0.5, 1.0, r);
+            r.marketImpact = r.deviation > 0 ? "JPY_INDUSTRY_UP" : "JPY_INDUSTRY_DOWN";
+            r.directionText = r.deviation > 0 ? "🏭 PRODUCTION INDUSTRIELLE JAPON FORTE: JPY ↗️" : "📉 PRODUCTION INDUSTRIELLE JAPON FAIBLE: JPY ↘️";
         } else {
             attribuerPoids(absEcart, 1.0, 2.0, r);
             r.marketImpact = "JPY_MACRO_OTHER";
@@ -280,6 +402,10 @@ public class EconomicAnalyzer {
             attribuerPoids(absEcart, 10.0, 20.0, r);
             r.marketImpact = r.deviation > 0 ? "CAD_JOBS_STRONG" : "CAD_JOBS_WEAK";
             r.directionText = r.deviation > 0 ? "💪 EMPLOI CANADA FORT: CAD ↗️" : "⚠️ EMPLOI CANADA FAIBLE: CAD ↘️";
+        } else if (combined.contains("IVEY PMI")) {
+            attribuerPoids(absEcart, 0.6, 1.2, r);
+            r.marketImpact = r.deviation > 0 ? "CAD_IVEY_UP" : "CAD_IVEY_DOWN";
+            r.directionText = r.deviation > 0 ? "🏭 PMI IVEY CANADA EN HAUSSE: CAD ↗️" : "🛑 PMI IVEY CANADA EN BAISSE: CAD ↘️";
         } else {
             attribuerPoids(absEcart, 1.0, 2.0, r);
             r.marketImpact = "CAD_MACRO_OTHER";
@@ -300,10 +426,32 @@ public class EconomicAnalyzer {
             r.weight = 4;
             r.marketImpact = r.deviation > 0 ? "RBA_HAWKISH" : "RBA_DOVISH";
             r.directionText = r.deviation > 0 ? "🦅 RBA HAWKISH: AUDUSD ↗️" : "🕊️ RBA DOVISH: AUDUSD ↘️";
+        } else if (combined.contains("NAB BUSINESS CONFIDENCE")) {
+            attribuerPoids(absEcart, 2.0, 5.0, r);
+            r.marketImpact = r.deviation > 0 ? "AUD_NAB_UP" : "AUD_NAB_DOWN";
+            r.directionText = r.deviation > 0 ? "📈 CONFIDENCE NAB AUSTRALIE EN HAUSSE: AUD ↗️" : "📉 CONFIDENCE NAB EN BAISSE: AUD ↘️";
+        } else if (combined.contains("WESTPAC") || combined.contains("CONSUMER SENTIMENT")) {
+            attribuerPoids(absEcart, 2.0, 5.0, r);
+            r.marketImpact = r.deviation > 0 ? "AUD_WESTPAC_UP" : "AUD_WESTPAC_DOWN";
+            r.directionText = r.deviation > 0 ? "🧠 SENTIMENT WESTPAC AUSTRALIE EN HAUSSE: AUD ↗️" : "📉 SENTIMENT WESTPAC EN BAISSE: AUD ↘️";
+        } else if (combined.contains("TRADE BALANCE")) {
+            attribuerPoids(absEcart, 0.5, 1.0, r);
+            r.marketImpact = r.deviation > 0 ? "AUD_TRADE_SURPLUS" : "AUD_TRADE_DEFICIT";
+            r.directionText = r.deviation > 0 ? "📈 EXCÉDENT COMMERCIAL AUSTRALIE: AUD ↗️" : "📉 DÉFICIT COMMERCIAL AUSTRALIE: AUD ↘️";
+        }
+        // Indicateurs chinois (proxy AUD)
+        else if (combined.contains("CAIXIN PMI")) {
+            attribuerPoids(absEcart, 0.6, 1.2, r);
+            r.marketImpact = r.deviation > 0 ? "CHINA_CAIXIN_UP" : "CHINA_CAIXIN_DOWN";
+            r.directionText = r.deviation > 0 ? "🏭 PMI CAIXIN CHINE EXPANSION: AUD ↗️, USOIL ↗️, GOLD ↗️" : "🛑 PMI CAIXIN CHINE CONTRACTION: AUD ↘️, USOIL ↘️";
+        } else if (combined.contains("CHINA") && (combined.contains("GDP") || combined.contains("PIB"))) {
+            attribuerPoids(absEcart, 0.2, 0.5, r);
+            r.marketImpact = r.deviation > 0 ? "CHINA_GDP_UP" : "CHINA_GDP_DOWN";
+            r.directionText = r.deviation > 0 ? "📈 CROISSANCE CHINOISE FORTE: AUD ↗️, USOIL ↗️" : "📉 CROISSANCE CHINOISE FAIBLE: AUD ↘️, USOIL ↘️";
         } else {
             attribuerPoids(absEcart, 1.0, 2.0, r);
             r.marketImpact = "AUD_MACRO_OTHER";
-            r.directionText = r.deviation > 0 ? "Donnée Australie supérieure" : "Donnée Australie inférieure";
+            r.directionText = r.deviation > 0 ? "Donnée Australie/Chine supérieure" : "Donnée Australie/Chine inférieure";
         }
     }
 
