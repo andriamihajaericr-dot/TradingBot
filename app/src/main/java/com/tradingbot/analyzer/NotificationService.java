@@ -1741,7 +1741,7 @@ Log.d(TAG, "Impact final qualifié : " + initialImpact);
                   Log.d(TAG, "📤 Envoi Telegram pour fingerprint=" + fingerprint + ", signaux impactants=" + activeSignalsCount);
                   
                   if (MainActivity.instance != null) {
-                  MainActivity.instance.addLog("[SERVICE] Envoi Telegram pour " + fingerprint);
+                  MainActivity.instance.addLog(source + ": Envoi Telegram " + fingerprint);
                   }
                   sendTelegramSecure(finalPayload, this);
                   
