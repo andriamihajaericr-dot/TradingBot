@@ -1032,7 +1032,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                 // 3️⃣ SYNCHRONISATION MACRO DÉTERMINISTE (Appel immédiat d'EconomicAnalyzer)
                 // On lui passe le titre et le corps brut d'origine (contenant les étiquettes ACTUAL/FORECAST intactes)
                 EconomicAnalyzer.EvaluationResult ecoResult = EconomicAnalyzer.analyserEvenement(title, bodyTextRaw);
-                
+                Log.d(TAG, "Devise détectée : " + ecoResult.currency + ", poids : " + ecoResult.weight);
                 // Le poids n'est plus forcé à 5 ou 3 statiquement, il découle de la surprise de l'écart mathématique (1 à 4)
                 int finalCalculatedWeight = ecoResult.weight;
 
