@@ -170,7 +170,7 @@ public class EventDatabase extends SQLiteOpenHelper {
     long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
 
     // Ajustement : driver_weight >= 3 pour capturer les PMI/ISM dans le rapport
-    String selection = "unix_timestamp >= ? AND driver_weight >= 3)";
+    String selection = "unix_timestamp >= ? AND driver_weight >= 3 OR (impact LIKE '%GEO%' AND driver_weight >= 2)";
     String[] whereArgs = new String[]{
             String.valueOf(twentyFourHoursAgo),
             "%DRIVER%",
