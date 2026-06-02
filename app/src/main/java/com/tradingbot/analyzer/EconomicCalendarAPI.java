@@ -68,7 +68,6 @@ private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hou
 interface FetchFunction {
     List<CalendarEvent> fetch(int hoursAhead) throws Exception;
 }
-
     /**
      * Surcharge essentielle pour préserver la compatibilité ascendante avec EventValidator.preloadCalendar()
      */
