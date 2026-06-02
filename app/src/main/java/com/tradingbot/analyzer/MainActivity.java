@@ -292,6 +292,37 @@ public class MainActivity extends AppCompatActivity {
     }
     }
 
+    private void exportDatabaseToStorage() {
+    try {
+        File dbFile = getDatabasePath("trading_bot.db");
+        if (dbFile == null || !dbFile.exists()) {
+            Toast.makeText(this, "Aucune base", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        File exportDir = new File(getExternalFilesDir(null), "TradingBotBackup");
+        if (!exportDir.exists()) exportDir.mkdirs();
+
+        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        File backupFile = new File(exportDir, "trading_bot_backup_" + timestamp + ".db");
+
+        FileInputStream fis = new FileInputStream(dbFile);
+        FileOutputStream fos = new FileOutputStream(backupFile);
+        byte[] buffer = new byte[1024];
+        int length;
+        while ((length = fis.read(buffer)) > 0) {
+            fos.write(buffer, 0, length);
+        }
+        fos.close();
+        fis.close();
+
+        Toast.makeText(this, "Base sauvegardée dans " + backupFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+    } catch (Exception e) {
+        e.printStackTrace();
+        Toast.makeText(this, "Erreur : " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    }
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
