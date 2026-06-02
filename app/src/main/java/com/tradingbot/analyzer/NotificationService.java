@@ -864,7 +864,7 @@ private static final String DAILY_SYSTEM_PROMPT =
                         String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n" + filteredMessage.toString().trim();
                         
                     if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog(source + ": Envoi Telegram " + fingerprint);
+                    MainActivity.instance.addLog(sourceName + ": Envoi Telegram " + fingerprint);
                     }
                         sendTelegramSecure(finalPayload, NotificationService.this);
                         db.markEventAsSynced(fingerprint, "PROCESSED_OK");
