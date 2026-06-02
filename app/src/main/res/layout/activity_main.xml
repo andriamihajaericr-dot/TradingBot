@@ -144,15 +144,14 @@
            android:textColor="#E5E7EB" 
            android:layout_marginBottom="20dp"/>
         <Button
-    android:id="@+id/importBtn"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="📂 Importer une base de données macros"
-    android:textSize="16sp"
-    android:layout_marginTop="8dp"
-    android:layout_marginBottom="16dp"
-    android:backgroundTint="#2ea043"
-    android:textColor="#ffffff" />
+           android:id="@+id/importBtn"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="📂 Importer une base de données macros"
+           android:textAllCaps="false"
+           android:backgroundTint="#1f2937"
+           android:textColor="#E5E7EB" 
+           android:layout_marginBottom="20dp"/>
     
 
         <TextView 
