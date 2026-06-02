@@ -1929,28 +1929,35 @@ Log.d(TAG, "Impact final qualifié : " + initialImpact);
         // =========================================================================
         // SÉCURITÉ REPLI AUTOMATIQUE : INTERCEPTION DIRECTE ABSENCE 24H
         // =========================================================================
-        if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
-            Log.w(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h. Extraction du rappel...");
-            
-            // Récupération sécurisée du tout dernier driver enregistré en base (sans limite de temps)
-            String dernierDriverConnu = eventDb.obtenirLeToutDernierDriver();
-            
-            if (dernierDriverConnu != null && !dernierDriverConnu.trim().isEmpty()) {
-                String messageRappel = "⚠️ *[RAPPEL : AUCUN NOUVEAU DRIVER DEPUIS 24H]*\n" +
-                                       "🕒 Rapport périodique du " + dateStr + " (Mada)\n\n" +
-                                       "Le flux de collecte n'a détecté aucun nouveau catalyseur macroéconomique.\n" +
-                                       "Voici le dernier état de marché enregistré à titre de rappel pour l'équipe :\n\n" +
-                                       dernierDriverConnu;
-                
-                // Envoi direct du bloc brut sur Telegram (Groq est court-circuité)
-                sendTelegramSecure(messageRappel, this);
-                Log.d(TAG, "[DAILY] Rappel de continuité envoyé avec succès sur Telegram.");
-            } else {
-                // Cas où l'application vient d'être installée et la table est 100% vierge
-                sendTelegramSecure("⚪ *RAPPEL SYSTEME :* Base de données entièrement vide. Aucun historique macroéconomique disponible.", this);
-            }
-            return; // 🔥 ARRET STAGE 1 : On quitte proprement la fonction. Rien d'autre n'est exécuté.
+        // =========================================================================
+// SÉCURITÉ REPLI AUTOMATIQUE : INTERCEPTION DIRECTE ABSENCE 24H
+// =========================================================================
+if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
+    Log.w(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h.");
+
+    // Éviter les envois multiples : utiliser SharedPreferences avec un délai
+    SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+    long lastReminderTime = prefs.getLong("last_empty_db_reminder", 0);
+    long now = System.currentTimeMillis();
+    if (now - lastReminderTime > 60 * 60 * 1000) { // 1 heure
+        prefs.edit().putLong("last_empty_db_reminder", now).apply();
+
+        String dernierDriverConnu = eventDb.obtenirLeToutDernierDriver();
+        if (dernierDriverConnu != null && !dernierDriverConnu.trim().isEmpty()) {
+            String messageRappel = "⚠️ *[RAPPEL : AUCUN NOUVEAU DRIVER DEPUIS 24H]*\n" +
+                                   "🕒 Rapport périodique du " + dateStr + " (Mada)\n\n" +
+                                   "Le flux de collecte n'a détecté aucun nouveau catalyseur macroéconomique.\n" +
+                                   "Voici le dernier état de marché enregistré à titre de rappel pour l'équipe :\n\n" +
+                                   dernierDriverConnu;
+            sendTelegramSecure(messageRappel, this);
+        } else {
+            sendTelegramSecure("⚪ *RAPPEL SYSTEME :* Base de données entièrement vide. Aucun historique macroéconomique disponible.", this);
         }
+    } else {
+        Log.d(TAG, "[DAILY] Rappel déjà envoyé récemment, ignoré.");
+    }
+    return;
+}
         // =========================================================================
 
         Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser");
