@@ -305,18 +305,23 @@ public class MainActivity extends AppCompatActivity {
     intent.putExtra(Intent.EXTRA_TITLE, "trading_bot_backup_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date()) + ".db");
     exportDbLauncher.launch(intent);
     }
-
+    
     private void exportDatabaseToUri(Uri uri) {
     try {
         File dbFile = getDatabasePath("trading_bot.db");
-        if (dbFile == null || !dbFile.exists()) return;
+        if (dbFile == null || !dbFile.exists()) {
+            Toast.makeText(this, "Aucune base de données", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         // 1. Copie vers l'emplacement choisi par l'utilisateur
-        InputStream fis = new FileInputStream(dbFile);
+        FileInputStream fis = new FileInputStream(dbFile);
         OutputStream os = getContentResolver().openOutputStream(uri);
         byte[] buffer = new byte[1024];
         int length;
-        while ((length = fis.read(buffer)) > 0) os.write(buffer, 0, length);
+        while ((length = fis.read(buffer)) > 0) {
+            os.write(buffer, 0, length);
+        }
         os.close();
         fis.close();
 
@@ -325,19 +330,24 @@ public class MainActivity extends AppCompatActivity {
         if (!privateBackupDir.exists()) privateBackupDir.mkdirs();
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         File privateBackupFile = new File(privateBackupDir, "auto_trading_bot_backup_" + timestamp + ".db");
-        fis = new FileInputStream(dbFile);
-        fos = new FileOutputStream(privateBackupFile);
-        while ((length = fis.read(buffer)) > 0) fos.write(buffer, 0, length);
+        
+        // Nouvelle déclaration de fis et fos pour la copie interne
+        FileInputStream fis2 = new FileInputStream(dbFile);
+        FileOutputStream fos = new FileOutputStream(privateBackupFile);
+        while ((length = fis2.read(buffer)) > 0) {
+            fos.write(buffer, 0, length);
+        }
         fos.close();
-        fis.close();
+        fis2.close();
 
         Toast.makeText(this, "Base exportée + sauvegarde automatique locale", Toast.LENGTH_LONG).show();
+        addLog("✅ Base exportée avec copie locale.");
     } catch (Exception e) {
         Log.e(TAG, "Erreur export", e);
         Toast.makeText(this, "Échec export : " + e.getMessage(), Toast.LENGTH_SHORT).show();
     }
     }
-
+    
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
