@@ -275,6 +275,38 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
 
     /**
+ * Récupère le dernier événement d'un type donné (ex: "FED-MONETARY-POLICY")
+ * pour l'envoyer dans un rappel Telegram.
+ * @return une chaîne formatée avec l'heure, le titre, le contenu tronqué et l'impact.
+ */
+public String getLastEventByType(String eventType) {
+    SQLiteDatabase db = this.getReadableDatabase();
+    Cursor cursor = null;
+    try {
+        cursor = db.query(TABLE_EVENTS, 
+                new String[]{"title", "feed_content", "impact", "unix_timestamp"},
+                "event_type = ? AND sync_status = 'synced'",
+                new String[]{eventType}, null, null, "unix_timestamp DESC", "1");
+        if (cursor != null && cursor.moveToFirst()) {
+            String title = cursor.getString(0);
+            String content = cursor.getString(1);
+            String impact = cursor.getString(2);
+            long ts = cursor.getLong(3);
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM HH:mm:ss", java.util.Locale.FRANCE);
+            sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
+            String timeStr = sdf.format(new java.util.Date(ts * 1000));
+            // Troncature du contenu à 200 caractères pour éviter les messages trop longs
+            String shortContent = content.length() > 200 ? content.substring(0, 200) + "…" : content;
+            return "🕒 " + timeStr + "\n📌 " + title + "\n📝 " + shortContent + "\n⚡ Impact: " + impact;
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur getLastEventByType", e);
+    } finally {
+        if (cursor != null) cursor.close();
+    }
+    return "Aucun historique trouvé pour ce driver.";
+}
+    /**
      * Récupère l'intégralité du contenu textuel des notifications des 30 dernières minutes
      */
     /**
