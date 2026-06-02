@@ -408,7 +408,7 @@ public class EventValidator {
 
     // ─────────────────────────────────────────────────────────────
     //  CALENDRIER ÉCONOMIQUE (inchangé)
-    private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(String title, String content, long timestamp) {
+private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(String title, String content, long timestamp) {
     String combined = (title + " " + content).toLowerCase(Locale.ROOT);
     // Normalisation : supprime les caractères non alphanumériques, réduit les espaces
     String normalizedCombined = combined.replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
@@ -430,28 +430,33 @@ public class EventValidator {
     return null;
 }
 
-    private static boolean matchesIndicatorKeywords(String text, String indicator, String country) {
-        if (text == null || indicator == null) return false;
-        if (indicator.contains("nfp") || indicator.contains("non-farm")) {
-            return text.contains("nfp") || text.contains("non-farm") || text.contains("payroll");
-        }
-        if (indicator.contains("cpi") || indicator.contains("inflation")) {
-            return text.contains("cpi") || text.contains("inflation") || text.contains("pce");
-        }
-        if (indicator.contains("gdp") || indicator.contains("growth")) {
-            return text.contains("gdp") || text.contains("gross domestic");
-        }
-        if (indicator.contains("fed") || indicator.contains("fomc") || indicator.contains("rate")) {
-            return text.contains("fed") || text.contains("rate") || text.contains("fomc") || text.contains("powell");
-        }
-        if (indicator.contains("ism") || indicator.contains("pmi")) {
-            return text.contains("ism") || text.contains("pmi") || text.contains("manufacturing");
-        }
-        if (indicator.contains("retail")) {
-            return text.contains("retail") || text.contains("consumer spending");
-        }
-        return false;
+private static boolean matchesIndicatorKeywords(String text, String indicator, String country) {
+    if (text == null || indicator == null) return false;
+    String ind = indicator.toLowerCase(Locale.ROOT);
+    // Table de synonymes
+    if (ind.contains("nfp") || ind.contains("non-farm")) {
+        return text.contains("nfp") || text.contains("non-farm") || text.contains("payroll") || text.contains("emploi");
     }
+    if (ind.contains("cpi") || ind.contains("inflation")) {
+        return text.contains("cpi") || text.contains("inflation") || text.contains("pce") || text.contains("prix à la consommation");
+    }
+    if (ind.contains("gdp") || ind.contains("growth")) {
+        return text.contains("gdp") || text.contains("pib") || text.contains("gross domestic") || text.contains("croissance");
+    }
+    if (ind.contains("fed") || ind.contains("fomc") || ind.contains("rate")) {
+        return text.contains("fed") || text.contains("rate") || text.contains("fomc") || text.contains("powell") || text.contains("taux");
+    }
+    if (ind.contains("ism") || ind.contains("pmi")) {
+        return text.contains("ism") || text.contains("pmi") || text.contains("manufacturing") || text.contains("industrie");
+    }
+    if (ind.contains("retail")) {
+        return text.contains("retail") || text.contains("ventes au détail") || text.contains("consumer spending");
+    }
+    if (ind.contains("jobless") || ind.contains("claims")) {
+        return text.contains("jobless") || text.contains("claims") || text.contains("chômage");
+    }
+    return false;
+}
 
     // ─────────────────────────────────────────────────────────────
     //  BREAKING NEWS GÉNÉRIQUE
