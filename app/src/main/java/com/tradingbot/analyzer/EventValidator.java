@@ -23,6 +23,8 @@ public class EventValidator {
     //  RÉSULTAT DE VALIDATION
     // ─────────────────────────────────────────────────────────────
     public static class ValidationResult {
+        public boolean isInertiaBlock = false;
+        public String lastEventSummary = "";
         public boolean isConfirmed    = false;
         public int     confidence     = 0;
         public String  forecast       = "N/A";
@@ -109,8 +111,8 @@ if (!detectedType.startsWith("GEO") && db != null) {
             result.assetsEnriched = !detectedAssets.isEmpty();
             // Récupérer le dernier événement de ce type pour le rappel
             result.lastEventSummary = db.getLastEventByType(detectedType);
-            logToMain("⏳ Driver " + detectedType + " déjà actif — envoi d'un rappel");
-            return result; // on retourne sans exécuter les autres étapes
+            logToMain("[⏳ Driver " + detectedType + " déjà actif — envoi d'un rappel");
+            return result;
         }
     } catch (Exception e) {
         Log.e(TAG, "Erreur inertie macro", e);
