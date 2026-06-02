@@ -22,15 +22,18 @@ public class EventDatabase extends SQLiteOpenHelper {
     private static volatile EventDatabase instance;
 
     public static EventDatabase getInstance(Context context) {
-        if (instance == null) {
-            synchronized (EventDatabase.class) {
-                if (instance == null) {
-                    instance = new EventDatabase(context.getApplicationContext());
+    if (instance == null) {
+        synchronized (EventDatabase.class) {
+            if (instance == null) {
+                if (context == null) {
+                    throw new IllegalStateException("EventDatabase.getInstance() requires a non-null Context");
                 }
+                instance = new EventDatabase(context.getApplicationContext());
             }
         }
-        return instance;
     }
+    return instance;
+}
 
     private EventDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
