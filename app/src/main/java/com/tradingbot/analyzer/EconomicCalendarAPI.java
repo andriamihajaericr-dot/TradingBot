@@ -326,6 +326,7 @@ interface FetchFunction {
             list.add(e);
         }
         return list;
+    }
     private static boolean isMediumHighImpact(String eventName) {
     if (eventName == null || eventName.isEmpty()) return false;
     String ind = eventName.toLowerCase(Locale.US);
