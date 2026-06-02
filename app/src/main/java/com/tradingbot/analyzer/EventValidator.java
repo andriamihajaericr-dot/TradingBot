@@ -109,7 +109,7 @@ if (!detectedType.startsWith("GEO") && db != null) {
             result.assetsEnriched = !detectedAssets.isEmpty();
             // Récupérer le dernier événement de ce type pour le rappel
             result.lastEventSummary = db.getLastEventByType(detectedType);
-            logToMain("[⏳ Driver " + detectedType + " déjà actif — envoi d'un rappel");
+            logToMain("⏳ Driver " + detectedType + " déjà actif — envoi d'un rappel");
             return result;
         }
     } catch (Exception e) {
@@ -501,12 +501,12 @@ private static boolean matchesIndicatorKeywords(String text, String indicator, S
     
     private static void logToMain(String message) {
     // Toujours dans Logcat
-    Log.d(TAG, "[VALIDATOR] " + message);
+    Log.d(TAG, "" + message);
     
     // Également dans l'interface si l'activité existe
     if (MainActivity.instance != null) {
         try {
-            MainActivity.instance.addLog("[VALIDATOR] " + message);
+            MainActivity.instance.addLog("" + message);
         } catch (Exception e) {
             Log.w(TAG, "Impossible d'ajouter le log à l'UI", e);
         }
@@ -553,7 +553,7 @@ private static boolean matchesIndicatorKeywords(String text, String indicator, S
                 upcomingEvents.put(key, event);
             }
         } catch (Exception e) {
-            logToMain("[VALIDATOR] ⚠️ Échec préchargement calendrier : " + e.getMessage());
+            logToMain("⚠️ Échec préchargement calendrier : " + e.getMessage());
         }
     }
 
