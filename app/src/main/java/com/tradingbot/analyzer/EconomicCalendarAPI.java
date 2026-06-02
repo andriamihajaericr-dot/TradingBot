@@ -321,38 +321,41 @@ interface FetchFunction {
             list.add(e);
         }
         return list;
-    }
-
     private static boolean isMediumHighImpact(String eventName) {
-        if (eventName == null || eventName.isEmpty()) return false;
-        String ind = eventName.toLowerCase(Locale.US);
-        return ind.contains("initial jobless claims")      ||
-               ind.contains("continuing claims")           ||
-               ind.contains("adp employment")              ||
-               ind.contains("jolts")                       ||
-               ind.contains("job openings")                ||
-               ind.contains("ppi")                         ||
-               ind.contains("producer price")              ||
-               ind.contains("gdp")                         ||
-               ind.contains("gross domestic product")      ||
-               ind.contains("industrial production")       ||
-               ind.contains("durable goods")               ||
-               ind.contains("chicago pmi")                 ||
-               ind.contains("philly fed")                  ||
-               ind.contains("empire state")                ||
-               ind.contains("michigan")                    ||
-               ind.contains("consumer confidence")         ||
-               ind.contains("consumer sentiment")          ||
-               ind.contains("retail sales")                ||
-               ind.contains("building permits")            ||
-               ind.contains("eia")                         ||
-               ind.contains("crude oil inventories")       ||
-               ind.contains("opec")                        ||
-               ind.contains("minutes")                     ||
-               ind.contains("powell")                      ||
-               ind.contains("warsh")                       ||
-               ind.contains("beige book");
-    }
+    if (eventName == null || eventName.isEmpty()) return false;
+    String ind = eventName.toLowerCase(Locale.US);
+    return ind.contains("initial jobless claims")      ||
+           ind.contains("continuing claims")           ||
+           ind.contains("adp employment")              ||
+           ind.contains("jolts")                       ||
+           ind.contains("job openings")                ||
+           ind.contains("ppi")                         ||
+           ind.contains("producer price")              ||
+           ind.contains("gdp")                         ||
+           ind.contains("gross domestic product")      ||
+           ind.contains("industrial production")       ||
+           ind.contains("durable goods")               ||
+           ind.contains("chicago pmi")                 ||
+           ind.contains("philly fed")                  ||
+           ind.contains("empire state")                ||
+           ind.contains("michigan")                    ||
+           ind.contains("consumer confidence")         ||
+           ind.contains("consumer sentiment")          ||
+           ind.contains("retail sales")                ||
+           ind.contains("building permits")            ||  // ajouté
+           ind.contains("housing starts")              ||  // ajouté
+           ind.contains("eia")                         ||
+           ind.contains("crude oil inventories")       ||
+           ind.contains("opec")                        ||
+           ind.contains("minutes")                     ||
+           ind.contains("powell")                      ||
+           ind.contains("warsh")                       ||
+           ind.contains("beige book")                  ||
+           ind.contains("trade balance")               ||  // ajouté
+           ind.contains("current account")             ||  // ajouté
+           ind.contains("personal spending")           ||  // ajouté
+           ind.contains("personal income");                // ajouté
+}
 
     private static String convertFMPDateToUnixSeconds(String dateStr) {
         if (dateStr == null || dateStr.isEmpty())
