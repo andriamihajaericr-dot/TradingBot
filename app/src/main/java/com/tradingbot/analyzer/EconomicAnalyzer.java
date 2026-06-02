@@ -255,18 +255,48 @@ public class EconomicAnalyzer {
     /**
      * Module d'extraction Regex : Isole les nombres rattachés aux étiquettes Actual et Forecast
      */
-    private static ParsedValues extraireChiffres(String texte) {
-        ParsedValues values = new ParsedValues();
-        if (texte == null) return values;
-
-        // Supprime les virgules de formatage des milliers pour éviter les erreurs de parsing (ex: 250,000 -> 250000)
-        String texteNettoye = texte.replace(",", "");
-
-        values.actual = chercherRegex(texteNettoye, "ACTUAL:\\s*([0-9.-]+)");
-        values.forecast = chercherRegex(texteNettoye, "FORECAST:\\s*([0-9.-]+)");
-
-        return values;
+private static ParsedValues extraireChiffres(String texte) {
+    ParsedValues values = new ParsedValues();
+    if (texte == null) return values;
+    
+    // Remplacer les virgules décimales par des points (ex: 2,5% -> 2.5)
+    String texteNettoye = texte.replace(',', '.');
+    // Supprimer les espaces insécables et autres caractères parasites
+    texteNettoye = texteNettoye.replaceAll("[^\\d.\\-\\s%]", " ");
+    
+    // Patterns élargis
+    String[] actualPatterns = {
+        "ACTUAL:\\s*([0-9.\\-]+)",
+        "ACTUAL\\s*[=:]\\s*([0-9.\\-]+)",
+        "ACT\\s*[=:]\\s*([0-9.\\-]+)",
+        "REAL\\s*[=:]\\s*([0-9.\\-]+)",
+        "ACTUAL\\s+VALUE\\s*[=:]\\s*([0-9.\\-]+)"
+    };
+    String[] forecastPatterns = {
+        "FORECAST:\\s*([0-9.\\-]+)",
+        "FORECAST\\s*[=:]\\s*([0-9.\\-]+)",
+        "EXP\\s*[=:]\\s*([0-9.\\-]+)",
+        "EST\\s*[=:]\\s*([0-9.\\-]+)",
+        "EXPECTED\\s*[=:]\\s*([0-9.\\-]+)",
+        "CONSENSUS\\s*[=:]\\s*([0-9.\\-]+)"
+    };
+    
+    for (String pattern : actualPatterns) {
+        double val = chercherRegex(texteNettoye, pattern);
+        if (!Double.isNaN(val)) {
+            values.actual = val;
+            break;
+        }
     }
+    for (String pattern : forecastPatterns) {
+        double val = chercherRegex(texteNettoye, pattern);
+        if (!Double.isNaN(val)) {
+            values.forecast = val;
+            break;
+        }
+    }
+    return values;
+}
 
     private static double chercherRegex(String texte, String expression) {
         try {
