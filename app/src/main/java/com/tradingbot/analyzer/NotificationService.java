@@ -1063,7 +1063,6 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                     lastSpeechTime = currentTime;
                     lastSpeaker = speakerToken;
                 }
-
                 // 5️⃣ Matrice de ciblage et d'allocation des Actifs Financiers (Thread-safe via liste locale)
                 List<String> enrichedAssets = new ArrayList<>();
                 if (upperFeed.contains("EUR") || upperFeed.contains("ECB") || upperFeed.contains("LAGARDE")) enrichedAssets.add("EURUSD");
