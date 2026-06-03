@@ -474,7 +474,35 @@ private static boolean matchesIndicatorKeywords(String text, String indicator, S
 
         return Math.min(100, score);
     }
-
+    /**
+ * Enrichit le contenu d'une notification avec les données du calendrier économique
+ * si un événement correspondant est trouvé.
+ * @param title Titre de la notification
+ * @param content Contenu original
+ * @param timestamp Timestamp de la notification (millisecondes)
+ * @return Contenu enrichi (ou l'original si aucun match ou pas de données)
+ */
+public static String enrichWithCalendar(String title, String content, long timestamp) {
+    if (title == null || content == null) return content;
+    CalendarEvent match = findMatchingEvent(title, content, timestamp);
+    if (match == null) return content;
+    
+    StringBuilder enriched = new StringBuilder(content);
+    boolean hasActual = match.actual != null && !match.actual.equals("N/A") && !match.actual.isEmpty();
+    boolean hasForecast = match.forecast != null && !match.forecast.equals("N/A") && !match.forecast.isEmpty();
+    
+    if (hasActual && hasForecast) {
+        enriched.append(" ACTUAL: ").append(match.actual).append(" FORECAST: ").append(match.forecast);
+        Log.d(TAG, "Enrichi " + match.indicator + " | A=" + match.actual + " F=" + match.forecast);
+    } else if (hasForecast) {
+        enriched.append(" FORECAST: ").append(match.forecast);
+        Log.d(TAG, "Consensus seulement pour " + match.indicator + " | F=" + match.forecast);
+    } else if (hasActual) {
+        enriched.append(" ACTUAL: ").append(match.actual);
+        Log.d(TAG, "Actual seulement pour " + match.indicator + " | A=" + match.actual);
+    }
+    return enriched.toString();
+}
     // ─────────────────────────────────────────────────────────────
     //  UTILITAIRES SÉCURISÉS (inchangés)
     // ─────────────────────────────────────────────────────────────
