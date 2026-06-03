@@ -407,30 +407,37 @@ if (!detectedType.startsWith("GEO") && db != null) {
         return geo;
     }
 
-    // ─────────────────────────────────────────────────────────────
-    //  CALENDRIER ÉCONOMIQUE (inchangé)
-private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(String title, String content, long timestamp) {
+private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(
+        String title, String content, long timestamp) {
+
     String combined = (title + " " + content).toLowerCase(Locale.ROOT);
-    // Normalisation : supprime les caractères non alphanumériques, réduit les espaces
-    String normalizedCombined = combined.replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+    String normalizedCombined = combined
+            .replaceAll("[^a-z0-9\\s]", " ")
+            .replaceAll("\\s+", " ").trim();
+
+    long window = 30 * 60 * 1000; // ±30 minutes (au lieu de ±10)
+
+    EconomicCalendarAPI.CalendarEvent bestMatch = null;
+   long bestDelta = Long.MAX_VALUE;
+
+for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
+    if (event == null || event.timestamp == null || event.indicator == null) continue;
     
-    long window = 30 * 60 * 1000; // ±10 minutes
-    for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
-        if (event == null || event.timestamp == null || event.indicator == null) continue;
-        // Ajouter une normalisation explicite
-        long eventTime = parseTimestamp(event.timestamp);
-        long normalizedTimestamp = (timestamp > 9999999999L) ? timestamp : timestamp * 1000;
-        if (Math.abs(eventTime - normalizedTimestamp) < window) {
-            String indicator = event.indicator.toLowerCase(Locale.ROOT);
-            String normalizedIndicator = indicator.replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+    long eventTime = parseTimestamp(event.timestamp);
+    long normalizedTimestamp = (timestamp > 9999999999L) ? timestamp : timestamp * 1000;
+    long delta = Math.abs(eventTime - normalizedTimestamp);
+    
+    if  (normalizedCombined.contains(normalizedIndicator) ||
+            matchesIndicatorKeywords(normalizedCombined, indicator, event.country)) {
             
-            if (normalizedCombined.contains(normalizedIndicator) || 
-                matchesIndicatorKeywords(normalizedCombined, indicator, event.country)) {
-                return event;
+            if (delta < bestDelta) {  // ← garder le plus proche
+                bestDelta = delta;
+                bestMatch = event;
             }
         }
     }
-    return null;
+}
+return bestMatch;
 }
 
 private static boolean matchesIndicatorKeywords(String text, String indicator, String country) {
