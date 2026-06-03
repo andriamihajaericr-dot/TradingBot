@@ -436,28 +436,105 @@ private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(String title,
 private static boolean matchesIndicatorKeywords(String text, String indicator, String country) {
     if (text == null || indicator == null) return false;
     String ind = indicator.toLowerCase(Locale.ROOT);
-    // Table de synonymes
-    if (ind.contains("nfp") || ind.contains("non-farm")) {
-        return text.contains("nfp") || text.contains("non-farm") || text.contains("payroll") || text.contains("emploi");
+
+    // NFP / Emploi
+    if (ind.contains("nfp") || ind.contains("non-farm") || ind.contains("non farm")) {
+        return text.contains("nfp") || text.contains("non-farm") || 
+               text.contains("nonfarm") || text.contains("payroll") || 
+               text.contains("emploi");
     }
-    if (ind.contains("cpi") || ind.contains("inflation")) {
-        return text.contains("cpi") || text.contains("inflation") || text.contains("pce") || text.contains("prix à la consommation");
+    // CPI / Inflation
+    if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("hicp")) {
+        return text.contains("cpi") || text.contains("inflation") || 
+               text.contains("prix à la consommation");
     }
-    if (ind.contains("gdp") || ind.contains("growth")) {
-        return text.contains("gdp") || text.contains("pib") || text.contains("gross domestic") || text.contains("croissance");
+    // PCE / Core PCE
+    if (ind.contains("pce")) {
+        return text.contains("pce") || text.contains("personal consumption") || 
+               text.contains("core pce") || text.contains("deflator");
     }
+    // PPI
+    if (ind.contains("ppi") || ind.contains("producer price")) {
+        return text.contains("ppi") || text.contains("producer price") || 
+               text.contains("prix à la production");
+    }
+    // GDP
+    if (ind.contains("gdp") || ind.contains("gross domestic")) {
+        return text.contains("gdp") || text.contains("pib") || 
+               text.contains("gross domestic") || text.contains("croissance");
+    }
+    // Fed / FOMC
     if (ind.contains("fed") || ind.contains("fomc") || ind.contains("rate")) {
-        return text.contains("fed") || text.contains("rate") || text.contains("fomc") || text.contains("powell") || text.contains("taux");
+        return text.contains("fed") || text.contains("rate") || 
+               text.contains("fomc") || text.contains("powell") || 
+               text.contains("taux") || text.contains("interest rate");
     }
+    // PMI / ISM
     if (ind.contains("ism") || ind.contains("pmi")) {
-        return text.contains("ism") || text.contains("pmi") || text.contains("manufacturing") || text.contains("industrie");
+        return text.contains("ism") || text.contains("pmi") || 
+               text.contains("manufacturing") || text.contains("services") ||
+               text.contains("industrie");
     }
+    // ADP
+    if (ind.contains("adp")) {
+        return text.contains("adp") || text.contains("private payroll") || 
+               text.contains("private employment");
+    }
+    // JOLTS
+    if (ind.contains("jolts") || ind.contains("job openings")) {
+        return text.contains("jolts") || text.contains("job openings") || 
+               text.contains("offres d emploi");
+    }
+    // Jobless Claims
+    if (ind.contains("jobless") || ind.contains("claims") || ind.contains("initial claims")) {
+        return text.contains("jobless") || text.contains("claims") || 
+               text.contains("initial claims") || text.contains("chômage");
+    }
+    // Retail Sales
     if (ind.contains("retail")) {
-        return text.contains("retail") || text.contains("ventes au détail") || text.contains("consumer spending");
+        return text.contains("retail") || text.contains("ventes au détail") || 
+               text.contains("consumer spending");
     }
-    if (ind.contains("jobless") || ind.contains("claims")) {
-        return text.contains("jobless") || text.contains("claims") || text.contains("chômage");
+    // Michigan / Consumer Sentiment
+    if (ind.contains("michigan") || ind.contains("consumer sentiment") || 
+        ind.contains("consumer confidence")) {
+        return text.contains("michigan") || text.contains("sentiment") || 
+               text.contains("confidence") || text.contains("confiance");
     }
+    // Durable Goods
+    if (ind.contains("durable goods")) {
+        return text.contains("durable") || text.contains("durable goods") || 
+               text.contains("biens durables");
+    }
+    // Housing / Building Permits
+    if (ind.contains("housing") || ind.contains("building permits") || 
+        ind.contains("home sales")) {
+        return text.contains("housing") || text.contains("building permits") || 
+               text.contains("home sales") || text.contains("immobilier");
+    }
+    // Trade Balance
+    if (ind.contains("trade balance") || ind.contains("current account")) {
+        return text.contains("trade balance") || text.contains("trade deficit") || 
+               text.contains("balance commerciale");
+    }
+    // Banques centrales étrangères
+    if (ind.contains("ecb") || ind.contains("lagarde")) {
+        return text.contains("ecb") || text.contains("lagarde") || 
+               text.contains("bce") || text.contains("eurozone rate");
+    }
+    if (ind.contains("boe") || ind.contains("bailey")) {
+        return text.contains("boe") || text.contains("bailey") || 
+               text.contains("bank of england");
+    }
+    if (ind.contains("boj") || ind.contains("ueda")) {
+        return text.contains("boj") || text.contains("ueda") || 
+               text.contains("bank of japan");
+    }
+    if (ind.contains("boc") || ind.contains("macklem")) {
+        return text.contains("boc") || text.contains("macklem") || 
+               text.contains("bank of canada");
+    }
+
     return false;
 }
 
