@@ -484,7 +484,9 @@ private static boolean matchesIndicatorKeywords(String text, String indicator, S
  */
 public static String enrichWithCalendar(String title, String content, long timestamp) {
     if (title == null || content == null) return content;
-    CalendarEvent match = findMatchingEvent(title, content, timestamp);
+    
+    // Corrigé
+    EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp);
     if (match == null) return content;
     
     StringBuilder enriched = new StringBuilder(content);
