@@ -1734,46 +1734,49 @@ Log.d(TAG, "Impact final qualifié : " + initialImpact);
                       // Ignorer les NEUTRE pour Telegram
                   }
               }
+                // ====================== ENVOI TELEGRAM ======================
+if (activeSignalsCount > 0) {
+    // Extraction précise du pourcentage de conviction depuis aiResult
+    int convictionPercent = extrairePourcentageConviction(aiResult);
+    boolean isSupremeRank = estEvenementSuprême(feed); // feed = le texte brut de l'événement
 
-              // ====================== ENVOI TELEGRAM ======================
-              if (activeSignalsCount > 0) {
-                  if (aiResult.contains("CONVICTION") && 
-                      (aiResult.contains("⚪⚪⚪⚪⚪") || aiResult.contains("20%") || aiResult.contains("30%"))) {
-                      eventDb.markEventAsSynced(fingerprint, "LOW_CONVICTION");
-                      return true;
-                  }
+    // Seuil : conviction >= 40% OU événement de Rang Suprême (Fed, CPI, NFP, etc.)
+    if (convictionPercent >= 40 || isSupremeRank) {
+        String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUES Pipeline*\n"
+                + "🕒 " + timeString + " (Mada)\n"
+                + "📡 Source : " + source + "\n"
+                + filteredMessage.toString().trim();
 
-                  String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n"
-                          + "🕒 " + timeString + " (Mada)\n"
-                          + "📡 Source : " + source + "\n"
-                          + filteredMessage.toString().trim();
+        if (finalPayload.length() < 200) {
+            eventDb.markEventAsSynced(fingerprint, "TOO_SHORT");
+            return true;
+        }
 
-                  if (finalPayload.length() < 200) {
-                      eventDb.markEventAsSynced(fingerprint, "TOO_SHORT");
-                      return true;
-                  }
-
-                  Log.d(TAG, "📤 Envoi Telegram pour fingerprint=" + fingerprint + ", signaux impactants=" + activeSignalsCount);
-                  
-                  if (MainActivity.instance != null) {
-                  MainActivity.instance.addLog(source + ": Envoi Telegram " + fingerprint);
-                  }
-                  sendTelegramSecure(finalPayload, this);
-                  
-                  lastAnalysisTime = System.currentTimeMillis();
-                  if (isGeoEvent) {
-                      lastGeoTime = System.currentTimeMillis();
-                  }
-                  
-                  eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
-                  return true;
-
-              } else {
-                  // Aucun signal fort → on marque comme filtré
-                  eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
-                  Log.d(TAG, "Tous les actifs neutres → pas d'envoi Telegram");
-                  return true;
-              }
+        Log.d(TAG, "📤 Envoi Telegram pour fingerprint=" + fingerprint + ", signaux impactants=" + activeSignalsCount);
+        
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog(source + ": Envoi Telegram " + fingerprint);
+        }
+        sendTelegramSecure(finalPayload, this);
+        
+        lastAnalysisTime = System.currentTimeMillis();
+        if (isGeoEvent) {
+            lastGeoTime = System.currentTimeMillis();
+        }
+        
+        eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
+        return true;
+    } else {
+        Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
+        eventDb.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
+        return true;
+    }
+} else {
+    // Aucun signal fort → on marque comme filtré
+    eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+    Log.d(TAG, "Tous les actifs neutres → pas d'envoi Telegram");
+    return true;
+}
 
                 } else {
                     throw new Exception("API Error: " + conn.getResponseCode());
