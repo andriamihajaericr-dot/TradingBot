@@ -482,6 +482,16 @@ private static final String DAILY_SYSTEM_PROMPT =
     // Volatile pour la cohérence multi-thread (Point 7)
     private volatile long lastSpeechTime = 0;
     private volatile String lastSpeaker = "";
+    private int extrairePourcentageConviction(String aiReport) {
+    Pattern p = Pattern.compile("CONVICTION\\s*:\\s*.*?(\\d{1,3})%");
+    Matcher m = p.matcher(aiReport);
+    if (m.find()) {
+        try {
+            return Integer.parseInt(m.group(1));
+        } catch (NumberFormatException e) { return 0; }
+    }
+    return 0;
+        }
 
     private void processAnalysisWithAI(final String sourceName, final String title, final String body, final List<String> enrichedAssets, final String fingerprint) {
     // 1. Intégration de votre SYSTEM_PROMPT (Le moule et les contraintes strictes)
@@ -861,21 +871,26 @@ private static final String DAILY_SYSTEM_PROMPT =
 
                     // ✅ CORRECTION 6 : Utilisation homogène de la variable SQLite locale 'db' pour acter la synchronisation
                     if (activeSignalsCount > 0) {
-                        String finalPayload = "⚡ *ANALYSE DRIVER MACRO EXPLICATIVE*\n" + filteredMessage.toString().trim();
-                        
-                    if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog(sourceName + ": Envoi Telegram " + fingerprint);
-                    }
-                        sendTelegramSecure(finalPayload, NotificationService.this);
-                        db.markEventAsSynced(fingerprint, "PROCESSED_OK");
-                    } else {
-                        db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
-                    }
-                } else {
-                    // ✅ CORRECTION 7 : Traitement des erreurs réseau réelles avec le code HTTP correspondant
-                    Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
-                    db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
-                }
+    // Extraction du pourcentage de conviction depuis la réponse IA
+    int convictionPercent = extrairePourcentageConviction(aiResult);
+    boolean isSupremeRank = estEvenementSuprême(feed); // feed = contenu brut de la notification
+
+    // Seuil : convition >= 40% OU événement de Rang Suprême (Fed, CPI, NFP, etc.)
+    if (convictionPercent >= 40 || isSupremeRank) {
+        String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
+
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog(sourceName + ": Envoi Telegram " + fingerprint);
+        }
+        sendTelegramSecure(finalPayload, NotificationService.this);
+        db.markEventAsSynced(fingerprint, "PROCESSED_OK");
+    } else {
+        Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
+        db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
+    }
+} else {
+    db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+}
             } catch (Exception e) {
                 Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
                 if (db != null) {
