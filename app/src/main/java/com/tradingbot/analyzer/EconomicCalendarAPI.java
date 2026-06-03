@@ -288,7 +288,7 @@ interface FetchFunction {
             assets.addAll(Arrays.asList("USDCAD", "USOIL"));
         } else if (cty.contains("australia")) {
             assets.add("AUDUSD");
-        } else if (cty.contains("eurozone") || cty.contains("ecb")) {
+        } else if (cty.contains("eurozone") || cty.contains("ecb") || ind.contains("ecb") || ind.contains("lagarde")) {
             assets.add("EURUSD");
         }
         else if (ind.contains("building permits") || ind.contains("housing starts") || ind.contains("home sales")) {
