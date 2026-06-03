@@ -1254,7 +1254,7 @@ scheduler.scheduleAtFixedRate(new Runnable() {
 
 
 private void processIncomingMacroFeed(String source, String title, String text, String feed, 
-                                      String pkg, long postTime, String fingerprint, String promptAI) {
+                                      String pkg, long postTime, String fingerprint, String promptAI, boolean isSupremeRank) {
     // 1. Nettoyage automatique des empreintes obsolètes au début de chaque cycle
     EventValidator.cleanupOldFingerprints();
 
