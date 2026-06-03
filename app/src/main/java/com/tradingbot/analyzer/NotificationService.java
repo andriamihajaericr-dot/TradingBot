@@ -451,7 +451,19 @@ private static final String DAILY_SYSTEM_PROMPT =
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
-    
+    private boolean estEvenementSuprême(String text) {
+    String upper = text.toUpperCase(Locale.ROOT);
+    return upper.contains("FOMC") || upper.contains("FED ") ||
+           upper.contains("CPI")  || upper.contains("PCE")  ||
+           upper.contains("NFP")  || upper.contains("BCE")  ||
+           upper.contains("ECB")  || upper.contains("BOJ")  ||
+           upper.contains("BOE")  || upper.contains("RBA")  ||
+           upper.contains("BOC")  || upper.contains("PIB")  ||
+           upper.contains("GDP")  || upper.contains("OPEC") ||
+           upper.contains("INFLATION") || upper.contains("INTEREST RATE") ||
+           upper.contains("POWELL") || upper.contains("LAGARDE") ||
+           upper.contains("PMI") || upper.contains("ISM");
+    }
     private Calendar getMadaCalendar() {
       return Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
     }
