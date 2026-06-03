@@ -844,68 +844,64 @@ private static final String DAILY_SYSTEM_PROMPT =
                         db.markEventAsSynced(fingerprint, "FAILED_EMPTY_LLM_REPORT");
                         return;
                     }
-
                     // Filtrage intelligent des signaux d'impacts macroéconomiques
-                    StringBuilder filteredMessage = new StringBuilder();
-                    String[] lines = aiReport.split("\n");
-                    int activeSignalsCount = 0;
-                    boolean inImpactSection = false;
+                    try {
+                        StringBuilder filteredMessage = new StringBuilder();
+                        String[] lines = aiReport.split("\n");
+                        int activeSignalsCount = 0;
+                        boolean inImpactSection = false;
 
-                    for (String line : lines) {
-                        String trimmed = line.trim();
-                        if (trimmed.isEmpty()) continue;
-                        if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") || trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
-                            filteredMessage.append(line).append("\n");
-                            if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
-                            continue;
-                        }
-                        if (inImpactSection && trimmed.startsWith("•")) {
-                            String upperLine = line.toUpperCase(Locale.ROOT);
-                            boolean isSignificant = upperLine.contains("ACHAT CHOC") || upperLine.contains("VENTE CHOC") || upperLine.contains("INCLINATION ACHAT") || upperLine.contains("INCLINATION VENTE");
-                            if (isSignificant) {
+                        for (String line : lines) {
+                            String trimmed = line.trim();
+                            if (trimmed.isEmpty()) continue;
+                            if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") || trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
                                 filteredMessage.append(line).append("\n");
-                                activeSignalsCount++;
+                                if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
+                                continue;
+                            }
+                            if (inImpactSection && trimmed.startsWith("•")) {
+                                String upperLine = line.toUpperCase(Locale.ROOT);
+                                boolean isSignificant = upperLine.contains("ACHAT CHOC") || upperLine.contains("VENTE CHOC") || upperLine.contains("INCLINATION ACHAT") || upperLine.contains("INCLINATION VENTE");
+                                if (isSignificant) {
+                                    filteredMessage.append(line).append("\n");
+                                    activeSignalsCount++;
+                                }
                             }
                         }
-                    }
 
-                    // ✅ CORRECTION 6 : Utilisation homogène de la variable SQLite locale 'db' pour acter la synchronisation
-                    if (activeSignalsCount > 0) {
-    // Extraction du pourcentage de conviction depuis la réponse IA
-    int convictionPercent = extrairePourcentageConviction(aiResult);
-    boolean isSupremeRank = estEvenementSuprême(feed); // feed = contenu brut de la notification
-
-    // Seuil : convition >= 40% OU événement de Rang Suprême (Fed, CPI, NFP, etc.)
-    if (convictionPercent >= 40 || isSupremeRank) {
-        String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
-
-        if (MainActivity.instance != null) {
-            MainActivity.instance.addLog(sourceName + ": Envoi Telegram " + fingerprint);
-        }
-        sendTelegramSecure(finalPayload, NotificationService.this);
-        db.markEventAsSynced(fingerprint, "PROCESSED_OK");
-    } else {
-        Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
-        db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
-    }
-} else {
-    db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
-}
-            } catch (Exception e) {
-                Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
-                if (db != null) {
-                    try {
-                        db.markEventAsSynced(fingerprint, "FAILED_CRITICAL_EXCEPTION");
-                    } catch (Exception ex) {
-                        Log.e(TAG, "Impossible de forcer la mise à jour du verrou SQLite", ex);
+                        // ✅ CORRECTION 6 : Utilisation homogène de la variable SQLite locale 'db' pour acter la synchronisation
+                        if (activeSignalsCount > 0) {
+                            int convictionPercent = extrairePourcentageConviction(aiReport); // utilise aiReport, pas aiResult
+                            boolean isSupremeRank = estEvenementSuprême(body); // ou feed, selon ce que tu as en variable
+                            if (convictionPercent >= 40 || isSupremeRank) {
+                                String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
+                                if (MainActivity.instance != null) {
+                                    MainActivity.instance.addLog(sourceName + ": Envoi Telegram " + fingerprint);
+                                }
+                                sendTelegramSecure(finalPayload, NotificationService.this);
+                                db.markEventAsSynced(fingerprint, "PROCESSED_OK");
+                            } else {
+                                Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
+                                db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
+                            }
+                        } else {
+                            db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
+                        if (db != null) {
+                            try {
+                                db.markEventAsSynced(fingerprint, "FAILED_CRITICAL_EXCEPTION");
+                            } catch (Exception ex) {
+                                Log.e(TAG, "Impossible de forcer la mise à jour du verrou SQLite", ex);
+                            }
+                        }
+                    } finally {
+                        if (conn != null) conn.disconnect();
                     }
                 }
-            } finally {
-                if (conn != null) conn.disconnect();
-            }
+            });
         }
-    });
-}
                
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
