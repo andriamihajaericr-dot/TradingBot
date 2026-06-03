@@ -464,6 +464,7 @@ private static final String DAILY_SYSTEM_PROMPT =
            upper.contains("POWELL") || upper.contains("LAGARDE") ||
            upper.contains("PMI") || upper.contains("ISM");
     }
+
     private Calendar getMadaCalendar() {
       return Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
     }
