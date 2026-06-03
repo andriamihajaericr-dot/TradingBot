@@ -493,7 +493,7 @@ private static final String DAILY_SYSTEM_PROMPT =
     return 0;
         }
 
-    private void processAnalysisWithAI(final String sourceName, final String title, final String body, final List<String> enrichedAssets, final String fingerprint) {
+    private void processAnalysisWithAI(final String sourceName, final String title, final String body, final List<String> enrichedAssets, final String fingerprint, final boolean isSupremeRank) {
     // 1. Intégration de votre SYSTEM_PROMPT (Le moule et les contraintes strictes)
     final String systemPrompt = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
     "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
