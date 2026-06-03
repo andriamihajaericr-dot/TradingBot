@@ -417,8 +417,10 @@ private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(String title,
     long window = 10 * 60 * 1000; // ±10 minutes
     for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
         if (event == null || event.timestamp == null || event.indicator == null) continue;
+        // Ajouter une normalisation explicite
         long eventTime = parseTimestamp(event.timestamp);
-        if (Math.abs(eventTime - timestamp) < window) {
+        long normalizedTimestamp = (timestamp > 9999999999L) ? timestamp : timestamp * 1000;
+        if (Math.abs(eventTime - normalizedTimestamp) < window) {
             String indicator = event.indicator.toLowerCase(Locale.ROOT);
             String normalizedIndicator = indicator.replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
             
