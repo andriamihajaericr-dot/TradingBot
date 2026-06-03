@@ -435,7 +435,7 @@ for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
                 bestMatch = event;
             }
         }
-    }
+    
 }
 return bestMatch;
 }
