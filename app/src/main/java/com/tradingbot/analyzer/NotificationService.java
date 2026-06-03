@@ -1038,6 +1038,7 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                            upperFeed.contains("FRAPPE") || upperFeed.contains("ESCALADE") || upperFeed.contains("CONFLIT") || upperFeed.contains("MILITARY") || 
                            upperFeed.contains("TAIWAN") || upperFeed.contains("UKRAINE") || upperFeed.contains("RUSSIA")) {
                     eventTypeStr = "GEOPOLITICAL";
+                    isSupremeRank = false;
                 }
 
                 // 3️⃣ SYNCHRONISATION MACRO DÉTERMINISTE (Appel immédiat d'EconomicAnalyzer)
