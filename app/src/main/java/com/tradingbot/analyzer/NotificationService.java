@@ -866,7 +866,7 @@ private static final String DAILY_SYSTEM_PROMPT =
                 // ✅ Application du filtre conviction
                 if (activeSignalsCount > 0) {
                     int convictionPercent = extrairePourcentageConviction(aiReport);
-                    boolean isSupremeRank = estEvenementSuprême(body);
+                    //boolean isSupremeRank = estEvenementSuprême(body);
 
                     if (convictionPercent >= 40 || isSupremeRank) {
                         String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
