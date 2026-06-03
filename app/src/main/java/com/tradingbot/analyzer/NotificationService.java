@@ -1054,13 +1054,13 @@ public void onNotificationPosted(StatusBarNotification sbn) {
                     isSupremeRank = false;
                 }
 
-                // 3️⃣ SYNCHRONISATION MACRO DÉTERMINISTE (Appel immédiat d'EconomicAnalyzer)
-                // On lui passe le titre et le corps brut d'origine (contenant les étiquettes ACTUAL/FORECAST intactes)
-                EconomicAnalyzer.EvaluationResult ecoResult = EconomicAnalyzer.analyserEvenement(title, bodyTextRaw);
+                // 3️⃣ SYNCHRONISATION MACRO DÉTERMINISTE avec enrichissement calendaire
+                // Enrichir le contenu avec les données du calendrier (ACTUAL/FORECAST) si disponibles
+                String enrichedBody = EventValidator.enrichWithCalendar(title, bodyTextRaw, postTimeMs);
+                EconomicAnalyzer.EvaluationResult ecoResult = EconomicAnalyzer.analyserEvenement(title, enrichedBody);
                 Log.d(TAG, "Devise détectée : " + ecoResult.currency + ", poids : " + ecoResult.weight);
                 // Le poids n'est plus forcé à 5 ou 3 statiquement, il découle de la surprise de l'écart mathématique (1 à 4)
                 int finalCalculatedWeight = ecoResult.weight;
-
                 // Ajustement du pavillon suprême selon le verdict de l'analyseur mathématique ou de l'urgence géopolitique
                 if (finalCalculatedWeight >= 3 || currentSpeaker.equals("FED") || eventTypeStr.equals("GEOPOLITICAL")) {
                     isSupremeRank = true;
