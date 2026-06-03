@@ -456,34 +456,41 @@ public class EconomicAnalyzer {
     }
 
     private static void traiterEvenementTextuel(String text, EvaluationResult result, String currency) {
-        if (text.contains("FOMC") || text.contains("FED") || text.contains("POWELL")) {
-            result.weight = 4;
-            result.marketImpact = "FOMC_STATEMENT";
-            result.directionText = "🗣️ ALERTE FED – Volatilité extrême imminente.";
-        } else if (text.contains("ECB") || text.contains("LAGARDE")) {
-            result.weight = 3;
-            result.marketImpact = "ECB_STATEMENT";
-            result.directionText = "🇪🇺 DISCOURS BCE – Impact direct sur EURUSD.";
-        } else if (text.contains("BOJ")) {
-            result.weight = 4;
-            result.marketImpact = "BOJ_STATEMENT";
-            result.directionText = "🇯🇵 ALERTE BOJ – Impact direct sur USDJPY.";
-        } else if (text.contains("BOE") || text.contains("BAILEY")) {
-            result.weight = 3;
-            result.marketImpact = "BOE_STATEMENT";
-            result.directionText = "🇬🇧 DISCOURS BOE – Impact sur GBPUSD.";
-        } else if (text.contains("BOC") || text.contains("MACKLEM")) {
-            result.weight = 3;
-            result.marketImpact = "BOC_STATEMENT";
-            result.directionText = "🇨🇦 DISCOURS BOC – Impact sur USDCAD et USOIL.";
-        } else if (text.contains("RBA") || text.contains("BULLOCK")) {
-            result.weight = 3;
-            result.marketImpact = "RBA_STATEMENT";
-            result.directionText = "🇦🇺 DISCOURS RBA – Impact sur AUDUSD.";
-        } else {
-            result.weight = 1;
-            result.marketImpact = "RAW_NEWS";
-        }
+    if (text.contains("FOMC") || text.contains("FED") || text.contains("POWELL")) {
+        result.weight = 4;
+        result.marketImpact = "FOMC_STATEMENT";
+        result.directionText = "🗣️ ALERTE FED – Volatilité extrême imminente.";
+    } else if (text.contains("ECB") || text.contains("LAGARDE")) {
+        result.weight = 3;
+        result.marketImpact = "ECB_STATEMENT";
+        result.directionText = "🇪🇺 DISCOURS BCE – Impact direct sur EURUSD.";
+    } else if (text.contains("BOJ")) {
+        result.weight = 4;
+        result.marketImpact = "BOJ_STATEMENT";
+        result.directionText = "🇯🇵 ALERTE BOJ – Impact direct sur USDJPY.";
+    } else if (text.contains("BOE") || text.contains("BAILEY")) {
+        result.weight = 3;
+        result.marketImpact = "BOE_STATEMENT";
+        result.directionText = "🇬🇧 DISCOURS BOE – Impact sur GBPUSD.";
+    } else if (text.contains("BOC") || text.contains("MACKLEM")) {
+        result.weight = 3;
+        result.marketImpact = "BOC_STATEMENT";
+        result.directionText = "🇨🇦 DISCOURS BOC – Impact sur USDCAD et USOIL.";
+    } else if (text.contains("RBA") || text.contains("BULLOCK")) {
+        result.weight = 3;
+        result.marketImpact = "RBA_STATEMENT";
+        result.directionText = "🇦🇺 DISCOURS RBA – Impact sur AUDUSD.";
+    } 
+    // ✅ AJOUT POUR ADP (et autres rapports d'emploi majeurs)
+    else if (text.contains("ADP") || text.contains("EMPLOYMENT REPORT")) {
+        result.weight = 3;  // ou 4 selon l'importance que vous voulez donner
+        result.marketImpact = "ADP_REPORT";
+        result.directionText = "📊 RAPPORT ADP – Impact modéré à élevé sur USD et indices.";
+    }
+    else {
+        result.weight = 1;
+        result.marketImpact = "RAW_NEWS";
+    }
     }
 
     private static void attribuerPoids(double absEcart, double seuilModere, double seuilViolent, EvaluationResult result) {
