@@ -2001,7 +2001,7 @@ if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
 "                    FORMAT OBLIGATOIRE (STRICT)\n" +
 "═══════════════════════════════════════════════════════════════\n\n" +
 
-"📊 RAPPORT DRIVER PÉRIODIQUE – [Date et heure exacte de Madagascar, ex: 28/05 18:50]\n\n" +
+"📊 RAPPORT DRIVER DAILY REPORT – [Date et heure exacte de Madagascar, ex: 28/05 18:50]\n\n" +
 
 "🚨 DRIVERS PRINCIPAUX (classés par importance macroéconomique, maximum 5) :\n\n" +
 "- [Nom du Driver] : [Description courte de l'impact, une phrase]. Probabilité d'impact : XX% | Conviction : [jauge selon paliers ci-dessous]\n\n" +
