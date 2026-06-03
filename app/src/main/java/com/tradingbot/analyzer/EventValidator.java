@@ -568,19 +568,19 @@ private static boolean matchesIndicatorKeywords(String text, String indicator, S
  * @param timestamp Timestamp de la notification (millisecondes)
  * @return Contenu enrichi (ou l'original si aucun match ou pas de données)
  */
-public static String enrichWithCalendar(String title, String content, long timestamp) {
+ public static String enrichWithCalendar(String title, String content, long timestamp) {
     if (title == null || content == null) return content;
     
-    // Corrigé
-    EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp);
+    EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp); // ← corrigé
     if (match == null) return content;
     
     StringBuilder enriched = new StringBuilder(content);
-    boolean hasActual = match.actual != null && !match.actual.equals("N/A") && !match.actual.isEmpty();
+    boolean hasActual   = match.actual   != null && !match.actual.equals("N/A")   && !match.actual.isEmpty();
     boolean hasForecast = match.forecast != null && !match.forecast.equals("N/A") && !match.forecast.isEmpty();
     
     if (hasActual && hasForecast) {
-        enriched.append(" ACTUAL: ").append(match.actual).append(" FORECAST: ").append(match.forecast);
+        enriched.append(" ACTUAL: ").append(match.actual)
+                .append(" FORECAST: ").append(match.forecast);
         Log.d(TAG, "Enrichi " + match.indicator + " | A=" + match.actual + " F=" + match.forecast);
     } else if (hasForecast) {
         enriched.append(" FORECAST: ").append(match.forecast);
