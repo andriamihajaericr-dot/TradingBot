@@ -414,7 +414,7 @@ private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(String title,
     // Normalisation : supprime les caractères non alphanumériques, réduit les espaces
     String normalizedCombined = combined.replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
     
-    long window = 10 * 60 * 1000; // ±10 minutes
+    long window = 30 * 60 * 1000; // ±10 minutes
     for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
         if (event == null || event.timestamp == null || event.indicator == null) continue;
         // Ajouter une normalisation explicite
