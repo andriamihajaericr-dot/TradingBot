@@ -39,35 +39,35 @@ public class EconomicCalendarAPI {
         }
     }
     private static final int MAX_RETRIES = 3;
-private static final long INITIAL_BACKOFF_MS = 1000;
+    private static final long INITIAL_BACKOFF_MS = 1000;
 
-private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hoursAhead) {
-    long backoff = INITIAL_BACKOFF_MS;
-    for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            List<CalendarEvent> events = fetcher.fetch(hoursAhead);
-            if (events != null && !events.isEmpty()) {
-                return events;
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Tentative " + attempt + " échouée : " + e.getMessage());
-        }
-        if (attempt < MAX_RETRIES) {
+    private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hoursAhead) {
+        long backoff = INITIAL_BACKOFF_MS;
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
-                Thread.sleep(backoff);
-                backoff *= 2;
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                break;
+                List<CalendarEvent> events = fetcher.fetch(hoursAhead);
+                if (events != null && !events.isEmpty()) {
+                    return events;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Tentative " + attempt + " échouée : " + e.getMessage());
+            }
+            if (attempt < MAX_RETRIES) {
+                try {
+                    Thread.sleep(backoff);
+                    backoff *= 2;
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
+        return new ArrayList<>();
     }
-    return new ArrayList<>();
-}
 
-interface FetchFunction {
-    List<CalendarEvent> fetch(int hoursAhead) throws Exception;
-}
+    interface FetchFunction {
+        List<CalendarEvent> fetch(int hoursAhead) throws Exception;
+    }
     /**
      * Surcharge essentielle pour préserver la compatibilité ascendante avec EventValidator.preloadCalendar()
      */
@@ -79,19 +79,19 @@ interface FetchFunction {
      * Point d'entrée principal (Pipeline de données à 3 niveaux)
      */
     public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
-    Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
-    if (targetContext != null) {
-        List<CalendarEvent> events = fetchWithRetry(h -> fetchFromFMP(targetContext, h), hoursAhead);
+        Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
+        if (targetContext != null) {
+            List<CalendarEvent> events = fetchWithRetry(h -> fetchFromFMP(targetContext, h), hoursAhead);
+            if (!events.isEmpty()) {
+                return events;
+            }
+        }
+        List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactory(h), hoursAhead);
         if (!events.isEmpty()) {
             return events;
         }
+        return generateInstitutionalExhaustiveFallback();
     }
-    List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactory(h), hoursAhead);
-    if (!events.isEmpty()) {
-        return events;
-    }
-    return generateInstitutionalExhaustiveFallback();
-}
 
     private static List<CalendarEvent> fetchFromFMP(Context context, int hoursAhead) {
         List<CalendarEvent> events = new ArrayList<>();
@@ -237,200 +237,200 @@ interface FetchFunction {
     }
     
     public static List<String> mapIndicatorToAssetsIntermarket(String indicator, String country) {
-    List<String> assets = new ArrayList<>();
-    String ind = indicator.toLowerCase(Locale.US);
-    String cty = country.toLowerCase(Locale.US);
-
-    assets.add("US10Y"); // Pivot obligatoire d'analyse macro intermarché
-
-    if (cty.contains("united states") || cty.equals("us") || cty.startsWith("us ")) {
-
-        if (ind.contains("fomc") || ind.contains("federal reserve") ||
-            ind.contains("interest rate") || ind.contains("rate decision") ||
-            ind.contains("powell") || ind.contains("warsh") ||
-            ind.contains("beige book") || ind.contains("minutes")) {
-            assets.addAll(Arrays.asList(
-                "GOLD", "SP500", "NASDAQ", "BITCOIN",
-                "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"
-            ));
-        } else if (ind.contains("cpi") || ind.contains("inflation") ||
-                   ind.contains("consumer price")) {
-            assets.addAll(Arrays.asList(
-                "GOLD", "SP500", "NASDAQ", "BITCOIN",
-                "USDJPY", "EURUSD", "GBPUSD", "USDCAD"
-            ));
-        } else if (ind.contains("pce") || ind.contains("personal consumption expenditure")) {
-            assets.addAll(Arrays.asList(
-                "GOLD", "SP500", "NASDAQ", "BITCOIN",
-                "USDJPY", "EURUSD", "GBPUSD"
-            ));
-        } else if (ind.contains("ppi") || ind.contains("producer price")) {
-            assets.addAll(Arrays.asList(
-                "GOLD", "USDJPY", "EURUSD", "SP500"
-            ));
-        } else if (ind.contains("non-farm") || ind.contains("nfp") ||
-                   ind.contains("payroll")) {
-            assets.addAll(Arrays.asList(
-                "GOLD", "SP500", "NASDAQ", "BITCOIN",
-                "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"
-            ));
-        } else if (ind.contains("adp")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
-            ));
-        } else if (ind.contains("jolts") || ind.contains("job openings")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
-            ));
-        } else if (ind.contains("jobless") || ind.contains("initial claims") ||
-                   ind.contains("continuing claims")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
-            ));
-        } else if (ind.contains("gdp") || ind.contains("gross domestic")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY", "GOLD", "USOIL"
-            ));
-        } else if (ind.contains("ism") || ind.contains("pmi") ||
-                   ind.contains("purchasing managers")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY", "USOIL"
-            ));
-        } else if (ind.contains("chicago pmi") || ind.contains("empire state") ||
-                   ind.contains("philly fed") || ind.contains("philadelphia")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY"
-            ));
-        } else if (ind.contains("retail") || ind.contains("consumer spending")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY", "BITCOIN"
-            ));
-        } else if (ind.contains("personal income") || ind.contains("personal spending")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY", "GOLD"
-            ));
-        } else if (ind.contains("michigan") || ind.contains("consumer sentiment") ||
-                   ind.contains("consumer confidence")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USOIL", "BITCOIN"
-            ));
-        } else if (ind.contains("durable goods") || ind.contains("capital goods")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY"
-            ));
-        } else if (ind.contains("industrial production") || ind.contains("capacity utilization")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USOIL", "USDJPY"
-            ));
-        } else if (ind.contains("housing starts") || ind.contains("building permits")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY"
-            ));
-        } else if (ind.contains("home sales") || ind.contains("existing home") ||
-                   ind.contains("new home") || ind.contains("pending home")) {
-            assets.addAll(Arrays.asList(
-                "SP500", "NASDAQ", "USDJPY"
-            ));
-        } else if (ind.contains("trade balance") || ind.contains("current account")) {
-            assets.addAll(Arrays.asList(
-                "USDJPY", "EURUSD", "GBPUSD", "GOLD"
-            ));
-        } else if (ind.contains("crude oil") || ind.contains("eia") ||
-                   ind.contains("oil inventories") || ind.contains("distillate") ||
-                   ind.contains("gasoline") || ind.contains("petroleum")) {
-            assets.addAll(Arrays.asList(
-                "USOIL", "USDCAD", "GOLD", "SP500"
-            ));
-        } else if (ind.contains("opec")) {
-            assets.addAll(Arrays.asList(
-                "USOIL", "USDCAD", "GOLD", "SP500", "NASDAQ"
-            ));
-        }
-
-    } else if (cty.contains("united kingdom") || cty.contains("uk")) {
-        assets.add("GBPUSD");
-        if (ind.contains("cpi") || ind.contains("inflation")) {
-            assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500"));
-        } else if (ind.contains("boe") || ind.contains("interest rate") ||
-                   ind.contains("monetary policy")) {
-            assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
-        } else if (ind.contains("gdp") || ind.contains("growth")) {
-            assets.addAll(Arrays.asList("EURUSD", "GOLD"));
-        } else if (ind.contains("average earnings") || ind.contains("wage")) {
-            assets.addAll(Arrays.asList("EURUSD", "GOLD"));
-        } else if (ind.contains("claimant count") || ind.contains("unemployment")) {
-            assets.addAll(Arrays.asList("EURUSD"));
-        } else if (ind.contains("pmi") || ind.contains("retail")) {
-            assets.addAll(Arrays.asList("EURUSD", "SP500"));
-        }
-
-    } else if (cty.contains("japan")) {
-        assets.add("USDJPY");
-        if (ind.contains("boj") || ind.contains("interest rate") ||
-            ind.contains("yield curve") || ind.contains("monetary policy")) {
-            assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "EURUSD", "AUDUSD"));
-        } else if (ind.contains("cpi") || ind.contains("inflation")) {
-            assets.addAll(Arrays.asList("GOLD"));
-        } else if (ind.contains("tankan")) {
-            assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
-        } else if (ind.contains("gdp")) {
-            assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
-        }
-
-    } else if (cty.contains("canada")) {
-        assets.addAll(Arrays.asList("USDCAD", "USOIL"));
-        if (ind.contains("boc") || ind.contains("interest rate") ||
-            ind.contains("rate decision")) {
-            assets.addAll(Arrays.asList("GOLD", "SP500", "EURUSD"));
-        } else if (ind.contains("cpi") || ind.contains("inflation")) {
-            assets.addAll(Arrays.asList("GOLD", "EURUSD"));
-        } else if (ind.contains("gdp") || ind.contains("employment")) {
-            assets.addAll(Arrays.asList("GOLD"));
-        }
-
-    } else if (cty.contains("australia")) {
-        assets.add("AUDUSD");
-        if (ind.contains("rba") || ind.contains("interest rate") ||
-            ind.contains("rate decision")) {
-            assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "USDJPY"));
-        } else if (ind.contains("cpi") || ind.contains("inflation")) {
-            assets.addAll(Arrays.asList("GOLD", "USDJPY"));
-        } else if (ind.contains("gdp") || ind.contains("employment")) {
-            assets.addAll(Arrays.asList("GOLD", "USDJPY"));
-        }
-
-    } else if (cty.contains("eurozone") || cty.contains("euro area") ||
-               ind.contains("ecb") || ind.contains("lagarde")) {
-        assets.add("EURUSD");
-        if (ind.contains("ecb") || ind.contains("interest rate") ||
-            ind.contains("rate decision") || ind.contains("lagarde")) {
-            assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
-        } else if (ind.contains("cpi") || ind.contains("inflation") ||
-                   ind.contains("hicp")) {
-            assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500"));
-        } else if (ind.contains("gdp") || ind.contains("growth")) {
-            assets.addAll(Arrays.asList("GBPUSD", "GOLD", "USOIL"));
-        } else if (ind.contains("pmi") || ind.contains("ifo") || ind.contains("zew")) {
-            assets.addAll(Arrays.asList("GBPUSD", "SP500", "USOIL"));
-        } else if (ind.contains("retail") || ind.contains("consumer")) {
-            assets.addAll(Arrays.asList("GBPUSD", "SP500"));
-        } else if (ind.contains("unemployment") || ind.contains("jobless")) {
-            assets.addAll(Arrays.asList("GBPUSD"));
-        }
-
-    } else if (cty.contains("china") || cty.contains("chinese")) {
-        assets.addAll(Arrays.asList("AUDUSD", "USDJPY", "USOIL"));
-        if (ind.contains("caixin") || ind.contains("pmi")) {
-            assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD"));
-        } else if (ind.contains("gdp") || ind.contains("growth")) {
-            assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD", "USOIL"));
-        } else if (ind.contains("trade balance") || ind.contains("exports")) {
-            assets.addAll(Arrays.asList("GOLD", "SP500"));
-        }
+        List<String> assets = new ArrayList<>();
+        String ind = indicator.toLowerCase(Locale.US);
+        String cty = country.toLowerCase(Locale.US);
+    
+        assets.add("US10Y"); // Pivot obligatoire d'analyse macro intermarché
+    
+        if (cty.contains("united states") || cty.equals("us") || cty.startsWith("us ")) {
+    
+            if (ind.contains("fomc") || ind.contains("federal reserve") ||
+                ind.contains("interest rate") || ind.contains("rate decision") ||
+                ind.contains("powell") || ind.contains("warsh") ||
+                ind.contains("beige book") || ind.contains("minutes")) {
+                assets.addAll(Arrays.asList(
+                    "GOLD", "SP500", "NASDAQ", "BITCOIN",
+                    "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"
+                ));
+            } else if (ind.contains("cpi") || ind.contains("inflation") ||
+                       ind.contains("consumer price")) {
+                assets.addAll(Arrays.asList(
+                    "GOLD", "SP500", "NASDAQ", "BITCOIN",
+                    "USDJPY", "EURUSD", "GBPUSD", "USDCAD"
+                ));
+            } else if (ind.contains("pce") || ind.contains("personal consumption expenditure")) {
+                assets.addAll(Arrays.asList(
+                    "GOLD", "SP500", "NASDAQ", "BITCOIN",
+                    "USDJPY", "EURUSD", "GBPUSD"
+                ));
+            } else if (ind.contains("ppi") || ind.contains("producer price")) {
+                assets.addAll(Arrays.asList(
+                    "GOLD", "USDJPY", "EURUSD", "SP500"
+                ));
+            } else if (ind.contains("non-farm") || ind.contains("nfp") ||
+                       ind.contains("payroll")) {
+                assets.addAll(Arrays.asList(
+                    "GOLD", "SP500", "NASDAQ", "BITCOIN",
+                    "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"
+                ));
+            } else if (ind.contains("adp")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
+                ));
+            } else if (ind.contains("jolts") || ind.contains("job openings")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
+                ));
+            } else if (ind.contains("jobless") || ind.contains("initial claims") ||
+                       ind.contains("continuing claims")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
+                ));
+            } else if (ind.contains("gdp") || ind.contains("gross domestic")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY", "GOLD", "USOIL"
+                ));
+            } else if (ind.contains("ism") || ind.contains("pmi") ||
+                       ind.contains("purchasing managers")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY", "USOIL"
+                ));
+            } else if (ind.contains("chicago pmi") || ind.contains("empire state") ||
+                       ind.contains("philly fed") || ind.contains("philadelphia")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY"
+                ));
+            } else if (ind.contains("retail") || ind.contains("consumer spending")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY", "BITCOIN"
+                ));
+            } else if (ind.contains("personal income") || ind.contains("personal spending")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY", "GOLD"
+                ));
+            } else if (ind.contains("michigan") || ind.contains("consumer sentiment") ||
+                       ind.contains("consumer confidence")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USOIL", "BITCOIN"
+                ));
+            } else if (ind.contains("durable goods") || ind.contains("capital goods")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY"
+                ));
+            } else if (ind.contains("industrial production") || ind.contains("capacity utilization")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USOIL", "USDJPY"
+                ));
+            } else if (ind.contains("housing starts") || ind.contains("building permits")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY"
+                ));
+            } else if (ind.contains("home sales") || ind.contains("existing home") ||
+                       ind.contains("new home") || ind.contains("pending home")) {
+                assets.addAll(Arrays.asList(
+                    "SP500", "NASDAQ", "USDJPY"
+                ));
+            } else if (ind.contains("trade balance") || ind.contains("current account")) {
+                assets.addAll(Arrays.asList(
+                    "USDJPY", "EURUSD", "GBPUSD", "GOLD"
+                ));
+            } else if (ind.contains("crude oil") || ind.contains("eia") ||
+                       ind.contains("oil inventories") || ind.contains("distillate") ||
+                       ind.contains("gasoline") || ind.contains("petroleum")) {
+                assets.addAll(Arrays.asList(
+                    "USOIL", "USDCAD", "GOLD", "SP500"
+                ));
+            } else if (ind.contains("opec")) {
+                assets.addAll(Arrays.asList(
+                    "USOIL", "USDCAD", "GOLD", "SP500", "NASDAQ"
+                ));
+            }
+    
+            } else if (cty.contains("united kingdom") || cty.contains("uk")) {
+                assets.add("GBPUSD");
+                if (ind.contains("cpi") || ind.contains("inflation")) {
+                    assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500"));
+                } else if (ind.contains("boe") || ind.contains("interest rate") ||
+                           ind.contains("monetary policy")) {
+                    assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
+                } else if (ind.contains("gdp") || ind.contains("growth")) {
+                    assets.addAll(Arrays.asList("EURUSD", "GOLD"));
+                } else if (ind.contains("average earnings") || ind.contains("wage")) {
+                    assets.addAll(Arrays.asList("EURUSD", "GOLD"));
+                } else if (ind.contains("claimant count") || ind.contains("unemployment")) {
+                    assets.addAll(Arrays.asList("EURUSD"));
+                } else if (ind.contains("pmi") || ind.contains("retail")) {
+                    assets.addAll(Arrays.asList("EURUSD", "SP500"));
+                }
+    
+                } else if (cty.contains("japan")) {
+                    assets.add("USDJPY");
+                    if (ind.contains("boj") || ind.contains("interest rate") ||
+                        ind.contains("yield curve") || ind.contains("monetary policy")) {
+                        assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "EURUSD", "AUDUSD"));
+                    } else if (ind.contains("cpi") || ind.contains("inflation")) {
+                        assets.addAll(Arrays.asList("GOLD"));
+                    } else if (ind.contains("tankan")) {
+                        assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
+                    } else if (ind.contains("gdp")) {
+                        assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
+                    }
+    
+            } else if (cty.contains("canada")) {
+                assets.addAll(Arrays.asList("USDCAD", "USOIL"));
+                if (ind.contains("boc") || ind.contains("interest rate") ||
+                    ind.contains("rate decision")) {
+                    assets.addAll(Arrays.asList("GOLD", "SP500", "EURUSD"));
+                } else if (ind.contains("cpi") || ind.contains("inflation")) {
+                    assets.addAll(Arrays.asList("GOLD", "EURUSD"));
+                } else if (ind.contains("gdp") || ind.contains("employment")) {
+                    assets.addAll(Arrays.asList("GOLD"));
+                }
+        
+            } else if (cty.contains("australia")) {
+                assets.add("AUDUSD");
+                if (ind.contains("rba") || ind.contains("interest rate") ||
+                    ind.contains("rate decision")) {
+                    assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "USDJPY"));
+                } else if (ind.contains("cpi") || ind.contains("inflation")) {
+                    assets.addAll(Arrays.asList("GOLD", "USDJPY"));
+                } else if (ind.contains("gdp") || ind.contains("employment")) {
+                    assets.addAll(Arrays.asList("GOLD", "USDJPY"));
+                }
+        
+            } else if (cty.contains("eurozone") || cty.contains("euro area") ||
+                       ind.contains("ecb") || ind.contains("lagarde")) {
+                assets.add("EURUSD");
+                if (ind.contains("ecb") || ind.contains("interest rate") ||
+                    ind.contains("rate decision") || ind.contains("lagarde")) {
+                    assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
+                } else if (ind.contains("cpi") || ind.contains("inflation") ||
+                           ind.contains("hicp")) {
+                    assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500"));
+                } else if (ind.contains("gdp") || ind.contains("growth")) {
+                    assets.addAll(Arrays.asList("GBPUSD", "GOLD", "USOIL"));
+                } else if (ind.contains("pmi") || ind.contains("ifo") || ind.contains("zew")) {
+                    assets.addAll(Arrays.asList("GBPUSD", "SP500", "USOIL"));
+                } else if (ind.contains("retail") || ind.contains("consumer")) {
+                    assets.addAll(Arrays.asList("GBPUSD", "SP500"));
+                } else if (ind.contains("unemployment") || ind.contains("jobless")) {
+                    assets.addAll(Arrays.asList("GBPUSD"));
+                }
+        
+            } else if (cty.contains("china") || cty.contains("chinese")) {
+                assets.addAll(Arrays.asList("AUDUSD", "USDJPY", "USOIL"));
+                if (ind.contains("caixin") || ind.contains("pmi")) {
+                    assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD"));
+                } else if (ind.contains("gdp") || ind.contains("growth")) {
+                    assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD", "USOIL"));
+                } else if (ind.contains("trade balance") || ind.contains("exports")) {
+                    assets.addAll(Arrays.asList("GOLD", "SP500"));
+                }
+            }
+    
+            return new ArrayList<>(new LinkedHashSet<>(assets));
     }
-
-    return new ArrayList<>(new LinkedHashSet<>(assets));
-}
     
     private static List<CalendarEvent> generateInstitutionalExhaustiveFallback() {
         List<CalendarEvent> list = new ArrayList<>();
@@ -460,40 +460,40 @@ interface FetchFunction {
         return list;
     }
     private static boolean isMediumHighImpact(String eventName) {
-    if (eventName == null || eventName.isEmpty()) return false;
-    String ind = eventName.toLowerCase(Locale.US);
-    return ind.contains("initial jobless claims")      ||
-           ind.contains("continuing claims")           ||
-           ind.contains("adp employment")              ||
-           ind.contains("jolts")                       ||
-           ind.contains("job openings")                ||
-           ind.contains("ppi")                         ||
-           ind.contains("producer price")              ||
-           ind.contains("gdp")                         ||
-           ind.contains("gross domestic product")      ||
-           ind.contains("industrial production")       ||
-           ind.contains("durable goods")               ||
-           ind.contains("chicago pmi")                 ||
-           ind.contains("philly fed")                  ||
-           ind.contains("empire state")                ||
-           ind.contains("michigan")                    ||
-           ind.contains("consumer confidence")         ||
-           ind.contains("consumer sentiment")          ||
-           ind.contains("retail sales")                ||
-           ind.contains("building permits")            ||  // ajouté
-           ind.contains("housing starts")              ||  // ajouté
-           ind.contains("eia")                         ||
-           ind.contains("crude oil inventories")       ||
-           ind.contains("opec")                        ||
-           ind.contains("minutes")                     ||
-           ind.contains("powell")                      ||
-           ind.contains("warsh")                       ||
-           ind.contains("beige book")                  ||
-           ind.contains("trade balance")               ||  // ajouté
-           ind.contains("current account")             ||  // ajouté
-           ind.contains("personal spending")           ||  // ajouté
-           ind.contains("personal income");                // ajouté
-}
+        if (eventName == null || eventName.isEmpty()) return false;
+        String ind = eventName.toLowerCase(Locale.US);
+        return ind.contains("initial jobless claims")      ||
+               ind.contains("continuing claims")           ||
+               ind.contains("adp employment")              ||
+               ind.contains("jolts")                       ||
+               ind.contains("job openings")                ||
+               ind.contains("ppi")                         ||
+               ind.contains("producer price")              ||
+               ind.contains("gdp")                         ||
+               ind.contains("gross domestic product")      ||
+               ind.contains("industrial production")       ||
+               ind.contains("durable goods")               ||
+               ind.contains("chicago pmi")                 ||
+               ind.contains("philly fed")                  ||
+               ind.contains("empire state")                ||
+               ind.contains("michigan")                    ||
+               ind.contains("consumer confidence")         ||
+               ind.contains("consumer sentiment")          ||
+               ind.contains("retail sales")                ||
+               ind.contains("building permits")            ||  // ajouté
+               ind.contains("housing starts")              ||  // ajouté
+               ind.contains("eia")                         ||
+               ind.contains("crude oil inventories")       ||
+               ind.contains("opec")                        ||
+               ind.contains("minutes")                     ||
+               ind.contains("powell")                      ||
+               ind.contains("warsh")                       ||
+               ind.contains("beige book")                  ||
+               ind.contains("trade balance")               ||  // ajouté
+               ind.contains("current account")             ||  // ajouté
+               ind.contains("personal spending")           ||  // ajouté
+               ind.contains("personal income");                // ajouté
+    }
 
     private static String convertFMPDateToUnixSeconds(String dateStr) {
         if (dateStr == null || dateStr.isEmpty())
