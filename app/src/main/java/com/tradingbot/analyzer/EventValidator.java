@@ -845,7 +845,7 @@ public class EventValidator {
 
     public static void preloadCalendar() {
         try {
-            List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(24);
+            List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(72);
             if (events == null) return;
             upcomingEvents.clear();
 
