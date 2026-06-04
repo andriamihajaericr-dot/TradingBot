@@ -462,8 +462,10 @@ public class EconomicCalendarAPI {
     private static boolean isMediumHighImpact(String eventName) {
         if (eventName == null || eventName.isEmpty()) return false;
         String ind = eventName.toLowerCase(Locale.US);
-        return ind.contains("initial jobless claims")      ||
-               ind.contains("continuing claims")           ||
+        return ind.contains("initial jobless claims") ||
+               ind.contains("jobless claims") ||
+               ind.contains("continuing claims") ||
+               ind.contains("unemployment claims") ||
                ind.contains("adp employment")              ||
                ind.contains("jolts")                       ||
                ind.contains("job openings")                ||
