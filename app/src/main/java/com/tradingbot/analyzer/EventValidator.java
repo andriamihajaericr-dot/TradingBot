@@ -773,6 +773,18 @@ public class EventValidator {
     
         return false;
     }
+    private static boolean isJoblessClaimsEvent(String indicatorLower, String textLower) {
+        boolean isClaimsInCalendar = indicatorLower.contains("jobless") || 
+                                     indicatorLower.contains("initial claims") ||
+                                     indicatorLower.contains("unemployment claims");
+    
+        boolean isClaimsInNotification = textLower.contains("jobless") || 
+                                         textLower.contains("initial claims") ||
+                                         textLower.contains("claims") ||
+                                         textLower.contains("chômage");
+    
+        return isClaimsInCalendar && isClaimsInNotification;
+    }
     // ─────────────────────────────────────────────────────────────
     //  BREAKING NEWS GÉNÉRIQUE
     // ─────────────────────────────────────────────────────────────
