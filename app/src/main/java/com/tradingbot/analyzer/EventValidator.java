@@ -452,112 +452,292 @@ private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(
     
     return bestMatch;
  }
-
-private static boolean matchesIndicatorKeywords(String text, String indicator, String country) {
+ private static boolean matchesIndicatorKeywords(String text, String indicator, String country) {
     if (text == null || indicator == null) return false;
     String ind = indicator.toLowerCase(Locale.ROOT);
 
-    // NFP / Emploi
-    if (ind.contains("nfp") || ind.contains("non-farm") || ind.contains("non farm")) {
-        return text.contains("nfp") || text.contains("non-farm") || 
-               text.contains("nonfarm") || text.contains("payroll") || 
+    // ── NFP / Non-Farm Payrolls ──
+    if (ind.contains("nfp") || ind.contains("non-farm") || ind.contains("non farm") ||
+        ind.contains("payroll")) {
+        return text.contains("nfp") || text.contains("non-farm") ||
+               text.contains("nonfarm") || text.contains("payroll") ||
                text.contains("emploi");
     }
-    // CPI / Inflation
-    if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("hicp")) {
-        return text.contains("cpi") || text.contains("inflation") || 
+
+    // ── CPI / Inflation ──
+    if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("hicp") ||
+        ind.contains("consumer price")) {
+        return text.contains("cpi") || text.contains("inflation") ||
+               text.contains("hicp") || text.contains("consumer price") ||
                text.contains("prix à la consommation");
     }
-    // PCE / Core PCE
-    if (ind.contains("pce")) {
-        return text.contains("pce") || text.contains("personal consumption") || 
-               text.contains("core pce") || text.contains("deflator");
+
+    // ── PCE / Core PCE ──
+    if (ind.contains("pce") || ind.contains("personal consumption expenditure")) {
+        return text.contains("pce") || text.contains("personal consumption") ||
+               text.contains("core pce") || text.contains("deflator") ||
+               text.contains("expenditure");
     }
-    // PPI
+
+    // ── PPI / Producer Price ──
     if (ind.contains("ppi") || ind.contains("producer price")) {
-        return text.contains("ppi") || text.contains("producer price") || 
+        return text.contains("ppi") || text.contains("producer price") ||
+               text.contains("wholesale price") ||
                text.contains("prix à la production");
     }
-    // GDP
-    if (ind.contains("gdp") || ind.contains("gross domestic")) {
-        return text.contains("gdp") || text.contains("pib") || 
-               text.contains("gross domestic") || text.contains("croissance");
+
+    // ── GDP / Croissance ──
+    if (ind.contains("gdp") || ind.contains("gross domestic") || ind.contains("pib")) {
+        return text.contains("gdp") || text.contains("pib") ||
+               text.contains("gross domestic") || text.contains("croissance") ||
+               text.contains("economic growth") || text.contains("quarterly growth");
     }
-    // Fed / FOMC
-    if (ind.contains("fed") || ind.contains("fomc") || ind.contains("rate")) {
-        return text.contains("fed") || text.contains("rate") || 
-               text.contains("fomc") || text.contains("powell") || 
-               text.contains("taux") || text.contains("interest rate");
+
+    // ── Fed / FOMC / Taux US ──
+    if (ind.contains("fomc") || ind.contains("federal reserve") ||
+        ind.contains("fed rate") || ind.contains("interest rate decision")) {
+        return text.contains("fed") || text.contains("fomc") ||
+               text.contains("federal reserve") || text.contains("powell") ||
+               text.contains("rate decision") || text.contains("interest rate") ||
+               text.contains("taux directeur") || text.contains("taux fed");
     }
-    // PMI / ISM
-    if (ind.contains("ism") || ind.contains("pmi")) {
-        return text.contains("ism") || text.contains("pmi") || 
-               text.contains("manufacturing") || text.contains("services") ||
-               text.contains("industrie");
+
+    // ── Beige Book / Minutes Fed ──
+    if (ind.contains("beige book") || ind.contains("fomc minutes") ||
+        ind.contains("fed minutes") || ind.contains("minutes")) {
+        return text.contains("beige book") || text.contains("minutes") ||
+               text.contains("fomc minutes") || text.contains("fed minutes") ||
+               text.contains("compte rendu fed");
     }
-    // ADP
+
+    // ── ISM / PMI Manufacturing & Services ──
+    if (ind.contains("ism") || ind.contains("pmi") ||
+        ind.contains("purchasing managers")) {
+        return text.contains("ism") || text.contains("pmi") ||
+               text.contains("purchasing managers") || text.contains("manufacturing") ||
+               text.contains("services pmi") || text.contains("composite pmi") ||
+               text.contains("industrie") || text.contains("secteur services");
+    }
+
+    // ── Chicago PMI / Empire State / Philly Fed / NY Fed ──
+    if (ind.contains("chicago pmi") || ind.contains("empire state") ||
+        ind.contains("philly fed") || ind.contains("philadelphia") ||
+        ind.contains("ny fed") || ind.contains("new york fed")) {
+        return text.contains("chicago pmi") || text.contains("chicago") ||
+               text.contains("empire state") || text.contains("philly fed") ||
+               text.contains("philadelphia") || text.contains("ny fed") ||
+               text.contains("manufacturing index") || text.contains("regional fed");
+    }
+
+    // ── ADP Employment ──
     if (ind.contains("adp")) {
-        return text.contains("adp") || text.contains("private payroll") || 
-               text.contains("private employment");
+        return text.contains("adp") || text.contains("private payroll") ||
+               text.contains("private employment") ||
+               text.contains("national employment") ||
+               text.contains("adp employment") ||
+               text.contains("adp report");
     }
-    // JOLTS
-    if (ind.contains("jolts") || ind.contains("job openings")) {
-        return text.contains("jolts") || text.contains("job openings") || 
-               text.contains("offres d emploi");
+
+    // ── JOLTS / Job Openings ──
+    if (ind.contains("jolts") || ind.contains("job openings") ||
+        ind.contains("labor turnover")) {
+        return text.contains("jolts") || text.contains("job openings") ||
+               text.contains("labor turnover") || text.contains("job turnover") ||
+               text.contains("offres d emploi") || text.contains("job vacancies");
     }
-    // Jobless Claims
-    if (ind.contains("jobless") || ind.contains("claims") || ind.contains("initial claims")) {
-        return text.contains("jobless") || text.contains("claims") || 
-               text.contains("initial claims") || text.contains("chômage");
+
+    // ── Jobless Claims / Initial / Continuing ──
+    if (ind.contains("jobless") || ind.contains("initial claims") ||
+        ind.contains("continuing claims") || ind.contains("unemployment claims")) {
+        return text.contains("jobless") || text.contains("initial claims") ||
+               text.contains("continuing claims") || text.contains("weekly claims") ||
+               text.contains("unemployment claims") || text.contains("chômage") ||
+               text.contains("demandeurs d emploi");
     }
-    // Retail Sales
-    if (ind.contains("retail")) {
-        return text.contains("retail") || text.contains("ventes au détail") || 
-               text.contains("consumer spending");
+
+    // ── Unemployment Rate ──
+    if (ind.contains("unemployment rate") || ind.contains("taux de chômage")) {
+        return text.contains("unemployment rate") || text.contains("jobless rate") ||
+               text.contains("taux de chômage") || text.contains("unemployment");
     }
-    // Michigan / Consumer Sentiment
-    if (ind.contains("michigan") || ind.contains("consumer sentiment") || 
-        ind.contains("consumer confidence")) {
-        return text.contains("michigan") || text.contains("sentiment") || 
-               text.contains("confidence") || text.contains("confiance");
+
+    // ── Retail Sales ──
+    if (ind.contains("retail sales") || ind.contains("retail")) {
+        return text.contains("retail sales") || text.contains("retail") ||
+               text.contains("consumer spending") || text.contains("consumer sales") ||
+               text.contains("ventes au détail") || text.contains("dépenses consommateurs");
     }
-    // Durable Goods
-    if (ind.contains("durable goods")) {
-        return text.contains("durable") || text.contains("durable goods") || 
-               text.contains("biens durables");
+
+    // ── Personal Income / Personal Spending ──
+    if (ind.contains("personal income") || ind.contains("personal spending") ||
+        ind.contains("personal consumption")) {
+        return text.contains("personal income") || text.contains("personal spending") ||
+               text.contains("personal consumption") || text.contains("disposable income") ||
+               text.contains("revenu personnel") || text.contains("dépenses personnelles");
     }
-    // Housing / Building Permits
-    if (ind.contains("housing") || ind.contains("building permits") || 
-        ind.contains("home sales")) {
-        return text.contains("housing") || text.contains("building permits") || 
-               text.contains("home sales") || text.contains("immobilier");
+
+    // ── Michigan Sentiment (Preliminary / Final) ──
+    if (ind.contains("michigan") || ind.contains("consumer sentiment") ||
+        ind.contains("consumer confidence") || ind.contains("sentiment prel") ||
+        ind.contains("sentiment final") || ind.contains("preliminary") ||
+        ind.contains("unc michigan")) {
+        return text.contains("michigan") || text.contains("consumer sentiment") ||
+               text.contains("consumer confidence") || text.contains("sentiment prel") ||
+               text.contains("preliminary sentiment") || text.contains("final sentiment") ||
+               text.contains("confiance consommateurs") || text.contains("confiance");
     }
-    // Trade Balance
-    if (ind.contains("trade balance") || ind.contains("current account")) {
-        return text.contains("trade balance") || text.contains("trade deficit") || 
-               text.contains("balance commerciale");
+
+    // ── Durable Goods ──
+    if (ind.contains("durable goods") || ind.contains("core durable")) {
+        return text.contains("durable goods") || text.contains("core durable") ||
+               text.contains("durable orders") || text.contains("capital goods") ||
+               text.contains("biens durables") || text.contains("commandes industrielles");
     }
-    // Banques centrales étrangères
-    if (ind.contains("ecb") || ind.contains("lagarde")) {
-        return text.contains("ecb") || text.contains("lagarde") || 
-               text.contains("bce") || text.contains("eurozone rate");
+
+    // ── Industrial Production / Capacity Utilization ──
+    if (ind.contains("industrial production") || ind.contains("capacity utilization") ||
+        ind.contains("manufacturing output")) {
+        return text.contains("industrial production") || text.contains("capacity utilization") ||
+               text.contains("manufacturing output") || text.contains("factory output") ||
+               text.contains("production industrielle") || text.contains("utilisation capacités");
     }
-    if (ind.contains("boe") || ind.contains("bailey")) {
-        return text.contains("boe") || text.contains("bailey") || 
-               text.contains("bank of england");
+
+    // ── Housing Starts / Building Permits ──
+    if (ind.contains("housing starts") || ind.contains("building permits")) {
+        return text.contains("housing starts") || text.contains("building permits") ||
+               text.contains("new construction") || text.contains("residential") ||
+               text.contains("mises en chantier") || text.contains("permis de construire");
     }
-    if (ind.contains("boj") || ind.contains("ueda")) {
-        return text.contains("boj") || text.contains("ueda") || 
-               text.contains("bank of japan");
+
+    // ── New Home Sales / Existing Home Sales / Pending Home Sales ──
+    if (ind.contains("home sales") || ind.contains("existing home") ||
+        ind.contains("new home") || ind.contains("pending home") ||
+        ind.contains("house sales")) {
+        return text.contains("home sales") || text.contains("existing home") ||
+               text.contains("new home sales") || text.contains("pending home") ||
+               text.contains("house sales") || text.contains("housing market") ||
+               text.contains("ventes immobilières") || text.contains("immobilier");
     }
-    if (ind.contains("boc") || ind.contains("macklem")) {
-        return text.contains("boc") || text.contains("macklem") || 
-               text.contains("bank of canada");
+
+    // ── Trade Balance / Current Account ──
+    if (ind.contains("trade balance") || ind.contains("current account") ||
+        ind.contains("trade deficit") || ind.contains("trade surplus")) {
+        return text.contains("trade balance") || text.contains("trade deficit") ||
+               text.contains("trade surplus") || text.contains("current account") ||
+               text.contains("balance commerciale") || text.contains("compte courant");
+    }
+
+    // ── EIA Crude Oil Inventories / Distillate / Gasoline ──
+    if (ind.contains("crude oil") || ind.contains("eia") ||
+        ind.contains("oil inventories") || ind.contains("distillate") ||
+        ind.contains("gasoline") || ind.contains("petroleum")) {
+        return text.contains("crude oil") || text.contains("eia") ||
+               text.contains("oil inventories") || text.contains("crude inventories") ||
+               text.contains("distillate") || text.contains("gasoline") ||
+               text.contains("petroleum") || text.contains("stockpiles") ||
+               text.contains("barrel") || text.contains("pétrole") ||
+               text.contains("stocks pétrole");
+    }
+
+    // ── OPEC ──
+    if (ind.contains("opec") || ind.contains("opec+")) {
+        return text.contains("opec") || text.contains("opec+") ||
+               text.contains("oil production") || text.contains("production cuts") ||
+               text.contains("production quota") || text.contains("barrel") ||
+               text.contains("réunion opec") || text.contains("quota pétrole");
+    }
+
+    // ── ECB / BCE ──
+    if (ind.contains("ecb") || ind.contains("lagarde") ||
+        ind.contains("european central bank")) {
+        return text.contains("ecb") || text.contains("lagarde") ||
+               text.contains("bce") || text.contains("european central bank") ||
+               text.contains("eurozone rate") || text.contains("taux bce") ||
+               text.contains("taux zone euro");
+    }
+
+    // ── BOE / Bank of England ──
+    if (ind.contains("boe") || ind.contains("bailey") ||
+        ind.contains("bank of england")) {
+        return text.contains("boe") || text.contains("bailey") ||
+               text.contains("bank of england") || text.contains("uk rate") ||
+               text.contains("taux boe") || text.contains("monetary policy committee") ||
+               text.contains("mpc");
+    }
+
+    // ── BOJ / Bank of Japan ──
+    if (ind.contains("boj") || ind.contains("ueda") ||
+        ind.contains("bank of japan")) {
+        return text.contains("boj") || text.contains("ueda") ||
+               text.contains("bank of japan") || text.contains("japan rate") ||
+               text.contains("taux boj") || text.contains("yield curve control") ||
+               text.contains("ycc");
+    }
+
+    // ── BOC / Bank of Canada ──
+    if (ind.contains("boc") || ind.contains("macklem") ||
+        ind.contains("bank of canada")) {
+        return text.contains("boc") || text.contains("macklem") ||
+               text.contains("bank of canada") || text.contains("canada rate") ||
+               text.contains("taux boc") || text.contains("canadian rate");
+    }
+
+    // ── RBA / Reserve Bank of Australia ──
+    if (ind.contains("rba") || ind.contains("bullock") ||
+        ind.contains("reserve bank of australia")) {
+        return text.contains("rba") || text.contains("bullock") ||
+               text.contains("reserve bank of australia") || text.contains("australia rate") ||
+               text.contains("taux rba") || text.contains("australian rate");
+    }
+
+    // ── IFO / ZEW (Allemagne) ──
+    if (ind.contains("ifo") || ind.contains("zew") ||
+        ind.contains("german business") || ind.contains("german sentiment")) {
+        return text.contains("ifo") || text.contains("zew") ||
+               text.contains("german business") || text.contains("german sentiment") ||
+               text.contains("german confidence") || text.contains("ifo business climate") ||
+               text.contains("indicateur allemand");
+    }
+
+    // ── Tankan (Japon) ──
+    if (ind.contains("tankan") || ind.contains("japan business")) {
+        return text.contains("tankan") || text.contains("japan business") ||
+               text.contains("boj survey") || text.contains("japanese business") ||
+               text.contains("enquête tankan");
+    }
+
+    // ── Average Earnings / Wages UK ──
+    if (ind.contains("average earnings") || ind.contains("wage growth") ||
+        ind.contains("wages")) {
+        return text.contains("average earnings") || text.contains("wage growth") ||
+               text.contains("wages") || text.contains("earnings") ||
+               text.contains("salaires") || text.contains("croissance salaires");
+    }
+
+    // ── Claimant Count UK ──
+    if (ind.contains("claimant count")) {
+        return text.contains("claimant count") || text.contains("claimant") ||
+               text.contains("uk jobless") || text.contains("uk unemployment") ||
+               text.contains("demandeurs emploi uk");
+    }
+
+    // ── Caixin PMI (Chine) ──
+    if (ind.contains("caixin") || ind.contains("china pmi") ||
+        ind.contains("chinese pmi")) {
+        return text.contains("caixin") || text.contains("china pmi") ||
+               text.contains("chinese pmi") || text.contains("china manufacturing") ||
+               text.contains("pmi chine") || text.contains("chine industrie");
+    }
+
+    // ── Balance of Trade / Current Account (autres pays) ──
+    if (ind.contains("trade") || ind.contains("balance of payments")) {
+        return text.contains("trade") || text.contains("balance of payments") ||
+               text.contains("exports") || text.contains("imports") ||
+               text.contains("exportations") || text.contains("importations");
     }
 
     return false;
 }
-
     // ─────────────────────────────────────────────────────────────
     //  BREAKING NEWS GÉNÉRIQUE
     // ─────────────────────────────────────────────────────────────
