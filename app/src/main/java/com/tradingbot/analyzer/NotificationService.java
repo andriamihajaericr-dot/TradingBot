@@ -36,7 +36,6 @@ public class NotificationService extends NotificationListenerService {
     private static final String TAG = "NotificationService";
     // ✅ Singleton
     private static NotificationService serviceInstance;
-
     public static NotificationService getInstance() {
         return serviceInstance;
     }
