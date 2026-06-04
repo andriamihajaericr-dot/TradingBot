@@ -1208,7 +1208,9 @@ public class NotificationService extends NotificationListenerService {
             public void run() {
                 try {
                     EventValidator.preloadCalendar(); 
-                    Log.d(TAG, "[SERVICE] Calendrier économique préchargé avec succès.");
+                    if (System.currentTimeMillis() % (30 * 60 * 1000) < 60000) { // toutes les 30 min
+                        Log.d(TAG, "Refresh forcé du calendrier économique");
+                    }
                 } catch (Exception e) {
                     Log.e(TAG, "[SERVICE] Erreur lors du préchargement du calendrier", e);
                 }
