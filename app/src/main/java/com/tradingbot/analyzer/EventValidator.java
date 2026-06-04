@@ -541,11 +541,18 @@ public class EventValidator {
     
         // ── Jobless Claims / Initial / Continuing ──
         if (ind.contains("jobless") || ind.contains("initial claims") ||
-            ind.contains("continuing claims") || ind.contains("unemployment claims")) {
-            return text.contains("jobless") || text.contains("initial claims") ||
-                   text.contains("continuing claims") || text.contains("weekly claims") ||
-                   text.contains("unemployment claims") || text.contains("chômage") ||
-                   text.contains("demandeurs d emploi");
+            ind.contains("continuing claims") || ind.contains("unemployment claims") ||
+            ind.contains("jobless claims")) {
+            
+            return text.contains("jobless") || 
+                   text.contains("initial claims") ||
+                   text.contains("continuing claims") ||
+                   text.contains("weekly claims") ||
+                   text.contains("unemployment claims") ||
+                   text.contains("chômage") ||
+                   text.contains("demandeurs d'emploi") ||
+                   text.contains("demandeurs emploi") ||
+                   text.contains("claims");
         }
     
         // ── Unemployment Rate ──
