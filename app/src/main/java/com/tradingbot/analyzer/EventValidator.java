@@ -1035,4 +1035,48 @@ private static String getMadaTimeNow() {
             Log.e("NotificationService", "Erreur lors du nettoyage des fingerprints", e);
         }
     }
+
+    // ─────────────────────────────────────────────────────────────
+//  WATCHER — Analyse résultats calendaires publiés sans news
+// ─────────────────────────────────────────────────────────────
+private static void analyzeAndSendCalendarResult(EconomicCalendarAPI.CalendarEvent event) {
+    if (appContext == null || event == null) return;
+    try {
+        // ✅ Construction du texte enrichi
+        String title   = event.indicator;
+        String content = event.indicator
+                + (event.country != null ? " " + event.country : "");
+
+        if (event.actual   != null && !event.actual.equals("N/A"))
+            content += " ACTUAL: "   + event.actual;
+        if (event.forecast != null && !event.forecast.equals("N/A"))
+            content += " FORECAST: " + event.forecast;
+        if (event.previous != null && !event.previous.equals("N/A"))
+            content += " PREVIOUS: " + event.previous;
+
+        // ✅ Détection surprise haussière / baissière
+        try {
+            double actual   = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
+            double forecast = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
+            double diff     = actual - forecast;
+            if      (diff > 0) content += " HIGHER THAN EXPECTED";
+            else if (diff < 0) content += " LOWER THAN EXPECTED";
+        } catch (Exception ignored) {}
+
+        // ✅ Récupération des actifs liés
+        List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
+                event.indicator,
+                event.country != null ? event.country : "United States");
+
+        // ✅ Envoi vers Groq + Telegram
+        NotificationService.sendToGroqAndTelegram(
+                "Calendrier Économique", title, content, assets, appContext);
+
+        logToMain("📤 Résultat calendaire : "
+                + event.indicator + " | " + event.actual + " vs " + event.forecast);
+
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur analyzeAndSendCalendarResult : " + event.indicator, e);
+    }
+}
 }
