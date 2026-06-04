@@ -138,26 +138,61 @@ public class EventValidator {
         }
     
         // ── ÉTAPE 4 : Calendrier économique ──────────────────────────────
-        EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp);
-        if (match != null) {
-            result.isConfirmed = true;
-            result.confidence  = 98;
-            result.forecast    = match.forecast != null ? match.forecast : "N/A";
-            result.previous    = match.previous != null ? match.previous : "N/A";
-            result.actual      = match.actual   != null ? match.actual   : "N/A";
-            result.reason      = "Confirmé par calendrier économique";
-    
-            if (match.affectedAssets != null) {
-                for (String asset : match.affectedAssets) {
-                    if (asset != null && !detectedAssets.contains(asset)) {
-                        detectedAssets.add(asset);
-                    }
+        private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(
+            String title, String content, long timestamp) {
+        
+            String combined = (title + " " + content).toLowerCase(Locale.ROOT);
+            String normalizedCombined = combined
+                    .replaceAll("[^a-z0-9\\s]", " ")
+                    .replaceAll("\\s+", " ").trim();
+        
+            long window = 45 * 60 * 1000L; // Augmenté à ±45 minutes (plus tolérant)
+            EconomicCalendarAPI.CalendarEvent bestMatch = null;
+            long bestDelta = Long.MAX_VALUE;
+        
+            for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
+                if (event == null || event.indicator == null) continue;
+        
+                long eventTime = parseTimestamp(event.timestamp);
+                long normalizedTimestamp = (timestamp > 9999999999L) ? timestamp : timestamp * 1000;
+                long delta = Math.abs(eventTime - normalizedTimestamp);
+        
+                if (delta > window) continue;
+        
+                String indicatorLower = event.indicator.toLowerCase(Locale.ROOT);
+                String normalizedIndicator = indicatorLower
+                        .replaceAll("[^a-z0-9\\s]", " ")
+                        .replaceAll("\\s+", " ").trim();
+        
+                // === MATCHING AMÉLIORÉ ===
+                boolean matchFound = false;
+        
+                // Matching direct
+                if (normalizedCombined.contains(normalizedIndicator) || 
+                    normalizedIndicator.contains(normalizedCombined)) {
+                    matchFound = true;
+                }
+                // Matching par mots-clés (le plus important)
+                else if (matchesIndicatorKeywords(normalizedCombined, indicatorLower, event.country)) {
+                    matchFound = true;
+                }
+                // Matching spécifique très permissif pour Jobless Claims
+                else if (isJoblessClaimsEvent(indicatorLower, normalizedCombined)) {
+                    matchFound = true;
+                }
+        
+                if (matchFound && delta < bestDelta) {
+                    bestDelta = delta;
+                    bestMatch = event;
                 }
             }
-            result.assetsEnriched = !detectedAssets.isEmpty();
-            String indicatorName = (match.indicator != null && !match.indicator.isEmpty()) ? match.indicator.substring(0, Math.min(40, match.indicator.length())) : "événement";
-            logToMain("✓ Calendrier confirmé – " + indicatorName);
-            return result;
+        
+            // Log de debug temporaire (à supprimer après test)
+            if (combined.contains("jobless") || combined.contains("claims")) {
+                Log.d(TAG, "Jobless Claims détecté. Match trouvé ? " + (bestMatch != null));
+            }
+        
+            return bestMatch;
         }
     
         // ── ÉTAPE 5 : Géopolitique ───────────────────────────────────────
