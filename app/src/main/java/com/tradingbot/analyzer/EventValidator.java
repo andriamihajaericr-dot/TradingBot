@@ -47,156 +47,156 @@ public class EventValidator {
     /**
      * Méthode principale de validation et d'enrichissement de la matrice d'actifs
      */
-public static ValidationResult validate(Context context, String title, String content, long timestamp, List<String> detectedAssets) {
-    ValidationResult result = new ValidationResult();
-
-    if (title == null) title = "";
-    if (content == null) content = "";
-    if (detectedAssets == null) detectedAssets = new ArrayList<>();
-
-    String combined = (title + " " + content).toLowerCase(Locale.ROOT);
-    String upperCombined = (title + " " + content).toUpperCase(Locale.ROOT);
+    public static ValidationResult validate(Context context, String title, String content, long timestamp, List<String> detectedAssets) {
+        ValidationResult result = new ValidationResult();
     
-    // ── EXTRACTION PRIORITAIRE ET SYSTÉMATIQUE DES ACTIFS (Sécurité Rang Suprême) ──
-    try {
-        List<String> rawExtracted = new ArrayList<>();
-        String textToScan = upperCombined;
-
-        if (textToScan.contains("EURUSD") || textToScan.contains("EUR/") || textToScan.contains("EURO")) rawExtracted.add("EURUSD");
-        if (textToScan.contains("USDJPY") || textToScan.contains("JPY")  || textToScan.contains("YEN"))  rawExtracted.add("USDJPY");
-        if (textToScan.contains("GBPUSD") || textToScan.contains("GBP/") || textToScan.contains("POUND")) rawExtracted.add("GBPUSD");
-        if (textToScan.contains("AUDUSD") || textToScan.contains("AUD/"))                                rawExtracted.add("AUDUSD");
-        if (textToScan.contains("USDCAD") || textToScan.contains("CAD/"))                                rawExtracted.add("USDCAD");
-        if (textToScan.contains("GOLD")   || textToScan.contains("XAU"))                                 rawExtracted.add("GOLD");
-        if (textToScan.contains("USOIL")  || textToScan.contains("CRUDE") || textToScan.contains("WTI") || textToScan.contains("PETROLE") || textToScan.contains("BRENT")) rawExtracted.add("USOIL");
-        if (textToScan.contains("NASDAQ") || textToScan.contains("NAS100")|| textToScan.contains("USTECH") || textToScan.contains("TECH")) rawExtracted.add("NASDAQ");
-        if (textToScan.contains("SP500")  || textToScan.contains("S&P")   || textToScan.contains("SPX"))   rawExtracted.add("SP500");
-        if (textToScan.contains("BITCOIN")|| textToScan.contains("BTC"))                                 rawExtracted.add("BITCOIN");
-        if (textToScan.contains("US10Y")  || textToScan.contains("TREASURY") || textToScan.contains("YIELD") || textToScan.contains("10-YEAR")) rawExtracted.add("US10Y");
-
-        if (rawExtracted != null) {
-            for (String asset : rawExtracted) {
-                if (asset != null && !detectedAssets.contains(asset)) {
-                    detectedAssets.add(asset);
+        if (title == null) title = "";
+        if (content == null) content = "";
+        if (detectedAssets == null) detectedAssets = new ArrayList<>();
+    
+        String combined = (title + " " + content).toLowerCase(Locale.ROOT);
+        String upperCombined = (title + " " + content).toUpperCase(Locale.ROOT);
+        
+        // ── EXTRACTION PRIORITAIRE ET SYSTÉMATIQUE DES ACTIFS (Sécurité Rang Suprême) ──
+        try {
+            List<String> rawExtracted = new ArrayList<>();
+            String textToScan = upperCombined;
+    
+            if (textToScan.contains("EURUSD") || textToScan.contains("EUR/") || textToScan.contains("EURO")) rawExtracted.add("EURUSD");
+            if (textToScan.contains("USDJPY") || textToScan.contains("JPY")  || textToScan.contains("YEN"))  rawExtracted.add("USDJPY");
+            if (textToScan.contains("GBPUSD") || textToScan.contains("GBP/") || textToScan.contains("POUND")) rawExtracted.add("GBPUSD");
+            if (textToScan.contains("AUDUSD") || textToScan.contains("AUD/")) rawExtracted.add("AUDUSD");
+            if (textToScan.contains("USDCAD") || textToScan.contains("CAD/")) rawExtracted.add("USDCAD");
+            if (textToScan.contains("GOLD")   || textToScan.contains("XAU")) rawExtracted.add("GOLD");
+            if (textToScan.contains("USOIL")  || textToScan.contains("CRUDE") || textToScan.contains("WTI") || textToScan.contains("PETROLE") || textToScan.contains("BRENT")) rawExtracted.add("USOIL");
+            if (textToScan.contains("NASDAQ") || textToScan.contains("NAS100")|| textToScan.contains("USTECH") || textToScan.contains("TECH")) rawExtracted.add("NASDAQ");
+            if (textToScan.contains("SP500")  || textToScan.contains("S&P")   || textToScan.contains("SPX"))   rawExtracted.add("SP500");
+            if (textToScan.contains("BITCOIN")|| textToScan.contains("BTC"))  rawExtracted.add("BITCOIN");
+            if (textToScan.contains("US10Y")  || textToScan.contains("TREASURY") || textToScan.contains("YIELD") || textToScan.contains("10-YEAR")) rawExtracted.add("US10Y");
+    
+            if (rawExtracted != null) {
+                for (String asset : rawExtracted) {
+                    if (asset != null && !detectedAssets.contains(asset)) {
+                        detectedAssets.add(asset);
+                    }
                 }
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur lors de l'extraction brute des actifs", e);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur lors de l'extraction brute des actifs", e);
-    }
-
-    // ── ÉTAPE 1 : Anti-Doublons (très haut dans le flux) ─────────────
-    if (isRecentDuplicate(title, content)) {
-        result.confidence  = 0;
-        result.isConfirmed = false;
-        result.reason      = "Doublon récent détecté (30min)";
-        result.assetsEnriched = !detectedAssets.isEmpty();
-        logToMain("🔄 Doublon identifié (Enrichissement préservé)");
-        return result;
-    }
-
-    // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
-    // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
-String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
-EventDatabase db = (context != null) ? EventDatabase.getInstance(context) : null;
-if (!detectedType.startsWith("GEO") && db != null) {
-    try {
-        long currentSeconds = timestamp / 1000;
-        if (db.isDriverActiveRecently(detectedType, currentSeconds)) {
+    
+        // ── ÉTAPE 1 : Anti-Doublons (très haut dans le flux) ─────────────
+        if (isRecentDuplicate(title, content)) {
+            result.confidence  = 0;
             result.isConfirmed = false;
-            result.isInertiaBlock = true;
-            result.reason = "Driver déjà actif récemment (Inertie Macro)";
+            result.reason      = "Doublon récent détecté (30min)";
             result.assetsEnriched = !detectedAssets.isEmpty();
-            // Récupérer le dernier événement de ce type pour le rappel
-            result.lastEventSummary = db.getLastEventByType(detectedType);
-            logToMain("⏳ Driver " + detectedType + " déjà actif — envoi d'un rappel");
+            logToMain("🔄 Doublon identifié (Enrichissement préservé)");
             return result;
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur inertie macro", e);
-    }
-}
-
-    // ── ÉTAPE 2 : Filtre anti-rumeur absolu ───────────────────────────
-    if (containsRumorMarkers(combined)) {
-        result.confidence  = 0;
-        result.isConfirmed = false;
-        result.reason      = "Rejeté — Marqueur de rumeur ou non-confirmé détecté";
-        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-        logToMain("❌ Rumeur/Non-confirmé rejeté – " + shortTitle + "…");
-        return result;
-    }
-
-    // ── ÉTAPE 3 : Filtre éditorial ───────────────────────────────────
-    if (containsEditorialContent(combined)) {
-        result.confidence  = 0;
-        result.isConfirmed = false;
-        result.reason      = "Bruit macroéconomique (Opinion/Éditorial pur)";
-        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-        logToMain("❌ Rejeté – Contenu éditorial – " + shortTitle + "…");
-        return result;
-    }
-
-    // ── ÉTAPE 4 : Calendrier économique ──────────────────────────────
-    EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp);
-    if (match != null) {
-        result.isConfirmed = true;
-        result.confidence  = 98;
-        result.forecast    = match.forecast != null ? match.forecast : "N/A";
-        result.previous    = match.previous != null ? match.previous : "N/A";
-        result.actual      = match.actual   != null ? match.actual   : "N/A";
-        result.reason      = "Confirmé par calendrier économique";
-
-        if (match.affectedAssets != null) {
-            for (String asset : match.affectedAssets) {
+    
+        // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
+        // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
+        String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
+        EventDatabase db = (context != null) ? EventDatabase.getInstance(context) : null;
+        if (!detectedType.startsWith("GEO") && db != null) {
+            try {
+                long currentSeconds = timestamp / 1000;
+                if (db.isDriverActiveRecently(detectedType, currentSeconds)) {
+                    result.isConfirmed = false;
+                    result.isInertiaBlock = true;
+                    result.reason = "Driver déjà actif récemment (Inertie Macro)";
+                    result.assetsEnriched = !detectedAssets.isEmpty();
+                    // Récupérer le dernier événement de ce type pour le rappel
+                    result.lastEventSummary = db.getLastEventByType(detectedType);
+                    logToMain("⏳ Driver " + detectedType + " déjà actif — envoi d'un rappel");
+                    return result;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur inertie macro", e);
+            }
+        }
+    
+        // ── ÉTAPE 2 : Filtre anti-rumeur absolu ───────────────────────────
+        if (containsRumorMarkers(combined)) {
+            result.confidence  = 0;
+            result.isConfirmed = false;
+            result.reason      = "Rejeté — Marqueur de rumeur ou non-confirmé détecté";
+            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
+            logToMain("❌ Rumeur/Non-confirmé rejeté – " + shortTitle + "…");
+            return result;
+        }
+    
+        // ── ÉTAPE 3 : Filtre éditorial ───────────────────────────────────
+        if (containsEditorialContent(combined)) {
+            result.confidence  = 0;
+            result.isConfirmed = false;
+            result.reason      = "Bruit macroéconomique (Opinion/Éditorial pur)";
+            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
+            logToMain("❌ Rejeté – Contenu éditorial – " + shortTitle + "…");
+            return result;
+        }
+    
+        // ── ÉTAPE 4 : Calendrier économique ──────────────────────────────
+        EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp);
+        if (match != null) {
+            result.isConfirmed = true;
+            result.confidence  = 98;
+            result.forecast    = match.forecast != null ? match.forecast : "N/A";
+            result.previous    = match.previous != null ? match.previous : "N/A";
+            result.actual      = match.actual   != null ? match.actual   : "N/A";
+            result.reason      = "Confirmé par calendrier économique";
+    
+            if (match.affectedAssets != null) {
+                for (String asset : match.affectedAssets) {
+                    if (asset != null && !detectedAssets.contains(asset)) {
+                        detectedAssets.add(asset);
+                    }
+                }
+            }
+            result.assetsEnriched = !detectedAssets.isEmpty();
+            String indicatorName = (match.indicator != null && !match.indicator.isEmpty()) ? match.indicator.substring(0, Math.min(40, match.indicator.length())) : "événement";
+            logToMain("✓ Calendrier confirmé – " + indicatorName);
+            return result;
+        }
+    
+        // ── ÉTAPE 5 : Géopolitique ───────────────────────────────────────
+        GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
+        if (geo.confidence >= 65) {
+            result.isConfirmed = true;
+            result.confidence  = geo.confidence;
+            result.reason      = "Événement géopolitique confirmé";
+            result.geoContext  = geo.contextLabel;
+    
+            for (String asset : geo.impactedAssets) {
                 if (asset != null && !detectedAssets.contains(asset)) {
                     detectedAssets.add(asset);
                 }
             }
+            result.assetsEnriched = !detectedAssets.isEmpty();
+            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
+            logToMain("🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
+            return result;
         }
+    
+        // ── ÉTAPE 6 : Breaking News générique ───────────────────────────
+        result.confidence = calculateBreakingNewsConfidence(title, content);
+        result.reason      = "Breaking News (Flux Interbancaire)";
+    
+        if (result.confidence < 70) {   
+            result.confidence  = 0;
+            result.isConfirmed = false;
+            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
+            logToMain("❌ Rejeté – " + shortTitle + "… (confiance " + result.confidence + "%)");
+        } else {
+            result.isConfirmed = true;
+            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
+            logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
+        }
+    
         result.assetsEnriched = !detectedAssets.isEmpty();
-        String indicatorName = (match.indicator != null && !match.indicator.isEmpty()) ? match.indicator.substring(0, Math.min(40, match.indicator.length())) : "événement";
-        logToMain("✓ Calendrier confirmé – " + indicatorName);
         return result;
     }
-
-    // ── ÉTAPE 5 : Géopolitique ───────────────────────────────────────
-    GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
-    if (geo.confidence >= 65) {
-        result.isConfirmed = true;
-        result.confidence  = geo.confidence;
-        result.reason      = "Événement géopolitique confirmé";
-        result.geoContext  = geo.contextLabel;
-
-        for (String asset : geo.impactedAssets) {
-            if (asset != null && !detectedAssets.contains(asset)) {
-                detectedAssets.add(asset);
-            }
-        }
-        result.assetsEnriched = !detectedAssets.isEmpty();
-        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
-        logToMain("🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
-        return result;
-    }
-
-    // ── ÉTAPE 6 : Breaking News générique ───────────────────────────
-    result.confidence = calculateBreakingNewsConfidence(title, content);
-    result.reason      = "Breaking News (Flux Interbancaire)";
-
-    if (result.confidence < 70) {   
-        result.confidence  = 0;
-        result.isConfirmed = false;
-        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
-        logToMain("❌ Rejeté – " + shortTitle + "… (confiance " + result.confidence + "%)");
-    } else {
-        result.isConfirmed = true;
-        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-        logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
-    }
-
-    result.assetsEnriched = !detectedAssets.isEmpty();
-    return result;
-}
 
     private static boolean containsRumorMarkers(String text) {
         if (text == null) return false;
@@ -409,328 +409,328 @@ if (!detectedType.startsWith("GEO") && db != null) {
     private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(
         String title, String content, long timestamp) {
 
-    String combined = (title + " " + content).toLowerCase(Locale.ROOT);
-    String normalizedCombined = combined
-            .replaceAll("[^a-z0-9\\s]", " ")
-            .replaceAll("\\s+", " ").trim();
-
-    long window = 30 * 60 * 1000; // ±30 minutes
-    EconomicCalendarAPI.CalendarEvent bestMatch = null;
-    long bestDelta = Long.MAX_VALUE;
-
-    for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
-        if (event == null || event.timestamp == null || event.indicator == null) continue;
-
-        long eventTime = parseTimestamp(event.timestamp);
-        long normalizedTimestamp = (timestamp > 9999999999L) ? timestamp : timestamp * 1000;
-        long delta = Math.abs(eventTime - normalizedTimestamp);
-
-        if (delta < window) {  // ← vérification fenêtre temporelle manquante aussi !
-            // ↓ déclarations manquantes dans votre version
-            String indicator = event.indicator.toLowerCase(Locale.ROOT);
-            String normalizedIndicator = indicator
-                    .replaceAll("[^a-z0-9\\s]", " ")
-                    .replaceAll("\\s+", " ").trim();
-
-            if (normalizedCombined.contains(normalizedIndicator) ||
-                matchesIndicatorKeywords(normalizedCombined, indicator, event.country)) {
-
-                if (delta < bestDelta) {
-                    bestDelta = delta;
-                    bestMatch = event;
+        String combined = (title + " " + content).toLowerCase(Locale.ROOT);
+        String normalizedCombined = combined
+                .replaceAll("[^a-z0-9\\s]", " ")
+                .replaceAll("\\s+", " ").trim();
+    
+        long window = 30 * 60 * 1000; // ±30 minutes
+        EconomicCalendarAPI.CalendarEvent bestMatch = null;
+        long bestDelta = Long.MAX_VALUE;
+    
+        for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
+            if (event == null || event.timestamp == null || event.indicator == null) continue;
+    
+            long eventTime = parseTimestamp(event.timestamp);
+            long normalizedTimestamp = (timestamp > 9999999999L) ? timestamp : timestamp * 1000;
+            long delta = Math.abs(eventTime - normalizedTimestamp);
+    
+            if (delta < window) {  // ← vérification fenêtre temporelle manquante aussi !
+                // ↓ déclarations manquantes dans votre version
+                String indicator = event.indicator.toLowerCase(Locale.ROOT);
+                String normalizedIndicator = indicator
+                        .replaceAll("[^a-z0-9\\s]", " ")
+                        .replaceAll("\\s+", " ").trim();
+    
+                if (normalizedCombined.contains(normalizedIndicator) ||
+                    matchesIndicatorKeywords(normalizedCombined, indicator, event.country)) {
+    
+                    if (delta < bestDelta) {
+                        bestDelta = delta;
+                        bestMatch = event;
+                    }
                 }
             }
         }
-    }
-    return bestMatch;
-}
-
- private static boolean matchesIndicatorKeywords(String text, String indicator, String country) {
-    if (text == null || indicator == null) return false;
-    String ind = indicator.toLowerCase(Locale.ROOT);
-
-    // ── NFP / Non-Farm Payrolls ──
-    if (ind.contains("nfp") || ind.contains("non-farm") || ind.contains("non farm") ||
-        ind.contains("payroll")) {
-        return text.contains("nfp") || text.contains("non-farm") ||
-               text.contains("nonfarm") || text.contains("payroll") ||
-               text.contains("emploi");
+        return bestMatch;
     }
 
-    // ── CPI / Inflation ──
-    if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("hicp") ||
-        ind.contains("consumer price")) {
-        return text.contains("cpi") || text.contains("inflation") ||
-               text.contains("hicp") || text.contains("consumer price") ||
-               text.contains("prix à la consommation");
+     private static boolean matchesIndicatorKeywords(String text, String indicator, String country) {
+        if (text == null || indicator == null) return false;
+        String ind = indicator.toLowerCase(Locale.ROOT);
+    
+        // ── NFP / Non-Farm Payrolls ──
+        if (ind.contains("nfp") || ind.contains("non-farm") || ind.contains("non farm") ||
+            ind.contains("payroll")) {
+            return text.contains("nfp") || text.contains("non-farm") ||
+                   text.contains("nonfarm") || text.contains("payroll") ||
+                   text.contains("emploi");
+        }
+    
+        // ── CPI / Inflation ──
+        if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("hicp") ||
+            ind.contains("consumer price")) {
+            return text.contains("cpi") || text.contains("inflation") ||
+                   text.contains("hicp") || text.contains("consumer price") ||
+                   text.contains("prix à la consommation");
+        }
+    
+        // ── PCE / Core PCE ──
+        if (ind.contains("pce") || ind.contains("personal consumption expenditure")) {
+            return text.contains("pce") || text.contains("personal consumption") ||
+                   text.contains("core pce") || text.contains("deflator") ||
+                   text.contains("expenditure");
+        }
+    
+        // ── PPI / Producer Price ──
+        if (ind.contains("ppi") || ind.contains("producer price")) {
+            return text.contains("ppi") || text.contains("producer price") ||
+                   text.contains("wholesale price") ||
+                   text.contains("prix à la production");
+        }
+    
+        // ── GDP / Croissance ──
+        if (ind.contains("gdp") || ind.contains("gross domestic") || ind.contains("pib")) {
+            return text.contains("gdp") || text.contains("pib") ||
+                   text.contains("gross domestic") || text.contains("croissance") ||
+                   text.contains("economic growth") || text.contains("quarterly growth");
+        }
+    
+        // ── Fed / FOMC / Taux US ──
+        if (ind.contains("fomc") || ind.contains("federal reserve") ||
+            ind.contains("fed rate") || ind.contains("interest rate decision")) {
+            return text.contains("fed") || text.contains("fomc") ||
+                   text.contains("federal reserve") || text.contains("powell") ||
+                   text.contains("rate decision") || text.contains("interest rate") ||
+                   text.contains("taux directeur") || text.contains("taux fed");
+        }
+    
+        // ── Beige Book / Minutes Fed ──
+        if (ind.contains("beige book") || ind.contains("fomc minutes") ||
+            ind.contains("fed minutes") || ind.contains("minutes")) {
+            return text.contains("beige book") || text.contains("minutes") ||
+                   text.contains("fomc minutes") || text.contains("fed minutes") ||
+                   text.contains("compte rendu fed");
+        }
+    
+        // ── ISM / PMI Manufacturing & Services ──
+        if (ind.contains("ism") || ind.contains("pmi") ||
+            ind.contains("purchasing managers")) {
+            return text.contains("ism") || text.contains("pmi") ||
+                   text.contains("purchasing managers") || text.contains("manufacturing") ||
+                   text.contains("services pmi") || text.contains("composite pmi") ||
+                   text.contains("industrie") || text.contains("secteur services");
+        }
+    
+        // ── Chicago PMI / Empire State / Philly Fed / NY Fed ──
+        if (ind.contains("chicago pmi") || ind.contains("empire state") ||
+            ind.contains("philly fed") || ind.contains("philadelphia") ||
+            ind.contains("ny fed") || ind.contains("new york fed")) {
+            return text.contains("chicago pmi") || text.contains("chicago") ||
+                   text.contains("empire state") || text.contains("philly fed") ||
+                   text.contains("philadelphia") || text.contains("ny fed") ||
+                   text.contains("manufacturing index") || text.contains("regional fed");
+        }
+    
+        // ── ADP Employment ──
+        if (ind.contains("adp")) {
+            return text.contains("adp") || text.contains("private payroll") ||
+                   text.contains("private employment") ||
+                   text.contains("national employment") ||
+                   text.contains("adp employment") ||
+                   text.contains("adp report");
+        }
+    
+        // ── JOLTS / Job Openings ──
+        if (ind.contains("jolts") || ind.contains("job openings") ||
+            ind.contains("labor turnover")) {
+            return text.contains("jolts") || text.contains("job openings") ||
+                   text.contains("labor turnover") || text.contains("job turnover") ||
+                   text.contains("offres d emploi") || text.contains("job vacancies");
+        }
+    
+        // ── Jobless Claims / Initial / Continuing ──
+        if (ind.contains("jobless") || ind.contains("initial claims") ||
+            ind.contains("continuing claims") || ind.contains("unemployment claims")) {
+            return text.contains("jobless") || text.contains("initial claims") ||
+                   text.contains("continuing claims") || text.contains("weekly claims") ||
+                   text.contains("unemployment claims") || text.contains("chômage") ||
+                   text.contains("demandeurs d emploi");
+        }
+    
+        // ── Unemployment Rate ──
+        if (ind.contains("unemployment rate") || ind.contains("taux de chômage")) {
+            return text.contains("unemployment rate") || text.contains("jobless rate") ||
+                   text.contains("taux de chômage") || text.contains("unemployment");
+        }
+    
+        // ── Retail Sales ──
+        if (ind.contains("retail sales") || ind.contains("retail")) {
+            return text.contains("retail sales") || text.contains("retail") ||
+                   text.contains("consumer spending") || text.contains("consumer sales") ||
+                   text.contains("ventes au détail") || text.contains("dépenses consommateurs");
+        }
+    
+        // ── Personal Income / Personal Spending ──
+        if (ind.contains("personal income") || ind.contains("personal spending") ||
+            ind.contains("personal consumption")) {
+            return text.contains("personal income") || text.contains("personal spending") ||
+                   text.contains("personal consumption") || text.contains("disposable income") ||
+                   text.contains("revenu personnel") || text.contains("dépenses personnelles");
+        }
+    
+        // ── Michigan Sentiment (Preliminary / Final) ──
+        if (ind.contains("michigan") || ind.contains("consumer sentiment") ||
+            ind.contains("consumer confidence") || ind.contains("sentiment prel") ||
+            ind.contains("sentiment final") || ind.contains("preliminary") ||
+            ind.contains("unc michigan")) {
+            return text.contains("michigan") || text.contains("consumer sentiment") ||
+                   text.contains("consumer confidence") || text.contains("sentiment prel") ||
+                   text.contains("preliminary sentiment") || text.contains("final sentiment") ||
+                   text.contains("confiance consommateurs") || text.contains("confiance");
+        }
+    
+        // ── Durable Goods ──
+        if (ind.contains("durable goods") || ind.contains("core durable")) {
+            return text.contains("durable goods") || text.contains("core durable") ||
+                   text.contains("durable orders") || text.contains("capital goods") ||
+                   text.contains("biens durables") || text.contains("commandes industrielles");
+        }
+    
+        // ── Industrial Production / Capacity Utilization ──
+        if (ind.contains("industrial production") || ind.contains("capacity utilization") ||
+            ind.contains("manufacturing output")) {
+            return text.contains("industrial production") || text.contains("capacity utilization") ||
+                   text.contains("manufacturing output") || text.contains("factory output") ||
+                   text.contains("production industrielle") || text.contains("utilisation capacités");
+        }
+    
+        // ── Housing Starts / Building Permits ──
+        if (ind.contains("housing starts") || ind.contains("building permits")) {
+            return text.contains("housing starts") || text.contains("building permits") ||
+                   text.contains("new construction") || text.contains("residential") ||
+                   text.contains("mises en chantier") || text.contains("permis de construire");
+        }
+    
+        // ── New Home Sales / Existing Home Sales / Pending Home Sales ──
+        if (ind.contains("home sales") || ind.contains("existing home") ||
+            ind.contains("new home") || ind.contains("pending home") ||
+            ind.contains("house sales")) {
+            return text.contains("home sales") || text.contains("existing home") ||
+                   text.contains("new home sales") || text.contains("pending home") ||
+                   text.contains("house sales") || text.contains("housing market") ||
+                   text.contains("ventes immobilières") || text.contains("immobilier");
+        }
+    
+        // ── Trade Balance / Current Account ──
+        if (ind.contains("trade balance") || ind.contains("current account") ||
+            ind.contains("trade deficit") || ind.contains("trade surplus")) {
+            return text.contains("trade balance") || text.contains("trade deficit") ||
+                   text.contains("trade surplus") || text.contains("current account") ||
+                   text.contains("balance commerciale") || text.contains("compte courant");
+        }
+    
+        // ── EIA Crude Oil Inventories / Distillate / Gasoline ──
+        if (ind.contains("crude oil") || ind.contains("eia") ||
+            ind.contains("oil inventories") || ind.contains("distillate") ||
+            ind.contains("gasoline") || ind.contains("petroleum")) {
+            return text.contains("crude oil") || text.contains("eia") ||
+                   text.contains("oil inventories") || text.contains("crude inventories") ||
+                   text.contains("distillate") || text.contains("gasoline") ||
+                   text.contains("petroleum") || text.contains("stockpiles") ||
+                   text.contains("barrel") || text.contains("pétrole") ||
+                   text.contains("stocks pétrole");
+        }
+    
+        // ── OPEC ──
+        if (ind.contains("opec") || ind.contains("opec+")) {
+            return text.contains("opec") || text.contains("opec+") ||
+                   text.contains("oil production") || text.contains("production cuts") ||
+                   text.contains("production quota") || text.contains("barrel") ||
+                   text.contains("réunion opec") || text.contains("quota pétrole");
+        }
+    
+        // ── ECB / BCE ──
+        if (ind.contains("ecb") || ind.contains("lagarde") ||
+            ind.contains("european central bank")) {
+            return text.contains("ecb") || text.contains("lagarde") ||
+                   text.contains("bce") || text.contains("european central bank") ||
+                   text.contains("eurozone rate") || text.contains("taux bce") ||
+                   text.contains("taux zone euro");
+        }
+    
+        // ── BOE / Bank of England ──
+        if (ind.contains("boe") || ind.contains("bailey") ||
+            ind.contains("bank of england")) {
+            return text.contains("boe") || text.contains("bailey") ||
+                   text.contains("bank of england") || text.contains("uk rate") ||
+                   text.contains("taux boe") || text.contains("monetary policy committee") ||
+                   text.contains("mpc");
+        }
+    
+        // ── BOJ / Bank of Japan ──
+        if (ind.contains("boj") || ind.contains("ueda") ||
+            ind.contains("bank of japan")) {
+            return text.contains("boj") || text.contains("ueda") ||
+                   text.contains("bank of japan") || text.contains("japan rate") ||
+                   text.contains("taux boj") || text.contains("yield curve control") ||
+                   text.contains("ycc");
+        }
+    
+        // ── BOC / Bank of Canada ──
+        if (ind.contains("boc") || ind.contains("macklem") ||
+            ind.contains("bank of canada")) {
+            return text.contains("boc") || text.contains("macklem") ||
+                   text.contains("bank of canada") || text.contains("canada rate") ||
+                   text.contains("taux boc") || text.contains("canadian rate");
+        }
+    
+        // ── RBA / Reserve Bank of Australia ──
+        if (ind.contains("rba") || ind.contains("bullock") ||
+            ind.contains("reserve bank of australia")) {
+            return text.contains("rba") || text.contains("bullock") ||
+                   text.contains("reserve bank of australia") || text.contains("australia rate") ||
+                   text.contains("taux rba") || text.contains("australian rate");
+        }
+    
+        // ── IFO / ZEW (Allemagne) ──
+        if (ind.contains("ifo") || ind.contains("zew") ||
+            ind.contains("german business") || ind.contains("german sentiment")) {
+            return text.contains("ifo") || text.contains("zew") ||
+                   text.contains("german business") || text.contains("german sentiment") ||
+                   text.contains("german confidence") || text.contains("ifo business climate") ||
+                   text.contains("indicateur allemand");
+        }
+    
+        // ── Tankan (Japon) ──
+        if (ind.contains("tankan") || ind.contains("japan business")) {
+            return text.contains("tankan") || text.contains("japan business") ||
+                   text.contains("boj survey") || text.contains("japanese business") ||
+                   text.contains("enquête tankan");
+        }
+    
+        // ── Average Earnings / Wages UK ──
+        if (ind.contains("average earnings") || ind.contains("wage growth") ||
+            ind.contains("wages")) {
+            return text.contains("average earnings") || text.contains("wage growth") ||
+                   text.contains("wages") || text.contains("earnings") ||
+                   text.contains("salaires") || text.contains("croissance salaires");
+        }
+    
+        // ── Claimant Count UK ──
+        if (ind.contains("claimant count")) {
+            return text.contains("claimant count") || text.contains("claimant") ||
+                   text.contains("uk jobless") || text.contains("uk unemployment") ||
+                   text.contains("demandeurs emploi uk");
+        }
+    
+        // ── Caixin PMI (Chine) ──
+        if (ind.contains("caixin") || ind.contains("china pmi") ||
+            ind.contains("chinese pmi")) {
+            return text.contains("caixin") || text.contains("china pmi") ||
+                   text.contains("chinese pmi") || text.contains("china manufacturing") ||
+                   text.contains("pmi chine") || text.contains("chine industrie");
+        }
+    
+        // ── Balance of Trade / Current Account (autres pays) ──
+        if (ind.contains("trade") || ind.contains("balance of payments")) {
+            return text.contains("trade") || text.contains("balance of payments") ||
+                   text.contains("exports") || text.contains("imports") ||
+                   text.contains("exportations") || text.contains("importations");
+        }
+    
+        return false;
     }
-
-    // ── PCE / Core PCE ──
-    if (ind.contains("pce") || ind.contains("personal consumption expenditure")) {
-        return text.contains("pce") || text.contains("personal consumption") ||
-               text.contains("core pce") || text.contains("deflator") ||
-               text.contains("expenditure");
-    }
-
-    // ── PPI / Producer Price ──
-    if (ind.contains("ppi") || ind.contains("producer price")) {
-        return text.contains("ppi") || text.contains("producer price") ||
-               text.contains("wholesale price") ||
-               text.contains("prix à la production");
-    }
-
-    // ── GDP / Croissance ──
-    if (ind.contains("gdp") || ind.contains("gross domestic") || ind.contains("pib")) {
-        return text.contains("gdp") || text.contains("pib") ||
-               text.contains("gross domestic") || text.contains("croissance") ||
-               text.contains("economic growth") || text.contains("quarterly growth");
-    }
-
-    // ── Fed / FOMC / Taux US ──
-    if (ind.contains("fomc") || ind.contains("federal reserve") ||
-        ind.contains("fed rate") || ind.contains("interest rate decision")) {
-        return text.contains("fed") || text.contains("fomc") ||
-               text.contains("federal reserve") || text.contains("powell") ||
-               text.contains("rate decision") || text.contains("interest rate") ||
-               text.contains("taux directeur") || text.contains("taux fed");
-    }
-
-    // ── Beige Book / Minutes Fed ──
-    if (ind.contains("beige book") || ind.contains("fomc minutes") ||
-        ind.contains("fed minutes") || ind.contains("minutes")) {
-        return text.contains("beige book") || text.contains("minutes") ||
-               text.contains("fomc minutes") || text.contains("fed minutes") ||
-               text.contains("compte rendu fed");
-    }
-
-    // ── ISM / PMI Manufacturing & Services ──
-    if (ind.contains("ism") || ind.contains("pmi") ||
-        ind.contains("purchasing managers")) {
-        return text.contains("ism") || text.contains("pmi") ||
-               text.contains("purchasing managers") || text.contains("manufacturing") ||
-               text.contains("services pmi") || text.contains("composite pmi") ||
-               text.contains("industrie") || text.contains("secteur services");
-    }
-
-    // ── Chicago PMI / Empire State / Philly Fed / NY Fed ──
-    if (ind.contains("chicago pmi") || ind.contains("empire state") ||
-        ind.contains("philly fed") || ind.contains("philadelphia") ||
-        ind.contains("ny fed") || ind.contains("new york fed")) {
-        return text.contains("chicago pmi") || text.contains("chicago") ||
-               text.contains("empire state") || text.contains("philly fed") ||
-               text.contains("philadelphia") || text.contains("ny fed") ||
-               text.contains("manufacturing index") || text.contains("regional fed");
-    }
-
-    // ── ADP Employment ──
-    if (ind.contains("adp")) {
-        return text.contains("adp") || text.contains("private payroll") ||
-               text.contains("private employment") ||
-               text.contains("national employment") ||
-               text.contains("adp employment") ||
-               text.contains("adp report");
-    }
-
-    // ── JOLTS / Job Openings ──
-    if (ind.contains("jolts") || ind.contains("job openings") ||
-        ind.contains("labor turnover")) {
-        return text.contains("jolts") || text.contains("job openings") ||
-               text.contains("labor turnover") || text.contains("job turnover") ||
-               text.contains("offres d emploi") || text.contains("job vacancies");
-    }
-
-    // ── Jobless Claims / Initial / Continuing ──
-    if (ind.contains("jobless") || ind.contains("initial claims") ||
-        ind.contains("continuing claims") || ind.contains("unemployment claims")) {
-        return text.contains("jobless") || text.contains("initial claims") ||
-               text.contains("continuing claims") || text.contains("weekly claims") ||
-               text.contains("unemployment claims") || text.contains("chômage") ||
-               text.contains("demandeurs d emploi");
-    }
-
-    // ── Unemployment Rate ──
-    if (ind.contains("unemployment rate") || ind.contains("taux de chômage")) {
-        return text.contains("unemployment rate") || text.contains("jobless rate") ||
-               text.contains("taux de chômage") || text.contains("unemployment");
-    }
-
-    // ── Retail Sales ──
-    if (ind.contains("retail sales") || ind.contains("retail")) {
-        return text.contains("retail sales") || text.contains("retail") ||
-               text.contains("consumer spending") || text.contains("consumer sales") ||
-               text.contains("ventes au détail") || text.contains("dépenses consommateurs");
-    }
-
-    // ── Personal Income / Personal Spending ──
-    if (ind.contains("personal income") || ind.contains("personal spending") ||
-        ind.contains("personal consumption")) {
-        return text.contains("personal income") || text.contains("personal spending") ||
-               text.contains("personal consumption") || text.contains("disposable income") ||
-               text.contains("revenu personnel") || text.contains("dépenses personnelles");
-    }
-
-    // ── Michigan Sentiment (Preliminary / Final) ──
-    if (ind.contains("michigan") || ind.contains("consumer sentiment") ||
-        ind.contains("consumer confidence") || ind.contains("sentiment prel") ||
-        ind.contains("sentiment final") || ind.contains("preliminary") ||
-        ind.contains("unc michigan")) {
-        return text.contains("michigan") || text.contains("consumer sentiment") ||
-               text.contains("consumer confidence") || text.contains("sentiment prel") ||
-               text.contains("preliminary sentiment") || text.contains("final sentiment") ||
-               text.contains("confiance consommateurs") || text.contains("confiance");
-    }
-
-    // ── Durable Goods ──
-    if (ind.contains("durable goods") || ind.contains("core durable")) {
-        return text.contains("durable goods") || text.contains("core durable") ||
-               text.contains("durable orders") || text.contains("capital goods") ||
-               text.contains("biens durables") || text.contains("commandes industrielles");
-    }
-
-    // ── Industrial Production / Capacity Utilization ──
-    if (ind.contains("industrial production") || ind.contains("capacity utilization") ||
-        ind.contains("manufacturing output")) {
-        return text.contains("industrial production") || text.contains("capacity utilization") ||
-               text.contains("manufacturing output") || text.contains("factory output") ||
-               text.contains("production industrielle") || text.contains("utilisation capacités");
-    }
-
-    // ── Housing Starts / Building Permits ──
-    if (ind.contains("housing starts") || ind.contains("building permits")) {
-        return text.contains("housing starts") || text.contains("building permits") ||
-               text.contains("new construction") || text.contains("residential") ||
-               text.contains("mises en chantier") || text.contains("permis de construire");
-    }
-
-    // ── New Home Sales / Existing Home Sales / Pending Home Sales ──
-    if (ind.contains("home sales") || ind.contains("existing home") ||
-        ind.contains("new home") || ind.contains("pending home") ||
-        ind.contains("house sales")) {
-        return text.contains("home sales") || text.contains("existing home") ||
-               text.contains("new home sales") || text.contains("pending home") ||
-               text.contains("house sales") || text.contains("housing market") ||
-               text.contains("ventes immobilières") || text.contains("immobilier");
-    }
-
-    // ── Trade Balance / Current Account ──
-    if (ind.contains("trade balance") || ind.contains("current account") ||
-        ind.contains("trade deficit") || ind.contains("trade surplus")) {
-        return text.contains("trade balance") || text.contains("trade deficit") ||
-               text.contains("trade surplus") || text.contains("current account") ||
-               text.contains("balance commerciale") || text.contains("compte courant");
-    }
-
-    // ── EIA Crude Oil Inventories / Distillate / Gasoline ──
-    if (ind.contains("crude oil") || ind.contains("eia") ||
-        ind.contains("oil inventories") || ind.contains("distillate") ||
-        ind.contains("gasoline") || ind.contains("petroleum")) {
-        return text.contains("crude oil") || text.contains("eia") ||
-               text.contains("oil inventories") || text.contains("crude inventories") ||
-               text.contains("distillate") || text.contains("gasoline") ||
-               text.contains("petroleum") || text.contains("stockpiles") ||
-               text.contains("barrel") || text.contains("pétrole") ||
-               text.contains("stocks pétrole");
-    }
-
-    // ── OPEC ──
-    if (ind.contains("opec") || ind.contains("opec+")) {
-        return text.contains("opec") || text.contains("opec+") ||
-               text.contains("oil production") || text.contains("production cuts") ||
-               text.contains("production quota") || text.contains("barrel") ||
-               text.contains("réunion opec") || text.contains("quota pétrole");
-    }
-
-    // ── ECB / BCE ──
-    if (ind.contains("ecb") || ind.contains("lagarde") ||
-        ind.contains("european central bank")) {
-        return text.contains("ecb") || text.contains("lagarde") ||
-               text.contains("bce") || text.contains("european central bank") ||
-               text.contains("eurozone rate") || text.contains("taux bce") ||
-               text.contains("taux zone euro");
-    }
-
-    // ── BOE / Bank of England ──
-    if (ind.contains("boe") || ind.contains("bailey") ||
-        ind.contains("bank of england")) {
-        return text.contains("boe") || text.contains("bailey") ||
-               text.contains("bank of england") || text.contains("uk rate") ||
-               text.contains("taux boe") || text.contains("monetary policy committee") ||
-               text.contains("mpc");
-    }
-
-    // ── BOJ / Bank of Japan ──
-    if (ind.contains("boj") || ind.contains("ueda") ||
-        ind.contains("bank of japan")) {
-        return text.contains("boj") || text.contains("ueda") ||
-               text.contains("bank of japan") || text.contains("japan rate") ||
-               text.contains("taux boj") || text.contains("yield curve control") ||
-               text.contains("ycc");
-    }
-
-    // ── BOC / Bank of Canada ──
-    if (ind.contains("boc") || ind.contains("macklem") ||
-        ind.contains("bank of canada")) {
-        return text.contains("boc") || text.contains("macklem") ||
-               text.contains("bank of canada") || text.contains("canada rate") ||
-               text.contains("taux boc") || text.contains("canadian rate");
-    }
-
-    // ── RBA / Reserve Bank of Australia ──
-    if (ind.contains("rba") || ind.contains("bullock") ||
-        ind.contains("reserve bank of australia")) {
-        return text.contains("rba") || text.contains("bullock") ||
-               text.contains("reserve bank of australia") || text.contains("australia rate") ||
-               text.contains("taux rba") || text.contains("australian rate");
-    }
-
-    // ── IFO / ZEW (Allemagne) ──
-    if (ind.contains("ifo") || ind.contains("zew") ||
-        ind.contains("german business") || ind.contains("german sentiment")) {
-        return text.contains("ifo") || text.contains("zew") ||
-               text.contains("german business") || text.contains("german sentiment") ||
-               text.contains("german confidence") || text.contains("ifo business climate") ||
-               text.contains("indicateur allemand");
-    }
-
-    // ── Tankan (Japon) ──
-    if (ind.contains("tankan") || ind.contains("japan business")) {
-        return text.contains("tankan") || text.contains("japan business") ||
-               text.contains("boj survey") || text.contains("japanese business") ||
-               text.contains("enquête tankan");
-    }
-
-    // ── Average Earnings / Wages UK ──
-    if (ind.contains("average earnings") || ind.contains("wage growth") ||
-        ind.contains("wages")) {
-        return text.contains("average earnings") || text.contains("wage growth") ||
-               text.contains("wages") || text.contains("earnings") ||
-               text.contains("salaires") || text.contains("croissance salaires");
-    }
-
-    // ── Claimant Count UK ──
-    if (ind.contains("claimant count")) {
-        return text.contains("claimant count") || text.contains("claimant") ||
-               text.contains("uk jobless") || text.contains("uk unemployment") ||
-               text.contains("demandeurs emploi uk");
-    }
-
-    // ── Caixin PMI (Chine) ──
-    if (ind.contains("caixin") || ind.contains("china pmi") ||
-        ind.contains("chinese pmi")) {
-        return text.contains("caixin") || text.contains("china pmi") ||
-               text.contains("chinese pmi") || text.contains("china manufacturing") ||
-               text.contains("pmi chine") || text.contains("chine industrie");
-    }
-
-    // ── Balance of Trade / Current Account (autres pays) ──
-    if (ind.contains("trade") || ind.contains("balance of payments")) {
-        return text.contains("trade") || text.contains("balance of payments") ||
-               text.contains("exports") || text.contains("imports") ||
-               text.contains("exportations") || text.contains("importations");
-    }
-
-    return false;
-}
     // ─────────────────────────────────────────────────────────────
     //  BREAKING NEWS GÉNÉRIQUE
     // ─────────────────────────────────────────────────────────────
@@ -746,37 +746,37 @@ if (!detectedType.startsWith("GEO") && db != null) {
 
         return Math.min(100, score);
     }
-    /**
- * Enrichit le contenu d'une notification avec les données du calendrier économique
- * si un événement correspondant est trouvé.
- * @param title Titre de la notification
- * @param content Contenu original
- * @param timestamp Timestamp de la notification (millisecondes)
- * @return Contenu enrichi (ou l'original si aucun match ou pas de données)
- */
- public static String enrichWithCalendar(String title, String content, long timestamp) {
-    if (title == null || content == null) return content;
-    
-    EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp); // ← corrigé
-    if (match == null) return content;
-    
-    StringBuilder enriched = new StringBuilder(content);
-    boolean hasActual   = match.actual   != null && !match.actual.equals("N/A")   && !match.actual.isEmpty();
-    boolean hasForecast = match.forecast != null && !match.forecast.equals("N/A") && !match.forecast.isEmpty();
-    
-    if (hasActual && hasForecast) {
-        enriched.append(" ACTUAL: ").append(match.actual)
-                .append(" FORECAST: ").append(match.forecast);
-        Log.d(TAG, "Enrichi " + match.indicator + " | A=" + match.actual + " F=" + match.forecast);
-    } else if (hasForecast) {
-        enriched.append(" FORECAST: ").append(match.forecast);
-        Log.d(TAG, "Consensus seulement pour " + match.indicator + " | F=" + match.forecast);
-    } else if (hasActual) {
-        enriched.append(" ACTUAL: ").append(match.actual);
-        Log.d(TAG, "Actual seulement pour " + match.indicator + " | A=" + match.actual);
+        /**
+     * Enrichit le contenu d'une notification avec les données du calendrier économique
+     * si un événement correspondant est trouvé.
+     * @param title Titre de la notification
+     * @param content Contenu original
+     * @param timestamp Timestamp de la notification (millisecondes)
+     * @return Contenu enrichi (ou l'original si aucun match ou pas de données)
+     */
+     public static String enrichWithCalendar(String title, String content, long timestamp) {
+        if (title == null || content == null) return content;
+        
+        EconomicCalendarAPI.CalendarEvent match = findMatchingEvent(title, content, timestamp); // ← corrigé
+        if (match == null) return content;
+        
+        StringBuilder enriched = new StringBuilder(content);
+        boolean hasActual   = match.actual   != null && !match.actual.equals("N/A")   && !match.actual.isEmpty();
+        boolean hasForecast = match.forecast != null && !match.forecast.equals("N/A") && !match.forecast.isEmpty();
+        
+        if (hasActual && hasForecast) {
+            enriched.append(" ACTUAL: ").append(match.actual)
+                    .append(" FORECAST: ").append(match.forecast);
+            Log.d(TAG, "Enrichi " + match.indicator + " | A=" + match.actual + " F=" + match.forecast);
+        } else if (hasForecast) {
+            enriched.append(" FORECAST: ").append(match.forecast);
+            Log.d(TAG, "Consensus seulement pour " + match.indicator + " | F=" + match.forecast);
+        } else if (hasActual) {
+            enriched.append(" ACTUAL: ").append(match.actual);
+            Log.d(TAG, "Actual seulement pour " + match.indicator + " | A=" + match.actual);
+        }
+        return enriched.toString();
     }
-    return enriched.toString();
-}
     // ─────────────────────────────────────────────────────────────
     //  UTILITAIRES SÉCURISÉS (inchangés)
     // ─────────────────────────────────────────────────────────────
@@ -859,18 +859,18 @@ if (!detectedType.startsWith("GEO") && db != null) {
         }
     }
 
-public static void cleanupOldFingerprints() {
-    if (recentFingerprints == null || recentFingerprints.isEmpty()) return;
-    
-    long now = System.currentTimeMillis();
-    // 2 heures converties explicitement en millisecondes (utilisation du suffixe L pour la sécurité)
-    long cleanupThreshold = now - (2 * 60 * 60 * 1000L); 
-    
-    try {
-        // removeIf est sûr ici grâce à l'utilisation d'une ConcurrentHashMap
-        recentFingerprints.entrySet().removeIf(entry -> entry.getValue() < cleanupThreshold);
-    } catch (Exception e) {
-        Log.e("NotificationService", "Erreur lors du nettoyage des fingerprints", e);
+    public static void cleanupOldFingerprints() {
+        if (recentFingerprints == null || recentFingerprints.isEmpty()) return;
+        
+        long now = System.currentTimeMillis();
+        // 2 heures converties explicitement en millisecondes (utilisation du suffixe L pour la sécurité)
+        long cleanupThreshold = now - (2 * 60 * 60 * 1000L); 
+        
+        try {
+            // removeIf est sûr ici grâce à l'utilisation d'une ConcurrentHashMap
+            recentFingerprints.entrySet().removeIf(entry -> entry.getValue() < cleanupThreshold);
+        } catch (Exception e) {
+            Log.e("NotificationService", "Erreur lors du nettoyage des fingerprints", e);
+        }
     }
-}
 }
