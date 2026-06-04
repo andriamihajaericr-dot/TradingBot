@@ -235,254 +235,203 @@ interface FetchFunction {
         }
         return events;
     }
-
+    
     public static List<String> mapIndicatorToAssetsIntermarket(String indicator, String country) {
-        List<String> assets = new ArrayList<>();
-        String ind = indicator.toLowerCase(Locale.US);
-        String cty = country.toLowerCase(Locale.US);
+    List<String> assets = new ArrayList<>();
+    String ind = indicator.toLowerCase(Locale.US);
+    String cty = country.toLowerCase(Locale.US);
 
-        assets.add("US10Y"); // Pivot obligatoire d'analyse macro intermarché
-        if (cty.contains("united states") || cty.contains("us ")) {
+    assets.add("US10Y"); // Pivot obligatoire d'analyse macro intermarché
 
-    // ── Fed / FOMC / Taux (Rang Suprême) ──
-    if (ind.contains("fomc") || ind.contains("federal reserve") ||
-        ind.contains("interest rate") || ind.contains("rate decision") ||
-        ind.contains("powell") || ind.contains("warsh") ||
-        ind.contains("beige book") || ind.contains("minutes")) {
-        assets.addAll(Arrays.asList(
-            "GOLD", "SP500", "NASDAQ", "BITCOIN",
-            "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"
-        ));
+    if (cty.contains("united states") || cty.equals("us") || cty.startsWith("us ")) {
+
+        if (ind.contains("fomc") || ind.contains("federal reserve") ||
+            ind.contains("interest rate") || ind.contains("rate decision") ||
+            ind.contains("powell") || ind.contains("warsh") ||
+            ind.contains("beige book") || ind.contains("minutes")) {
+            assets.addAll(Arrays.asList(
+                "GOLD", "SP500", "NASDAQ", "BITCOIN",
+                "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"
+            ));
+        } else if (ind.contains("cpi") || ind.contains("inflation") ||
+                   ind.contains("consumer price")) {
+            assets.addAll(Arrays.asList(
+                "GOLD", "SP500", "NASDAQ", "BITCOIN",
+                "USDJPY", "EURUSD", "GBPUSD", "USDCAD"
+            ));
+        } else if (ind.contains("pce") || ind.contains("personal consumption expenditure")) {
+            assets.addAll(Arrays.asList(
+                "GOLD", "SP500", "NASDAQ", "BITCOIN",
+                "USDJPY", "EURUSD", "GBPUSD"
+            ));
+        } else if (ind.contains("ppi") || ind.contains("producer price")) {
+            assets.addAll(Arrays.asList(
+                "GOLD", "USDJPY", "EURUSD", "SP500"
+            ));
+        } else if (ind.contains("non-farm") || ind.contains("nfp") ||
+                   ind.contains("payroll")) {
+            assets.addAll(Arrays.asList(
+                "GOLD", "SP500", "NASDAQ", "BITCOIN",
+                "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"
+            ));
+        } else if (ind.contains("adp")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
+            ));
+        } else if (ind.contains("jolts") || ind.contains("job openings")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
+            ));
+        } else if (ind.contains("jobless") || ind.contains("initial claims") ||
+                   ind.contains("continuing claims")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
+            ));
+        } else if (ind.contains("gdp") || ind.contains("gross domestic")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY", "GOLD", "USOIL"
+            ));
+        } else if (ind.contains("ism") || ind.contains("pmi") ||
+                   ind.contains("purchasing managers")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY", "USOIL"
+            ));
+        } else if (ind.contains("chicago pmi") || ind.contains("empire state") ||
+                   ind.contains("philly fed") || ind.contains("philadelphia")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY"
+            ));
+        } else if (ind.contains("retail") || ind.contains("consumer spending")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY", "BITCOIN"
+            ));
+        } else if (ind.contains("personal income") || ind.contains("personal spending")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY", "GOLD"
+            ));
+        } else if (ind.contains("michigan") || ind.contains("consumer sentiment") ||
+                   ind.contains("consumer confidence")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USOIL", "BITCOIN"
+            ));
+        } else if (ind.contains("durable goods") || ind.contains("capital goods")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY"
+            ));
+        } else if (ind.contains("industrial production") || ind.contains("capacity utilization")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USOIL", "USDJPY"
+            ));
+        } else if (ind.contains("housing starts") || ind.contains("building permits")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY"
+            ));
+        } else if (ind.contains("home sales") || ind.contains("existing home") ||
+                   ind.contains("new home") || ind.contains("pending home")) {
+            assets.addAll(Arrays.asList(
+                "SP500", "NASDAQ", "USDJPY"
+            ));
+        } else if (ind.contains("trade balance") || ind.contains("current account")) {
+            assets.addAll(Arrays.asList(
+                "USDJPY", "EURUSD", "GBPUSD", "GOLD"
+            ));
+        } else if (ind.contains("crude oil") || ind.contains("eia") ||
+                   ind.contains("oil inventories") || ind.contains("distillate") ||
+                   ind.contains("gasoline") || ind.contains("petroleum")) {
+            assets.addAll(Arrays.asList(
+                "USOIL", "USDCAD", "GOLD", "SP500"
+            ));
+        } else if (ind.contains("opec")) {
+            assets.addAll(Arrays.asList(
+                "USOIL", "USDCAD", "GOLD", "SP500", "NASDAQ"
+            ));
+        }
+
+    } else if (cty.contains("united kingdom") || cty.contains("uk")) {
+        assets.add("GBPUSD");
+        if (ind.contains("cpi") || ind.contains("inflation")) {
+            assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500"));
+        } else if (ind.contains("boe") || ind.contains("interest rate") ||
+                   ind.contains("monetary policy")) {
+            assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
+        } else if (ind.contains("gdp") || ind.contains("growth")) {
+            assets.addAll(Arrays.asList("EURUSD", "GOLD"));
+        } else if (ind.contains("average earnings") || ind.contains("wage")) {
+            assets.addAll(Arrays.asList("EURUSD", "GOLD"));
+        } else if (ind.contains("claimant count") || ind.contains("unemployment")) {
+            assets.addAll(Arrays.asList("EURUSD"));
+        } else if (ind.contains("pmi") || ind.contains("retail")) {
+            assets.addAll(Arrays.asList("EURUSD", "SP500"));
+        }
+
+    } else if (cty.contains("japan")) {
+        assets.add("USDJPY");
+        if (ind.contains("boj") || ind.contains("interest rate") ||
+            ind.contains("yield curve") || ind.contains("monetary policy")) {
+            assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "EURUSD", "AUDUSD"));
+        } else if (ind.contains("cpi") || ind.contains("inflation")) {
+            assets.addAll(Arrays.asList("GOLD"));
+        } else if (ind.contains("tankan")) {
+            assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
+        } else if (ind.contains("gdp")) {
+            assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
+        }
+
+    } else if (cty.contains("canada")) {
+        assets.addAll(Arrays.asList("USDCAD", "USOIL"));
+        if (ind.contains("boc") || ind.contains("interest rate") ||
+            ind.contains("rate decision")) {
+            assets.addAll(Arrays.asList("GOLD", "SP500", "EURUSD"));
+        } else if (ind.contains("cpi") || ind.contains("inflation")) {
+            assets.addAll(Arrays.asList("GOLD", "EURUSD"));
+        } else if (ind.contains("gdp") || ind.contains("employment")) {
+            assets.addAll(Arrays.asList("GOLD"));
+        }
+
+    } else if (cty.contains("australia")) {
+        assets.add("AUDUSD");
+        if (ind.contains("rba") || ind.contains("interest rate") ||
+            ind.contains("rate decision")) {
+            assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "USDJPY"));
+        } else if (ind.contains("cpi") || ind.contains("inflation")) {
+            assets.addAll(Arrays.asList("GOLD", "USDJPY"));
+        } else if (ind.contains("gdp") || ind.contains("employment")) {
+            assets.addAll(Arrays.asList("GOLD", "USDJPY"));
+        }
+
+    } else if (cty.contains("eurozone") || cty.contains("euro area") ||
+               ind.contains("ecb") || ind.contains("lagarde")) {
+        assets.add("EURUSD");
+        if (ind.contains("ecb") || ind.contains("interest rate") ||
+            ind.contains("rate decision") || ind.contains("lagarde")) {
+            assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
+        } else if (ind.contains("cpi") || ind.contains("inflation") ||
+                   ind.contains("hicp")) {
+            assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500"));
+        } else if (ind.contains("gdp") || ind.contains("growth")) {
+            assets.addAll(Arrays.asList("GBPUSD", "GOLD", "USOIL"));
+        } else if (ind.contains("pmi") || ind.contains("ifo") || ind.contains("zew")) {
+            assets.addAll(Arrays.asList("GBPUSD", "SP500", "USOIL"));
+        } else if (ind.contains("retail") || ind.contains("consumer")) {
+            assets.addAll(Arrays.asList("GBPUSD", "SP500"));
+        } else if (ind.contains("unemployment") || ind.contains("jobless")) {
+            assets.addAll(Arrays.asList("GBPUSD"));
+        }
+
+    } else if (cty.contains("china") || cty.contains("chinese")) {
+        assets.addAll(Arrays.asList("AUDUSD", "USDJPY", "USOIL"));
+        if (ind.contains("caixin") || ind.contains("pmi")) {
+            assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD"));
+        } else if (ind.contains("gdp") || ind.contains("growth")) {
+            assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD", "USOIL"));
+        } else if (ind.contains("trade balance") || ind.contains("exports")) {
+            assets.addAll(Arrays.asList("GOLD", "SP500"));
+        }
     }
-    // ── CPI / Inflation ──
-    else if (ind.contains("cpi") || ind.contains("inflation") ||
-             ind.contains("consumer price")) {
-        assets.addAll(Arrays.asList(
-            "GOLD", "SP500", "NASDAQ", "BITCOIN",
-            "USDJPY", "EURUSD", "GBPUSD", "USDCAD"
-        ));
-    }
-    // ── PCE / Core PCE ──
-    else if (ind.contains("pce") || ind.contains("personal consumption expenditure")) {
-        assets.addAll(Arrays.asList(
-            "GOLD", "SP500", "NASDAQ", "BITCOIN",
-            "USDJPY", "EURUSD", "GBPUSD"
-        ));
-    }
-    // ── PPI / Producer Price ──
-    else if (ind.contains("ppi") || ind.contains("producer price")) {
-        assets.addAll(Arrays.asList(
-            "GOLD", "USDJPY", "EURUSD", "SP500"
-        ));
-    }
-    // ── NFP / Non-Farm Payrolls ──
-    else if (ind.contains("non-farm") || ind.contains("nfp") ||
-             ind.contains("payroll")) {
-        assets.addAll(Arrays.asList(
-            "GOLD", "SP500", "NASDAQ", "BITCOIN",
-            "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"
-        ));
-    }
-    // ── ADP Employment ──
-    else if (ind.contains("adp")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
-        ));
-    }
-    // ── JOLTS / Job Openings ──
-    else if (ind.contains("jolts") || ind.contains("job openings")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
-        ));
-    }
-    // ── Jobless Claims ──
-    else if (ind.contains("jobless") || ind.contains("initial claims") ||
-             ind.contains("continuing claims")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
-        ));
-    }
-    // ── GDP ──
-    else if (ind.contains("gdp") || ind.contains("gross domestic")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY", "GOLD", "USOIL"
-        ));
-    }
-    // ── ISM / PMI Manufacturing & Services ──
-    else if (ind.contains("ism") || ind.contains("pmi") ||
-             ind.contains("purchasing managers")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY", "USOIL"
-        ));
-    }
-    // ── Chicago PMI / Empire State / Philly Fed ──
-    else if (ind.contains("chicago pmi") || ind.contains("empire state") ||
-             ind.contains("philly fed") || ind.contains("philadelphia")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY"
-        ));
-    }
-    // ── Retail Sales ──
-    else if (ind.contains("retail") || ind.contains("consumer spending")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY", "BITCOIN"
-        ));
-    }
-    // ── Personal Income / Spending ──
-    else if (ind.contains("personal income") || ind.contains("personal spending")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY", "GOLD"
-        ));
-    }
-    // ── Michigan Sentiment (Prel / Final) ──
-    else if (ind.contains("michigan") || ind.contains("consumer sentiment") ||
-             ind.contains("consumer confidence")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USOIL", "BITCOIN"
-        ));
-    }
-    // ── Durable Goods ──
-    else if (ind.contains("durable goods") || ind.contains("capital goods")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY"
-        ));
-    }
-    // ── Industrial Production / Capacity Utilization ──
-    else if (ind.contains("industrial production") || ind.contains("capacity utilization")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USOIL", "USDJPY"
-        ));
-    }
-    // ── Housing Starts / Building Permits ──
-    else if (ind.contains("housing starts") || ind.contains("building permits")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY"
-        ));
-    }
-    // ── New / Existing / Pending Home Sales ──
-    else if (ind.contains("home sales") || ind.contains("existing home") ||
-             ind.contains("new home") || ind.contains("pending home")) {
-        assets.addAll(Arrays.asList(
-            "SP500", "NASDAQ", "USDJPY", "US10Y"
-        ));
-    }
-    // ── Trade Balance ──
-    else if (ind.contains("trade balance") || ind.contains("current account")) {
-        assets.addAll(Arrays.asList(
-            "USDJPY", "EURUSD", "GBPUSD", "GOLD"
-        ));
-    }
-    // ── EIA Crude Oil / Distillate / Gasoline ──
-    else if (ind.contains("crude oil") || ind.contains("eia") ||
-             ind.contains("oil inventories") || ind.contains("distillate") ||
-             ind.contains("gasoline") || ind.contains("petroleum")) {
-        assets.addAll(Arrays.asList(
-            "USOIL", "USDCAD", "GOLD", "SP500"
-        ));
-    }
-    // ── OPEC ──
-    else if (ind.contains("opec")) {
-        assets.addAll(Arrays.asList(
-            "USOIL", "USDCAD", "GOLD", "SP500", "NASDAQ"
-        ));
-    }
-    }
-        // ── United Kingdom ──
-else if (cty.contains("united kingdom") || cty.contains("uk")) {
-    assets.add("GBPUSD");
-    if (ind.contains("cpi") || ind.contains("inflation")) {
-        assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500"));
-    } else if (ind.contains("boe") || ind.contains("interest rate") ||
-               ind.contains("monetary policy")) {
-        assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
-    } else if (ind.contains("gdp") || ind.contains("growth")) {
-        assets.addAll(Arrays.asList("EURUSD", "GOLD"));
-    } else if (ind.contains("average earnings") || ind.contains("wage")) {
-        assets.addAll(Arrays.asList("EURUSD", "GOLD"));
-    } else if (ind.contains("claimant count") || ind.contains("unemployment")) {
-        assets.addAll(Arrays.asList("EURUSD"));
-    } else if (ind.contains("pmi") || ind.contains("retail")) {
-        assets.addAll(Arrays.asList("EURUSD", "SP500"));
-    }
+
+    return new ArrayList<>(new LinkedHashSet<>(assets));
 }
-
-// ── Japan ──
-else if (cty.contains("japan")) {
-    assets.add("USDJPY");
-    if (ind.contains("boj") || ind.contains("interest rate") ||
-        ind.contains("yield curve") || ind.contains("monetary policy")) {
-        assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "EURUSD", "AUDUSD"));
-    } else if (ind.contains("cpi") || ind.contains("inflation")) {
-        assets.addAll(Arrays.asList("GOLD"));
-    } else if (ind.contains("tankan")) {
-        assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
-    } else if (ind.contains("gdp")) {
-        assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
-    }
-}
-
-// ── Canada ──
-else if (cty.contains("canada")) {
-    assets.addAll(Arrays.asList("USDCAD", "USOIL"));
-    if (ind.contains("boc") || ind.contains("interest rate") ||
-        ind.contains("rate decision")) {
-        assets.addAll(Arrays.asList("GOLD", "SP500", "EURUSD"));
-    } else if (ind.contains("cpi") || ind.contains("inflation")) {
-        assets.addAll(Arrays.asList("GOLD", "EURUSD"));
-    } else if (ind.contains("gdp") || ind.contains("employment")) {
-        assets.addAll(Arrays.asList("GOLD"));
-    }
-}
-
-// ── Australia ──
-else if (cty.contains("australia")) {
-    assets.add("AUDUSD");
-    if (ind.contains("rba") || ind.contains("interest rate") ||
-        ind.contains("rate decision")) {
-        assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "USDJPY"));
-    } else if (ind.contains("cpi") || ind.contains("inflation")) {
-        assets.addAll(Arrays.asList("GOLD", "USDJPY"));
-    } else if (ind.contains("gdp") || ind.contains("employment")) {
-        assets.addAll(Arrays.asList("GOLD", "USDJPY"));
-    }
-}
-
-// ── Eurozone / ECB ──
-else if (cty.contains("eurozone") || cty.contains("euro area") ||
-         ind.contains("ecb") || ind.contains("lagarde")) {
-    assets.add("EURUSD");
-    if (ind.contains("ecb") || ind.contains("interest rate") ||
-        ind.contains("rate decision") || ind.contains("lagarde")) {
-        assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
-    } else if (ind.contains("cpi") || ind.contains("inflation") ||
-               ind.contains("hicp")) {
-        assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500"));
-    } else if (ind.contains("gdp") || ind.contains("growth")) {
-        assets.addAll(Arrays.asList("GBPUSD", "GOLD", "USOIL"));
-    } else if (ind.contains("pmi") || ind.contains("ifo") ||
-               ind.contains("zew")) {
-        assets.addAll(Arrays.asList("GBPUSD", "SP500", "USOIL"));
-    } else if (ind.contains("retail") || ind.contains("consumer")) {
-        assets.addAll(Arrays.asList("GBPUSD", "SP500"));
-    } else if (ind.contains("unemployment") || ind.contains("jobless")) {
-        assets.addAll(Arrays.asList("GBPUSD"));
-    }
-}
-
-// ── China ── (proxy via AUD)
-else if (cty.contains("china") || cty.contains("chinese")) {
-    assets.addAll(Arrays.asList("AUDUSD", "USDJPY", "USOIL"));
-    if (ind.contains("caixin") || ind.contains("pmi")) {
-        assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD"));
-    } else if (ind.contains("gdp") || ind.contains("growth")) {
-        assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD", "USOIL"));
-    } else if (ind.contains("trade balance") || ind.contains("exports")) {
-        assets.addAll(Arrays.asList("GOLD", "SP500"));
-    }
-}
-return new ArrayList<>(new LinkedHashSet<>(assets)); // Protection absolue contre les doublons d'ordonnancement
-    }
-
+    
     private static List<CalendarEvent> generateInstitutionalExhaustiveFallback() {
         List<CalendarEvent> list = new ArrayList<>();
         long nowSeconds = System.currentTimeMillis() / 1000;
