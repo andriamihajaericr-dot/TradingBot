@@ -460,16 +460,20 @@ public class EventValidator {
             long normalizedTimestamp = (timestamp > 9999999999L) ? timestamp : timestamp * 1000;
             long delta = Math.abs(eventTime - normalizedTimestamp);
     
-            if (delta < window) {  // ← vérification fenêtre temporelle manquante aussi !
-                // ↓ déclarations manquantes dans votre version
+            if (delta < window) {
                 String indicator = event.indicator.toLowerCase(Locale.ROOT);
-                String normalizedIndicator = indicator
-                        .replaceAll("[^a-z0-9\\s]", " ")
-                        .replaceAll("\\s+", " ").trim();
-    
-                if (normalizedCombined.contains(normalizedIndicator) ||
-                    matchesIndicatorKeywords(normalizedCombined, indicator, event.country)) {
-    
+                String normalizedIndicator = indicator.replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+                
+                String normalizedText = normalizedCombined;
+                
+                // Matching plus permissif pour Jobless Claims
+                boolean isJoblessMatch = (indicator.contains("jobless") || indicator.contains("initial claims")) &&
+                                         (normalizedText.contains("jobless") || normalizedText.contains("initial claims") || normalizedText.contains("claims"));
+                
+                if (normalizedText.contains(normalizedIndicator) || 
+                    matchesIndicatorKeywords(normalizedText, indicator, event.country) ||
+                    isJoblessMatch) {
+                    
                     if (delta < bestDelta) {
                         bestDelta = delta;
                         bestMatch = event;
