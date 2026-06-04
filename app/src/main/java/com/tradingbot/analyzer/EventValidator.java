@@ -848,21 +848,171 @@ public class EventValidator {
         return false;
     }
 
-    public static void preloadCalendar() {
-        try {
-            List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(72);
-            if (events == null) return;
-            upcomingEvents.clear();
+    // ✅ Ajouter en haut de la classe (après les autres champs statiques)
+private static Context appContext = null;
 
-            for (EconomicCalendarAPI.CalendarEvent event : events) {
-                if (event == null) continue;
-                String key = createEventKey(event.indicator, event.timestamp);
-                upcomingEvents.put(key, event);
-            }
-        } catch (Exception e) {
-            logToMain("⚠️ Échec préchargement calendrier : " + e.getMessage());
+public static void setAppContext(Context context) {
+    appContext = context.getApplicationContext();
+}
+
+public static void preloadCalendar() {
+    try {
+        List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(72);
+        if (events == null || events.isEmpty()) {
+            logToMain("⚠️ Calendrier vide ou non disponible.");
+            return;
         }
+
+        upcomingEvents.clear();
+
+        // ── Tri par timestamp croissant ──
+        List<EconomicCalendarAPI.CalendarEvent> sortedEvents = new ArrayList<>(events);
+        Collections.sort(sortedEvents, (a, b) -> {
+            long tsA = parseTimestamp(a.timestamp);
+            long tsB = parseTimestamp(b.timestamp);
+            return Long.compare(tsA, tsB);
+        });
+
+        // ── Stockage dans la map interne ──
+        for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
+            if (event == null) continue;
+            String key = createEventKey(event.indicator, event.timestamp);
+            upcomingEvents.put(key, event);
+        }
+
+        // ── Construction du rapport Telegram ──
+        StringBuilder report = new StringBuilder();
+        report.append("📅 *CALENDRIER ÉCONOMIQUE — PROCHAINS ÉVÉNEMENTS*\n");
+        report.append("─────────────────────────────────────────\n");
+
+        String lastDay = "";
+        int totalAffiche = 0;
+
+        for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
+            if (event == null || event.indicator == null || event.timestamp == null) continue;
+
+            // ── Séparateur par jour ──
+            String currentDay = formatEventDay(event.timestamp);
+            if (!currentDay.equals(lastDay)) {
+                report.append("\n📆 *").append(currentDay).append("*\n");
+                lastDay = currentDay;
+            }
+
+            // ── Icône impact ──
+            String impactIcon;
+            String imp = event.impact != null ? event.impact.toUpperCase(Locale.ROOT) : "";
+            if      (imp.equals("HIGH"))   impactIcon = "🔴";
+            else if (imp.equals("MEDIUM")) impactIcon = "🟠";
+            else                           impactIcon = "⚪";
+
+            // ── Heure Madagascar ──
+            String time = formatEventTime(event.timestamp);
+
+            // ── Pays / Devise ──
+            String pays = (event.country != null && !event.country.isEmpty())
+                    ? event.country : (event.currency != null ? event.currency : "?");
+
+            report.append(impactIcon)
+                  .append(" `").append(time).append("` ")
+                  .append("[").append(pays).append("] ")
+                  .append(event.indicator);
+
+            // ── Actual / Forecast / Previous ──
+            boolean hasActual   = event.actual   != null && !event.actual.equals("N/A")   && !event.actual.isEmpty();
+            boolean hasForecast = event.forecast != null && !event.forecast.equals("N/A") && !event.forecast.isEmpty();
+            boolean hasPrevious = event.previous != null && !event.previous.equals("N/A") && !event.previous.isEmpty();
+
+            if (hasActual && hasForecast) {
+                report.append(" | Réel: `").append(event.actual)
+                      .append("` Prévu: `").append(event.forecast).append("`");
+
+                // ── Détection surprise ──
+                try {
+                    double actual   = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
+                    double forecast = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
+                    double diff     = actual - forecast;
+                    if (Math.abs(diff) > 0.0) {
+                        report.append(diff > 0 ? " 📈 SURPRISE HAUSSIÈRE" : " 📉 SURPRISE BAISSIÈRE");
+                    }
+                } catch (Exception ignored) {}
+
+            } else if (hasForecast) {
+                report.append(" | Prévu: `").append(event.forecast).append("`");
+            } else if (hasActual) {
+                report.append(" | Réel: `").append(event.actual).append("`");
+            }
+
+            if (hasPrevious) {
+                report.append(" Préc: `").append(event.previous).append("`");
+            }
+
+            report.append("\n");
+            totalAffiche++;
+        }
+
+        // ── Pied de rapport ──
+        report.append("\n─────────────────────────────────────────\n");
+        report.append("📊 *Total :* ").append(totalAffiche).append(" événements\n");
+        report.append("🕒 *Mis à jour :* ").append(getMadaTimeNow()).append(" (Mada)");
+
+        // ── Envoi Telegram découpé ──
+        sendCalendarToTelegram(report.toString());
+
+        logToMain("✅ Calendrier chargé : " + upcomingEvents.size() + " événements — envoyé sur Telegram.");
+
+    } catch (Exception e) {
+        logToMain("⚠️ Échec préchargement calendrier : " + e.getMessage());
+        Log.e(TAG, "Erreur preloadCalendar", e);
     }
+}
+
+// ── Envoi Telegram avec découpage automatique (limite 4000 chars) ──
+private static void sendCalendarToTelegram(String fullMessage) {
+    if (appContext == null) {
+        Log.w(TAG, "appContext null — impossible d'envoyer le calendrier sur Telegram");
+        return;
+    }
+    int maxLength = 4000;
+    int start = 0;
+    while (start < fullMessage.length()) {
+        int end = Math.min(start + maxLength, fullMessage.length());
+        if (end < fullMessage.length()) {
+            int lastNewline = fullMessage.lastIndexOf('\n', end);
+            if (lastNewline > start) end = lastNewline + 1;
+        }
+        String chunk = fullMessage.substring(start, end);
+        NotificationService.sendTelegramSecure(chunk, appContext);
+        start = end;
+        try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+    }
+}
+
+// ── Helpers formatage date/heure Madagascar ──
+private static String formatEventDay(String timestamp) {
+    try {
+        long ts = parseTimestamp(timestamp);
+        SimpleDateFormat sdf = new SimpleDateFormat("EEEE dd/MM", Locale.FRANCE);
+        sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+        return sdf.format(new Date(ts));
+    } catch (Exception e) { return "?"; }
+}
+
+private static String formatEventTime(String timestamp) {
+    try {
+        long ts = parseTimestamp(timestamp);
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.FRANCE);
+        sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+        return sdf.format(new Date(ts));
+    } catch (Exception e) { return "?"; }
+}
+
+private static String getMadaTimeNow() {
+    try {
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE);
+        sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+        return sdf.format(new Date());
+    } catch (Exception e) { return "N/A"; }
+}
 
     public static void cleanupOldFingerprints() {
         if (recentFingerprints == null || recentFingerprints.isEmpty()) return;
