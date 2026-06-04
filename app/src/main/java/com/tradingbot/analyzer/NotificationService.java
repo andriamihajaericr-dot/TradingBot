@@ -34,6 +34,12 @@ import java.util.regex.*;
 public class NotificationService extends NotificationListenerService {
 
     private static final String TAG = "NotificationService";
+    // ✅ Singleton
+    private static NotificationService serviceInstance;
+
+    public static NotificationService getInstance() {
+        return serviceInstance;
+    }
     //private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>();
     private static final String CHANNEL_ID = "trading_alerts";
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
@@ -1194,6 +1200,24 @@ public class NotificationService extends NotificationListenerService {
         });
     }
 
+    
+
+// ✅ Appelé par EventValidator pour les résultats calendaires
+public static void sendToGroqAndTelegram(String source, String title,
+        String body, List<String> assets, Context context) {
+    if (context == null) return;
+    String fingerprint = String.valueOf((source + title + body).hashCode());
+    NotificationService instance = serviceInstance;
+    if (instance != null) {
+        instance.processAnalysisWithAI(
+                source, title, body, assets, fingerprint, true);
+    } else {
+        // Fallback direct sans Groq
+        String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
+        sendTelegramSecure(msg, context);
+    }
+}
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -1202,6 +1226,7 @@ public class NotificationService extends NotificationListenerService {
         // ── MISE À JOUR : Liaison du contexte pour l'extraction de la clé macro_api_key ──
         EconomicCalendarAPI.init(this);
         EventValidator.setAppContext(this); 
+        serviceInstance = this;                 // ✅
         //EventValidator.init(eventDb); 
         // ── MISE À JOUR : Déportation du préchargement réseau dans un thread d'arrière-plan ──
         new Thread(new Runnable() {
