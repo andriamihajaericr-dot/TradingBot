@@ -870,7 +870,7 @@ public static void preloadCalendar() {
         Collections.sort(sortedEvents, (a, b) -> {
             long tsA = parseTimestamp(a.timestamp);
             long tsB = parseTimestamp(b.timestamp);
-            return Long.compare(tsA, tsB);
+            return Long.compare(tsA, tsB); 
         });
 
         // ── Stockage dans la map interne ──
