@@ -900,18 +900,19 @@ public static void preloadCalendar() {
 
             // ── Icône impact ──
             String impactIcon;
-            String imp = event.impact != null ? event.impact.toUpperCase(Locale.ROOT) : "";
+            // ✅ Utiliser event.importance à la place de event.impact
+            String imp = event.importance != null ? event.importance.toUpperCase(Locale.ROOT) : "";
             if      (imp.equals("HIGH"))   impactIcon = "🔴";
             else if (imp.equals("MEDIUM")) impactIcon = "🟠";
             else                           impactIcon = "⚪";
 
+            // ✅ country suffit — pas de champ currency dans CalendarEvent
+            String pays = (event.country != null && !event.country.isEmpty()) ? event.country : "?"; 
             // ── Heure Madagascar ──
             String time = formatEventTime(event.timestamp);
 
             // ── Pays / Devise ──
-            String pays = (event.country != null && !event.country.isEmpty())
-                    ? event.country : (event.currency != null ? event.currency : "?");
-
+            
             report.append(impactIcon)
                   .append(" `").append(time).append("` ")
                   .append("[").append(pays).append("] ")
