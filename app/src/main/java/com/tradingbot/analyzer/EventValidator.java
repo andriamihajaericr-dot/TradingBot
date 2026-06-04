@@ -175,63 +175,6 @@ public class EventValidator {
         result.assetsEnriched = !detectedAssets.isEmpty();
         return result;
     }
-    // ── ÉTAPE 4 : Calendrier économique ──────────────────────────────
-        private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(
-            String title, String content, long timestamp) {
-        
-            String combined = (title + " " + content).toLowerCase(Locale.ROOT);
-            String normalizedCombined = combined
-                    .replaceAll("[^a-z0-9\\s]", " ")
-                    .replaceAll("\\s+", " ").trim();
-        
-            long window = 45 * 60 * 1000L; // Augmenté à ±45 minutes (plus tolérant)
-            EconomicCalendarAPI.CalendarEvent bestMatch = null;
-            long bestDelta = Long.MAX_VALUE;
-        
-            for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
-                if (event == null || event.indicator == null) continue;
-        
-                long eventTime = parseTimestamp(event.timestamp);
-                long normalizedTimestamp = (timestamp > 9999999999L) ? timestamp : timestamp * 1000;
-                long delta = Math.abs(eventTime - normalizedTimestamp);
-        
-                if (delta > window) continue;
-        
-                String indicatorLower = event.indicator.toLowerCase(Locale.ROOT);
-                String normalizedIndicator = indicatorLower
-                        .replaceAll("[^a-z0-9\\s]", " ")
-                        .replaceAll("\\s+", " ").trim();
-        
-                // === MATCHING AMÉLIORÉ ===
-                boolean matchFound = false;
-        
-                // Matching direct
-                if (normalizedCombined.contains(normalizedIndicator) || 
-                    normalizedIndicator.contains(normalizedCombined)) {
-                    matchFound = true;
-                }
-                // Matching par mots-clés (le plus important)
-                else if (matchesIndicatorKeywords(normalizedCombined, indicatorLower, event.country)) {
-                    matchFound = true;
-                }
-                // Matching spécifique très permissif pour Jobless Claims
-                else if (isJoblessClaimsEvent(indicatorLower, normalizedCombined)) {
-                    matchFound = true;
-                }
-        
-                if (matchFound && delta < bestDelta) {
-                    bestDelta = delta;
-                    bestMatch = event;
-                }
-            }
-        
-            // Log de debug temporaire (à supprimer après test)
-            //if (combined.contains("jobless") || combined.contains("claims")) {
-              //  Log.d(TAG, "Jobless Claims détecté. Match trouvé ? " + (bestMatch != null));
-          //  }
-        
-            return bestMatch;
-        }
 
     private static boolean containsRumorMarkers(String text) {
         if (text == null) return false;
