@@ -2441,7 +2441,7 @@ public static void sendToGroqAndTelegram(String source, String title,
     @Override
     public void onDestroy() {
         super.onDestroy();
-        serviceInstance = null;    // ✅
+        serviceInstance = null;    // ✅ 
         scheduler.shutdownNow();
         exec.shutdownNow();
         Log.d(TAG, "[SERVICE] Service arrêté");
