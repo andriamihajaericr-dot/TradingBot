@@ -347,7 +347,7 @@ public class EconomicCalendarAPI {
                 ));
             }
     
-            } else if (cty.contains("united kingdom") || cty.contains("uk")) {
+        } else if (cty.contains("united kingdom") || cty.contains("uk")) {
                 assets.add("GBPUSD");
                 if (ind.contains("cpi") || ind.contains("inflation")) {
                     assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500"));
@@ -364,7 +364,7 @@ public class EconomicCalendarAPI {
                     assets.addAll(Arrays.asList("EURUSD", "SP500"));
                 }
     
-                } else if (cty.contains("japan")) {
+        } else if (cty.contains("japan")) {
                     assets.add("USDJPY");
                     if (ind.contains("boj") || ind.contains("interest rate") ||
                         ind.contains("yield curve") || ind.contains("monetary policy")) {
@@ -377,7 +377,7 @@ public class EconomicCalendarAPI {
                         assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
                     }
     
-            } else if (cty.contains("canada")) {
+        } else if (cty.contains("canada")) {
                 assets.addAll(Arrays.asList("USDCAD", "USOIL"));
                 if (ind.contains("boc") || ind.contains("interest rate") ||
                     ind.contains("rate decision")) {
@@ -388,7 +388,7 @@ public class EconomicCalendarAPI {
                     assets.addAll(Arrays.asList("GOLD"));
                 }
         
-            } else if (cty.contains("australia")) {
+        } else if (cty.contains("australia")) {
                 assets.add("AUDUSD");
                 if (ind.contains("rba") || ind.contains("interest rate") ||
                     ind.contains("rate decision")) {
@@ -399,7 +399,7 @@ public class EconomicCalendarAPI {
                     assets.addAll(Arrays.asList("GOLD", "USDJPY"));
                 }
         
-            } else if (cty.contains("eurozone") || cty.contains("euro area") ||
+        } else if (cty.contains("eurozone") || cty.contains("euro area") ||
                        ind.contains("ecb") || ind.contains("lagarde")) {
                 assets.add("EURUSD");
                 if (ind.contains("ecb") || ind.contains("interest rate") ||
@@ -418,7 +418,7 @@ public class EconomicCalendarAPI {
                     assets.addAll(Arrays.asList("GBPUSD"));
                 }
         
-            } else if (cty.contains("china") || cty.contains("chinese")) {
+        } else if (cty.contains("china") || cty.contains("chinese")) {
                 assets.addAll(Arrays.asList("AUDUSD", "USDJPY", "USOIL"));
                 if (ind.contains("caixin") || ind.contains("pmi")) {
                     assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD"));
