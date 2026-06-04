@@ -406,8 +406,7 @@ if (!detectedType.startsWith("GEO") && db != null) {
         geo.confidence = Math.min(100, score);
         return geo;
     }
-
-private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(
+    private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(
         String title, String content, long timestamp) {
 
     String combined = (title + " " + content).toLowerCase(Locale.ROOT);
@@ -416,42 +415,36 @@ private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(
             .replaceAll("\\s+", " ").trim();
 
     long window = 30 * 60 * 1000; // ±30 minutes
-
     EconomicCalendarAPI.CalendarEvent bestMatch = null;
     long bestDelta = Long.MAX_VALUE;
 
     for (EconomicCalendarAPI.CalendarEvent event : upcomingEvents.values()) {
         if (event == null || event.timestamp == null || event.indicator == null) continue;
-        
+
         long eventTime = parseTimestamp(event.timestamp);
         long normalizedTimestamp = (timestamp > 9999999999L) ? timestamp : timestamp * 1000;
         long delta = Math.abs(eventTime - normalizedTimestamp);
-        
-        // --- LA CORRECTION EST ICI ---
-        // 1. On récupère l'indicateur de l'événement en cours
-        String indicator = event.indicator; 
-        
-        // 2. On le normalise pour pouvoir faire le .contains() proprement
-        String normalizedIndicator = indicator.toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9\\s]", " ")
-                .replaceAll("\\s+", " ").trim();
-        // ------------------------------
 
-        // Reste du filtre de temps (optionnel mais recommandé si vous avez défini une window)
-        if (delta <= window) { 
+        if (delta < window) {  // ← vérification fenêtre temporelle manquante aussi !
+            // ↓ déclarations manquantes dans votre version
+            String indicator = event.indicator.toLowerCase(Locale.ROOT);
+            String normalizedIndicator = indicator
+                    .replaceAll("[^a-z0-9\\s]", " ")
+                    .replaceAll("\\s+", " ").trim();
+
             if (normalizedCombined.contains(normalizedIndicator) ||
                 matchesIndicatorKeywords(normalizedCombined, indicator, event.country)) {
-                
-                if (delta < bestDelta) {  // Garder le plus proche
+
+                if (delta < bestDelta) {
                     bestDelta = delta;
                     bestMatch = event;
                 }
             }
         }
-    } // Remplacement du explicit "};" par une fermeture propre de la boucle
-    
+    }
     return bestMatch;
- }
+}
+
  private static boolean matchesIndicatorKeywords(String text, String indicator, String country) {
     if (text == null || indicator == null) return false;
     String ind = indicator.toLowerCase(Locale.ROOT);
