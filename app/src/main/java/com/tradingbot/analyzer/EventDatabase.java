@@ -22,18 +22,18 @@ public class EventDatabase extends SQLiteOpenHelper {
     private static volatile EventDatabase instance;
 
     public static EventDatabase getInstance(Context context) {
-    if (instance == null) {
-        synchronized (EventDatabase.class) {
-            if (instance == null) {
-                if (context == null) {
-                    throw new IllegalStateException("EventDatabase.getInstance() requires a non-null Context");
+        if (instance == null) {
+            synchronized (EventDatabase.class) {
+                if (instance == null) {
+                    if (context == null) {
+                        throw new IllegalStateException("EventDatabase.getInstance() requires a non-null Context");
+                    }
+                    instance = new EventDatabase(context.getApplicationContext());
                 }
-                instance = new EventDatabase(context.getApplicationContext());
             }
         }
+        return instance;
     }
-    return instance;
-}
 
     private EventDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -165,46 +165,46 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
 
     public String getDailyMacroSummary(long currentUnixTime) {
-    SQLiteDatabase db = this.getReadableDatabase();
-    StringBuilder sb = new StringBuilder();
-    long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
-    String selection = "unix_timestamp >= ? AND (driver_weight >= 3 OR (impact LIKE '%GEO%' AND driver_weight >= 2))";
-    String[] whereArgs = new String[]{
-        String.valueOf(twentyFourHoursAgo)
-    };
-
-    Cursor cursor = null;
-    try {
-        // CORRECTION : On récupère source et title en plus pour donner la matière exacte à l'IA
-        cursor = db.query(TABLE_EVENTS, new String[]{"source", "title", "feed_content", "impact"}, selection, whereArgs, null, null, "unix_timestamp ASC");
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-                String src = cursor.getString(0);
-                String title = cursor.getString(1);
-                String content = cursor.getString(2);
-                String impact = cursor.getString(3);
-
-                // Nettoyage de l'en-tête temporel pour économiser les tokens de l'IA
-                if (content.contains("\n\n")) {
-                    String[] parts = content.split("\n\n", 2);
-                    if (parts.length > 1) content = parts[1]; 
-                }
-
-                // Formatage quantitatif hautement lisible pour Groq/Gemini
-                sb.append("--- ALERTE MACRO ---\n");
-                sb.append("Source: ").append(src).append("\n");
-                sb.append("Titre: ").append(title).append("\n");
-                sb.append("Contenu: ").append(content).append("\n");
-                sb.append("Impact calculé: ").append(impact).append("\n\n");
-            } while (cursor.moveToNext());
+        SQLiteDatabase db = this.getReadableDatabase();
+        StringBuilder sb = new StringBuilder();
+        long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
+        String selection = "unix_timestamp >= ? AND (driver_weight >= 3 OR (impact LIKE '%GEO%' AND driver_weight >= 2))";
+        String[] whereArgs = new String[]{
+            String.valueOf(twentyFourHoursAgo)
+        };
+    
+        Cursor cursor = null;
+        try {
+            // CORRECTION : On récupère source et title en plus pour donner la matière exacte à l'IA
+            cursor = db.query(TABLE_EVENTS, new String[]{"source", "title", "feed_content", "impact"}, selection, whereArgs, null, null, "unix_timestamp ASC");
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String src = cursor.getString(0);
+                    String title = cursor.getString(1);
+                    String content = cursor.getString(2);
+                    String impact = cursor.getString(3);
+    
+                    // Nettoyage de l'en-tête temporel pour économiser les tokens de l'IA
+                    if (content.contains("\n\n")) {
+                        String[] parts = content.split("\n\n", 2);
+                        if (parts.length > 1) content = parts[1]; 
+                    }
+    
+                    // Formatage quantitatif hautement lisible pour Groq/Gemini
+                    sb.append("--- ALERTE MACRO ---\n");
+                    sb.append("Source: ").append(src).append("\n");
+                    sb.append("Titre: ").append(title).append("\n");
+                    sb.append("Contenu: ").append(content).append("\n");
+                    sb.append("Impact calculé: ").append(impact).append("\n\n");
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e("EventDatabase", "Erreur construction Daily Macro Summary", e);
+        } finally {
+            if (cursor != null) cursor.close();
         }
-    } catch (Exception e) {
-        Log.e("EventDatabase", "Erreur construction Daily Macro Summary", e);
-    } finally {
-        if (cursor != null) cursor.close();
+        return sb.toString();
     }
-    return sb.toString();
-}
 
     public String getMonthlyMacroRegistry(long currentUnixTime) {
         SQLiteDatabase db = this.getReadableDatabase();
@@ -275,33 +275,33 @@ public class EventDatabase extends SQLiteOpenHelper {
  * pour l'envoyer dans un rappel Telegram.
  * @return une chaîne formatée avec l'heure, le titre, le contenu tronqué et l'impact.
  */
-public String getLastEventByType(String eventType) {
-    SQLiteDatabase db = this.getReadableDatabase();
-    Cursor cursor = null;
-    try {
-        cursor = db.query(TABLE_EVENTS, 
-                new String[]{"title", "feed_content", "impact", "unix_timestamp"},
-                "event_type = ? AND sync_status = 'synced'",
-                new String[]{eventType}, null, null, "unix_timestamp DESC", "1");
-        if (cursor != null && cursor.moveToFirst()) {
-            String title = cursor.getString(0);
-            String content = cursor.getString(1);
-            String impact = cursor.getString(2);
-            long ts = cursor.getLong(3);
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM HH:mm:ss", java.util.Locale.FRANCE);
-            sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
-            String timeStr = sdf.format(new java.util.Date(ts * 1000));
-            // Troncature du contenu à 200 caractères pour éviter les messages trop longs
-            String shortContent = content.length() > 200 ? content.substring(0, 200) + "…" : content;
-            return "🕒 " + timeStr + "\n📌 " + title + "\n📝 " + shortContent + "\n⚡ Impact: " + impact;
+    public String getLastEventByType(String eventType) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_EVENTS, 
+                    new String[]{"title", "feed_content", "impact", "unix_timestamp"},
+                    "event_type = ? AND sync_status = 'synced'",
+                    new String[]{eventType}, null, null, "unix_timestamp DESC", "1");
+            if (cursor != null && cursor.moveToFirst()) {
+                String title = cursor.getString(0);
+                String content = cursor.getString(1);
+                String impact = cursor.getString(2);
+                long ts = cursor.getLong(3);
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM HH:mm:ss", java.util.Locale.FRANCE);
+                sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
+                String timeStr = sdf.format(new java.util.Date(ts * 1000));
+                // Troncature du contenu à 200 caractères pour éviter les messages trop longs
+                String shortContent = content.length() > 200 ? content.substring(0, 200) + "…" : content;
+                return "🕒 " + timeStr + "\n📌 " + title + "\n📝 " + shortContent + "\n⚡ Impact: " + impact;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur getLastEventByType", e);
+        } finally {
+            if (cursor != null) cursor.close();
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur getLastEventByType", e);
-    } finally {
-        if (cursor != null) cursor.close();
+        return "Aucun historique trouvé pour ce driver.";
     }
-    return "Aucun historique trouvé pour ce driver.";
-}
     /**
      * Récupère l'intégralité du contenu textuel des notifications des 30 dernières minutes
      */
@@ -338,74 +338,74 @@ public String getLastEventByType(String eventType) {
  * Extrait l'unique dernier driver macroéconomique de la base de données
  * pour servir de rappel brut.
  */
-public String obtenirLeToutDernierDriver() {
-    StringBuilder sb = new StringBuilder();
-    SQLiteDatabase db = this.getReadableDatabase();
-    Cursor cursor = null;
-    try {
-        // ✅ SÉCURITÉ : On cherche le dernier événement validé et synchronisé par le bot
-        cursor = db.rawQuery(
-            "SELECT unix_timestamp, title, feed_content FROM " + TABLE_EVENTS + 
-            " WHERE sync_status = 'synced' ORDER BY unix_timestamp DESC LIMIT 1", 
-            null
-        );
-        
-        if (cursor != null && cursor.moveToFirst()) {
-            long ts = cursor.getLong(0);
-            String titre = cursor.getString(1);
-            String contenu = cursor.getString(2);
+    public String obtenirLeToutDernierDriver() {
+        StringBuilder sb = new StringBuilder();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            // ✅ SÉCURITÉ : On cherche le dernier événement validé et synchronisé par le bot
+            cursor = db.rawQuery(
+                "SELECT unix_timestamp, title, feed_content FROM " + TABLE_EVENTS + 
+                " WHERE sync_status = 'synced' ORDER BY unix_timestamp DESC LIMIT 1", 
+                null
+            );
             
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.FRANCE);
-            String dateStr = sdf.format(new java.util.Date(ts * 1000L));
-            
-            sb.append("📅 *Dernier état de marché validé (").append(dateStr).append(")* \n")
-              .append("🔹 *").append(titre).append("* \n")
-              .append(contenu);
+            if (cursor != null && cursor.moveToFirst()) {
+                long ts = cursor.getLong(0);
+                String titre = cursor.getString(1);
+                String contenu = cursor.getString(2);
+                
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.FRANCE);
+                String dateStr = sdf.format(new java.util.Date(ts * 1000L));
+                
+                sb.append("📅 *Dernier état de marché validé (").append(dateStr).append(")* \n")
+                  .append("🔹 *").append(titre).append("* \n")
+                  .append(contenu);
+            }
+        } catch (Exception e) {
+            Log.e("EventDatabase", "Erreur lors de la récupération du dernier driver historique", e);
+        } finally {
+            if (cursor != null) cursor.close();
         }
-    } catch (Exception e) {
-        Log.e("EventDatabase", "Erreur lors de la récupération du dernier driver historique", e);
-    } finally {
-        if (cursor != null) cursor.close();
+        return sb.toString();
     }
-    return sb.toString();
-}
     //LISTER LES DONNÉES DE LA BASE DE DONNÉES 
-public void diagnostiquerTableEvents() {
-    SQLiteDatabase db = this.getReadableDatabase();
-    Cursor cursor = null;
-    try {
-        cursor = db.rawQuery(
-            "SELECT id, sync_status, source, title, driver_weight FROM " + TABLE_EVENTS + 
-            " ORDER BY id DESC LIMIT 5", 
-            null
-        );
-
-        // Utilisé à la place de Log.d pour forcer l'apparition dans la console GitHub Actions
-        System.out.println("=== GITHUB RUNNER DIAGNOSTIC: TABLE EVENTS ===");
-        if (cursor != null && cursor.moveToFirst()) {
-            int count = 0;
-            do {
-                count++;
-                int id = cursor.getInt(0);
-                String syncStatus = cursor.getString(1);
-                String source = cursor.getString(2);
-                String title = cursor.getString(3);
-                int weight = cursor.getInt(4);
-
-                System.out.println("Élément #" + count + " [ID: " + id + "]");
-                System.out.println("   -> Source      : " + source);
-                System.out.println("   -> Statut Sync : " + syncStatus);
-                System.out.println("   -> Poids       : " + weight);
-                System.out.println("   -> Titre       : " + title);
-            } while (cursor.moveToNext());
-        } else {
-            System.out.println("❌ La table TABLE_EVENTS est STRICTEMENT vide sur ce Runner GitHub.");
+    public void diagnostiquerTableEvents() {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                "SELECT id, sync_status, source, title, driver_weight FROM " + TABLE_EVENTS + 
+                " ORDER BY id DESC LIMIT 5", 
+                null
+            );
+    
+            // Utilisé à la place de Log.d pour forcer l'apparition dans la console GitHub Actions
+            System.out.println("=== GITHUB RUNNER DIAGNOSTIC: TABLE EVENTS ===");
+            if (cursor != null && cursor.moveToFirst()) {
+                int count = 0;
+                do {
+                    count++;
+                    int id = cursor.getInt(0);
+                    String syncStatus = cursor.getString(1);
+                    String source = cursor.getString(2);
+                    String title = cursor.getString(3);
+                    int weight = cursor.getInt(4);
+    
+                    System.out.println("Élément #" + count + " [ID: " + id + "]");
+                    System.out.println("   -> Source      : " + source);
+                    System.out.println("   -> Statut Sync : " + syncStatus);
+                    System.out.println("   -> Poids       : " + weight);
+                    System.out.println("   -> Titre       : " + title);
+                } while (cursor.moveToNext());
+            } else {
+                System.out.println("❌ La table TABLE_EVENTS est STRICTEMENT vide sur ce Runner GitHub.");
+            }
+            System.out.println("========================================");
+        } catch (Exception e) {
+            System.out.println("Erreur lors du diagnostic : " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
         }
-        System.out.println("========================================");
-    } catch (Exception e) {
-        System.out.println("Erreur lors du diagnostic : " + e.getMessage());
-    } finally {
-        if (cursor != null) cursor.close();
     }
-}
 }
