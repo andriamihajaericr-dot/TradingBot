@@ -137,7 +137,45 @@ public class EventValidator {
             return result;
         }
     
-        // ── ÉTAPE 4 : Calendrier économique ──────────────────────────────
+    
+        // ── ÉTAPE 5 : Géopolitique ───────────────────────────────────────
+        GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
+        if (geo.confidence >= 65) {
+            result.isConfirmed = true;
+            result.confidence  = geo.confidence;
+            result.reason      = "Événement géopolitique confirmé";
+            result.geoContext  = geo.contextLabel;
+    
+            for (String asset : geo.impactedAssets) {
+                if (asset != null && !detectedAssets.contains(asset)) {
+                    detectedAssets.add(asset);
+                }
+            }
+            result.assetsEnriched = !detectedAssets.isEmpty();
+            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
+            logToMain("🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
+            return result;
+        }
+    
+        // ── ÉTAPE 6 : Breaking News générique ───────────────────────────
+        result.confidence = calculateBreakingNewsConfidence(title, content);
+        result.reason      = "Breaking News (Flux Interbancaire)";
+    
+        if (result.confidence < 70) {   
+            result.confidence  = 0;
+            result.isConfirmed = false;
+            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
+            logToMain("❌ Rejeté – " + shortTitle + "… (confiance " + result.confidence + "%)");
+        } else {
+            result.isConfirmed = true;
+            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
+            logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
+        }
+    
+        result.assetsEnriched = !detectedAssets.isEmpty();
+        return result;
+    }
+    // ── ÉTAPE 4 : Calendrier économique ──────────────────────────────
         private static EconomicCalendarAPI.CalendarEvent findMatchingEvent(
             String title, String content, long timestamp) {
         
@@ -188,50 +226,12 @@ public class EventValidator {
             }
         
             // Log de debug temporaire (à supprimer après test)
-            if (combined.contains("jobless") || combined.contains("claims")) {
-                Log.d(TAG, "Jobless Claims détecté. Match trouvé ? " + (bestMatch != null));
-            }
+            //if (combined.contains("jobless") || combined.contains("claims")) {
+              //  Log.d(TAG, "Jobless Claims détecté. Match trouvé ? " + (bestMatch != null));
+          //  }
         
             return bestMatch;
         }
-    
-        // ── ÉTAPE 5 : Géopolitique ───────────────────────────────────────
-        GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
-        if (geo.confidence >= 65) {
-            result.isConfirmed = true;
-            result.confidence  = geo.confidence;
-            result.reason      = "Événement géopolitique confirmé";
-            result.geoContext  = geo.contextLabel;
-    
-            for (String asset : geo.impactedAssets) {
-                if (asset != null && !detectedAssets.contains(asset)) {
-                    detectedAssets.add(asset);
-                }
-            }
-            result.assetsEnriched = !detectedAssets.isEmpty();
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
-            logToMain("🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
-            return result;
-        }
-    
-        // ── ÉTAPE 6 : Breaking News générique ───────────────────────────
-        result.confidence = calculateBreakingNewsConfidence(title, content);
-        result.reason      = "Breaking News (Flux Interbancaire)";
-    
-        if (result.confidence < 70) {   
-            result.confidence  = 0;
-            result.isConfirmed = false;
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
-            logToMain("❌ Rejeté – " + shortTitle + "… (confiance " + result.confidence + "%)");
-        } else {
-            result.isConfirmed = true;
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-            logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
-        }
-    
-        result.assetsEnriched = !detectedAssets.isEmpty();
-        return result;
-    }
 
     private static boolean containsRumorMarkers(String text) {
         if (text == null) return false;
