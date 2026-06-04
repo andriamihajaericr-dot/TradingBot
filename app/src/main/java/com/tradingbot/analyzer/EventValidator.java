@@ -14,7 +14,13 @@ public class EventValidator {
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
     private static final long DUPLICATE_WINDOW_MS = 30 * 60 * 1000L; // 45 minutes
     private static final String TAG = "EventValidator";
+    
+    // ✅ Ajouter en haut de la classe (après les autres champs statiques)
+    private static Context appContext = null;
 
+    public static void setAppContext(Context context) {
+       appContext = context.getApplicationContext();
+    }
     private static EventDatabase getDatabase(Context context) {
         return EventDatabase.getInstance(context);
     }
@@ -848,12 +854,6 @@ public class EventValidator {
         return false;
     }
 
-    // ✅ Ajouter en haut de la classe (après les autres champs statiques)
-private static Context appContext = null;
-
-public static void setAppContext(Context context) {
-    appContext = context.getApplicationContext();
-}
 
 public static void preloadCalendar() {
     try {
