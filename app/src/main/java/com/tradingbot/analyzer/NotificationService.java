@@ -493,7 +493,6 @@ public class NotificationService extends NotificationListenerService {
     private volatile boolean isSyncing = false;
     private static final String PREF_LAST_DAILY_REPORT = "last_daily_report_";
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-
     // Volatile pour la cohérence multi-thread (Point 7)
     private volatile long lastSpeechTime = 0;
     private volatile String lastSpeaker = "";
