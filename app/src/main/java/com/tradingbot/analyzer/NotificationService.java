@@ -2340,7 +2340,6 @@ public class NotificationService extends NotificationListenerService {
     }
     public String construirePromptFinal(String evenementActuel, List<String> historiqueRecent) {
         boolean alerteGéoMajeure = false;
-        
         // Mots-clés qui déclenchent le mode de crise géopolitique (liste enrichie)
         String[] motsClesCrise = {
             "hormuz", "ormuz", "détroit d'hormuz", "strait of hormuz",
@@ -2374,8 +2373,8 @@ public class NotificationService extends NotificationListenerService {
                                "L'Or (GOLD) doit refléter le flux refuge (Safe-Haven) indépendamment de la force du Dollar ou du PCE. " +
                                "Appliquer immédiatement l'exception de la CONTRAINTE 11 (Régime de dominance géopolitique sur l'inflation).\n\n";
         }
-        
-        return directiveDeCrise + SYSTEM_PROMPT + "\n\nFlux à analyser : " + evenementActuel;
+        //return directiveDeCrise + SYSTEM_PROMPT + "\n\nFlux à analyser : " + evenementActuel;
+        return directiveDeCrise + SYSTEM_PROMPT;
     }
 
      // Méthode de vérification géographique des mots-clés
