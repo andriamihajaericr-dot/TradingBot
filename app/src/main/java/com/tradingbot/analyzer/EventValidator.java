@@ -854,13 +854,30 @@ public class EventValidator {
         return false;
     }
 
-
 public static void preloadCalendar() {
     try {
         List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(72);
         if (events == null || events.isEmpty()) {
             logToMain("⚠️ Calendrier vide ou non disponible.");
             return;
+        }
+
+        // ✅ WATCHER — Détecter les nouveaux résultats publiés depuis le dernier chargement
+        List<EconomicCalendarAPI.CalendarEvent> newlyPublished = new ArrayList<>();
+        for (EconomicCalendarAPI.CalendarEvent event : events) {
+            if (event == null) continue;
+            boolean hasActual = event.actual != null
+                    && !event.actual.equals("N/A")
+                    && !event.actual.isEmpty();
+            if (hasActual) {
+                String key = createEventKey(event.indicator, event.timestamp);
+                EconomicCalendarAPI.CalendarEvent previous = upcomingEvents.get(key);
+                boolean isNew = (previous == null)
+                        || (previous.actual == null
+                        || previous.actual.equals("N/A")
+                        || previous.actual.isEmpty());
+                if (isNew) newlyPublished.add(event);
+            }
         }
 
         upcomingEvents.clear();
@@ -870,7 +887,7 @@ public static void preloadCalendar() {
         Collections.sort(sortedEvents, (a, b) -> {
             long tsA = parseTimestamp(a.timestamp);
             long tsB = parseTimestamp(b.timestamp);
-            return Long.compare(tsA, tsB); 
+            return Long.compare(tsA, tsB);
         });
 
         // ── Stockage dans la map interne ──
@@ -891,34 +908,26 @@ public static void preloadCalendar() {
         for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
             if (event == null || event.indicator == null || event.timestamp == null) continue;
 
-            // ── Séparateur par jour ──
             String currentDay = formatEventDay(event.timestamp);
             if (!currentDay.equals(lastDay)) {
                 report.append("\n📆 *").append(currentDay).append("*\n");
                 lastDay = currentDay;
             }
 
-            // ── Icône impact ──
-            String impactIcon;
-            // ✅ Utiliser event.importance à la place de event.impact
             String imp = event.importance != null ? event.importance.toUpperCase(Locale.ROOT) : "";
+            String impactIcon;
             if      (imp.equals("HIGH"))   impactIcon = "🔴";
             else if (imp.equals("MEDIUM")) impactIcon = "🟠";
             else                           impactIcon = "⚪";
 
-            // ✅ country suffit — pas de champ currency dans CalendarEvent
-            String pays = (event.country != null && !event.country.isEmpty()) ? event.country : "?"; 
-            // ── Heure Madagascar ──
+            String pays = (event.country != null && !event.country.isEmpty()) ? event.country : "?";
             String time = formatEventTime(event.timestamp);
 
-            // ── Pays / Devise ──
-            
             report.append(impactIcon)
                   .append(" `").append(time).append("` ")
                   .append("[").append(pays).append("] ")
                   .append(event.indicator);
 
-            // ── Actual / Forecast / Previous ──
             boolean hasActual   = event.actual   != null && !event.actual.equals("N/A")   && !event.actual.isEmpty();
             boolean hasForecast = event.forecast != null && !event.forecast.equals("N/A") && !event.forecast.isEmpty();
             boolean hasPrevious = event.previous != null && !event.previous.equals("N/A") && !event.previous.isEmpty();
@@ -926,40 +935,37 @@ public static void preloadCalendar() {
             if (hasActual && hasForecast) {
                 report.append(" | Réel: `").append(event.actual)
                       .append("` Prévu: `").append(event.forecast).append("`");
-
-                // ── Détection surprise ──
                 try {
-                    double actual   = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
-                    double forecast = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
-                    double diff     = actual - forecast;
+                    double a = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
+                    double f = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
+                    double diff = a - f;
                     if (Math.abs(diff) > 0.0) {
                         report.append(diff > 0 ? " 📈 SURPRISE HAUSSIÈRE" : " 📉 SURPRISE BAISSIÈRE");
                     }
                 } catch (Exception ignored) {}
-
             } else if (hasForecast) {
                 report.append(" | Prévu: `").append(event.forecast).append("`");
             } else if (hasActual) {
                 report.append(" | Réel: `").append(event.actual).append("`");
             }
-
-            if (hasPrevious) {
-                report.append(" Préc: `").append(event.previous).append("`");
-            }
-
+            if (hasPrevious) report.append(" Préc: `").append(event.previous).append("`");
             report.append("\n");
             totalAffiche++;
         }
 
-        // ── Pied de rapport ──
         report.append("\n─────────────────────────────────────────\n");
         report.append("📊 *Total :* ").append(totalAffiche).append(" événements\n");
         report.append("🕒 *Mis à jour :* ").append(getMadaTimeNow()).append(" (Mada)");
 
-        // ── Envoi Telegram découpé ──
         sendCalendarToTelegram(report.toString());
 
-        logToMain("✅ Calendrier chargé : " + upcomingEvents.size() + " événements — envoyé sur Telegram.");
+        // ✅ Analyse et envoi immédiat des nouveaux résultats publiés sans notification Android
+        for (EconomicCalendarAPI.CalendarEvent event : newlyPublished) {
+            analyzeAndSendCalendarResult(event);
+        }
+
+        logToMain("✅ Calendrier chargé : " + upcomingEvents.size()
+                + " événements — " + newlyPublished.size() + " nouveaux résultats détectés.");
 
     } catch (Exception e) {
         logToMain("⚠️ Échec préchargement calendrier : " + e.getMessage());
