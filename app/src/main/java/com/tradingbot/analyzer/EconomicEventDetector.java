@@ -19,15 +19,22 @@ public class EconomicEventDetector {
          * Extrait l'impact brut normalisé pour l'alignement strict avec EventDatabase
          */
         public String getRawImpact() {
-            if (impact == null) return "NEUTRE";
-            if (impact.contains("Haute Volatilité") || impact.contains("Choc Géopolitique") || impact.contains("Forte Impulsion")) {
-                return "HIGH";
-            }
-            if (impact.contains("Moyenne Volatilité")) {
-                return "MEDIUM";
-            }
-            return "LOW";
-        }
+    if (impact == null) return "NEUTRE";
+
+    // Rang Suprême — Volatilité confirmée institutionnelle
+    if (impact.contains("Haute Volatilité") || impact.contains("Choc Géopolitique")) {
+        return "HIGH";
+    }
+    // Rang Intermédiaire — Impulsion non confirmée ou volatilité modérée
+    if (impact.contains("Moyenne Volatilité") || impact.contains("Forte Impulsion")) {
+        return "MEDIUM";
+    }
+    // Rang Faible — Biais directionnel seul sans volatilité confirmée
+    if (impact.contains("Biais Haussier") || impact.contains("Biais Baissier")) {
+        return "LOW";
+    }
+    return "NEUTRE";
+    }
 
         /**
          * Extrait le biais directionnel de manière isolée pour les décisions algorithmiques de l'IA
