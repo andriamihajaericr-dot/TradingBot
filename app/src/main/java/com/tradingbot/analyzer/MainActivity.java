@@ -263,88 +263,88 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void importDatabaseFromStorage() {
-    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-    intent.addCategory(Intent.CATEGORY_OPENABLE);
-    intent.setType("*/*");
-    intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/octet-stream", "application/x-sqlite3"});
-    importDbLauncher.launch(intent);
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/octet-stream", "application/x-sqlite3"});
+        importDbLauncher.launch(intent);
      }
     private void importDatabaseFromUri(Uri uri) {
-    try {
-        // Demander un accès permanent à l'Uri (l'utilisateur devra confirmer)
-        getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-        File currentDb = getDatabasePath("trading_bot.db");
-        if (eventDb != null) {
-            eventDb.close();
-            eventDb = null;
+        try {
+            // Demander un accès permanent à l'Uri (l'utilisateur devra confirmer)
+            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    
+            File currentDb = getDatabasePath("trading_bot.db");
+            if (eventDb != null) {
+                eventDb.close();
+                eventDb = null;
+            }
+    
+            InputStream is = getContentResolver().openInputStream(uri);
+            FileOutputStream fos = new FileOutputStream(currentDb);
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = is.read(buffer)) > 0) {
+                fos.write(buffer, 0, length);
+            }
+            fos.flush();
+            fos.close();
+            is.close();
+            eventDb = EventDatabase.getInstance(this);
+            Toast.makeText(this, "Base macro restaurée avec succès", Toast.LENGTH_LONG).show();
+            addLog("✅ Base de données importée avec succès.");
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur lors de l'importation", e);
+            Toast.makeText(this, "Échec de l'importation : " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
-
-        InputStream is = getContentResolver().openInputStream(uri);
-        FileOutputStream fos = new FileOutputStream(currentDb);
-        byte[] buffer = new byte[1024];
-        int length;
-        while ((length = is.read(buffer)) > 0) {
-            fos.write(buffer, 0, length);
-        }
-        fos.flush();
-        fos.close();
-        is.close();
-        eventDb = EventDatabase.getInstance(this);
-        Toast.makeText(this, "Base macro restaurée avec succès", Toast.LENGTH_LONG).show();
-        addLog("✅ Base de données importée avec succès.");
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur lors de l'importation", e);
-        Toast.makeText(this, "Échec de l'importation : " + e.getMessage(), Toast.LENGTH_LONG).show();
-    }
     }
     private void exportDatabaseToStorage() {
-    Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-    intent.addCategory(Intent.CATEGORY_OPENABLE);
-    intent.setType("application/octet-stream");
-    intent.putExtra(Intent.EXTRA_TITLE, "trading_bot_backup_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date()) + ".db");
-    exportDbLauncher.launch(intent);
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/octet-stream");
+        intent.putExtra(Intent.EXTRA_TITLE, "trading_bot_backup_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date()) + ".db");
+        exportDbLauncher.launch(intent);
     }
     
     private void exportDatabaseToUri(Uri uri) {
-    try {
-        File dbFile = getDatabasePath("trading_bot.db");
-        if (dbFile == null || !dbFile.exists()) {
-            Toast.makeText(this, "Aucune base de données", Toast.LENGTH_SHORT).show();
-            return;
+        try {
+            File dbFile = getDatabasePath("trading_bot.db");
+            if (dbFile == null || !dbFile.exists()) {
+                Toast.makeText(this, "Aucune base de données", Toast.LENGTH_SHORT).show();
+                return;
+            }
+    
+            // 1. Copie vers l'emplacement choisi par l'utilisateur
+            FileInputStream fis = new FileInputStream(dbFile);
+            OutputStream os = getContentResolver().openOutputStream(uri);
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = fis.read(buffer)) > 0) {
+                os.write(buffer, 0, length);
+            }
+            os.close();
+            fis.close();
+    
+            // 2. Copie automatique vers le dossier privé de l'app (sauvegarde interne)
+            File privateBackupDir = new File(getExternalFilesDir(null), "AutoBackups");
+            if (!privateBackupDir.exists()) privateBackupDir.mkdirs();
+            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+            File privateBackupFile = new File(privateBackupDir, "auto_trading_bot_backup_" + timestamp + ".db");
+            
+            // Nouvelle déclaration de fis et fos pour la copie interne
+            FileInputStream fis2 = new FileInputStream(dbFile);
+            FileOutputStream fos = new FileOutputStream(privateBackupFile);
+            while ((length = fis2.read(buffer)) > 0) {
+                fos.write(buffer, 0, length);
+            }
+            fos.close();
+            fis2.close();
+            Toast.makeText(this, "Base exportée + sauvegarde automatique locale", Toast.LENGTH_LONG).show();
+            addLog("✅ Base exportée avec copie locale.");
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur export", e);
+            Toast.makeText(this, "Échec export : " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
-
-        // 1. Copie vers l'emplacement choisi par l'utilisateur
-        FileInputStream fis = new FileInputStream(dbFile);
-        OutputStream os = getContentResolver().openOutputStream(uri);
-        byte[] buffer = new byte[1024];
-        int length;
-        while ((length = fis.read(buffer)) > 0) {
-            os.write(buffer, 0, length);
-        }
-        os.close();
-        fis.close();
-
-        // 2. Copie automatique vers le dossier privé de l'app (sauvegarde interne)
-        File privateBackupDir = new File(getExternalFilesDir(null), "AutoBackups");
-        if (!privateBackupDir.exists()) privateBackupDir.mkdirs();
-        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-        File privateBackupFile = new File(privateBackupDir, "auto_trading_bot_backup_" + timestamp + ".db");
-        
-        // Nouvelle déclaration de fis et fos pour la copie interne
-        FileInputStream fis2 = new FileInputStream(dbFile);
-        FileOutputStream fos = new FileOutputStream(privateBackupFile);
-        while ((length = fis2.read(buffer)) > 0) {
-            fos.write(buffer, 0, length);
-        }
-        fos.close();
-        fis2.close();
-        Toast.makeText(this, "Base exportée + sauvegarde automatique locale", Toast.LENGTH_LONG).show();
-        addLog("✅ Base exportée avec copie locale.");
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur export", e);
-        Toast.makeText(this, "Échec export : " + e.getMessage(), Toast.LENGTH_SHORT).show();
-    }
     }
     
     @Override
