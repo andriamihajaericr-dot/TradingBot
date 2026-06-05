@@ -2383,6 +2383,33 @@ public static void sendToGroqAndTelegram(String source, String title,
                 }
             }
         }
+
+        public String construirePromptFinalAvecPrompt(String evenementActuel, List<String> historiqueRecent, String basePrompt) {
+            boolean alerteGéoMajeure = false;
+            String[] motsClesCrise = {
+                "hormuz", "ormuz", "détroit d'hormuz", "strait of hormuz",
+                "iran", "israel", "hezbollah", "houthi", "frappe militaire",
+                "airstrike", "missile", "drone attack", "riposte", "escalade",
+                "blocus", "blockade", "raid", "invasion"
+            };
+            String toutLeTexte = (evenementActuel != null ? evenementActuel.toLowerCase() : "");
+            if (historiqueRecent != null) {
+                for (String hist : historiqueRecent) {
+                    if (hist != null) toutLeTexte += " " + hist.toLowerCase();
+                }
+            }
+            for (String mot : motsClesCrise) {
+                if (toutLeTexte.contains(mot)) { alerteGéoMajeure = true; break; }
+            }
+            String directiveDeCrise = "";
+            if (alerteGéoMajeure) {
+                directiveDeCrise =
+                    "⚠️ [ALERTE SYSTÈME : RÉGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE ACTIF]. " +
+                    "Appliquer immédiatement la CONTRAINTE 11.\n\n";
+            }
+            // ✅ Utilise basePrompt qui peut contenir le guidage mathématique
+            return directiveDeCrise + basePrompt;
+        }
         
         for (String mot : motsClesCrise) {
             if (toutLeTexte.contains(mot)) {
