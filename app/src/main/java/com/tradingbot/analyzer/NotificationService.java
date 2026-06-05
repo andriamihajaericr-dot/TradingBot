@@ -1441,8 +1441,8 @@ public class NotificationService extends NotificationListenerService {
             exec.submit(() -> {
                 boolean pipelineSucces = false;
                 try {
-                    // Construction et exécution natives
-                    String promptFinal = construirePromptFinal(currentFeed, finalHistorique);
+                    // ✅ Utilise construirePromptFinalAvecPrompt avec SYSTEM_PROMPT par défaut
+                    String promptFinal = construirePromptFinalAvecPrompt(currentFeed, finalHistorique, SYSTEM_PROMPT);
                     executeAnalysisPipeline(currentSource, currentFeed, promptFinal, assets, currentPostTime, currentHash);
                     pipelineSucces = true; // L'exécution s'est déroulée sans lever d'exception
                     
