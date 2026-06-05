@@ -174,7 +174,9 @@ public class EconomicAnalyzer {
             }
         }
         // Chômage
-        else if (combined.contains("JOBLESS CLAIMS") || combined.contains("IJC")) {
+        else if (combined.contains("JOBLESS CLAIMS") || combined.contains("IJC") ||
+         combined.contains("INITIAL CLAIMS") || combined.contains("CONTINUING CLAIMS") ||
+         combined.contains("UNEMPLOYMENT CLAIMS") || combined.contains("WEEKLY CLAIMS")) {
             attribuerPoids(absEcart, 10.0, 20.0, r);
             if (r.deviation > 0) {
                 r.marketImpact = "US_IJC_BAD";
