@@ -121,7 +121,10 @@ public class EconomicAnalyzer {
             }
         }
         // Emploi : NFP, ADP, JOLTS
-        else if (combined.contains("NFP") || combined.contains("NON-FARM") || combined.contains("PAYROLLS")) {
+        else if (combined.contains("NON-FARM PAYROLLS") || combined.contains("NFP") ||
+        combined.contains("NONFARM") || combined.contains("PAYROLL") ||
+        combined.contains("NON-FARM EMPLOYMENT CHANGE") || 
+        combined.contains("NONFARM EMPLOYMENT"))  {
             attribuerPoids(absEcart, 25.0, 55.0, r);
             if (r.deviation > 0) {
                 r.marketImpact = "US_NFP_STRONG";
