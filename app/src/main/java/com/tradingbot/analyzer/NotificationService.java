@@ -2378,28 +2378,38 @@ public class NotificationService extends NotificationListenerService {
             return "N/A";
         }
     }
+    // Méthode 1 — version simple sans paramètre prompt
     public String construirePromptFinal(String evenementActuel, List<String> historiqueRecent) {
-        boolean alerteGéoMajeure = false;
-        // Mots-clés qui déclenchent le mode de crise géopolitique (liste enrichie)
-        String[] motsClesCrise = {
-            "hormuz", "ormuz", "détroit d'hormuz", "strait of hormuz",
-            "iran", "israel", "hezbollah", "houthi", "frappe militaire", 
-            "airstrike", "missile", "drone attack", "riposte", "escalade", 
-            "blocus", "blockade", "raid", "invasion"
-        };
-        
-        // On scanne l'événement actuel et l'historique récent
-        String toutLeTexte = (evenementActuel != null ? evenementActuel.toLowerCase() : "");
-        if (historiqueRecent != null) {
-            for (String hist : historiqueRecent) {
-                if (hist != null) {
-                    toutLeTexte += " " + hist.toLowerCase();
+            boolean alerteGéoMajeure = false;
+            String[] motsClesCrise = {
+                "hormuz", "ormuz", "détroit d'hormuz", "strait of hormuz",
+                "iran", "israel", "hezbollah", "houthi", "frappe militaire",
+                "airstrike", "missile", "drone attack", "riposte", "escalade",
+                "blocus", "blockade", "raid", "invasion"
+            };
+            String toutLeTexte = (evenementActuel != null ? evenementActuel.toLowerCase() : "");
+            if (historiqueRecent != null) {
+                for (String hist : historiqueRecent) {
+                    if (hist != null) toutLeTexte += " " + hist.toLowerCase();
                 }
             }
-        }
+            for (String mot : motsClesCrise) {
+                if (toutLeTexte.contains(mot)) { alerteGéoMajeure = true; break; }
+            }
+            String directiveDeCrise = "";
+            if (alerteGéoMajeure) {
+                directiveDeCrise =
+                    "⚠️ [ALERTE SYSTÈME : RÉGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE ACTIF]. " +
+                    "Le risque de guerre au Moyen-Orient ou une menace sur le Détroit d'Hormuz est prioritaire. " +
+                    "L'Or (GOLD) doit refléter le flux refuge (Safe-Haven). " +
+                    "Appliquer immédiatement la CONTRAINTE 11.\n\n";
+            }
+            return directiveDeCrise + SYSTEM_PROMPT;
     }
-
-    public String construirePromptFinalAvecPrompt(String evenementActuel, List<String> historiqueRecent, String basePrompt) {
+        
+    // Méthode 2 — version avec prompt personnalisé (séparée, au même niveau)
+    public String construirePromptFinalAvecPrompt(String evenementActuel,
+                List<String> historiqueRecent, String basePrompt) {
             boolean alerteGéoMajeure = false;
             String[] motsClesCrise = {
                 "hormuz", "ormuz", "détroit d'hormuz", "strait of hormuz",
@@ -2422,27 +2432,8 @@ public class NotificationService extends NotificationListenerService {
                     "⚠️ [ALERTE SYSTÈME : RÉGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE ACTIF]. " +
                     "Appliquer immédiatement la CONTRAINTE 11.\n\n";
             }
-            // ✅ Utilise basePrompt qui peut contenir le guidage mathématique
+            // ✅ Utilise basePrompt (contient le guidage mathématique si présent)
             return directiveDeCrise + basePrompt;
-        }
-        
-        for (String mot : motsClesCrise) {
-            if (toutLeTexte.contains(mot)) {
-                alerteGéoMajeure = true;
-                break;
-            }
-        }
-        
-        // Si une crise est détectée, on injecte une directive prioritaire en haut du prompt
-        String directiveDeCrise = "";
-        if (alerteGéoMajeure) {
-            directiveDeCrise = "⚠️ [ALERTE SYSTÈME : RÉGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE ACTIF]. " +
-                               "Le risque de guerre au Moyen-Orient ou une menace sur le Détroit d'Hormuz est prioritaire. " +
-                               "L'Or (GOLD) doit refléter le flux refuge (Safe-Haven) indépendamment de la force du Dollar ou du PCE. " +
-                               "Appliquer immédiatement l'exception de la CONTRAINTE 11 (Régime de dominance géopolitique sur l'inflation).\n\n";
-        }
-        //return directiveDeCrise + SYSTEM_PROMPT + "\n\nFlux à analyser : " + evenementActuel;
-        return directiveDeCrise + SYSTEM_PROMPT;
     }
 
      // Méthode de vérification géographique des mots-clés
