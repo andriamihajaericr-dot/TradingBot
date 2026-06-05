@@ -802,8 +802,8 @@ public class NotificationService extends NotificationListenerService {
     
             try {
                 List<String> historique = db.obtenirTexteEvenementsRecents();
-                String promptFinal = construirePromptFinal(userContent, historique);
-    
+                //String promptFinal = construirePromptFinal(userContent, historique);
+                String promptFinal = construirePromptFinalAvecPrompt(body, historique, customSystemPrompt);
                 JSONObject jsonPayload = new JSONObject();
                 jsonPayload.put("model", GROQ_MODEL);
                 jsonPayload.put("temperature", 0.02);
