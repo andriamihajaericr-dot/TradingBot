@@ -1207,18 +1207,20 @@ public class NotificationService extends NotificationListenerService {
         // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report
         if (instance != null && instance.eventDb != null) {
             String assetsStr = assets != null ? android.text.TextUtils.join(",", assets) : "";
+            // ✅ impact décrit correctement pour le Daily Report
+            String impactLabel = "CALENDRIER ÉCONOMIQUE | " + title;
             instance.eventDb.saveEvent(
                 fingerprint,
-                "com.tradingbot.calendar",   // package
-                source,                       // "Calendrier Économique"
-                "CALENDAR-RESULT",            // eventType
+                "com.tradingbot.calendar",
+                source,
+                "CALENDAR-RESULT",
                 title,
                 body,
                 assetsStr,
-                "pending",
+                impactLabel,    // ✅ lisible dans getDailyMacroSummary
                 System.currentTimeMillis() / 1000,
-                "pending",
-                4                             // poids élevé — résultat calendaire confirmé
+                "synced",       // ✅ déjà traité par Groq — pas besoin de resync
+                4
             );
         }
     
