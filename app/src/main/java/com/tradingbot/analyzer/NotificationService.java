@@ -1199,23 +1199,37 @@ public class NotificationService extends NotificationListenerService {
         });
     }
 
+    public static void sendToGroqAndTelegram(String source, String title, String body, List<String> assets, Context context) {
+        if (context == null) return;
+        String fingerprint = String.valueOf((source + title + body).hashCode());
+        NotificationService instance = serviceInstance;
     
-
-// ✅ Appelé par EventValidator pour les résultats calendaires
-public static void sendToGroqAndTelegram(String source, String title,
-        String body, List<String> assets, Context context) {
-    if (context == null) return;
-    String fingerprint = String.valueOf((source + title + body).hashCode());
-    NotificationService instance = serviceInstance;
-    if (instance != null) {
-        instance.processAnalysisWithAI(
-                source, title, body, assets, fingerprint, true);
-    } else {
-        // Fallback direct sans Groq
-        String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
-        sendTelegramSecure(msg, context);
+        // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report
+        if (instance != null && instance.eventDb != null) {
+            String assetsStr = assets != null ? android.text.TextUtils.join(",", assets) : "";
+            instance.eventDb.saveEvent(
+                fingerprint,
+                "com.tradingbot.calendar",   // package
+                source,                       // "Calendrier Économique"
+                "CALENDAR-RESULT",            // eventType
+                title,
+                body,
+                assetsStr,
+                "pending",
+                System.currentTimeMillis() / 1000,
+                "pending",
+                4                             // poids élevé — résultat calendaire confirmé
+            );
+        }
+    
+        if (instance != null) {
+            instance.processAnalysisWithAI(
+                source, title, body, assets, fingerprint, SYSTEM_PROMPT, true);
+        } else {
+            String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
+            sendTelegramSecure(msg, context);
+                        }
     }
-}
 
     @Override
     public void onCreate() {
