@@ -80,8 +80,8 @@ public class EventValidator {
             if (textToScan.contains("BITCOIN")|| textToScan.contains("BTC"))  rawExtracted.add("BITCOIN");
             if (textToScan.contains("US10Y")  || textToScan.contains("TREASURY") || textToScan.contains("YIELD") || textToScan.contains("10-YEAR")) rawExtracted.add("US10Y");
     
-            if (rawExtracted != null) {
-                for (String asset : rawExtracted) {
+            // ✅ new ArrayList() n'est jamais null
+            for (String asset : rawExtracted) {
                     if (asset != null && !detectedAssets.contains(asset)) {
                         detectedAssets.add(asset);
                     }
