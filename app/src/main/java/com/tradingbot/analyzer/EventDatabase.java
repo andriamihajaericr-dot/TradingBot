@@ -176,14 +176,14 @@ public class EventDatabase extends SQLiteOpenHelper {
         Cursor cursor = null;
         try {
             // CORRECTION : On récupère source et title en plus pour donner la matière exacte à l'IA
-            cursor = db.query(TABLE_EVENTS, new String[]{"source", "title", "feed_content", "impact"}, selection, whereArgs, null, null, "unix_timestamp ASC");
+            cursor = db.query(TABLE_EVENTS, new String[]{"source", "title", "feed_content", "impact", "event_type"}, selection, whereArgs, null, null, "unix_timestamp ASC");
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     String src = cursor.getString(0);
                     String title = cursor.getString(1);
                     String content = cursor.getString(2);
                     String impact = cursor.getString(3);
-    
+                    String type    = cursor.getString(4); // ✅ nouveau
                     // Nettoyage de l'en-tête temporel pour économiser les tokens de l'IA
                     if (content.contains("\n\n")) {
                         String[] parts = content.split("\n\n", 2);
@@ -191,7 +191,15 @@ public class EventDatabase extends SQLiteOpenHelper {
                     }
     
                     // Formatage quantitatif hautement lisible pour Groq/Gemini
-                    sb.append("--- ALERTE MACRO ---\n");
+                    // ✅ Différenciation calendaire vs news dans le Daily Report
+                    boolean isCalendarResult = "CALENDAR-RESULT".equals(type) ||
+                        (impact != null && impact.startsWith("CALENDRIER ÉCONOMIQUE"));
+                    
+                    if (isCalendarResult) {
+                        sb.append("--- 📅 RÉSULTAT CALENDAIRE OFFICIEL ---\n");
+                    } else {
+                        sb.append("--- ⚡ ALERTE MACRO / NEWS ---\n");
+                    }
                     sb.append("Source: ").append(src).append("\n");
                     sb.append("Titre: ").append(title).append("\n");
                     sb.append("Contenu: ").append(content).append("\n");
