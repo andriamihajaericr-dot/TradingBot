@@ -86,7 +86,7 @@ public class EventValidator {
                         detectedAssets.add(asset);
                     }
                 }
-            }
+            
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors de l'extraction brute des actifs", e);
         }
