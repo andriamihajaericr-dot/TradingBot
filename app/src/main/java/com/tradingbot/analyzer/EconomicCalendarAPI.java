@@ -49,8 +49,13 @@ public class EconomicCalendarAPI {
                 if (events != null && !events.isEmpty()) {
                     return events;
                 }
+                // ✅ Log si résultat vide sans exception
+                if (attempt < MAX_RETRIES) {
+                    logToMain("⚠️ [CALENDRIER] Tentative " + attempt + "/" + MAX_RETRIES + " — réponse vide, retry dans " + (backoff/1000) + "s");
+                }
             } catch (Exception e) {
                 Log.w(TAG, "Tentative " + attempt + " échouée : " + e.getMessage());
+                logToMain("❌ [CALENDRIER] Tentative " + attempt + "/" + MAX_RETRIES + " échouée : " + e.getMessage());
             }
             if (attempt < MAX_RETRIES) {
                 try {
@@ -80,17 +85,33 @@ public class EconomicCalendarAPI {
      */
     public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
         Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
+    
+        // ── Tentative FMP ──
         if (targetContext != null) {
+            logToMain("🔄 [CALENDRIER] Chargement FMP en cours...");
             List<CalendarEvent> events = fetchWithRetry(h -> fetchFromFMP(targetContext, h), hoursAhead);
             if (!events.isEmpty()) {
+                logToMain("✅ [CALENDRIER] FMP : " + events.size() + " événements chargés (" + hoursAhead + "h)");
                 return events;
             }
+            logToMain("⚠️ [CALENDRIER] FMP vide ou indisponible — bascule sur ForexFactory");
+        } else {
+            logToMain("⚠️ [CALENDRIER] Contexte FMP null — bascule directe sur ForexFactory");
         }
+    
+        // ── Tentative ForexFactory ──
+        logToMain("🔄 [CALENDRIER] Chargement ForexFactory en cours...");
         List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactory(h), hoursAhead);
         if (!events.isEmpty()) {
+            logToMain("✅ [CALENDRIER] ForexFactory : " + events.size() + " événements chargés");
             return events;
         }
-        return generateInstitutionalExhaustiveFallback();
+        logToMain("⚠️ [CALENDRIER] ForexFactory vide — activation du Fallback institutionnel");
+    
+        // ── Fallback institutionnel ──
+        List<CalendarEvent> fallback = generateInstitutionalExhaustiveFallback();
+        logToMain("🔁 [CALENDRIER] Fallback activé : " + fallback.size() + " drivers institutionnels injectés");
+        return fallback;
     }
 
     private static List<CalendarEvent> fetchFromFMP(Context context, int hoursAhead) {
@@ -101,6 +122,7 @@ public class EconomicCalendarAPI {
             String apiKey = prefs.getString(PREF_MACRO_KEY, "");
             if (apiKey.isEmpty()) {
                 Log.w(TAG, "macro_api_key non configurée dans l'application.");
+                logToMain("❌ [CALENDRIER] Clé API FMP manquante — vérifiez les paramètres");
                 return events;
             }
 
