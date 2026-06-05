@@ -1471,7 +1471,7 @@ public class NotificationService extends NotificationListenerService {
     }
 
     
-    private int assignDriverWeight(String text) {
+    private static int assignDriverWeight(String text) {
         String u = text.toUpperCase();
         
         // CORRECTION ACTIFS CRUCIAUX : Ajout de la détection des synonymes/surnoms institutionnels
