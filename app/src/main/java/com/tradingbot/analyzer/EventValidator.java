@@ -12,7 +12,7 @@ public class EventValidator {
         new ConcurrentHashMap<>();
     
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
-    private static final long DUPLICATE_WINDOW_MS = 30 * 60 * 1000L; // 45 minutes
+    private static final long DUPLICATE_WINDOW_MS = 30 * 60 * 1000L; // 30 minutes
     private static final String TAG = "EventValidator";
     
     // ✅ Ajouter en haut de la classe (après les autres champs statiques)
