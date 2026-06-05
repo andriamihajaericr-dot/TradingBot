@@ -648,8 +648,9 @@ public class EventValidator {
     
         // ── BOE / Bank of England ──
         if (ind.contains("boe") || ind.contains("bailey") ||
-            ind.contains("bank of england")) {
+            ind.contains("bank of england") || ind.contains("boe gov")) {
             return text.contains("boe") || text.contains("bailey") ||
+                   text.contains("boe gov") ||
                    text.contains("bank of england") || text.contains("uk rate") ||
                    text.contains("taux boe") || text.contains("monetary policy committee") ||
                    text.contains("mpc");
