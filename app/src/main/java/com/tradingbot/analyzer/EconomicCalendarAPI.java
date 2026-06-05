@@ -175,8 +175,10 @@ public class EconomicCalendarAPI {
                     event.affectedAssets = mapIndicatorToAssetsIntermarket(event.indicator, event.country);
                     events.add(event);
                 }
+                logToMain("📡 [FMP] " + events.size() + " événements récupérés (HTTP 200)");
             } else {
                 Log.e(TAG, "Erreur Serveur FMP : HTTP " + conn.getResponseCode());
+                logToMain("❌ [FMP] Erreur serveur HTTP " + conn.getResponseCode());
             }
         } catch (Exception e) {
             Log.e(TAG, "Échec de traitement FMP", e);
@@ -247,8 +249,10 @@ public class EconomicCalendarAPI {
                     event.affectedAssets = mapIndicatorToAssetsIntermarket(event.indicator, event.country);
                     events.add(event);
                 }
+                logToMain("📡 [ForexFactory] " + events.size() + " événements récupérés (HTTP 200)");
             } else {
                 Log.e(TAG, "Erreur Serveur ForexFactory : HTTP " + conn.getResponseCode());
+                logToMain("❌ [ForexFactory] Erreur serveur HTTP " + conn.getResponseCode());
             }
         } catch (Exception e) {
             Log.e(TAG, "Échec ForexFactory URL: " + urlString, e);
@@ -577,6 +581,17 @@ public class EconomicCalendarAPI {
             case "CAD": return "Canada";
             case "AUD": return "Australia";
             default:    return "Global";
+        }
+    }
+    // ── Log vers MainActivity + Logcat ──
+    private static void logToMain(String message) {
+        Log.d(TAG, message);
+        if (MainActivity.instance != null) {
+            try {
+                MainActivity.instance.addLog(message);
+            } catch (Exception e) {
+                Log.w(TAG, "Impossible d'ajouter le log à l'UI : " + e.getMessage());
+            }
         }
     }
 }
