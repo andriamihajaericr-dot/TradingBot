@@ -2397,8 +2397,9 @@ public class NotificationService extends NotificationListenerService {
                 }
             }
         }
+    }
 
-        public String construirePromptFinalAvecPrompt(String evenementActuel, List<String> historiqueRecent, String basePrompt) {
+    public String construirePromptFinalAvecPrompt(String evenementActuel, List<String> historiqueRecent, String basePrompt) {
             boolean alerteGéoMajeure = false;
             String[] motsClesCrise = {
                 "hormuz", "ormuz", "détroit d'hormuz", "strait of hormuz",
