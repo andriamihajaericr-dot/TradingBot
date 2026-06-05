@@ -1209,19 +1209,24 @@ public class NotificationService extends NotificationListenerService {
             String assetsStr = assets != null ? android.text.TextUtils.join(",", assets) : "";
             // ✅ impact décrit correctement pour le Daily Report
             String impactLabel = "CALENDRIER ÉCONOMIQUE | " + title;
+            // ✅ Poids dynamique basé sur l'indicateur réel
+            int calendarWeight = assignDriverWeight(title + " " + body);
+           // Si le poids calculé est < 3, forcer à 3 minimum
+           // car tout résultat calendaire avec actual mérite d'être dans le Daily Report
+           if (calendarWeight < 3) calendarWeight = 3;
             instance.eventDb.saveEvent(
-                fingerprint,
-                "com.tradingbot.calendar",
-                source,
-                "CALENDAR-RESULT",
-                title,
-                body,
-                assetsStr,
-                impactLabel,    // ✅ lisible dans getDailyMacroSummary
-                System.currentTimeMillis() / 1000,
-                "synced",       // ✅ déjà traité par Groq — pas besoin de resync
-                4
-            );
+            fingerprint,
+           "com.tradingbot.calendar",
+           source,
+           "CALENDAR-RESULT",
+           title,
+           body,
+           assetsStr,
+           impactLabel,
+           System.currentTimeMillis() / 1000,
+           "synced",
+           calendarWeight  // ✅ CPI → 5, GDP → 4, PMI → 3
+           );
         }
     
         if (instance != null) {
