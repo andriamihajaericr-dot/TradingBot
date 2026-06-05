@@ -438,8 +438,10 @@ public class EventValidator {
         String ind = indicator.toLowerCase(Locale.ROOT);
     
         // ── NFP / Non-Farm Payrolls ──
-        if (ind.contains("nfp") || ind.contains("non-farm") || ind.contains("non farm") ||
-            ind.contains("payroll")) {
+        if (combined.contains("NON-FARM PAYROLLS") || combined.contains("NFP") ||
+        combined.contains("NONFARM") || combined.contains("PAYROLL") ||
+        combined.contains("NON-FARM EMPLOYMENT CHANGE") ||   // ✅ libellé FMP exact
+        combined.contains("NONFARM EMPLOYMENT")) {
             return text.contains("nfp") || text.contains("non-farm") ||
                    text.contains("nonfarm") || text.contains("payroll") ||
                    text.contains("emploi");
