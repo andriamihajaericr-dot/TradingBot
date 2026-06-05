@@ -1928,11 +1928,11 @@ public class NotificationService extends NotificationListenerService {
            upperText.contains("GEO");
     }
     private void startDailyBriefScheduler() {
-       TimeZone tz = TimeZone.getTimeZone("GMT+03:00");
-       int[] targetHours = {7,8, 9, 12,13, 16, 17};
-       for (int hour : targetHours) {
-          scheduleDailyBriefAt(hour, tz);
-       }
+        TimeZone tz = TimeZone.getTimeZone("Indian/Antananarivo"); // ✅ cohérent partout
+        int[] targetHours = {7, 8, 9, 12, 13, 16, 17};
+        for (int hour : targetHours) {
+            scheduleDailyBriefAt(hour, tz);
+        }
     }
     private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
     // 1. Créer un formateur de date fiable (UTC+3)
