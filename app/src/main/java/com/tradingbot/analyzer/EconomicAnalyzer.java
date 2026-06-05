@@ -261,12 +261,26 @@ public class EconomicAnalyzer {
                 r.directionText = "🛢️ DÉFICIT STOCKS PÉTROLE: USOIL ↗️";
             }
         }
+        // ✅ Average Hourly Earnings — proxy inflation salariale
+       else if (combined.contains("AVERAGE HOURLY EARNINGS") ||
+         combined.contains("HOURLY EARNINGS") ||
+         combined.contains("WAGE GROWTH") ||
+         combined.contains("AVG HOURLY")) {
+          attribuerPoids(absEcart, 0.1, 0.3, r);
+            if (r.deviation > 0) {
+             r.marketImpact = "US_WAGES_HOT";
+             r.directionText = "🦅 SALAIRES ÉLEVÉS US: USD ↗️, GOLD ↘️, NASDAQ ↘️ (pression inflation)";
+            } else {
+               r.marketImpact = "US_WAGES_COOL";
+               r.directionText = "🕊️ SALAIRES FAIBLES US: USD ↘️, GOLD ↗️, NASDAQ ↗️ (détente inflation)";
+             }
+        }
         else {
             attribuerPoids(absEcart, 1.0, 2.0, r);
             r.marketImpact = "US_MACRO_OTHER";
             r.directionText = r.deviation > 0 ? "Donnée US supérieure aux attentes" : "Donnée US inférieure aux attentes";
         }
-    }
+   }
 
     private static void analyserEUR(ParsedValues v, EvaluationResult r, String combined, double absEcart) {
         if (combined.contains("CPI") || combined.contains("INFLATION") || combined.contains("HICP")) {
