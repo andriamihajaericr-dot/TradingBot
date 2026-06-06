@@ -511,11 +511,74 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
     return sb.toString();
    }
+        // Détecter le régime actuel basé sur les 7 derniers jours
+    public String detecterRegimeMarche(long currentUnixTime) {
+        long sevenDaysAgo = currentUnixTime - (7 * 24 * 60 * 60);
+        
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        
+        try {
+            cursor = db.rawQuery(
+                "SELECT impact FROM " + TABLE_EVENTS + 
+                " WHERE unix_timestamp >= ? AND driver_weight >= 3",
+                new String[]{String.valueOf(sevenDaysAgo)}
+            );
 
-    // Détecter le régime actuel basé sur les 7 derniers jours
-   public String detecterRegimeMarche(long currentUnixTime) {
-    long sevenDaysAgo = currentUnixTime - (7 * 24 * 60 * 60);
-    // Compter les events HAWKISH vs DOVISH vs GEO des 7 derniers jours
-    // Retourner : "RÉGIME HAWKISH DOMINANT", "RÉGIME RISK-OFF", "RÉGIME MIXTE / INCERTAIN"
-   }
+            if (cursor == null || !cursor.moveToFirst()) {
+                return "RÉGIME MIXTE / INCERTAIN ⚖️";
+            }
+
+            int hawkishCount = 0;
+            int dovishCount = 0;
+            int geoCount = 0;
+            int totalSignificant = 0;
+
+            do {
+                String impact = cursor.getString(0);
+                if (impact == null) continue;
+
+                String imp = impact.toUpperCase(Locale.ROOT);
+                totalSignificant++;
+
+                if (imp.contains("HAWKISH") || imp.contains("STRONG") || 
+                    imp.contains("SURPRISE HAUSSIÈRE") || imp.contains("NFP") || 
+                    imp.contains("CPI") && !imp.contains("BAISSE")) {
+                    hawkishCount++;
+                }
+                
+                if (imp.contains("DOVISH") || imp.contains("WEAK") || 
+                    imp.contains("SURPRISE BAISSIÈRE") || imp.contains("WEAK")) {
+                    dovishCount++;
+                }
+                
+                if (imp.contains("GEO") || imp.contains("HORMUZ") || imp.contains("IRAN") || 
+                    imp.contains("ISRAEL") || imp.contains("MISSILE") || imp.contains("RISK-OFF")) {
+                    geoCount++;
+                }
+            } while (cursor.moveToNext());
+
+            // Décision du régime dominant
+            if (geoCount >= 2 || geoCount >= totalSignificant * 0.4) {
+                return "RÉGIME RISK-OFF GÉOPOLITIQUE 🐻";
+            }
+            if (hawkishCount > dovishCount + 1) {
+                return "RÉGIME HAWKISH DOMINANT 🐻";
+            }
+            if (dovishCount > hawkishCount + 1) {
+                return "RÉGIME DOVISH / RISK-ON 🐂";
+            }
+            if (geoCount >= 1) {
+                return "RÉGIME MIXTE AVEC TENSION GÉO ⚠️";
+            }
+
+            return "RÉGIME MIXTE / INCERTAIN ⚖️";
+
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur detecterRegimeMarche", e);
+            return "RÉGIME NON DÉTERMINÉ";
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+      }
 }
