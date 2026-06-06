@@ -21,6 +21,7 @@ public class EventValidator {
     private static final String TAG = "EventValidator";
     // ✅ Hash du dernier rapport envoyé — évite les doublons
     private static String lastCalendarHash = "";
+    private static final Map<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
     // ✅ Ajouter en haut de la classe (après les autres champs statiques)
     private static Context appContext = null;
 
