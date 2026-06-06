@@ -114,7 +114,12 @@ public class EconomicEventDetector {
             description = "Données Macroéconomiques Secondaires";
             impact      = "Moyenne Volatilité";
         }
-
+        
+        } else if (containsAny(unified, "NOMINATED", "APPOINTED", "NOMINATION", "APPOINTMENT", "FED CHAIR", "FED VICE CHAIR", "ECB PRESIDENT", "BOJ GOVERNOR", "REPLACE POWELL", "REPLACE LAGARDE", "REPLACE UEDA")) {
+            eventType   = "CENTRAL-BANK-NOMINATION";
+            description = "Nomination Banque Centrale — Changement de Politique Potentiel";
+            impact      = "Haute Volatilité";
+        }
         // ── 2. EXTRACTION ET ACCUMULATION DU BIAIS DIRECTIONNEL FONDAMENTAL ──
         if (containsAny(unified, "HIGHER THAN EXPECTED", "BEATS ESTIMATES", "ABOVE FORECAST",
                        "ABOVE EXPECTATIONS", "BETTER THAN EXPECTED", "HAWKISH")) {
