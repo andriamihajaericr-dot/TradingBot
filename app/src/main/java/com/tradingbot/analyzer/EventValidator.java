@@ -801,17 +801,23 @@ public class EventValidator {
     private static long parseTimestamp(String timestamp) {
     if (timestamp == null) return System.currentTimeMillis();
     try {
-        // ✅ Forcer UTC pour éviter le décalage de fuseau horaire
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
-        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return sdf.parse(timestamp).getTime();
+        // ✅ Priorité 1 — Unix timestamp (cas le plus fréquent depuis FMP/ForexFactory)
+        long ts = Long.parseLong(timestamp.trim());
+        return (ts > 9999999999L) ? ts : ts * 1000L;
     } catch (Exception e) {
         try {
-            // ✅ Détection automatique ms vs secondes
-            long ts = Long.parseLong(timestamp.trim());
-            return (ts > 9999999999L) ? ts : ts * 1000L;
+            // ✅ Priorité 2 — ISO avec timezone explicite (ex: 2026-06-05T08:30:00-04:00)
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US);
+            return sdf.parse(timestamp).getTime();
         } catch (Exception e2) {
-            return System.currentTimeMillis();
+            try {
+                // ✅ Priorité 3 — ISO sans timezone → New York (DST automatique)
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+                sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
+                return sdf.parse(timestamp).getTime();
+            } catch (Exception e3) {
+                return System.currentTimeMillis();
+            }
         }
     }
     }
