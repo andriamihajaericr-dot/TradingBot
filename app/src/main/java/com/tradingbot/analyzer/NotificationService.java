@@ -1352,7 +1352,13 @@ public class NotificationService extends NotificationListenerService {
                                 upFeed.contains("GDP")  || upFeed.contains("OPEC") ||
                                 upFeed.contains("INFLATION") || upFeed.contains("INTEREST RATE") ||
                                 upFeed.contains("POWELL") || upFeed.contains("LAGARDE") ||
-                                upFeed.contains("PMI") || upFeed.contains("ISM");
+                                upFeed.contains("PMI") || upFeed.contains("ISM") ||
+                                upFeed.contains("FEDERAL RESERVE") || // ✅ ajout
+                                upFeed.contains("FED CHAIR")       || // ✅ ajout
+                                upFeed.contains("EMERGENCY")       || // ✅ réunion urgence
+                                upFeed.contains("RATE DECISION")   ||
+                                upFeed.contains("RATE CUT")        || // ✅ ajout
+                                upFeed.contains("RATE HIKE");         // ✅ ajout
     
         int weight = assignDriverWeight(feed);
     
