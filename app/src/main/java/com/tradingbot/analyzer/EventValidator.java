@@ -14,7 +14,8 @@ public class EventValidator {
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
     private static final long DUPLICATE_WINDOW_MS = 30 * 60 * 1000L; // 30 minutes
     private static final String TAG = "EventValidator";
-    
+    // ✅ Hash du dernier rapport envoyé — évite les doublons
+    private static String lastCalendarHash = "";
     // ✅ Ajouter en haut de la classe (après les autres champs statiques)
     private static Context appContext = null;
 
