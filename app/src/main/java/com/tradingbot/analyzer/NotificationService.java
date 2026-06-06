@@ -1437,15 +1437,27 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
     // Dans NotificationService.onCreate(), après la planification de minuit, ajouter :
 
 // Rafraîchissement du calendrier toutes les 6 heures (21600000 ms)
-    long sixHoursMillis = 6 * 60 * 60 * 1000L;
-    scheduler.scheduleAtFixedRate(new Runnable() {
-        @Override
-        public void run() {
-            Log.d(TAG, "[CALENDAR] Rafraîchissement périodique du calendrier économique...");
-            EventValidator.preloadCalendar();
-        }
-    }, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
+long sixHoursMillis = 6 * 60 * 60 * 1000L;
+scheduler.scheduleAtFixedRate(new Runnable() {
+    @Override
+    public void run() {
+        EventValidator.preloadCalendar();
     }
+}, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
+
+// ✅ Alertes préventives toutes les 5 minutes
+long fiveMinutesMillis = 5 * 60 * 1000L;
+scheduler.scheduleAtFixedRate(new Runnable() {
+    @Override
+    public void run() {
+        try {
+            EventValidator.checkUpcomingAlerts();
+        } catch (Exception e) {
+            Log.e(TAG, "[ALERTE] Erreur vérification alertes", e);
+        }
+    }
+}, fiveMinutesMillis, fiveMinutesMillis, TimeUnit.MILLISECONDS);
+}
 
 
     private void processIncomingMacroFeed(String source, String title, String text, String feed, 
