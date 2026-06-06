@@ -1479,43 +1479,73 @@ public class NotificationService extends NotificationListenerService {
 
     
     private static int assignDriverWeight(String text) {
-        String u = text.toUpperCase();
-        
-        // CORRECTION ACTIFS CRUCIAUX : Ajout de la détection des synonymes/surnoms institutionnels
-        if (u.contains("CPI")            || u.contains("INFLATION")       || u.contains("NFP")          ||
-            u.contains("NON-FARM PAYROLLS") || u.contains("FOMC")           || u.contains("INTEREST RATE") ||
-            u.contains("RBA")            || u.contains("BOC")             || u.contains("BOJ")           ||
-            u.contains("BOE")            || u.contains("ECB")             || u.contains("BCE")           ||
-            u.contains("LAGARDE")        || u.contains("BAILEY")          || u.contains("MACKLEM")       ||
-            u.contains("BULLOCK")        || u.contains("UEDA")            || u.contains("CABLE")         || 
-            u.contains("STERLING")       || u.contains("AUSSIE")          || u.contains("LOONIE")        ||
-            u.contains("WARSH")          || u.contains("POWELL")) return 5;
-            
-        if (u.contains("GDP")                || u.contains("PIB")                    ||
-            u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT RATE")        ||
-            u.contains("STOCKS")             || u.contains("JOBLESS")                ||
-            u.contains("ADP")                || u.contains("JOLTS")                  ||
-            u.contains("JOB OPENINGS")       || u.contains("PPI")                    ||
-            u.contains("PRODUCER PRICE")     || u.contains("DURABLE GOODS")          ||
-            u.contains("TRADE BALANCE")      || u.contains("CURRENT ACCOUNT")        ||
-            u.contains("INDUSTRIAL PRODUCTION") || u.contains("CAPACITY UTILIZATION") ||
-            u.contains("PHILLY FED")         || u.contains("EMPIRE STATE")           ||
-            u.contains("CHICAGO PMI")        || u.contains("BEIGE BOOK")             ||
-            u.contains("PERSONAL SPENDING")  || u.contains("PERSONAL INCOME")        ||
-            u.contains("HOUSING STARTS")     || u.contains("BUILDING PERMITS")       ||
-            u.contains("WTI")                || u.contains("BRENT")                  || 
-            u.contains("CRUDE OIL")          || u.contains("XAUUSD")                 ||
-            u.contains("HOME SALES")         || u.contains("CHALLENGER")) return 4;
-            
-        if (u.contains("PMI")               || u.contains("ISM")                  ||
-            u.contains("MICHIGAN")          || u.contains("CONSUMER CONFIDENCE")   ||
-            u.contains("CONSUMER SENTIMENT")|| u.contains("IMPORT PRICE")          ||
-            u.contains("NAS100")            || u.contains("SPX")                  ||
-            u.contains("US500")             || u.contains("USTECH")                ||
-            u.contains("EXPORT PRICE")      || u.contains("NATURAL GAS")) return 3;
-            
-        return 1;
+    String u = text.toUpperCase();
+
+    // ✅ Détection BREAKING + contexte macro/géo → forcer poids 4 minimum
+    boolean isBreaking = u.contains("BREAKING") || u.contains("BREAKING NEWS") ||
+                         u.contains("URGENT") || u.contains("FLASH:") ||
+                         u.contains("JUST IN") || u.contains("ALERTE");
+
+    // === NIVEAU 5 : ÉVÉNEMENTS SUPRÊMES (Volatilité maximale) ===
+    if (u.contains("CPI")              || u.contains("CORE CPI")        || u.contains("PCE")             ||
+        u.contains("CORE PCE")         || u.contains("INFLATION")        || u.contains("NFP")             ||
+        u.contains("NON-FARM")         || u.contains("NONFARM")          || u.contains("PAYROLL")        ||
+        u.contains("PAYROLLS")         || u.contains("FOMC")             || u.contains("INTEREST RATE")   ||
+        u.contains("RATE DECISION")    || u.contains("FEDERAL RESERVE")  || u.contains("POWELL")          ||
+        u.contains("WARSH")            || u.contains("LAGARDE")          || u.contains("ECB")             ||
+        u.contains("BCE")              || u.contains("BOE")              || u.contains("BOJ")             ||
+        u.contains("BOC")              || u.contains("RBA")              || u.contains("BAILEY")         ||
+        u.contains("MACKLEM")          || u.contains("BULLOCK")          || u.contains("UEDA")            ||
+        u.contains("FED CHAIR")        || u.contains("MONETARY POLICY")) {
+        return 5;
     }
+
+    // === NIVEAU 4 : Haut impact (GDP, Emploi secondaire, Pétrole, Géo) ===
+    if (u.contains("GDP")                || u.contains("PIB")                    ||
+        u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT")             ||
+        u.contains("JOBLESS")            || u.contains("INITIAL CLAIMS")         ||
+        u.contains("ADP")                || u.contains("JOLTS")                  ||
+        u.contains("PPI")                || u.contains("PRODUCER PRICE")         ||
+        u.contains("DURABLE GOODS")      || u.contains("TRADE BALANCE")          ||
+        u.contains("CURRENT ACCOUNT")    || u.contains("INDUSTRIAL PRODUCTION")  ||
+        u.contains("CAPACITY UTILIZATION")|| u.contains("PHILLY FED")           ||
+        u.contains("EMPIRE STATE")       || u.contains("CHICAGO PMI")            ||
+        u.contains("BEIGE BOOK")         || u.contains("PERSONAL SPENDING")      ||
+        u.contains("PERSONAL INCOME")    || u.contains("HOUSING STARTS")         ||
+        u.contains("BUILDING PERMITS")   || u.contains("HOME SALES")             ||
+        u.contains("EXISTING HOME")      || u.contains("NEW HOME")               ||
+        // Pétrole & Géopolitique
+        u.contains("EIA")                || u.contains("CRUDE OIL")              ||
+        u.contains("OIL INVENTORIES")    || u.contains("OPEC")                   ||
+        u.contains("HORMUZ")             || u.contains("ORMUZ")                  ||
+        u.contains("IRAN")               || u.contains("ISRAEL")                 ||
+        u.contains("MIDDLE EAST")        || u.contains("GEOPOLITIC")             ||
+        u.contains("MISSILE")            || u.contains("STRIKE")                 ||
+        // Chine
+        u.contains("CAIXIN")             || u.contains("CHINA PMI")              ||
+        u.contains("CHINESE GDP")) {
+        return 4;
+    }
+
+    // === NIVEAU 3 : Impact moyen ===
+    if (u.contains("PMI")               || u.contains("ISM")                    ||
+        u.contains("MICHIGAN")          || u.contains("CONSUMER CONFIDENCE")     ||
+        u.contains("CONSUMER SENTIMENT")|| u.contains("IMPORT PRICE")            ||
+        u.contains("EXPORT PRICE")      || u.contains("NATURAL GAS")             ||
+        u.contains("IFO")               || u.contains("ZEW")                     ||
+        u.contains("TANKAN")            || u.contains("AVERAGE EARNINGS")        ||
+        u.contains("WAGE GROWTH")       || u.contains("CLAIMANT COUNT")          ||
+        u.contains("CHALLENGER")        || u.contains("NAS100")                  ||
+        u.contains("SPX")               || u.contains("US500")                   ||
+        u.contains("USTECH")            || u.contains("SENTIMENT")) {
+        return 3;
+    }
+
+    // ✅ BREAKING seul sans mot-clé macro → poids 2 minimum pour ne pas rejeter
+    if (isBreaking) return 2;
+
+    return 1;
+}
 
     private boolean detectDriverDeviation(String text) {
         String upper = text.toUpperCase();
