@@ -909,11 +909,11 @@ public static void preloadCalendar() {
 
         // ── Construction du rapport Telegram ──
         // ✅ Envoyer uniquement si le contenu a changé
-        String reportStr = buildCalendarReport(sortedEvents).toString();
+        //String reportStr = buildCalendarReport(sortedEvents).toString();
         String newHash   = String.valueOf(reportStr.hashCode());
         String lastHash  = lastCalendarHash;
 
-        //StringBuilder report = new StringBuilder();
+        StringBuilder report = new StringBuilder();
         report.append("📅 *CALENDRIER ÉCONOMIQUE — PROCHAINS ÉVÉNEMENTS*\n");
         report.append("─────────────────────────────────────────\n");
 
