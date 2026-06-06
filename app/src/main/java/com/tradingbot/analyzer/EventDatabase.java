@@ -419,8 +419,53 @@ public class EventDatabase extends SQLiteOpenHelper {
             if (cursor != null) cursor.close();
         }
     }
-    
-    // ✅ Vérifie si un driver spécifique est enregistré dans les dernières 48h
+
+    public String getDerniersDriversGeo(long currentUnixTime) {
+    SQLiteDatabase db = this.getReadableDatabase();
+    StringBuilder sb = new StringBuilder();
+    long fortyEightHoursAgo = currentUnixTime - (48 * 60 * 60);
+    Cursor cursor = null;
+    try {
+        cursor = db.query(TABLE_EVENTS,
+            new String[]{"title", "impact", "unix_timestamp"},
+            "unix_timestamp >= ? AND (" +
+            "event_type LIKE '%GEO%' OR " +
+            "impact LIKE '%GÉOPOLITIQUE%' OR impact LIKE '%GEO%' OR " +
+            "title LIKE '%IRAN%' OR title LIKE '%iran%' OR " +
+            "title LIKE '%ISRAEL%' OR title LIKE '%israel%' OR " +
+            "title LIKE '%UKRAINE%' OR title LIKE '%ukraine%' OR " +
+            "title LIKE '%RUSSIA%' OR title LIKE '%russia%' OR " +
+            "title LIKE '%HORMUZ%' OR title LIKE '%hormuz%' OR " +
+            "title LIKE '%RED SEA%' OR title LIKE '%red sea%' OR " +
+            "title LIKE '%HEZBOLLAH%' OR title LIKE '%hezbollah%' OR " +
+            "title LIKE '%HOUTHI%' OR title LIKE '%houthi%' OR " +
+            "title LIKE '%GAZA%' OR title LIKE '%gaza%' OR " +
+            "title LIKE '%MISSILE%' OR title LIKE '%missile%' OR " +
+            "title LIKE '%TAIWAN%' OR title LIKE '%taiwan%' OR " +
+            "title LIKE '%PUTIN%' OR title LIKE '%putin%')",
+            new String[]{String.valueOf(fortyEightHoursAgo)},
+            null, null, "unix_timestamp DESC", "5");
+
+        if (cursor != null && cursor.moveToFirst()) {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
+            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+            do {
+                long ts = cursor.getLong(2);
+                String dateStr = sdf.format(new Date(ts * 1000));
+                sb.append("⚠️ [").append(dateStr).append("] ")
+                  .append(cursor.getString(0))
+                  .append(" | ").append(cursor.getString(1))
+                  .append("\n");
+            } while (cursor.moveToNext());
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur getDerniersDriversGeo", e);
+    } finally {
+        if (cursor != null) cursor.close();
+    }
+    return sb.toString();
+    }
+
     public String diagnostiquerDriverSpecifique(String keyword) {
     SQLiteDatabase db = this.getReadableDatabase();
     StringBuilder sb = new StringBuilder();
@@ -441,19 +486,20 @@ public class EventDatabase extends SQLiteOpenHelper {
         if (cursor != null && cursor.getCount() > 0) {
             sb.append("✅ [DB] ").append(cursor.getCount())
               .append(" entrée(s) trouvée(s) pour : ").append(keyword).append("\n");
-            while (cursor.moveToNext()) {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
+            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+            cursor.moveToFirst(); // ✅ positionner avant la boucle
+            do {
                 long ts = cursor.getLong(5);
-                SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
-                sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
                 String dateStr = sdf.format(new Date(ts * 1000));
                 sb.append("  → [").append(dateStr).append("] ")
-                  .append(cursor.getString(0))        // title
-                  .append(" | Source: ").append(cursor.getString(1))  // source
-                  .append(" | Poids: ").append(cursor.getInt(3))      // driver_weight
-                  .append(" | Status: ").append(cursor.getString(4))  // sync_status
-                  .append(" | Type: ").append(cursor.getString(6))    // event_type
+                  .append(cursor.getString(0))
+                  .append(" | Source: ").append(cursor.getString(1))
+                  .append(" | Poids: ").append(cursor.getInt(3))
+                  .append(" | Status: ").append(cursor.getString(4))
+                  .append(" | Type: ").append(cursor.getString(6))
                   .append("\n");
-            }
+            } while (cursor.moveToNext());
         } else {
             sb.append("❌ [DB] Aucune entrée pour : ").append(keyword)
               .append(" (dernières 48h)\n");
@@ -464,42 +510,5 @@ public class EventDatabase extends SQLiteOpenHelper {
         if (cursor != null) cursor.close();
     }
     return sb.toString();
-    }
-
-    // ✅ Retourne les derniers drivers géopolitiques actifs (48h)
-   public String getDerniersDriversGeo(long currentUnixTime) {
-    SQLiteDatabase db = this.getReadableDatabase();
-    StringBuilder sb = new StringBuilder();
-    long fortyEightHoursAgo = currentUnixTime - (48 * 60 * 60);
-    Cursor cursor = null;
-    try {
-        cursor = db.query(TABLE_EVENTS,
-            new String[]{"title", "impact", "unix_timestamp"},
-            "unix_timestamp >= ? AND (event_type LIKE '%GEO%' OR " +
-            "impact LIKE '%GÉOPOLITIQUE%' OR impact LIKE '%GEO%' OR " +
-            "title LIKE '%IRAN%' OR title LIKE '%ISRAEL%' OR " +
-            "title LIKE '%UKRAINE%' OR title LIKE '%RUSSIA%' OR " +
-            "title LIKE '%HORMUZ%' OR title LIKE '%RED SEA%')",
-            new String[]{String.valueOf(fortyEightHoursAgo)},
-            null, null, "unix_timestamp DESC", "5");
-
-        if (cursor != null && cursor.moveToFirst()) {
-            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
-            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
-            do {
-                long ts = cursor.getLong(2);
-                String dateStr = sdf.format(new Date(ts * 1000));
-                sb.append("⚠️ [").append(dateStr).append("] ")
-                  .append(cursor.getString(0))  // title
-                  .append(" | ").append(cursor.getString(1))  // impact
-                  .append("\n");
-            } while (cursor.moveToNext());
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur getDerniersDriversGeo", e);
-    } finally {
-        if (cursor != null) cursor.close();
-    }
-    return sb.toString(); 
-  }
+   }
 }
