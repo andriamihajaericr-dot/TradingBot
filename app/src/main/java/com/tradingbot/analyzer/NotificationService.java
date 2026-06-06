@@ -1590,7 +1590,7 @@ public class NotificationService extends NotificationListenerService {
         u.contains("TAIWAN")              || u.contains("TAIWAN STRAIT")           || // ✅
         u.contains("XI JINPING")          || u.contains("TSMC")                    || // ✅
         u.contains("SOUTH CHINA SEA")     ||                                          // ✅
-        // ── Chine ──
+        // ── Chine ── 
         u.contains("CAIXIN")              || u.contains("CHINA PMI")               ||
         u.contains("CHINESE GDP")         || u.contains("CHINA GDP")               || // ✅
         u.contains("CHINA TRADE")         || u.contains("CHINESE EXPORTS")         ||
