@@ -902,7 +902,12 @@ public static void preloadCalendar() {
         }
 
         // ── Construction du rapport Telegram ──
-        StringBuilder report = new StringBuilder();
+        // ✅ Envoyer uniquement si le contenu a changé
+        String reportStr = buildCalendarReport(sortedEvents).toString();
+        String newHash   = String.valueOf(reportStr.hashCode());
+        String lastHash  = lastCalendarHash;
+
+        //StringBuilder report = new StringBuilder();
         report.append("📅 *CALENDRIER ÉCONOMIQUE — PROCHAINS ÉVÉNEMENTS*\n");
         report.append("─────────────────────────────────────────\n");
 
@@ -961,7 +966,14 @@ public static void preloadCalendar() {
         report.append("📊 *Total :* ").append(totalAffiche).append(" événements\n");
         report.append("🕒 *Mis à jour :* ").append(getMadaTimeNow()).append(" (Mada)");
 
-        sendCalendarToTelegram(report.toString());
+        
+if (!newHash.equals(lastHash)) {
+    lastCalendarHash = newHash;
+    sendCalendarToTelegram(reportStr);
+    logToMain("📤 [CALENDRIER] Rapport envoyé — contenu modifié");
+} else {
+    logToMain("⏭️ [CALENDRIER] Rapport inchangé — envoi ignoré");
+};
 
         // ✅ Analyse et envoi immédiat des nouveaux résultats publiés sans notification Android
         for (EconomicCalendarAPI.CalendarEvent event : newlyPublished) {
