@@ -1291,9 +1291,14 @@ if (hasForecast) {
         baseSystemPrompt;
 
     // ✅ Log pour diagnostic MainActivity
-    logToMain("🔢 [SCORING] Déviation=" + String.format("%.4f", ecoResult.deviation) +
-              " | Surprise=" + niveauSurprise +
-              " | Direction=" + ecoResult.directionText);
+    Log.d(TAG, "🔢 [SCORING] Déviation=" + String.format("%.4f", ecoResult.deviation) +
+          " | Surprise=" + niveauSurprise +
+          " | Direction=" + ecoResult.directionText);
+       if (MainActivity.instance != null) {
+          MainActivity.instance.addLog("🔢 [SCORING] Déviation=" + String.format("%.4f", ecoResult.deviation) +
+          " | Surprise=" + niveauSurprise +
+          " | Direction=" + ecoResult.directionText);
+       }
 }
 
 // 🔟 Exécution finale
