@@ -120,6 +120,11 @@ public class EconomicEventDetector {
             description = "Nomination Banque Centrale — Changement de Politique Potentiel";
             impact      = "Haute Volatilité";
         }
+        } else if (containsAny(unified, "CHINA CPI", "CHINA PPI", "CHINA GDP", "CHINA PMI", "PBOC", "YUAN", "CNY", "RENMINBI", "CHINESE ECONOMY", "CHINA STIMULUS", "CHINA PROPERTY", "EVERGRANDE","NPC", "POLITBURO", "XI JINPING ECONOMY")) {
+            eventType   = "CHINA-MACRO";
+            description = "Données Macroéconomiques Chine / PBOC";
+            impact      = "Haute Volatilité";
+        }
         // ── 2. EXTRACTION ET ACCUMULATION DU BIAIS DIRECTIONNEL FONDAMENTAL ──
         if (containsAny(unified, "HIGHER THAN EXPECTED", "BEATS ESTIMATES", "ABOVE FORECAST",
                        "ABOVE EXPECTATIONS", "BETTER THAN EXPECTED", "HAWKISH")) {
