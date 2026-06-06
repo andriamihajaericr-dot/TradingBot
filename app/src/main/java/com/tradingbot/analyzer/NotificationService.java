@@ -1197,8 +1197,7 @@ public class NotificationService extends NotificationListenerService {
 
                 // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
                 // 9️⃣ Enrichissement dynamique du Prompt Système IA
-                String baseSystemPrompt = SYSTEM_PROMPT;
-
+String baseSystemPrompt = SYSTEM_PROMPT;
 // ✅ Injection du régime de marché dynamique en tête du prompt
 try {
     String regimeActuel = eventDb.detecterRegimeMarche(
