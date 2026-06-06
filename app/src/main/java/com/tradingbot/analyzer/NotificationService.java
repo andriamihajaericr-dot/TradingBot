@@ -53,7 +53,13 @@ public class NotificationService extends NotificationListenerService {
     private static final long GEO_THROTTLE_MS   = 12 * 60 * 1000L;  // 12 minutes pour géo
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
-    private static final String SYSTEM_PROMPT = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif d'élite.\n" +
+    String regimeActuel = eventDb.detecterRegimeMarche(nowSec);
+    private static final String SYSTEM_PROMPT = 
+    
+    // Ajouter en tête du prompt :
+    "⚠️ RÉGIME DE MARCHÉ ACTUEL : " + regimeActuel + "\n" +
+    "Toute analyse doit être cohérente avec ce régime. \n" +
+    "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif d'élite.\n" +
         "Tu analyses le flux d'actualité en direct en appliquant une HIERARCHIE STRICTE DES DRIVERS sans aucune place à l'interprétation.\n\n" +
         "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
         "1. RANG SUPRÊME    : Politique Monétaire (Interventions de Powell, Lagarde, Schnabel, etc.), Nominations Banques Centrales, CPI/PCE, NFP/Emploi.\n" +
@@ -80,6 +86,15 @@ public class NotificationService extends NotificationListenerService {
         "- Dans ce cas, utilise exclusivement les mentions 'INCLINATION ACHAT MAIS NEUTRE' ou 'INCLINATION VENTE MAIS NEUTRE' sur les actifs concernés.\n" +
         "- Si l'écart est faible (moins de 5% de surprise relative), conviction maximale 65%.\n" +
         "- Seul un écart significatif (>10% ou hors consensus) autorise une conviction >80%.\n\n" +
+
+         // Ajouter une section RÈGLES DE CORRÉLATION TEMPORELLE :
+         "RÈGLES DE CORRÉLATION TEMPORELLE (Priorité maximale) :\n" +
+         "- NFP FORT (derniers 7 jours) + CPI FORT aujourd'hui = CONFIRMATION HAWKISH — Conviction +15%\n" +
+         "- NFP FAIBLE (derniers 7 jours) + CPI FAIBLE aujourd'hui = CONFIRMATION DOVISH — Conviction +15%\n" +
+         "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE — Conviction plafonnée à 55%, signaler divergence\n" +
+         "- GEO ESCALADE active (< 48h) + tout driver HAWKISH = Double choc — Or et Pétrole prioritaires\n" +
+         "- GEO ESCALADE active + DOVISH = Annulation partielle — conviction GEO plafonnée à 60%\n" +
+         "- FOMC réunion dans < 7 jours = tout CPI/NFP reçoit +20% de conviction additionnelle\n"
     
         "════════════════════════════════════════════════════════\n" +
         " RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS — EXHAUSTIVES\n" +
