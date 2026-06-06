@@ -1415,8 +1415,11 @@ public class NotificationService extends NotificationListenerService {
         }
         // ✅ Diagnostic log pour confirmer l'enregistrement
         if (weight >= 4) {
-            String diagnostic = eventDb.diagnostiquerDriverSpecifique(title);
-            logToMain(diagnostic);
+        String diagnostic = eventDb.diagnostiquerDriverSpecifique(title);
+           Log.d(TAG, diagnostic);  // ✅ Logcat toujours accessible
+           if (MainActivity.instance != null) {
+               MainActivity.instance.addLog(diagnostic);  // ✅ MainActivity
+           }
         }
         // ✅ PIPELINE ASYNCHRONE SÉCURISÉ
         if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
