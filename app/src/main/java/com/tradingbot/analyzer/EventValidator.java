@@ -909,10 +909,7 @@ public static void preloadCalendar() {
 
         // ── Construction du rapport Telegram ──
         // ✅ Envoyer uniquement si le contenu a changé
-        //String reportStr = buildCalendarReport(sortedEvents).toString();
-        String newHash   = String.valueOf(reportStr.hashCode());
-        String lastHash  = lastCalendarHash;
-
+        // ── Construction du rapport Telegram ──
         StringBuilder report = new StringBuilder();
         report.append("📅 *CALENDRIER ÉCONOMIQUE — PROCHAINS ÉVÉNEMENTS*\n");
         report.append("─────────────────────────────────────────\n");
@@ -963,6 +960,7 @@ public static void preloadCalendar() {
             } else if (hasActual) {
                 report.append(" | Réel: `").append(event.actual).append("`");
             }
+
             if (hasPrevious) report.append(" Préc: `").append(event.previous).append("`");
             report.append("\n");
             totalAffiche++;
@@ -972,14 +970,17 @@ public static void preloadCalendar() {
         report.append("📊 *Total :* ").append(totalAffiche).append(" événements\n");
         report.append("🕒 *Mis à jour :* ").append(getMadaTimeNow()).append(" (Mada)");
 
-        
-if (!newHash.equals(lastHash)) {
-    lastCalendarHash = newHash;
-    sendCalendarToTelegram(reportStr);
-    logToMain("📤 [CALENDRIER] Rapport envoyé — contenu modifié");
-} else {
-    logToMain("⏭️ [CALENDRIER] Rapport inchangé — envoi ignoré");
-};
+        // ✅ Hash pour éviter les doublons Telegram
+        String reportStr = report.toString();
+        String newHash   = String.valueOf(reportStr.hashCode());
+
+        if (!newHash.equals(lastCalendarHash)) {
+            lastCalendarHash = newHash;
+            sendCalendarToTelegram(reportStr);
+            logToMain("📤 [CALENDRIER] Rapport envoyé — contenu modifié");
+        } else {
+            logToMain("⏭️ [CALENDRIER] Rapport inchangé — envoi ignoré");
+        }
 
         // ✅ Analyse et envoi immédiat des nouveaux résultats publiés sans notification Android
         for (EconomicCalendarAPI.CalendarEvent event : newlyPublished) {
