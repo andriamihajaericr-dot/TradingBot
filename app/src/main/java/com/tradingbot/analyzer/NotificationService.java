@@ -1197,10 +1197,27 @@ public class NotificationService extends NotificationListenerService {
 
                 // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
                 // 9️⃣ Enrichissement dynamique du Prompt Système IA
-                String baseSystemPrompt = SYSTEM_PROMPT;  // Utilise la constante de classe
-                String promptAI = baseSystemPrompt;
-if (ecoResult.isParsed) {
+                String baseSystemPrompt = SYSTEM_PROMPT;
 
+// ✅ Injection du régime de marché dynamique en tête du prompt
+try {
+    String regimeActuel = eventDb.detecterRegimeMarche(
+        System.currentTimeMillis() / 1000);
+    if (regimeActuel != null && !regimeActuel.isEmpty()) {
+        baseSystemPrompt =
+            "⚠️ RÉGIME DE MARCHÉ ACTUEL (7 derniers jours) :\n" +
+            regimeActuel + "\n" +
+            "Toute analyse doit être cohérente avec ce régime. " +
+            "Un signal contraire = DIVERGENCE à signaler explicitement.\n\n" +
+            SYSTEM_PROMPT;
+    }
+} catch (Exception e) {
+    Log.w(TAG, "Impossible de détecter le régime", e);
+}
+
+String promptAI = baseSystemPrompt;
+if (ecoResult.isParsed) {
+    
     // ✅ Calcul du scoring de conviction mathématique
     double absDeviation = Math.abs(ecoResult.deviation);
     String convictionDirective;
