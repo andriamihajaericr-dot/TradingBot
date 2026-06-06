@@ -103,7 +103,11 @@ public class EconomicEventDetector {
             eventType   = "GEO-ASIA-PACIFIC";
             description = "Événement Géopolitique — Asie-Pacifique";
             impact      = "Choc Géopolitique AUD/NASDAQ";
-
+            // Ajouter dans detectEvent — avant "Macro secondaire"
+        } else if (containsAny(unified, "TARIFF", "TARIFFS", "TRADE WAR", "TRADE DEAL", "IMPORT TAX", "CUSTOMS DUTY", "SANCTIONS", "EMBARGO", "TRADE AGREEMENT", "SECTION 301", "SECTION 232")) {
+            eventType   = "TRADE-TARIFF";
+            description = "Tarifs Douaniers / Guerre Commerciale";
+            impact      = "Haute Volatilité";
         // Macro secondaire (Poids 2)
         } else if (containsAny(unified, "RETAIL SALES", "CONSUMER CONFIDENCE", "CONSUMER SENTIMENT", "GDP", "PMI", "ISM", "MICHIGAN")) {
             eventType   = "ECONOMIC-GROWTH-DATA";
