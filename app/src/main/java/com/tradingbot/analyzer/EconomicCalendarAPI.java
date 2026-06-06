@@ -522,23 +522,25 @@ public class EconomicCalendarAPI {
                ind.contains("personal spending")           ||  // ajouté
                ind.contains("personal income");                // ajouté
     }
-
     private static String convertFMPDateToUnixSeconds(String dateStr) {
-        if (dateStr == null || dateStr.isEmpty())
-            return String.valueOf(System.currentTimeMillis() / 1000);
+    if (dateStr == null || dateStr.isEmpty())
+        return String.valueOf(System.currentTimeMillis() / 1000);
+    try {
+        // ✅ FMP retourne les heures en heure de New York (EST/EDT)
+        // America/New_York gère automatiquement le DST (EDT UTC-4 été, EST UTC-5 hiver)
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+        sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
+        return String.valueOf(sdf.parse(dateStr).getTime() / 1000);
+    } catch (Exception e) {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
-            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            // ✅ Date sans heure → assigner 00:00 New York
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+            sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
             return String.valueOf(sdf.parse(dateStr).getTime() / 1000);
-        } catch (Exception e) {
-            try {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-                return String.valueOf(sdf.parse(dateStr).getTime() / 1000);
-            } catch (Exception e2) {
-                return String.valueOf(System.currentTimeMillis() / 1000);
-            }
+        } catch (Exception e2) {
+            return String.valueOf(System.currentTimeMillis() / 1000);
         }
+    }
     }
 
     private static long convertForexFactoryDateToMs(String dateStr) {
