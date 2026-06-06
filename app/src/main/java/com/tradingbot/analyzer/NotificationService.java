@@ -2231,7 +2231,10 @@ String monthlyRegistry = eventDb.getMonthlyMacroRegistry(nowSec);
 
 // ✅ Régime de marché dynamique — basé sur les 7 derniers jours
 String regimeMarche = eventDb.detecterRegimeMarche(nowSec);
-logToMain("📈 [RÉGIME] " + regimeMarche.split("\n")[0]); // Log première ligne seulement
+Log.d(TAG, "📈 [RÉGIME] " + regimeMarche.split("\n")[0]);
+if (MainActivity.instance != null) {
+    MainActivity.instance.addLog("📈 [RÉGIME] " + regimeMarche.split("\n")[0]);
+}
 StringBuilder upcomingContext = new StringBuilder();
 upcomingContext.append("\n\n═══ CALENDRIER ÉCONOMIQUE À VENIR (72H) ═══\n");
 
