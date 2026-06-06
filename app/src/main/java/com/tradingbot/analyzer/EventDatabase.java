@@ -510,74 +510,153 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
     return sb.toString();
    }
-        // Détecter le régime actuel basé sur les 7 derniers jours
-    public String detecterRegimeMarche(long currentUnixTime) {
-        long sevenDaysAgo = currentUnixTime - (7 * 24 * 60 * 60);
-        
-        SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = null;
-        
-        try {
-            cursor = db.rawQuery(
-                "SELECT impact FROM " + TABLE_EVENTS + 
-                " WHERE unix_timestamp >= ? AND driver_weight >= 3",
-                new String[]{String.valueOf(sevenDaysAgo)}
-            );
 
-            if (cursor == null || !cursor.moveToFirst()) {
-                return "RÉGIME MIXTE / INCERTAIN ⚖️";
-            }
+    // ✅ Détecte le régime de marché actuel basé sur les 7 derniers jours
+public String detecterRegimeMarche(long currentUnixTime) {
+    SQLiteDatabase db = this.getReadableDatabase();
+    long sevenDaysAgo = currentUnixTime - (7 * 24 * 60 * 60);
+    Cursor cursor = null;
 
-            int hawkishCount = 0;
-            int dovishCount = 0;
-            int geoCount = 0;
-            int totalSignificant = 0;
+    int scoreHawkish  = 0;
+    int scoreDovish   = 0;
+    int scoreGeo      = 0;
+    int scoreRiskOn   = 0;
+    int scoreRiskOff  = 0;
+    int totalEvents   = 0;
 
-            do {
-                String impact = cursor.getString(0);
-                if (impact == null) continue;
+    try {
+        cursor = db.query(TABLE_EVENTS,
+            new String[]{"impact", "event_type", "driver_weight", "title"},
+            "unix_timestamp >= ? AND driver_weight >= 3",
+            new String[]{String.valueOf(sevenDaysAgo)},
+            null, null, "unix_timestamp DESC");
 
-                String imp = impact.toUpperCase(Locale.ROOT);
-                totalSignificant++;
-
-                if (imp.contains("HAWKISH") || imp.contains("STRONG") || 
-                    imp.contains("SURPRISE HAUSSIÈRE") || imp.contains("NFP") || 
-                    imp.contains("CPI") && !imp.contains("BAISSE")) {
-                    hawkishCount++;
-                }
-                
-                if (imp.contains("DOVISH") || imp.contains("WEAK") || 
-                    imp.contains("SURPRISE BAISSIÈRE") || imp.contains("WEAK")) {
-                    dovishCount++;
-                }
-                
-                if (imp.contains("GEO") || imp.contains("HORMUZ") || imp.contains("IRAN") || 
-                    imp.contains("ISRAEL") || imp.contains("MISSILE") || imp.contains("RISK-OFF")) {
-                    geoCount++;
-                }
-            } while (cursor.moveToNext());
-
-            // Décision du régime dominant
-            if (geoCount >= 2 || geoCount >= totalSignificant * 0.4) {
-                return "RÉGIME RISK-OFF GÉOPOLITIQUE 🐻";
-            }
-            if (hawkishCount > dovishCount + 1) {
-                return "RÉGIME HAWKISH DOMINANT 🐻";
-            }
-            if (dovishCount > hawkishCount + 1) {
-                return "RÉGIME DOVISH / RISK-ON 🐂";
-            }
-            if (geoCount >= 1) {
-                return "RÉGIME MIXTE AVEC TENSION GÉO ⚠️";
-            }
-
-            return "RÉGIME MIXTE / INCERTAIN ⚖️";
-
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur detecterRegimeMarche", e);
-            return "RÉGIME NON DÉTERMINÉ";
-        } finally {
-            if (cursor != null) cursor.close();
+        if (cursor == null || cursor.getCount() == 0) {
+            return "RÉGIME INDÉTERMINÉ | Aucun driver macro significatif sur 7 jours.";
         }
-      }
+
+        cursor.moveToFirst();
+        do {
+            String impact    = cursor.getString(0) != null ? cursor.getString(0).toUpperCase() : "";
+            String eventType = cursor.getString(1) != null ? cursor.getString(1).toUpperCase() : "";
+            int weight       = cursor.getInt(2);
+            String title     = cursor.getString(3) != null ? cursor.getString(3).toUpperCase() : "";
+
+            totalEvents++;
+
+            // ── Score pondéré par le poids du driver ──
+            int multiplier = (weight >= 5) ? 3 : (weight == 4) ? 2 : 1;
+
+            // ── Détection HAWKISH ──
+            if (impact.contains("BIAIS HAUSSIER") || impact.contains("HAWKISH") ||
+                impact.contains("HIGHER THAN EXPECTED") || impact.contains("ABOVE FORECAST") ||
+                impact.contains("BEATS ESTIMATES") || impact.contains("BETTER THAN EXPECTED") ||
+                title.contains("HAWKISH") || title.contains("RATE HIKE") ||
+                title.contains("BEATS") || title.contains("ABOVE FORECAST")) {
+                scoreHawkish += multiplier;
+                scoreRiskOff += multiplier; // HAWKISH = taux hauts = risk-off actions
+            }
+
+            // ── Détection DOVISH ──
+            else if (impact.contains("BIAIS BAISSIER") || impact.contains("DOVISH") ||
+                     impact.contains("LOWER THAN EXPECTED") || impact.contains("BELOW FORECAST") ||
+                     impact.contains("MISSES ESTIMATES") || impact.contains("WORSE THAN EXPECTED") ||
+                     title.contains("DOVISH") || title.contains("RATE CUT") ||
+                     title.contains("MISSES") || title.contains("BELOW FORECAST")) {
+                scoreDovish += multiplier;
+                scoreRiskOn += multiplier; // DOVISH = baisses taux attendues = risk-on
+            }
+
+            // ── Détection GEO / RISK-OFF ──
+            if (eventType.contains("GEO") ||
+                impact.contains("CHOC GÉOPOLITIQUE") ||
+                impact.contains("GEO") ||
+                title.contains("IRAN") || title.contains("ISRAEL") ||
+                title.contains("UKRAINE") || title.contains("RUSSIA") ||
+                title.contains("MISSILE") || title.contains("STRIKE") ||
+                title.contains("HORMUZ") || title.contains("RED SEA") ||
+                title.contains("TAIWAN") || title.contains("HOUTHI")) {
+                scoreGeo     += multiplier;
+                scoreRiskOff += multiplier;
+            }
+
+        } while (cursor.moveToNext());
+
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur detecterRegimeMarche", e);
+        return "RÉGIME INDÉTERMINÉ | Erreur de calcul.";
+    } finally {
+        if (cursor != null) cursor.close();
+    }
+
+    // ── Calcul du régime dominant ──
+    int scoreTotal = scoreHawkish + scoreDovish + scoreGeo;
+    if (scoreTotal == 0) {
+        return "RÉGIME NEUTRE | Aucun signal directionnel dominant sur 7 jours.";
+    }
+
+    // ── Détermination du régime principal ──
+    String regimePrincipal;
+    String regimeDetail;
+
+    // Cas 1 — GEO dominant (score GEO > 60% du total)
+    if (scoreGeo > 0 && (scoreGeo * 100 / scoreTotal) >= 60) {
+        regimePrincipal = "RÉGIME RISK-OFF GÉOPOLITIQUE DOMINANT 🔴";
+        regimeDetail    = "Les chocs géopolitiques dominent le flux macro. " +
+                          "Or et Yen sont les refuges prioritaires. " +
+                          "Pétrole sous pression haussière structurelle.";
+    }
+    // Cas 2 — HAWKISH dominant (score HAWKISH > 50% du total)
+    else if (scoreHawkish > scoreDovish && scoreHawkish > scoreGeo &&
+             (scoreHawkish * 100 / scoreTotal) >= 50) {
+        regimePrincipal = "RÉGIME HAWKISH DOMINANT 🦅";
+        regimeDetail    = "Les données macro US confirment un contexte de resserrement monétaire. " +
+                          "Dollar structurellement fort. " +
+                          "Actions et actifs risk-on sous pression.";
+    }
+    // Cas 3 — DOVISH dominant (score DOVISH > 50% du total)
+    else if (scoreDovish > scoreHawkish && scoreDovish > scoreGeo &&
+             (scoreDovish * 100 / scoreTotal) >= 50) {
+        regimePrincipal = "RÉGIME DOVISH DOMINANT 🕊️";
+        regimeDetail    = "Les données macro US confirment un contexte accommodant. " +
+                          "Dollar structurellement faible. " +
+                          "Actions et actifs risk-on favorisés.";
+    }
+    // Cas 4 — STAGFLATION (HAWKISH + RISK-OFF simultanés équilibrés)
+    else if (scoreHawkish > 0 && scoreGeo > 0 &&
+             Math.abs(scoreHawkish - scoreGeo) <= 2) {
+        regimePrincipal = "RÉGIME STAGFLATIONNISTE / DOUBLE CHOC ⚠️";
+        regimeDetail    = "Coexistence d'un choc HAWKISH (inflation) et d'un choc GÉOPOLITIQUE. " +
+                          "Or est le seul actif avec double bénéfice. " +
+                          "Pétrole haussier. Toutes les devises sous pression.";
+    }
+    // Cas 5 — HAWKISH + DOVISH contradictoires (mixte)
+    else if (scoreHawkish > 0 && scoreDovish > 0 &&
+             Math.abs(scoreHawkish - scoreDovish) <= 2) {
+        regimePrincipal = "RÉGIME MIXTE / INCERTAIN 🔄";
+        regimeDetail    = "Les signaux macro sont contradictoires sur 7 jours. " +
+                          "Conviction réduite sur tous les actifs. " +
+                          "Attendre une confirmation directionnelle.";
+    }
+    // Cas 6 — Défaut
+    else {
+        regimePrincipal = "RÉGIME NEUTRE FAIBLE SIGNAL 〰️";
+        regimeDetail    = "Aucun signal macro dominant détecté. Marché en attente de catalyseur.";
+    }
+
+    // ── Construction du rapport de régime ──
+    StringBuilder sb = new StringBuilder();
+    sb.append(regimePrincipal).append("\n");
+    sb.append("─────────────────────────────────\n");
+    sb.append("📊 Score HAWKISH  : ").append(scoreHawkish).append("\n");
+    sb.append("📊 Score DOVISH   : ").append(scoreDovish).append("\n");
+    sb.append("📊 Score GEO      : ").append(scoreGeo).append("\n");
+    sb.append("📊 Score RISK-ON  : ").append(scoreRiskOn).append("\n");
+    sb.append("📊 Score RISK-OFF : ").append(scoreRiskOff).append("\n");
+    sb.append("📊 Total événements analysés : ").append(totalEvents).append("\n");
+    sb.append("─────────────────────────────────\n");
+    sb.append("📝 ").append(regimeDetail);
+
+    return sb.toString();
+}
 }
