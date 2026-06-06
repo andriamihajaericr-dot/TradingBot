@@ -2132,7 +2132,9 @@ String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
 // ✅ Mémoire contextuelle inter-sessions — Registre macro 30 derniers jours
 String monthlyRegistry = eventDb.getMonthlyMacroRegistry(nowSec);
 
-// ✅ Contexte prospectif — événements à venir dans les 72h
+// ✅ Régime de marché dynamique — basé sur les 7 derniers jours
+String regimeMarche = eventDb.detecterRegimeMarche(nowSec);
+logToMain("📈 [RÉGIME] " + regimeMarche.split("\n")[0]); // Log première ligne seulement
 StringBuilder upcomingContext = new StringBuilder();
 upcomingContext.append("\n\n═══ CALENDRIER ÉCONOMIQUE À VENIR (72H) ═══\n");
 
@@ -2356,18 +2358,25 @@ if (monthlyRegistry != null && !monthlyRegistry.trim().isEmpty()) {
 } else {
     monthlyContext = "\n\n═══ REGISTRE MACRO DU MOIS : Aucun historique disponible ═══\n";
 }
+// ✅ Construction du contexte régime
+String regimeContext = "\n\n═══ RÉGIME DE MARCHÉ ACTUEL (7 derniers jours) ═══\n" +
+    regimeMarche +
+    "\n⚠️ INSTRUCTION RÉGIME : Toute analyse doit être cohérente avec ce régime. " +
+    "Un signal contraire au régime dominant doit être signalé comme DIVERGENCE.\n";
 
 messages.put(new JSONObject().put("role", "user").put("content",
     "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n" +
     "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers +
-    monthlyContext +                          // ✅ mémoire 30 jours
-    upcomingContext.toString() +              // ✅ calendrier 72h à venir
+    monthlyContext +               // ✅ mémoire 30 jours
+    regimeContext +                // ✅ régime 7 jours
+    upcomingContext.toString() +   // ✅ calendrier 72h
     "\n\nINSTRUCTION SPÉCIALE : Analyse les corrélations entre les drivers passés " +
     "(NFP, géopolitique, banques centrales) et les événements à venir (CPI, FOMC, etc.). " +
     "Identifie les risques d'escalade ou de confirmation de tendance. " +
-    "Si le registre mensuel montre une tendance HAWKISH dominante, le biais général " +
-    "doit refléter cette persistance sauf signal contraire explicite."));
-
+    "Si le régime est HAWKISH DOMINANT et que le CPI d'aujourd'hui bat les prévisions, " +
+    "c'est une CONFIRMATION — augmenter la conviction. " +
+    "Si le régime est DOVISH DOMINANT et que le NFP est fort, " +
+    "c'est une DIVERGENCE — signaler explicitement et plafonner la conviction à 55%."));
 payload.put("messages", messages);
         
         URL url = new URL(GROQ_URL);
