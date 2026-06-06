@@ -1413,7 +1413,11 @@ public class NotificationService extends NotificationListenerService {
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
         }
-    
+        // ✅ Diagnostic log pour confirmer l'enregistrement
+        if (weight >= 4) {
+            String diagnostic = eventDb.diagnostiquerDriverSpecifique(title);
+            logToMain(diagnostic);
+        }
         // ✅ PIPELINE ASYNCHRONE SÉCURISÉ
         if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
             Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié (Poids=" + weight + ") → Préparation du pipeline.");
