@@ -1194,18 +1194,76 @@ public class NotificationService extends NotificationListenerService {
                 // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
                 // 9️⃣ Enrichissement dynamique du Prompt Système IA
                 String baseSystemPrompt = SYSTEM_PROMPT;  // Utilise la constante de classe
-
                 String promptAI = baseSystemPrompt;
-                if (ecoResult.isParsed) {
-                promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
-                    "L'analyseur mathématique déterministe a détecté un écart type. " +
-                    "Direction recommandée : " + ecoResult.directionText + "\n\n" + baseSystemPrompt;
-                 }
+if (ecoResult.isParsed) {
 
-                // 🔟 Exécution finale de l'analyse cognitive LLM (Requête API Groq, génération de la matrice et envoi Telegram)
-                // 🔟 Exécution finale de l'analyse cognitive LLM
-                processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank);
+    // ✅ Calcul du scoring de conviction mathématique
+    double absDeviation = Math.abs(ecoResult.deviation);
+    String convictionDirective;
+    String niveauSurprise;
 
+    // ✅ Seuils basés sur la déviation absolue
+    // (pas de forecast dans EvaluationResult — on utilise la déviation brute)
+    if (absDeviation == 0.0) {
+        // Conforme aux prévisions
+        convictionDirective =
+            "⚠️ DIRECTIVE CONVICTION MATHÉMATIQUE : " +
+            "Écart NUL (actual = forecast) → " +
+            "Conviction PLAFONNÉE à 50% (jauge orange 🟠). " +
+            "Utiliser exclusivement INCLINATION ACHAT MAIS NEUTRE ou INCLINATION VENTE MAIS NEUTRE.\n";
+        niveauSurprise = "CONFORME";
+
+    } else if (absDeviation <= 5.0) {
+        // Faible surprise < 5%
+        convictionDirective =
+            "⚠️ DIRECTIVE CONVICTION MATHÉMATIQUE : " +
+            "Écart FAIBLE (déviation = " + String.format("%.2f", ecoResult.deviation) + ") → " +
+            "Conviction PLAFONNÉE à 65% maximum. " +
+            "Signal réel mais insuffisant pour un choc majeur.\n";
+        niveauSurprise = "FAIBLE";
+
+    } else if (absDeviation <= 15.0) {
+        // Surprise modérée
+        convictionDirective =
+            "⚠️ DIRECTIVE CONVICTION MATHÉMATIQUE : " +
+            "Écart MODÉRÉ (déviation = " + String.format("%.2f", ecoResult.deviation) + ") → " +
+            "Conviction AUTORISÉE jusqu'à 75%. " +
+            "Signal significatif — impact directionnel confirmé.\n";
+        niveauSurprise = "MODÉRÉE";
+
+    } else {
+        // Forte surprise > 15 — choc majeur
+        convictionDirective =
+            "⚠️ DIRECTIVE CONVICTION MATHÉMATIQUE : " +
+            "Écart MAJEUR (déviation = " + String.format("%.2f", ecoResult.deviation) + ") → " +
+            "Conviction AUTORISÉE > 80%. " +
+            "CHOC MACRO CONFIRMÉ — Signal institutionnel de première importance.\n";
+        niveauSurprise = "MAJEURE";
+    }
+
+    // ✅ Direction mathématique confirmée
+    String directionConfirmee = ecoResult.deviation > 0
+        ? "📈 DIRECTION MATHÉMATIQUE : HAUSSIÈRE (actual > forecast)"
+        : "📉 DIRECTION MATHÉMATIQUE : BAISSIÈRE (actual < forecast)";
+
+    // ✅ Construction du prompt enrichi
+    promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE — SCORING QUANTITATIF] :\n" +
+        convictionDirective +
+        directionConfirmee + "\n" +
+        "Direction recommandée par l'analyseur : " + ecoResult.directionText + "\n" +
+        "Niveau de surprise : " + niveauSurprise + "\n" +
+        "Déviation brute : " + String.format("%.4f", ecoResult.deviation) + "\n\n" +
+        baseSystemPrompt;
+
+    // ✅ Log pour diagnostic MainActivity
+    logToMain("🔢 [SCORING] Déviation=" + String.format("%.4f", ecoResult.deviation) +
+              " | Surprise=" + niveauSurprise +
+              " | Direction=" + ecoResult.directionText);
+}
+
+// 🔟 Exécution finale
+processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank);
+                
             } catch (Exception e) {
                 Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
             }
