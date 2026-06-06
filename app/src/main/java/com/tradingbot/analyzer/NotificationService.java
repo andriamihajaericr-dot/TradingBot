@@ -1483,73 +1483,138 @@ public class NotificationService extends NotificationListenerService {
         }
     }
 
-    
     private static int assignDriverWeight(String text) {
     String u = text.toUpperCase();
 
-    // ✅ Détection BREAKING + contexte macro/géo → forcer poids 4 minimum
-    boolean isBreaking = u.contains("BREAKING") || u.contains("BREAKING NEWS") ||
-                         u.contains("URGENT") || u.contains("FLASH:") ||
-                         u.contains("JUST IN") || u.contains("ALERTE");
+    // ✅ Détection BREAKING + contexte macro/géo → poids 2 minimum
+    boolean isBreaking = u.contains("BREAKING")      || u.contains("BREAKING NEWS") ||
+                         u.contains("URGENT")         || u.contains("FLASH:")        ||
+                         u.contains("JUST IN")        || u.contains("ALERTE")        ||
+                         u.contains("ALERT:")         || u.contains("DEVELOPING")    ||
+                         u.contains("JUST RELEASED")  || u.contains("EXCLUSIVE:");
 
-    // === NIVEAU 5 : ÉVÉNEMENTS SUPRÊMES (Volatilité maximale) ===
-    if (u.contains("CPI")              || u.contains("CORE CPI")        || u.contains("PCE")             ||
-        u.contains("CORE PCE")         || u.contains("INFLATION")        || u.contains("NFP")             ||
-        u.contains("NON-FARM")         || u.contains("NONFARM")          || u.contains("PAYROLL")        ||
-        u.contains("PAYROLLS")         || u.contains("FOMC")             || u.contains("INTEREST RATE")   ||
-        u.contains("RATE DECISION")    || u.contains("FEDERAL RESERVE")  || u.contains("POWELL")          ||
-        u.contains("WARSH")            || u.contains("LAGARDE")          || u.contains("ECB")             ||
-        u.contains("BCE")              || u.contains("BOE")              || u.contains("BOJ")             ||
-        u.contains("BOC")              || u.contains("RBA")              || u.contains("BAILEY")         ||
-        u.contains("MACKLEM")          || u.contains("BULLOCK")          || u.contains("UEDA")            ||
-        u.contains("FED CHAIR")        || u.contains("MONETARY POLICY")) {
+    // ══════════════════════════════════════════════════════════
+    // NIVEAU 5 — Rang Suprême (Volatilité maximale garantie)
+    // ══════════════════════════════════════════════════════════
+    if (u.contains("CPI")               || u.contains("CORE CPI")         || u.contains("PCE")              ||
+        u.contains("CORE PCE")          || u.contains("INFLATION")         || u.contains("NFP")              ||
+        u.contains("NON-FARM")          || u.contains("NONFARM")           || u.contains("PAYROLL")          ||
+        u.contains("PAYROLLS")          || u.contains("FOMC")              || u.contains("INTEREST RATE")    ||
+        u.contains("RATE DECISION")     || u.contains("RATE CUT")          || u.contains("RATE HIKE")        || // ✅
+        u.contains("EMERGENCY MEETING") || u.contains("EMERGENCY CUT")     || u.contains("EMERGENCY RATE")   || // ✅
+        u.contains("FEDERAL RESERVE")   || u.contains("FED CHAIR")         || u.contains("FED MEETING")      || // ✅
+        u.contains("MONETARY POLICY")   || u.contains("POLICY DECISION")   || u.contains("POLICY RATE")      || // ✅
+        u.contains("POWELL")            || u.contains("WARSH")             || u.contains("BARKIN")           ||
+        u.contains("GOOLSBEE")          || u.contains("HAMMACK")           || u.contains("WALLER")           || // ✅ membres FOMC
+        u.contains("WILLIAMS")          || u.contains("KUGLER")            || u.contains("RATE STANDS")      ||
+        u.contains("ECB")               || u.contains("BCE")               || u.contains("LAGARDE")          ||
+        u.contains("BOE")               || u.contains("BAILEY")            || u.contains("MPC")              || // ✅ Monetary Policy Committee
+        u.contains("BOJ")               || u.contains("UEDA")              || u.contains("YCC")              || // ✅ Yield Curve Control
+        u.contains("BOC")               || u.contains("MACKLEM")           ||
+        u.contains("RBA")               || u.contains("BULLOCK")           ||
+        u.contains("CABLE")             || u.contains("STERLING")          || u.contains("AUSSIE")           || // ✅ surnoms devises
+        u.contains("LOONIE")            || u.contains("SWISSY")            || u.contains("KIWI")) {           // ✅
         return 5;
     }
 
-    // === NIVEAU 4 : Haut impact (GDP, Emploi secondaire, Pétrole, Géo) ===
-    if (u.contains("GDP")                || u.contains("PIB")                    ||
-        u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT")             ||
-        u.contains("JOBLESS")            || u.contains("INITIAL CLAIMS")         ||
-        u.contains("ADP")                || u.contains("JOLTS")                  ||
-        u.contains("PPI")                || u.contains("PRODUCER PRICE")         ||
-        u.contains("DURABLE GOODS")      || u.contains("TRADE BALANCE")          ||
-        u.contains("CURRENT ACCOUNT")    || u.contains("INDUSTRIAL PRODUCTION")  ||
-        u.contains("CAPACITY UTILIZATION")|| u.contains("PHILLY FED")           ||
-        u.contains("EMPIRE STATE")       || u.contains("CHICAGO PMI")            ||
-        u.contains("BEIGE BOOK")         || u.contains("PERSONAL SPENDING")      ||
-        u.contains("PERSONAL INCOME")    || u.contains("HOUSING STARTS")         ||
-        u.contains("BUILDING PERMITS")   || u.contains("HOME SALES")             ||
-        u.contains("EXISTING HOME")      || u.contains("NEW HOME")               ||
-        // Pétrole & Géopolitique
-        u.contains("EIA")                || u.contains("CRUDE OIL")              ||
-        u.contains("OIL INVENTORIES")    || u.contains("OPEC")                   ||
-        u.contains("HORMUZ")             || u.contains("ORMUZ")                  ||
-        u.contains("IRAN")               || u.contains("ISRAEL")                 ||
-        u.contains("MIDDLE EAST")        || u.contains("GEOPOLITIC")             ||
-        u.contains("MISSILE")            || u.contains("STRIKE")                 ||
-        // Chine
-        u.contains("CAIXIN")             || u.contains("CHINA PMI")              ||
-        u.contains("CHINESE GDP")) {
+    // ══════════════════════════════════════════════════════════
+    // NIVEAU 4 — Haut impact (Données macro, Géo, Pétrole)
+    // ══════════════════════════════════════════════════════════
+    if (u.contains("GDP")                 || u.contains("PIB")                     ||
+        u.contains("GROSS DOMESTIC")      || u.contains("ECONOMIC GROWTH")         || // ✅
+        u.contains("RETAIL SALES")        || u.contains("EMPLOYMENT")              ||
+        u.contains("EMPLOYMENT CHANGE")   || u.contains("UNEMPLOYMENT RATE")       || // ✅
+        u.contains("JOBLESS")             || u.contains("INITIAL CLAIMS")          ||
+        u.contains("CONTINUING CLAIMS")   || u.contains("WEEKLY CLAIMS")           || // ✅
+        u.contains("ADP")                 || u.contains("JOLTS")                   ||
+        u.contains("JOB OPENINGS")        || u.contains("LABOR TURNOVER")          || // ✅
+        u.contains("PPI")                 || u.contains("PRODUCER PRICE")          ||
+        u.contains("WHOLESALE PRICE")     ||                                           // ✅
+        u.contains("DURABLE GOODS")       || u.contains("CAPITAL GOODS")           || // ✅
+        u.contains("TRADE BALANCE")       || u.contains("TRADE DEFICIT")           || // ✅
+        u.contains("TRADE SURPLUS")       || u.contains("CURRENT ACCOUNT")         ||
+        u.contains("BALANCE OF PAYMENTS") ||                                           // ✅
+        u.contains("INDUSTRIAL PRODUCTION") || u.contains("CAPACITY UTILIZATION")  ||
+        u.contains("FACTORY OUTPUT")      ||                                           // ✅
+        u.contains("PHILLY FED")          || u.contains("PHILADELPHIA FED")        || // ✅
+        u.contains("EMPIRE STATE")        || u.contains("NY FED")                  || // ✅
+        u.contains("CHICAGO PMI")         || u.contains("BEIGE BOOK")              ||
+        u.contains("FED MINUTES")         || u.contains("FOMC MINUTES")            || // ✅
+        u.contains("PERSONAL SPENDING")   || u.contains("PERSONAL INCOME")         ||
+        u.contains("PERSONAL CONSUMPTION") ||                                          // ✅
+        u.contains("HOUSING STARTS")      || u.contains("BUILDING PERMITS")        ||
+        u.contains("NEW HOME SALES")      || u.contains("EXISTING HOME SALES")     || // ✅
+        u.contains("PENDING HOME SALES")  || u.contains("HOME SALES")              ||
+        u.contains("EXISTING HOME")       || u.contains("NEW HOME")                ||
+        // ── Pétrole / Énergie ──
+        u.contains("EIA")                 || u.contains("CRUDE OIL")               ||
+        u.contains("OIL INVENTORIES")     || u.contains("CRUDE INVENTORIES")       || // ✅
+        u.contains("DISTILLATE")          || u.contains("GASOLINE")                || // ✅
+        u.contains("OPEC")                || u.contains("OPEC+")                   ||
+        u.contains("OIL PRODUCTION")      || u.contains("PRODUCTION CUTS")         || // ✅
+        u.contains("WTI")                 || u.contains("BRENT")                   ||
+        u.contains("XAUUSD")              || u.contains("GOLD")                    ||
+        // ── Géopolitique Moyen-Orient ──
+        u.contains("HORMUZ")              || u.contains("ORMUZ")                   ||
+        u.contains("RED SEA")             || u.contains("MER ROUGE")               || // ✅
+        u.contains("IRAN")                || u.contains("ISRAEL")                  ||
+        u.contains("HEZBOLLAH")           || u.contains("HOUTHI")                  || // ✅
+        u.contains("HAMAS")               || u.contains("GAZA")                    || // ✅
+        u.contains("LEBANON")             || u.contains("LIBAN")                   || // ✅
+        u.contains("MIDDLE EAST")         || u.contains("MOYEN-ORIENT")            || // ✅
+        u.contains("AIRSTRIKE")           || u.contains("FRAPPE MILITAIRE")        || // ✅
+        u.contains("MISSILE")             || u.contains("DRONE ATTACK")            || // ✅
+        u.contains("INVASION")            || u.contains("BLOCUS")                  || // ✅
+        u.contains("STRIKE")              || u.contains("GEOPOLITIC")              ||
+        // ── Géopolitique Europe de l'Est ──
+        u.contains("UKRAINE")             || u.contains("RUSSIA")                  || // ✅
+        u.contains("PUTIN")               || u.contains("ZELENSKY")                || // ✅
+        u.contains("NATO")                || u.contains("OTAN")                    || // ✅
+        u.contains("ESCALATION")          || u.contains("ESCALADE")                || // ✅
+        // ── Géopolitique Asie-Pacifique ──
+        u.contains("TAIWAN")              || u.contains("TAIWAN STRAIT")           || // ✅
+        u.contains("XI JINPING")          || u.contains("TSMC")                    || // ✅
+        u.contains("SOUTH CHINA SEA")     ||                                          // ✅
+        // ── Chine ──
+        u.contains("CAIXIN")              || u.contains("CHINA PMI")               ||
+        u.contains("CHINESE GDP")         || u.contains("CHINA GDP")               || // ✅
+        u.contains("CHINA TRADE")         || u.contains("CHINESE EXPORTS")) {        // ✅
         return 4;
     }
 
-    // === NIVEAU 3 : Impact moyen ===
-    if (u.contains("PMI")               || u.contains("ISM")                    ||
-        u.contains("MICHIGAN")          || u.contains("CONSUMER CONFIDENCE")     ||
-        u.contains("CONSUMER SENTIMENT")|| u.contains("IMPORT PRICE")            ||
-        u.contains("EXPORT PRICE")      || u.contains("NATURAL GAS")             ||
-        u.contains("IFO")               || u.contains("ZEW")                     ||
-        u.contains("TANKAN")            || u.contains("AVERAGE EARNINGS")        ||
-        u.contains("WAGE GROWTH")       || u.contains("CLAIMANT COUNT")          ||
-        u.contains("CHALLENGER")        || u.contains("NAS100")                  ||
-        u.contains("SPX")               || u.contains("US500")                   ||
-        u.contains("USTECH")            || u.contains("SENTIMENT")) {
+    // ══════════════════════════════════════════════════════════
+    // NIVEAU 3 — Impact moyen (PMI régionaux, sentiment, salaires)
+    // ══════════════════════════════════════════════════════════
+    if (u.contains("PMI")                || u.contains("ISM")                     ||
+        u.contains("PURCHASING MANAGERS") ||                                          // ✅
+        u.contains("MICHIGAN")           || u.contains("UNC MICHIGAN")             || // ✅
+        u.contains("CONSUMER CONFIDENCE") || u.contains("CONSUMER SENTIMENT")      ||
+        u.contains("IMPORT PRICE")        || u.contains("EXPORT PRICE")            ||
+        u.contains("NATURAL GAS")         || u.contains("GAS INVENTORIES")         || // ✅
+        u.contains("IFO")                 || u.contains("ZEW")                     ||
+        u.contains("GERMAN BUSINESS")     || u.contains("GERMAN SENTIMENT")        || // ✅
+        u.contains("TANKAN")              || u.contains("JAPAN BUSINESS")          || // ✅
+        u.contains("AVERAGE EARNINGS")    || u.contains("HOURLY EARNINGS")         || // ✅
+        u.contains("WAGE GROWTH")         || u.contains("WAGES")                   || // ✅
+        u.contains("CLAIMANT COUNT")      || u.contains("UK JOBLESS")              || // ✅
+        u.contains("CHALLENGER")          || u.contains("LAYOFFS")                 || // ✅
+        u.contains("CAPACITY")            || u.contains("UTILIZATION")             || // ✅
+        u.contains("NAS100")              || u.contains("SPX")                     ||
+        u.contains("US500")               || u.contains("USTECH")                  ||
+        u.contains("SENTIMENT")           || u.contains("CONFIANCE")               || // ✅
+        u.contains("FLASH PMI")           || u.contains("COMPOSITE PMI")           || // ✅
+        u.contains("SERVICES PMI")        || u.contains("MANUFACTURING PMI")) {       // ✅
         return 3;
     }
 
-    // ✅ BREAKING seul sans mot-clé macro → poids 2 minimum pour ne pas rejeter
+    // ══════════════════════════════════════════════════════════
+    // NIVEAU 2 — Breaking news sans mot-clé macro identifié
+    // ══════════════════════════════════════════════════════════
     if (isBreaking) return 2;
 
+    // ══════════════════════════════════════════════════════════
+    // NIVEAU 1 — Bruit de fond / non qualifié
+    // ══════════════════════════════════════════════════════════
     return 1;
 }
 
