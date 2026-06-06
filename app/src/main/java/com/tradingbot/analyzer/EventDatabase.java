@@ -7,7 +7,10 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.util.*;
+import java.util.TimeZone;  // ✅ ajouter
+import java.util.Date;      // ✅ ajouter si absent
+import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.ArrayList;
