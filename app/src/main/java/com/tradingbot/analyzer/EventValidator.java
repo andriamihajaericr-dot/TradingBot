@@ -966,9 +966,10 @@ public static void preloadCalendar() {
         for (EconomicCalendarAPI.CalendarEvent event : newlyPublished) {
             analyzeAndSendCalendarResult(event);
         }
-
+        // ✅ Log cohérent — affiche brut reçu ET stocké
         logToMain("✅ Calendrier chargé : " + upcomingEvents.size()
-                + " événements — " + newlyPublished.size() + " nouveaux résultats détectés.");
+        + " stockés / " + events.size() + " reçus — "
+        + newlyPublished.size() + " nouveaux résultats.");
 
     } catch (Exception e) {
         logToMain("⚠️ Échec préchargement calendrier : " + e.getMessage());
