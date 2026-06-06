@@ -1593,7 +1593,9 @@ public class NotificationService extends NotificationListenerService {
         // ── Chine ──
         u.contains("CAIXIN")              || u.contains("CHINA PMI")               ||
         u.contains("CHINESE GDP")         || u.contains("CHINA GDP")               || // ✅
-        u.contains("CHINA TRADE")         || u.contains("CHINESE EXPORTS")) {        // ✅
+        u.contains("CHINA TRADE")         || u.contains("CHINESE EXPORTS") 
+        u.contains("DXY")                 || u.contains("DOLLAR INDEX")            ||
+        u.contains("DOLLAR STRENGTH")     || u.contains("DOLLAR WEAKNESS")) {        // ✅
         return 4;
     }
 
