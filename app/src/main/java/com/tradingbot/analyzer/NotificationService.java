@@ -2009,6 +2009,53 @@ public class NotificationService extends NotificationListenerService {
         long nowSec = System.currentTimeMillis() / 1000;
         String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
 
+// ✅ Contexte prospectif — événements à venir dans les 72h
+StringBuilder upcomingContext = new StringBuilder();
+upcomingContext.append("\n\n═══ CALENDRIER ÉCONOMIQUE À VENIR (72H) ═══\n");
+
+List<EconomicCalendarAPI.CalendarEvent> upcomingList =
+    new ArrayList<>(EventValidator.getUpcomingEvents().values());
+
+Collections.sort(upcomingList, (a, b) -> {
+    long tsA = 0, tsB = 0;
+    try { tsA = Long.parseLong(a.timestamp); } catch (Exception ignored) {}
+    try { tsB = Long.parseLong(b.timestamp); } catch (Exception ignored) {}
+    return Long.compare(tsA, tsB);
+});
+
+SimpleDateFormat sdfEvent = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
+sdfEvent.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+long nowMs = System.currentTimeMillis();
+
+for (EconomicCalendarAPI.CalendarEvent ev : upcomingList) {
+    if (ev == null || ev.indicator == null || ev.timestamp == null) continue;
+    long evTs = 0;
+    try { evTs = Long.parseLong(ev.timestamp) * 1000; } catch (Exception ignored) { continue; }
+    if (evTs < nowMs) continue;
+    if (evTs > nowMs + 72 * 60 * 60 * 1000L) continue;
+
+    String evTime = sdfEvent.format(new Date(evTs));
+    String icon = "HIGH".equals(ev.importance) ? "🔴" :
+                  "MEDIUM".equals(ev.importance) ? "🟠" : "⚪";
+    upcomingContext.append(icon).append(" ").append(evTime)
+                   .append(" [").append(ev.country).append("] ")
+                   .append(ev.indicator);
+    if (ev.forecast != null && !ev.forecast.equals("N/A"))
+        upcomingContext.append(" | Prévu: ").append(ev.forecast);
+    upcomingContext.append("\n");
+}
+
+// ✅ Contexte géopolitique actif (derniers drivers GEO 48h)
+String geoContext = eventDb.getDerniersDriversGeo(nowSec);
+if (geoContext != null && !geoContext.isEmpty()) {
+    upcomingContext.append("\n═══ CONTEXTE GÉOPOLITIQUE ACTIF ═══\n")
+                   .append(geoContext);
+}
+
+// ... (vérification isEmpty + DAILY_SYSTEM_PROMPT inchangés) ...
+
+
+
         // Date locale pour le message (Mada UTC+3)
         SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
         sdfDate.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
@@ -2166,17 +2213,24 @@ public class NotificationService extends NotificationListenerService {
         // Traitement de l'enveloppe de prompt (Filtres géopolitiques complexes de votre script)
         String systemPromptFinal = construirePromptQuotidienSystem(dailyDrivers, DAILY_SYSTEM_PROMPT);
 
-                JSONObject payload = new JSONObject();
-        payload.put("model", GROQ_MODEL);
-        payload.put("temperature", 0.02);
+JSONObject payload = new JSONObject();
+payload.put("model", GROQ_MODEL);
+payload.put("temperature", 0.02);
 
-        JSONArray messages = new JSONArray();
-        messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
-        messages.put(new JSONObject().put("role", "user").put("content", 
-            "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n" +
-            "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers));
-        payload.put("messages", messages);
+JSONArray messages = new JSONArray();
+messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
 
+// ✅ Message enrichi — drivers passés + calendrier à venir + géopolitique
+messages.put(new JSONObject().put("role", "user").put("content",
+    "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n" +
+    "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers +
+    upcomingContext.toString() +
+    "\n\nINSTRUCTION SPÉCIALE : Analyse les corrélations entre les drivers passés " +
+    "(NFP, géopolitique, banques centrales) et les événements à venir (CPI, FOMC, etc.). " +
+    "Identifie les risques d'escalade ou de confirmation de tendance."));
+
+payload.put("messages", messages);
+        
         URL url = new URL(GROQ_URL);
         conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
