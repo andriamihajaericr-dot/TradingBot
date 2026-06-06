@@ -10,6 +10,10 @@ public class EventValidator {
 
     private static Map<String, EconomicCalendarAPI.CalendarEvent> upcomingEvents =
         new ConcurrentHashMap<>();
+    // ✅ Getter pour accès depuis NotificationService (Daily Report)
+    public static Map<String, EconomicCalendarAPI.CalendarEvent> getUpcomingEvents() {
+        return Collections.unmodifiableMap(upcomingEvents);
+    }
     
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
     private static final long DUPLICATE_WINDOW_MS = 30 * 60 * 1000L; // 30 minutes
