@@ -542,23 +542,32 @@ public class EconomicCalendarAPI {
         }
     }
     }
-
+    
     private static long convertForexFactoryDateToMs(String dateStr) {
-        if (dateStr == null || dateStr.isEmpty())
-            return System.currentTimeMillis();
+    if (dateStr == null || dateStr.isEmpty())
+        return System.currentTimeMillis();
+    try {
+        // ✅ Format avec timezone explicite (ex: 2026-06-05T08:30:00-04:00)
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US);
+        return sdf.parse(dateStr).getTime();
+    } catch (Exception e) {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US);
+            // ✅ Format sans timezone → New York par défaut (DST automatique)
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+            sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
             return sdf.parse(dateStr).getTime();
-        } catch (Exception e) {
+        } catch (Exception e2) {
             try {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
-                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                // ✅ Date seule → New York minuit
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
                 return sdf.parse(dateStr).getTime();
-            } catch (Exception e2) {
+            } catch (Exception e3) {
                 return System.currentTimeMillis();
             }
         }
     }
+        }
 
     private static String formatValue(String value) {
         if (value == null || value.isEmpty() || value.equalsIgnoreCase("null")) return "N/A";
