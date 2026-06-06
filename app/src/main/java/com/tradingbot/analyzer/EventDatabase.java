@@ -462,4 +462,41 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
     return sb.toString();
     }
+
+    // ✅ Retourne les derniers drivers géopolitiques actifs (48h)
+   public String getDerniersDriversGeo(long currentUnixTime) {
+    SQLiteDatabase db = this.getReadableDatabase();
+    StringBuilder sb = new StringBuilder();
+    long fortyEightHoursAgo = currentUnixTime - (48 * 60 * 60);
+    Cursor cursor = null;
+    try {
+        cursor = db.query(TABLE_EVENTS,
+            new String[]{"title", "impact", "unix_timestamp"},
+            "unix_timestamp >= ? AND (event_type LIKE '%GEO%' OR " +
+            "impact LIKE '%GÉOPOLITIQUE%' OR impact LIKE '%GEO%' OR " +
+            "title LIKE '%IRAN%' OR title LIKE '%ISRAEL%' OR " +
+            "title LIKE '%UKRAINE%' OR title LIKE '%RUSSIA%' OR " +
+            "title LIKE '%HORMUZ%' OR title LIKE '%RED SEA%')",
+            new String[]{String.valueOf(fortyEightHoursAgo)},
+            null, null, "unix_timestamp DESC", "5");
+
+        if (cursor != null && cursor.moveToFirst()) {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
+            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+            do {
+                long ts = cursor.getLong(2);
+                String dateStr = sdf.format(new Date(ts * 1000));
+                sb.append("⚠️ [").append(dateStr).append("] ")
+                  .append(cursor.getString(0))  // title
+                  .append(" | ").append(cursor.getString(1))  // impact
+                  .append("\n");
+            } while (cursor.moveToNext());
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur getDerniersDriversGeo", e);
+    } finally {
+        if (cursor != null) cursor.close();
+    }
+    return sb.toString();
+  }
 }
