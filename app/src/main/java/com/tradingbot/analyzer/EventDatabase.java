@@ -466,7 +466,7 @@ public class EventDatabase extends SQLiteOpenHelper {
     return sb.toString();
     }
 
-    public String diagnostiquerDriverSpecifique(String keyword) {
+   public String diagnostiquerDriverSpecifique(String keyword) {
     SQLiteDatabase db = this.getReadableDatabase();
     StringBuilder sb = new StringBuilder();
     long fortyEightHoursAgo = (System.currentTimeMillis() / 1000) - (48 * 60 * 60);
