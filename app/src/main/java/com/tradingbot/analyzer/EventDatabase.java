@@ -511,4 +511,11 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
     return sb.toString();
    }
+
+    // Détecter le régime actuel basé sur les 7 derniers jours
+   public String detecterRegimeMarche(long currentUnixTime) {
+    long sevenDaysAgo = currentUnixTime - (7 * 24 * 60 * 60);
+    // Compter les events HAWKISH vs DOVISH vs GEO des 7 derniers jours
+    // Retourner : "RÉGIME HAWKISH DOMINANT", "RÉGIME RISK-OFF", "RÉGIME MIXTE / INCERTAIN"
+   }
 }
