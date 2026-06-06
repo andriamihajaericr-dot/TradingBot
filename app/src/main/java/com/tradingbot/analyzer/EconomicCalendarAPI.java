@@ -126,8 +126,9 @@ public class EconomicCalendarAPI {
                 return events;
             }
 
+            // ✅ FMP attend des dates en heure New York
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
             
             long nowMs = System.currentTimeMillis();
             long pastMs = nowMs - (24 * 60 * 60 * 1000L); // Fenêtre de sécurité arrière de 24 heures
