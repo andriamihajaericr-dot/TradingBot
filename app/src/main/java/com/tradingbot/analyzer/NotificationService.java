@@ -87,15 +87,6 @@ public class NotificationService extends NotificationListenerService {
         "- Si l'écart est faible (moins de 5% de surprise relative), conviction maximale 65%.\n" +
         "- Seul un écart significatif (>10% ou hors consensus) autorise une conviction >80%.\n\n" +
 
-         // Ajouter une section RÈGLES DE CORRÉLATION TEMPORELLE :
-         "RÈGLES DE CORRÉLATION TEMPORELLE (Priorité maximale) :\n" +
-         "- NFP FORT (derniers 7 jours) + CPI FORT aujourd'hui = CONFIRMATION HAWKISH — Conviction +15%\n" +
-         "- NFP FAIBLE (derniers 7 jours) + CPI FAIBLE aujourd'hui = CONFIRMATION DOVISH — Conviction +15%\n" +
-         "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE — Conviction plafonnée à 55%, signaler divergence\n" +
-         "- GEO ESCALADE active (< 48h) + tout driver HAWKISH = Double choc — Or et Pétrole prioritaires\n" +
-         "- GEO ESCALADE active + DOVISH = Annulation partielle — conviction GEO plafonnée à 60%\n" +
-         "- FOMC réunion dans < 7 jours = tout CPI/NFP reçoit +20% de conviction additionnelle\n" +
-    
         "════════════════════════════════════════════════════════\n" +
         " RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS — EXHAUSTIVES\n" +
         "════════════════════════════════════════════════════════\n\n" +
@@ -321,6 +312,14 @@ public class NotificationService extends NotificationListenerService {
         "     * 🇯🇵 USDJPY  : VENTE CHOC 🔴 [Régime de dominance géopolitique – Yen refuge prioritaire]\n" +
         "     * 🇨🇦 USDCAD  : NEUTRE ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
         "   - Le modèle doit mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans le FAIT MARQUANT.\n\n" +
+    
+         "RÈGLES DE CORRÉLATION TEMPORELLE (Priorité maximale) :\n" +
+         "- NFP FORT (derniers 7 jours) + CPI FORT aujourd'hui = CONFIRMATION HAWKISH — Conviction +15%\n" +
+         "- NFP FAIBLE (derniers 7 jours) + CPI FAIBLE aujourd'hui = CONFIRMATION DOVISH — Conviction +15%\n" +
+         "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE — Conviction plafonnée à 55%, signaler divergence\n" +
+         "- GEO ESCALADE active (< 48h) + tout driver HAWKISH = Double choc — Or et Pétrole prioritaires\n" +
+         "- GEO ESCALADE active + DOVISH = Annulation partielle — conviction GEO plafonnée à 60%\n" +
+         "- FOMC réunion dans < 7 jours = tout CPI/NFP reçoit +20% de conviction additionnelle\n" +
         "</HARD_CONSTRAINTS>\n\n" +
     
         "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
