@@ -1060,6 +1060,65 @@ private static String getMadaTimeNow() {
     } catch (Exception e) { return "N/A"; }
 }
 
+public static void checkUpcomingAlerts() {
+    if (appContext == null) return;
+    try {
+        long nowMs         = System.currentTimeMillis();
+        long windowStartMs = nowMs + (25 * 60 * 1000L);
+        long windowEndMs   = nowMs + (35 * 60 * 1000L);
+
+        for (EconomicCalendarAPI.CalendarEvent ev : upcomingEvents.values()) {
+            if (ev == null || ev.indicator == null || ev.timestamp == null) continue;
+            if (!"HIGH".equalsIgnoreCase(ev.importance)) continue;
+
+            long evTs = parseTimestamp(ev.timestamp);
+            if (evTs < windowStartMs || evTs > windowEndMs) continue;
+
+            String alertKey = ev.indicator + "_" + ev.timestamp;
+            Long lastSent = lastAlertsSent.get(alertKey);
+            if (lastSent != null && (nowMs - lastSent) < 20 * 60 * 1000L) continue;
+
+            lastAlertsSent.put(alertKey, nowMs);
+
+            long minutesRestantes = (evTs - nowMs) / (60 * 1000L);
+
+            StringBuilder alert = new StringBuilder();
+            alert.append("⏰ *ALERTE PRÉVENTIVE — DANS ")
+                 .append(minutesRestantes).append(" MIN*\n");
+            alert.append("─────────────────────────────────────────\n");
+            alert.append("🔴 *").append(ev.indicator).append("*\n");
+            alert.append("🌍 Pays : ")
+                 .append(ev.country != null ? ev.country : "?").append("\n");
+            alert.append("🕒 Heure : ")
+                 .append(formatEventTime(ev.timestamp)).append(" (Mada)\n");
+
+            if (ev.forecast != null && !ev.forecast.equals("N/A") 
+                    && !ev.forecast.isEmpty())
+                alert.append("📊 Consensus : ").append(ev.forecast).append("\n");
+
+            if (ev.previous != null && !ev.previous.equals("N/A") 
+                    && !ev.previous.isEmpty())
+                alert.append("📌 Précédent : ").append(ev.previous).append("\n");
+
+            List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
+                ev.indicator,
+                ev.country != null ? ev.country : "United States");
+            if (!assets.isEmpty())
+                alert.append("🎯 Actifs : ")
+                     .append(String.join(", ", assets)).append("\n");
+
+            alert.append("─────────────────────────────────────────\n");
+            alert.append("⚠️ *Préparez-vous à une forte volatilité.*");
+
+            NotificationService.sendTelegramSecure(alert.toString(), appContext);
+            logToMain("⏰ [ALERTE] " + ev.indicator + 
+                      " dans " + minutesRestantes + " min");
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur checkUpcomingAlerts", e);
+    }
+}
+    
     public static void cleanupOldFingerprints() {
         if (recentFingerprints == null || recentFingerprints.isEmpty()) return;
         
