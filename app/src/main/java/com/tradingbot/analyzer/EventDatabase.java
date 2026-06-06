@@ -497,6 +497,6 @@ public class EventDatabase extends SQLiteOpenHelper {
     } finally {
         if (cursor != null) cursor.close();
     }
-    return sb.toString();
+    return sb.toString(); 
   }
 }
