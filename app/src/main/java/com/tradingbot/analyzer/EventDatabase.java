@@ -416,4 +416,50 @@ public class EventDatabase extends SQLiteOpenHelper {
             if (cursor != null) cursor.close();
         }
     }
+    
+    // ✅ Vérifie si un driver spécifique est enregistré dans les dernières 48h
+    public String diagnostiquerDriverSpecifique(String keyword) {
+    SQLiteDatabase db = this.getReadableDatabase();
+    StringBuilder sb = new StringBuilder();
+    long fortyEightHoursAgo = (System.currentTimeMillis() / 1000) - (48 * 60 * 60);
+    Cursor cursor = null;
+    try {
+        cursor = db.query(TABLE_EVENTS,
+            new String[]{"title", "source", "impact", "driver_weight",
+                         "sync_status", "unix_timestamp", "event_type"},
+            "unix_timestamp >= ? AND (title LIKE ? OR feed_content LIKE ?)",
+            new String[]{
+                String.valueOf(fortyEightHoursAgo),
+                "%" + keyword + "%",
+                "%" + keyword + "%"
+            },
+            null, null, "unix_timestamp DESC");
+
+        if (cursor != null && cursor.getCount() > 0) {
+            sb.append("✅ [DB] ").append(cursor.getCount())
+              .append(" entrée(s) trouvée(s) pour : ").append(keyword).append("\n");
+            while (cursor.moveToNext()) {
+                long ts = cursor.getLong(5);
+                SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
+                sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+                String dateStr = sdf.format(new Date(ts * 1000));
+                sb.append("  → [").append(dateStr).append("] ")
+                  .append(cursor.getString(0))        // title
+                  .append(" | Source: ").append(cursor.getString(1))  // source
+                  .append(" | Poids: ").append(cursor.getInt(3))      // driver_weight
+                  .append(" | Status: ").append(cursor.getString(4))  // sync_status
+                  .append(" | Type: ").append(cursor.getString(6))    // event_type
+                  .append("\n");
+            }
+        } else {
+            sb.append("❌ [DB] Aucune entrée pour : ").append(keyword)
+              .append(" (dernières 48h)\n");
+        }
+    } catch (Exception e) {
+        sb.append("⚠️ Erreur diagnostic : ").append(e.getMessage());
+    } finally {
+        if (cursor != null) cursor.close();
+    }
+    return sb.toString();
+    }
 }
