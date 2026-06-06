@@ -2128,6 +2128,8 @@ public class NotificationService extends NotificationListenerService {
         if (apiKey.isEmpty()) return;
 
         long nowSec = System.currentTimeMillis() / 1000;
+        // ✅ Récupération du régime de marché actuel
+        String regimeActuel = eventDb.detecterRegimeMarche(nowSec);
         String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
 
 // ✅ Contexte prospectif — événements à venir dans les 72h
