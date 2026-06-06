@@ -8,14 +8,16 @@ import java.util.regex.Pattern;
 public class EconomicAnalyzer {
 
     private static final String TAG = "BOT_ECONOMIC_ANALYZER";
-
+    
     public static class EvaluationResult {
-        public int weight = 1;
-        public String marketImpact = "NEUTRAL";
-        public String directionText = "";
-        public double deviation = 0.0;
-        public boolean isParsed = false;
-        public String currency = "USD";
+    public int weight = 1;
+    public String marketImpact = "NEUTRAL";
+    public String directionText = "";
+    public double deviation = 0.0;
+    public double actual = Double.NaN;    // ✅ valeur publiée
+    public double forecast = Double.NaN; // ✅ valeur attendue
+    public boolean isParsed = false;
+    public String currency = "USD";
     }
 
     private static class ParsedValues {
