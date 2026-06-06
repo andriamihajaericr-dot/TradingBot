@@ -20,7 +20,6 @@ public class EventDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "trading_bot.db";
     private static final int DATABASE_VERSION = 3;
     public static final String TABLE_EVENTS = "events";
-
     // Implémentation du Singleton pour la sécurité d'accès concurrentiel (WAL)
     private static volatile EventDatabase instance;
 
