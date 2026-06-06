@@ -5,6 +5,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import android.util.Log;
 import android.content.Context;
+import java.util.Collections; // ✅ ajouter si absent
 
 public class EventValidator {
 
