@@ -735,6 +735,12 @@ public class EventValidator {
                    text.contains("exports") || text.contains("imports") ||
                    text.contains("exportations") || text.contains("importations");
         }
+        // Ajouter
+        if (ind.contains("tariff") || ind.contains("trade war") || ind.contains("trade deal")) {
+            return text.contains("tariff") || text.contains("trade war") ||
+                   text.contains("trade deal") || text.contains("sanctions") ||
+                   text.contains("embargo") || text.contains("customs");
+        }
     
         return false;
     }
