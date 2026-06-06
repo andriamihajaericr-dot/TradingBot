@@ -108,18 +108,23 @@ public class EconomicEventDetector {
             eventType   = "TRADE-TARIFF";
             description = "Tarifs Douaniers / Guerre Commerciale";
             impact      = "Haute Volatilité";
+            
+        } else if (containsAny(unified, "REVISED TO", "REVISED UP", "REVISED DOWN", "REVISION", "UPWARD REVISION", "DOWNWARD REVISION", "PRIOR REVISED", "PREVIOUS REVISED")) {
+            eventType   = "DATA-REVISION";
+            description = "Révision de Donnée Macro — Impact sur Sentiment";
+            impact      = "Moyenne Volatilité";
         // Macro secondaire (Poids 2)
         } else if (containsAny(unified, "RETAIL SALES", "CONSUMER CONFIDENCE", "CONSUMER SENTIMENT", "GDP", "PMI", "ISM", "MICHIGAN")) {
             eventType   = "ECONOMIC-GROWTH-DATA";
             description = "Données Macroéconomiques Secondaires";
             impact      = "Moyenne Volatilité";
-        }
+        
         
         } else if (containsAny(unified, "NOMINATED", "APPOINTED", "NOMINATION", "APPOINTMENT", "FED CHAIR", "FED VICE CHAIR", "ECB PRESIDENT", "BOJ GOVERNOR", "REPLACE POWELL", "REPLACE LAGARDE", "REPLACE UEDA")) {
             eventType   = "CENTRAL-BANK-NOMINATION";
             description = "Nomination Banque Centrale — Changement de Politique Potentiel";
             impact      = "Haute Volatilité";
-        }
+        
         } else if (containsAny(unified, "CHINA CPI", "CHINA PPI", "CHINA GDP", "CHINA PMI", "PBOC", "YUAN", "CNY", "RENMINBI", "CHINESE ECONOMY", "CHINA STIMULUS", "CHINA PROPERTY", "EVERGRANDE","NPC", "POLITBURO", "XI JINPING ECONOMY")) {
             eventType   = "CHINA-MACRO";
             description = "Données Macroéconomiques Chine / PBOC";
