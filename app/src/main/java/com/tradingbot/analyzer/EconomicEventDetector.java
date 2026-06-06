@@ -118,7 +118,7 @@ public class EconomicEventDetector {
             eventType   = "ECONOMIC-GROWTH-DATA";
             description = "Données Macroéconomiques Secondaires";
             impact      = "Moyenne Volatilité";
-        
+         
         
         } else if (containsAny(unified, "NOMINATED", "APPOINTED", "NOMINATION", "APPOINTMENT", "FED CHAIR", "FED VICE CHAIR", "ECB PRESIDENT", "BOJ GOVERNOR", "REPLACE POWELL", "REPLACE LAGARDE", "REPLACE UEDA")) {
             eventType   = "CENTRAL-BANK-NOMINATION";
