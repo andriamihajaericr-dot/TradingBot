@@ -94,7 +94,7 @@ public class NotificationService extends NotificationListenerService {
          "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE — Conviction plafonnée à 55%, signaler divergence\n" +
          "- GEO ESCALADE active (< 48h) + tout driver HAWKISH = Double choc — Or et Pétrole prioritaires\n" +
          "- GEO ESCALADE active + DOVISH = Annulation partielle — conviction GEO plafonnée à 60%\n" +
-         "- FOMC réunion dans < 7 jours = tout CPI/NFP reçoit +20% de conviction additionnelle\n"
+         "- FOMC réunion dans < 7 jours = tout CPI/NFP reçoit +20% de conviction additionnelle\n" +
     
         "════════════════════════════════════════════════════════\n" +
         " RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS — EXHAUSTIVES\n" +
