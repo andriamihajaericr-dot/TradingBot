@@ -2126,11 +2126,11 @@ public class NotificationService extends NotificationListenerService {
     try {
         String apiKey = getGroqApiKey();
         if (apiKey.isEmpty()) return;
-
         long nowSec = System.currentTimeMillis() / 1000;
-        // ✅ Récupération du régime de marché actuel
-        String regimeActuel = eventDb.detecterRegimeMarche(nowSec);
-        String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
+String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
+
+// ✅ Mémoire contextuelle inter-sessions — Registre macro 30 derniers jours
+String monthlyRegistry = eventDb.getMonthlyMacroRegistry(nowSec);
 
 // ✅ Contexte prospectif — événements à venir dans les 72h
 StringBuilder upcomingContext = new StringBuilder();
@@ -2342,15 +2342,31 @@ payload.put("temperature", 0.02);
 
 JSONArray messages = new JSONArray();
 messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
+// ✅ Construction du contexte mensuel
+String monthlyContext = "";
+if (monthlyRegistry != null && !monthlyRegistry.trim().isEmpty()) {
+    monthlyContext = "\n\n═══ REGISTRE MACRO DU MOIS (30 derniers jours — Rang Suprême) ═══\n" +
+        monthlyRegistry +
+        "\nINSTRUCTION MÉMOIRE : Interpréter les drivers actuels EN COHÉRENCE avec ce registre.\n" +
+        "- NFP FORT (7j) + CPI FORT aujourd'hui = CONFIRMATION HAWKISH → Conviction +15%\n" +
+        "- NFP FAIBLE (7j) + CPI FAIBLE aujourd'hui = CONFIRMATION DOVISH → Conviction +15%\n" +
+        "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE → Conviction plafonnée 55%, signaler divergence\n" +
+        "- GEO ESCALADE active (48h) + HAWKISH = Double choc → Or et Pétrole prioritaires\n" +
+        "- FOMC dans < 7 jours = tout CPI/NFP reçoit +20% conviction additionnelle\n";
+} else {
+    monthlyContext = "\n\n═══ REGISTRE MACRO DU MOIS : Aucun historique disponible ═══\n";
+}
 
-// ✅ Message enrichi — drivers passés + calendrier à venir + géopolitique
 messages.put(new JSONObject().put("role", "user").put("content",
     "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n" +
     "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers +
-    upcomingContext.toString() +
+    monthlyContext +                          // ✅ mémoire 30 jours
+    upcomingContext.toString() +              // ✅ calendrier 72h à venir
     "\n\nINSTRUCTION SPÉCIALE : Analyse les corrélations entre les drivers passés " +
     "(NFP, géopolitique, banques centrales) et les événements à venir (CPI, FOMC, etc.). " +
-    "Identifie les risques d'escalade ou de confirmation de tendance."));
+    "Identifie les risques d'escalade ou de confirmation de tendance. " +
+    "Si le registre mensuel montre une tendance HAWKISH dominante, le biais général " +
+    "doit refléter cette persistance sauf signal contraire explicite."));
 
 payload.put("messages", messages);
         
