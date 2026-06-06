@@ -1202,44 +1202,79 @@ if (ecoResult.isParsed) {
     String convictionDirective;
     String niveauSurprise;
 
-    // ✅ Seuils basés sur la déviation absolue
-    // (pas de forecast dans EvaluationResult — on utilise la déviation brute)
-    if (absDeviation == 0.0) {
-        // Conforme aux prévisions
+// ✅ Priorité 1 — Calcul en % si forecast disponible (plus précis)
+boolean hasForecast = !Double.isNaN(ecoResult.forecast) && ecoResult.forecast != 0.0;
+
+if (hasForecast) {
+    double surprisePercent = (absDeviation / Math.abs(ecoResult.forecast)) * 100.0;
+
+    if (surprisePercent < 1.0) {
         convictionDirective =
-            "⚠️ DIRECTIVE CONVICTION MATHÉMATIQUE : " +
-            "Écart NUL (actual = forecast) → " +
-            "Conviction PLAFONNÉE à 50% (jauge orange 🟠). " +
-            "Utiliser exclusivement INCLINATION ACHAT MAIS NEUTRE ou INCLINATION VENTE MAIS NEUTRE.\n";
+            "⚠️ DIRECTIVE CONVICTION : Surprise NULLE < 1% " +
+            "(Actual=" + String.format("%.4f", ecoResult.actual) +
+            " vs Forecast=" + String.format("%.4f", ecoResult.forecast) + ") → " +
+            "Conviction PLAFONNÉE à 50% 🟠. Utiliser INCLINATION uniquement.\n";
+        niveauSurprise = "CONFORME (< 1%)";
+
+    } else if (surprisePercent <= 5.0) {
+        convictionDirective =
+            "⚠️ DIRECTIVE CONVICTION : Surprise FAIBLE de " +
+            String.format("%.1f", surprisePercent) + "% " +
+            "(Actual=" + String.format("%.4f", ecoResult.actual) +
+            " vs Forecast=" + String.format("%.4f", ecoResult.forecast) + ") → " +
+            "Conviction PLAFONNÉE à 65%.\n";
+        niveauSurprise = "FAIBLE (" + String.format("%.1f", surprisePercent) + "%)";
+
+    } else if (surprisePercent <= 10.0) {
+        convictionDirective =
+            "⚠️ DIRECTIVE CONVICTION : Surprise MODÉRÉE de " +
+            String.format("%.1f", surprisePercent) + "% " +
+            "(Actual=" + String.format("%.4f", ecoResult.actual) +
+            " vs Forecast=" + String.format("%.4f", ecoResult.forecast) + ") → " +
+            "Conviction AUTORISÉE jusqu'à 75%.\n";
+        niveauSurprise = "MODÉRÉE (" + String.format("%.1f", surprisePercent) + "%)";
+
+    } else {
+        convictionDirective =
+            "⚠️ DIRECTIVE CONVICTION : Surprise MAJEURE de " +
+            String.format("%.1f", surprisePercent) + "% " +
+            "(Actual=" + String.format("%.4f", ecoResult.actual) +
+            " vs Forecast=" + String.format("%.4f", ecoResult.forecast) + ") → " +
+            "Conviction AUTORISÉE > 80%. CHOC MACRO CONFIRMÉ.\n";
+        niveauSurprise = "MAJEURE (" + String.format("%.1f", surprisePercent) + "%)";
+    }
+
+// ✅ Priorité 2 — Fallback déviation brute si forecast absent
+} else {
+    if (absDeviation == 0.0) {
+        convictionDirective =
+            "⚠️ DIRECTIVE CONVICTION : Écart NUL → " +
+            "Conviction PLAFONNÉE à 50% 🟠. Utiliser INCLINATION uniquement.\n";
         niveauSurprise = "CONFORME";
 
     } else if (absDeviation <= 5.0) {
-        // Faible surprise < 5%
         convictionDirective =
-            "⚠️ DIRECTIVE CONVICTION MATHÉMATIQUE : " +
-            "Écart FAIBLE (déviation = " + String.format("%.2f", ecoResult.deviation) + ") → " +
-            "Conviction PLAFONNÉE à 65% maximum. " +
-            "Signal réel mais insuffisant pour un choc majeur.\n";
+            "⚠️ DIRECTIVE CONVICTION : Écart FAIBLE " +
+            "(déviation=" + String.format("%.4f", ecoResult.deviation) + ") → " +
+            "Conviction PLAFONNÉE à 65%.\n";
         niveauSurprise = "FAIBLE";
 
     } else if (absDeviation <= 15.0) {
-        // Surprise modérée
         convictionDirective =
-            "⚠️ DIRECTIVE CONVICTION MATHÉMATIQUE : " +
-            "Écart MODÉRÉ (déviation = " + String.format("%.2f", ecoResult.deviation) + ") → " +
-            "Conviction AUTORISÉE jusqu'à 75%. " +
-            "Signal significatif — impact directionnel confirmé.\n";
+            "⚠️ DIRECTIVE CONVICTION : Écart MODÉRÉ " +
+            "(déviation=" + String.format("%.4f", ecoResult.deviation) + ") → " +
+            "Conviction AUTORISÉE jusqu'à 75%.\n";
         niveauSurprise = "MODÉRÉE";
 
     } else {
-        // Forte surprise > 15 — choc majeur
         convictionDirective =
-            "⚠️ DIRECTIVE CONVICTION MATHÉMATIQUE : " +
-            "Écart MAJEUR (déviation = " + String.format("%.2f", ecoResult.deviation) + ") → " +
-            "Conviction AUTORISÉE > 80%. " +
-            "CHOC MACRO CONFIRMÉ — Signal institutionnel de première importance.\n";
+            "⚠️ DIRECTIVE CONVICTION : Écart MAJEUR " +
+            "(déviation=" + String.format("%.4f", ecoResult.deviation) + ") → " +
+            "Conviction AUTORISÉE > 80%. CHOC MACRO CONFIRMÉ.\n";
         niveauSurprise = "MAJEURE";
+      }
     }
+
 
     // ✅ Direction mathématique confirmée
     String directionConfirmee = ecoResult.deviation > 0
