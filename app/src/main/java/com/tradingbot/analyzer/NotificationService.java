@@ -750,6 +750,14 @@ public class NotificationService extends NotificationListenerService {
         "     * 🇯🇵 USDJPY  : VENTE CHOC 🔴 [Régime de dominance géopolitique – Yen refuge prioritaire]\n" +
         "     * 🇨🇦 USDCAD  : NEUTRE ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
         "   - Le modèle doit mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans le FAIT MARQUANT.\n\n" +
+        
+         "RÈGLES DE CORRÉLATION TEMPORELLE (Priorité maximale) :\n" +
+         "- NFP FORT (derniers 7 jours) + CPI FORT aujourd'hui = CONFIRMATION HAWKISH — Conviction +15%\n" +
+         "- NFP FAIBLE (derniers 7 jours) + CPI FAIBLE aujourd'hui = CONFIRMATION DOVISH — Conviction +15%\n" +
+         "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE — Conviction plafonnée à 55%, signaler divergence\n" +
+         "- GEO ESCALADE active (< 48h) + tout driver HAWKISH = Double choc — Or et Pétrole prioritaires\n" +
+         "- GEO ESCALADE active + DOVISH = Annulation partielle — conviction GEO plafonnée à 60%\n" +
+         "- FOMC réunion dans < 7 jours = tout CPI/NFP reçoit +20% de conviction additionnelle\n" +
         "</HARD_CONSTRAINTS>\n\n" +
         "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
         "   Si l'actualité dit : \"BCE dovish, Schnabel s'inquiète de la croissance européenne\", la réponse DOIT copier l'intégralité des 11 lignes ainsi :\n" +
