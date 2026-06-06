@@ -48,9 +48,11 @@ public class EconomicAnalyzer {
             return result;
         }
 
-        result.isParsed = true;
+        result.isParsed  = true;
+        result.actual    = valeurs.actual;    // ✅
+        result.forecast  = valeurs.forecast;  // ✅
         result.deviation = valeurs.actual - valeurs.forecast;
-        double absEcart = Math.abs(result.deviation);
+        double absEcart  = Math.abs(result.deviation);
 
         // Appliquer l'analyse selon la devise
         if (currency.equals("USD")) {
