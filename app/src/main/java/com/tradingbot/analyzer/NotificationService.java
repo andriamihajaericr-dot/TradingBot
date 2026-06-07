@@ -1739,7 +1739,28 @@ scheduler.scheduleAtFixedRate(new Runnable() {
         u.contains("CENTRAL BANK CHIEF")  ||                                          // ✅
         // ── DXY / Dollar Index ──
         u.contains("DXY")                 || u.contains("DOLLAR INDEX")            ||
-        u.contains("DOLLAR STRENGTH")     || u.contains("DOLLAR WEAKNESS")) {        // ✅
+        u.contains("DOLLAR STRENGTH")     || u.contains("DOLLAR WEAKNESS")         ||
+        // ── US10Y / Treasury ──
+u.contains("TREASURY AUCTION")   || u.contains("BID TO COVER")          ||
+u.contains("DEBT CEILING")       || u.contains("BUDGET DEFICIT")         ||
+// ── GOLD ──
+u.contains("REAL YIELDS")        || u.contains("REAL RATES")             ||
+u.contains("SPR")                || u.contains("STRATEGIC PETROLEUM")    ||
+// ── BITCOIN ──
+u.contains("ETF FLOWS")          || u.contains("BITCOIN ETF")            ||
+u.contains("HALVING")            || u.contains("SEC CRYPTO")             ||
+u.contains("FTX")                || u.contains("EXCHANGE HACK")          ||
+// ── NASDAQ/SP500 ──
+u.contains("EARNINGS")           || u.contains("PROFIT WARNING")         ||
+u.contains("GUIDANCE")           || u.contains("VIX")                    ||
+// ── USDJPY ──
+u.contains("MOF JAPAN")          || u.contains("FX INTERVENTION")        ||
+u.contains("CARRY TRADE")        || u.contains("VERBAL INTERVENTION")    ||
+// ── AUDUSD ──
+u.contains("IRON ORE")           || u.contains("COPPER PRICE")           ||
+// ── USOIL ──
+u.contains("SPR RELEASE")        || u.contains("RIG COUNT")              ||
+u.contains("API CRUDE")          || u.contains("BAKER HUGHES")) {        // ✅
         return 4;
     }
 
