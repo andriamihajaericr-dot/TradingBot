@@ -1809,27 +1809,78 @@ scheduler.scheduleAtFixedRate(new Runnable() {
         // ── DXY / Dollar Index ──
         u.contains("DXY")                 || u.contains("DOLLAR INDEX")            ||
         u.contains("DOLLAR STRENGTH")     || u.contains("DOLLAR WEAKNESS")         ||
+
         // ── US10Y / Treasury ──
-u.contains("TREASURY AUCTION")   || u.contains("BID TO COVER")          ||
-u.contains("DEBT CEILING")       || u.contains("BUDGET DEFICIT")         ||
-// ── GOLD ──
-u.contains("REAL YIELDS")        || u.contains("REAL RATES")             ||
-u.contains("SPR")                || u.contains("STRATEGIC PETROLEUM")    ||
-// ── BITCOIN ──
-u.contains("ETF FLOWS")          || u.contains("BITCOIN ETF")            ||
-u.contains("HALVING")            || u.contains("SEC CRYPTO")             ||
-u.contains("FTX")                || u.contains("EXCHANGE HACK")          ||
-// ── NASDAQ/SP500 ──
-u.contains("EARNINGS")           || u.contains("PROFIT WARNING")         ||
-u.contains("GUIDANCE")           || u.contains("VIX")                    ||
-// ── USDJPY ──
-u.contains("MOF JAPAN")          || u.contains("FX INTERVENTION")        ||
-u.contains("CARRY TRADE")        || u.contains("VERBAL INTERVENTION")    ||
-// ── AUDUSD ──
-u.contains("IRON ORE")           || u.contains("COPPER PRICE")           ||
-// ── USOIL ──
-u.contains("SPR RELEASE")        || u.contains("RIG COUNT")              ||
-u.contains("API CRUDE")          || u.contains("BAKER HUGHES")) {        // ✅
+        u.contains("TREASURY AUCTION")    || u.contains("BID TO COVER")            ||
+        u.contains("DEBT CEILING")        || u.contains("BUDGET DEFICIT")          ||
+        u.contains("TREASURY YIELD")      || u.contains("BOND SELLOFF")            ||
+        u.contains("YIELD SPIKE")         || u.contains("FOREIGN SELLING")         ||
+
+        // ── GOLD — drivers spécifiques ──
+        u.contains("REAL YIELDS")         || u.contains("REAL RATES")              ||
+        u.contains("PBOC GOLD")           || u.contains("GOLD RESERVES")           ||
+        u.contains("CENTRAL BANK GOLD")   || u.contains("GOLD DEMAND")             ||
+
+        // ── USOIL — drivers spécifiques ──
+        u.contains("SPR RELEASE")         || u.contains("SPR REFILL")              ||
+        u.contains("STRATEGIC PETROLEUM") || u.contains("BAKER HUGHES")            ||
+        u.contains("RIG COUNT")           || u.contains("API CRUDE")               ||
+        u.contains("API WEEKLY")          || u.contains("HURRICANE")               ||
+        u.contains("TROPICAL STORM")      || u.contains("GULF OF MEXICO")          ||
+        u.contains("VIENNA AGREEMENT")    || u.contains("OPEC QUOTA")              ||
+
+        // ── NASDAQ/SP500 — drivers spécifiques ──
+        u.contains("EARNINGS")            || u.contains("PROFIT WARNING")          ||
+        u.contains("GUIDANCE")            || u.contains("REVENUE MISS")            ||
+        u.contains("REVENUE BEAT")        || u.contains("VIX")                     ||
+        u.contains("BANK RUN")            || u.contains("SYSTEMIC RISK")           ||
+        u.contains("NVDA")                || u.contains("NVIDIA")                  ||
+        u.contains("AAPL")                || u.contains("APPLE EARNINGS")          ||
+        u.contains("MICROSOFT EARNINGS")  || u.contains("MSFT")                    ||
+        u.contains("AMAZON EARNINGS")     || u.contains("AMZN")                    ||
+        u.contains("GOOGLE EARNINGS")     || u.contains("ALPHABET EARNINGS")       ||
+        u.contains("META EARNINGS")       || u.contains("TESLA EARNINGS")          ||
+
+        // ── USDJPY — drivers spécifiques ──
+        u.contains("MOF JAPAN")           || u.contains("FX INTERVENTION")         ||
+        u.contains("CARRY TRADE")         || u.contains("VERBAL INTERVENTION")     ||
+        u.contains("JAPAN MOF")           || u.contains("WATCHING CLOSELY")        ||
+        u.contains("EXCESSIVE MOVES")     || u.contains("SHARP MOVES")             ||
+        u.contains("JAPAN CPI")           || u.contains("JAPAN INFLATION")         ||
+
+        // ── AUDUSD — drivers spécifiques ──
+        u.contains("IRON ORE")            || u.contains("COPPER PRICE")            ||
+        u.contains("AUSTRALIA EMPLOYMENT")|| u.contains("AUSTRALIA JOBS")          ||
+        u.contains("AUSTRALIA CPI")       || u.contains("AUSTRALIA TRADE")         ||
+        u.contains("CHINA STEEL")         || u.contains("CHINA INFRASTRUCTURE")    ||
+
+        // ── USDCAD — drivers spécifiques ──
+        u.contains("CANADA EMPLOYMENT")   || u.contains("CANADA JOBS")             ||
+        u.contains("CANADA CPI")          || u.contains("KEYSTONE")                ||
+        u.contains("PIPELINE")            || u.contains("USMCA")                   ||
+        u.contains("CANADA TRADE")        ||
+
+        // ── BITCOIN — drivers spécifiques ──
+        u.contains("BITCOIN ETF")         || u.contains("ETF FLOWS")               ||
+        u.contains("IBIT")                || u.contains("FBTC")                    ||
+        u.contains("HALVING")             || u.contains("SEC CRYPTO")              ||
+        u.contains("CRYPTO BAN")          || u.contains("EXCHANGE HACK")           ||
+        u.contains("CRYPTO REGULATION")   || u.contains("STABLECOIN")              ||
+        u.contains("TETHER")              || u.contains("USDT")                    ||
+
+        // ── EURUSD — drivers spécifiques ──
+        u.contains("PMI FLASH")           || u.contains("FLASH PMI EUROZONE")      ||
+        u.contains("SCHNABEL")            || u.contains("LANE ECB")                ||
+        u.contains("PANETTA")             || u.contains("BTP SPREAD")              ||
+        u.contains("OAT SPREAD")          || u.contains("SOVEREIGN SPREAD")        ||
+        u.contains("ITALIAN BONDS")       || u.contains("FRENCH BONDS")            ||
+
+        // ── GBPUSD — drivers spécifiques ──
+        u.contains("UK CPI")              || u.contains("UK INFLATION")            ||
+        u.contains("UK GDP")              || u.contains("UK BUDGET")               ||
+        u.contains("AUTUMN STATEMENT")    || u.contains("MPC VOTE")                ||
+        u.contains("SPRING STATEMENT")    || u.contains("UK TRADE")                ||
+        u.contains("BREXIT")              || u.contains("NORTHERN IRELAND")) {
         return 4;
     }
 
