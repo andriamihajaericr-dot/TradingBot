@@ -1320,20 +1320,80 @@ public class NotificationService extends NotificationListenerService {
     
         // Détection et filtrage immédiat des packages sources autorisés
         String packageName = sbn.getPackageName().toLowerCase(Locale.ROOT);
-        String sourceName = "Source Institutionnelle";
-        if (packageName.contains("financialjuice")) {
-        sourceName = "FinancialJuice";
-        } else if (packageName.contains("nikkei")) {
-            sourceName = "TradingEconomics";
-        } else if (packageName.contains("forex.portal")) {
-            sourceName = "Myfxbook";
-        } else if (packageName.contains("twitter") || packageName.contains("periscope")) {
-            sourceName = "X /Twitter";
-        } else if (packageName.contains("chrome") || packageName.equals("com.android.chrome")) {
-            sourceName = "Chrome";
-        } else {
-            return; // Ignore immédiatement tout le reste
+String sourceName = "Source Institutionnelle";
+
+if (packageName.contains("financialjuice")) {
+    sourceName = "FinancialJuice";
+} else if (packageName.contains("nikkei")) {
+    sourceName = "TradingEconomics";
+} else if (packageName.contains("forex.portal")) {
+    sourceName = "Myfxbook";
+} else if (packageName.contains("twitter") || packageName.contains("periscope")) {
+    sourceName = "X /Twitter";
+} else if (packageName.contains("chrome") || packageName.equals("com.android.chrome")) {
+    sourceName = "Forex Factory";
+
+// ✅ Nouvelles sources ajoutées
+} else if (packageName.contains("thomsonreuters")) {
+    sourceName = "Reuters";
+} else if (packageName.contains("bloomberg.btva")) {
+    sourceName = "Bloomberg";
+} else if (packageName.contains("bloomberg.android.anywhere")) {
+    sourceName = "Bloomberg Pro";
+} else if (packageName.contains("cnbc.client")) {
+    sourceName = "CNBC";
+} else if (packageName.contains("cointelegraph")) {
+    sourceName = "CoinTelegraph";
+
+// ✅ Telegram — filtrage par canal spécifique
+} else if (packageName.contains("org.telegram.messenger") ||
+           packageName.equals("org.telegram.messenger.web")) {
+
+    // ✅ Liste blanche des canaux Telegram financiers autorisés
+    final Set<String> ALLOWED_TELEGRAM_CHANNELS = new HashSet<>(Arrays.asList(
+        // ── Macro / Forex / Économie ──
+        "financialjuice", "forex factory", "market news", "mni market",
+        "reuters markets", "bloomberg markets", "forexlive", "fxstreet",
+        "dailyfx", "investing.com",
+        // ── Géopolitique ──
+        "war monitor", "intel slava", "osintdefender", "the lookout",
+        "middle east eye", "iran international",
+        // ── Pétrole / Énergie ──
+        "oilprice", "opec news", "energy intelligence", "petroleum",
+        // ── Crypto / Bitcoin ──
+        "cointelegraph", "coindesk", "whale alert", "bitcoin magazine",
+        "lookonchain", "unusual whales",
+        // ── Actions / Indices ──
+        "cnbc markets", "marketwatch", "wall street journal", "fed watch",
+        "ecb news", "central bank"
+    ));
+
+    // ✅ Extraire le nom du canal depuis le titre de la notification
+    Bundle tgExtras = sbn.getNotification().extras;
+    String channelName = tgExtras.getString(Notification.EXTRA_TITLE, "").toLowerCase(Locale.ROOT);
+
+    boolean isAllowedChannel = false;
+    String matchedChannel = "";
+    for (String allowed : ALLOWED_TELEGRAM_CHANNELS) {
+        if (channelName.contains(allowed)) {
+            isAllowedChannel = true;
+            matchedChannel = allowed;
+            break;
         }
+    }
+
+    if (!isAllowedChannel) {
+        Log.d(TAG, "[TELEGRAM] Canal ignoré : " + channelName);
+        return; // ← ignorer tous les autres canaux Telegram
+    }
+
+    // ✅ Source = Telegram + nom du canal
+    sourceName = "Telegram/" + tgExtras.getString(Notification.EXTRA_TITLE, "Telegram");
+    logToMain("📨 [TELEGRAM] Canal autorisé : " + matchedChannel);
+
+} else {
+    return; // Ignore immédiatement tout le reste
+}
     
         // Extraction sécurisée des chaînes de caractères brutes fournies par Android
         Bundle extras = sbn.getNotification().extras;
