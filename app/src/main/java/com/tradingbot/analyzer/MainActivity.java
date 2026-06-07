@@ -109,20 +109,41 @@ public class MainActivity extends AppCompatActivity {
             startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
         });
         testBtn.setOnClickListener(v -> {
-            addLog("🧪 [TEST] Déclenchement d'une simulation réseau...");
-            try {
-                NotificationService.sendTelegramSecure(
-                    "🧪 **TEST DU CAPTEUR DE TRADING**\n" +
-                    "Statut : Opérationnel\n" +
-                    "Zone Temporelle : UTC+3 (Madagascar)\n" +
-                    "Flux : Liaison montante et descendante OK.",
-                    this
-                );
-            } catch (Exception e) {
-                Log.e(TAG, "Échec lors de l'envoi du test", e);
-                addLog("❌ [TEST] Erreur lors de l'appel : " + e.getMessage());
-            }
-        });
+    addLog("🧪 [TEST] Déclenchement du diagnostic complet...");
+    new Thread(() -> {
+        try {
+            // ✅ Test 1 — Telegram
+            NotificationService.sendTelegramSecure(
+                "🧪 *TEST DU CAPTEUR DE MACROS ÉCONOMIQUE*\n" +
+                "✅ Statut : Opérationnel\n" +
+                "🕒 Zone : UTC+3 (Madagascar)\n" +
+                "📡 Flux : Liaison montante et descendante OK.",
+                this
+            );
+            runOnUiThread(() -> addLog("✅ [TEST] Telegram OK"));
+
+            // ✅ Test 2 — Régime de marché
+            String regime = eventDb.detecterRegimeMarche(
+                System.currentTimeMillis() / 1000);
+            runOnUiThread(() -> addLog("📈 [TEST] Régime : " +
+                (regime != null ? regime.split("\n")[0] : "Indéterminé")));
+
+            // ✅ Test 3 — Calendrier économique
+            int nbEvents = EventValidator.getUpcomingEvents().size();
+            runOnUiThread(() -> addLog("📅 [TEST] Calendrier : " +
+                nbEvents + " événements chargés"));
+
+            // ✅ Test 4 — DB diagnostic
+            String diag = eventDb.diagnostiquerDriverSpecifique("NFP");
+            runOnUiThread(() -> addLog("🔍 [TEST] DB NFP : " +
+                (diag != null ? diag.split("\n")[0] : "Aucun résultat")));
+
+        } catch (Exception e) {
+            Log.e(TAG, "Échec test complet", e);
+            runOnUiThread(() -> addLog("❌ [TEST] Erreur : " + e.getMessage()));
+        }
+    }).start();
+});
         exportBtn.setOnClickListener(v -> exportDatabaseToStorage());
         importBtn.setOnClickListener(v -> importDatabaseFromStorage());
 
