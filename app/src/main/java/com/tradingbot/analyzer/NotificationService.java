@@ -1907,13 +1907,19 @@ scheduler.scheduleAtFixedRate(new Runnable() {
         u.contains("FLASH PMI")           || u.contains("MANUFACTURING PMI")       ||
         u.contains("COMPOSITE PMI")       || u.contains("SERVICES PMI")            ||
         // ── Révisions de données — niveau 3 ──
-        u.contains("REVISED TO")          || u.contains("REVISED UP")              || // ✅
-        u.contains("REVISED DOWN")        || u.contains("UPWARD REVISION")         || // ✅
-        u.contains("DOWNWARD REVISION")   || u.contains("PRIOR REVISED")           || // ✅
-        u.contains("PREVIOUS REVISED")    || u.contains("DATA REVISION")) {           // ✅
-        return 3;
-    }
+        u.contains("REVISED TO")          || u.contains("REVISED UP")              ||
+        u.contains("REVISED DOWN")        || u.contains("UPWARD REVISION")         ||
+        u.contains("DOWNWARD REVISION")   || u.contains("PRIOR REVISED")           ||
+        u.contains("PREVIOUS REVISED")    || u.contains("DATA REVISION")           ||
 
+        // ── Indicateurs de marché secondaires ──
+        u.contains("CREDIT DEFAULT SWAP") || u.contains("CDS SPREAD")              ||
+        u.contains("LIBOR")               || u.contains("SOFR")                    ||
+        u.contains("REPO RATE")           || u.contains("OVERNIGHT RATE")          ||
+        u.contains("MONEY MARKET")        || u.contains("LIQUIDITY CRISIS")        ||
+        u.contains("VIX SPIKE")           || u.contains("FEAR INDEX")) {
+        return 3;
+    } 
     // ══════════════════════════════════════════════════════════
     // NIVEAU 2 — Breaking news sans mot-clé macro identifié
     // ══════════════════════════════════════════════════════════
