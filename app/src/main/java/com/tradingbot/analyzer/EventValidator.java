@@ -793,8 +793,113 @@ public class EventValidator {
                    text.contains("previous revised");
         }
 
+        // ── Treasury Auction / Debt Ceiling ──
+        if (ind.contains("treasury auction") || ind.contains("debt ceiling") ||
+            ind.contains("bid to cover") || ind.contains("budget deficit") ||
+            ind.contains("yield spike") || ind.contains("bond selloff")) {
+            return text.contains("treasury") || text.contains("auction") ||
+                   text.contains("debt ceiling") || text.contains("bid to cover") ||
+                   text.contains("budget deficit") || text.contains("yield") ||
+                   text.contains("bond");
+        }
+
+        // ── Carry Trade / MOF Intervention Japon ──
+        if (ind.contains("carry trade") || ind.contains("fx intervention") ||
+            ind.contains("mof japan") || ind.contains("verbal intervention") ||
+            ind.contains("watching closely") || ind.contains("sharp yen")) {
+            return text.contains("carry trade") || text.contains("intervention") ||
+                   text.contains("mof") || text.contains("yen") ||
+                   text.contains("watching closely") || text.contains("excessive moves");
+        }
+
+        // ── Big Tech Earnings ──
+        if (ind.contains("earnings") || ind.contains("profit warning") ||
+            ind.contains("guidance") || ind.contains("eps beat") ||
+            ind.contains("eps miss") || ind.contains("revenue")) {
+            return text.contains("earnings") || text.contains("profit warning") ||
+                   text.contains("guidance") || text.contains("eps") ||
+                   text.contains("revenue") || text.contains("quarterly results") ||
+                   text.contains("nvda") || text.contains("nvidia") ||
+                   text.contains("aapl") || text.contains("msft") ||
+                   text.contains("amzn") || text.contains("meta") ||
+                   text.contains("alphabet") || text.contains("tesla");
+        }
+
+        // ── Bitcoin ETF / Halving / Regulatory ──
+        if (ind.contains("bitcoin etf") || ind.contains("etf flows") ||
+            ind.contains("halving") || ind.contains("sec crypto") ||
+            ind.contains("crypto ban") || ind.contains("exchange hack") ||
+            ind.contains("stablecoin") || ind.contains("ftx")) {
+            return text.contains("bitcoin etf") || text.contains("etf") ||
+                   text.contains("halving") || text.contains("sec") ||
+                   text.contains("crypto ban") || text.contains("hack") ||
+                   text.contains("stablecoin") || text.contains("ftx") ||
+                   text.contains("ibit") || text.contains("fbtc") ||
+                   text.contains("tether") || text.contains("usdt");
+        }
+
+        // ── Systemic Risk / Bank Run ──
+        if (ind.contains("bank run") || ind.contains("systemic risk") ||
+            ind.contains("bank collapse") || ind.contains("banking crisis") ||
+            ind.contains("fdic") || ind.contains("bailout") ||
+            ind.contains("contagion")) {
+            return text.contains("bank run") || text.contains("systemic") ||
+                   text.contains("bank collapse") || text.contains("banking crisis") ||
+                   text.contains("fdic") || text.contains("bailout") ||
+                   text.contains("contagion") || text.contains("svb") ||
+                   text.contains("silicon valley bank") || text.contains("credit suisse");
+        }
+
+        // ── Iron Ore / Copper ──
+        if (ind.contains("iron ore") || ind.contains("copper") ||
+            ind.contains("commodity metals") || ind.contains("china steel")) {
+            return text.contains("iron ore") || text.contains("copper") ||
+                   text.contains("commodity") || text.contains("china steel") ||
+                   text.contains("metals") || text.contains("infrastructure");
+        }
+
+        // ── Sovereign Debt / Spreads ──
+        if (ind.contains("btp spread") || ind.contains("oat spread") ||
+            ind.contains("sovereign spread") || ind.contains("cds spread") ||
+            ind.contains("debt crisis") || ind.contains("sovereign debt")) {
+            return text.contains("btp") || text.contains("oat") ||
+                   text.contains("spread") || text.contains("sovereign") ||
+                   text.contains("debt crisis") || text.contains("cds") ||
+                   text.contains("italian bonds") || text.contains("french bonds");
+        }
+
+        // ── SPR / Baker Hughes / API ──
+        if (ind.contains("spr") || ind.contains("strategic petroleum") ||
+            ind.contains("baker hughes") || ind.contains("rig count") ||
+            ind.contains("api crude") || ind.contains("api weekly")) {
+            return text.contains("spr") || text.contains("strategic petroleum") ||
+                   text.contains("baker hughes") || text.contains("rig count") ||
+                   text.contains("api crude") || text.contains("api weekly") ||
+                   text.contains("crude stock") || text.contains("petroleum reserve");
+        }
+
+        // ── MPC Vote / UK Budget ──
+        if (ind.contains("mpc vote") || ind.contains("uk budget") ||
+            ind.contains("autumn statement") || ind.contains("spring statement") ||
+            ind.contains("uk cpi") || ind.contains("uk gdp")) {
+            return text.contains("mpc vote") || text.contains("uk budget") ||
+                   text.contains("autumn statement") || text.contains("spring statement") ||
+                   text.contains("uk cpi") || text.contains("uk gdp") ||
+                   text.contains("uk inflation") || text.contains("chancellor");
+        }
+
+        // ── Real Yields / Gold specific ──
+        if (ind.contains("real yields") || ind.contains("real rates") ||
+            ind.contains("pboc gold") || ind.contains("gold reserves") ||
+            ind.contains("central bank gold") || ind.contains("gold demand")) {
+            return text.contains("real yields") || text.contains("real rates") ||
+                   text.contains("pboc gold") || text.contains("gold reserves") ||
+                   text.contains("central bank gold") || text.contains("gold demand") ||
+                   text.contains("tips") || text.contains("inflation linked");
+        }
+
         return false;
-    } 
+    }  
 
          
     private static boolean isJoblessClaimsEvent(String indicatorLower, String textLower) {
