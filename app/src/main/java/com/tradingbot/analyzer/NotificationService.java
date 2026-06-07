@@ -1881,7 +1881,7 @@ scheduler.scheduleAtFixedRate(new Runnable() {
         u.contains("AUTUMN STATEMENT")    || u.contains("MPC VOTE")                ||
         u.contains("SPRING STATEMENT")    || u.contains("UK TRADE")                ||
         u.contains("BREXIT")              || u.contains("NORTHERN IRELAND")) {
-        return 4;
+        return 4; 
     }
 
     // ══════════════════════════════════════════════════════════
