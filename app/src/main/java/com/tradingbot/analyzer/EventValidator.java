@@ -736,15 +736,67 @@ public class EventValidator {
                    text.contains("exports") || text.contains("imports") ||
                    text.contains("exportations") || text.contains("importations");
         }
-        // Ajouter tarif 
-        if (ind.contains("tariff") || ind.contains("trade war") || ind.contains("trade deal")) {
-            return text.contains("tariff") || text.contains("trade war") ||
-                   text.contains("trade deal") || text.contains("sanctions") ||
-                   text.contains("embargo") || text.contains("customs");
+        // ── Tariffs / Guerre Commerciale ──
+        if (ind.contains("tariff") || ind.contains("trade war") ||
+            ind.contains("trade deal") || ind.contains("sanctions") ||
+            ind.contains("section 301") || ind.contains("section 232")) {
+            return text.contains("tariff")        || text.contains("trade war")    ||
+                   text.contains("trade deal")    || text.contains("sanctions")    ||
+                   text.contains("embargo")       || text.contains("customs")      ||
+                   text.contains("import tax")    || text.contains("customs duty") ||
+                   text.contains("section 301")   || text.contains("section 232")  ||
+                   text.contains("trade agreement");
         }
-    
+
+        // ── DXY / Dollar Index ──
+        if (ind.contains("dxy") || ind.contains("dollar index") ||
+            ind.contains("dollar strength") || ind.contains("dollar weakness")) {
+            return text.contains("dxy")              || text.contains("dollar index")    ||
+                   text.contains("dollar strength")  || text.contains("dollar weakness") ||
+                   text.contains("us dollar")        || text.contains("usd index");
+        }
+
+        // ── Nominations Banques Centrales ──
+        if (ind.contains("nominated") || ind.contains("appointed") ||
+            ind.contains("nomination") || ind.contains("appointment") ||
+            ind.contains("replace powell") || ind.contains("replace lagarde") ||
+            ind.contains("fed chair") || ind.contains("ecb president") ||
+            ind.contains("boj governor")) {
+            return text.contains("nominated")      || text.contains("appointed")      ||
+                   text.contains("nomination")     || text.contains("appointment")    ||
+                   text.contains("replace powell") || text.contains("replace lagarde")||
+                   text.contains("fed chair")      || text.contains("ecb president")  ||
+                   text.contains("boj governor")   || text.contains("central bank chief");
+        }
+
+        // ── Données Chine / PBOC ──
+        if (ind.contains("china") || ind.contains("pboc") ||
+            ind.contains("yuan") || ind.contains("cny") ||
+            ind.contains("renminbi") || ind.contains("caixin") ||
+            ind.contains("chinese") || ind.contains("politburo")) {
+            return text.contains("china")          || text.contains("pboc")          ||
+                   text.contains("yuan")           || text.contains("cny")           ||
+                   text.contains("renminbi")       || text.contains("caixin")        ||
+                   text.contains("chinese")        || text.contains("politburo")     ||
+                   text.contains("xi jinping")     || text.contains("npc")           ||
+                   text.contains("china stimulus") || text.contains("evergrande");
+        }
+
+        // ── Révisions de données ──
+        if (ind.contains("revised") || ind.contains("revision") ||
+            ind.contains("upward revision") || ind.contains("downward revision") ||
+            ind.contains("prior revised") || ind.contains("previous revised")) {
+            return text.contains("revised")           || text.contains("revision")          ||
+                   text.contains("revised to")        || text.contains("revised up")        ||
+                   text.contains("revised down")      || text.contains("upward revision")   ||
+                   text.contains("downward revision") || text.contains("prior revised")     ||
+                   text.contains("previous revised");
+        }
+
         return false;
-    }
+    } 
+
+         
     private static boolean isJoblessClaimsEvent(String indicatorLower, String textLower) {
         boolean isClaimsInCalendar = indicatorLower.contains("jobless") || 
                                      indicatorLower.contains("initial claims") ||
