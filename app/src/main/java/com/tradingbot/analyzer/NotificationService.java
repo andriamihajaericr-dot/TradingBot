@@ -238,6 +238,41 @@ public class NotificationService extends NotificationListenerService {
         "   DÉSESCALADE TARIFAIRE (suspension, baisse, accord) :\n" +
         "   Inverser toutes les directions ci-dessus, conviction plafonnée à 50%.\n" +
         "   🏁 FLUX DOMINANT : RISK-ON / APPÉTIT POUR LE RISQUE 🐂\n\n" +
+
+        "H. TREASURY AUCTIONS / DEBT CEILING\\n" +
+"─────────────────────────────────────\\n" +
+"   Treasury auction WEAK (tail, bid-to-cover < 2.3) :\\n" +
+"   • 📈 US10Y : VENTE CHOC 🔴 | Yields montent — demande insuffisante\\n" +
+"   • 🏆 GOLD  : ACHAT CHOC 🟢 | Fuite vers l'or si doute sur la solvabilité US\\n" +
+"   Debt Ceiling crisis :\\n" +
+"   • 🏆 GOLD  : ACHAT CHOC 🟢 | Couverture souveraine\\n" +
+"   • 💻 NASDAQ : VENTE CHOC 🔴 | Risk-off institutionnel\\n" +
+"   • ₿ BITCOIN : VENTE CHOC 🔴 | Liquidation actifs spéculatifs\\n\\n" +
+
+"I. CARRY TRADE UNWINDING (Yen) :\\n" +
+"────────────────────────────────\\n" +
+"   Signal : USDJPY chute > 2% sur une session / Volatilité Yen extrême :\\n" +
+"   • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Débouclage carry trade massif\\n" +
+"   • 💻 NASDAQ  : VENTE CHOC 🔴 | Vente d'actifs risk-on pour rembourser les emprunts Yen\\n" +
+"   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\\n" +
+"   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge\\n" +
+"   🏁 FLUX DOMINANT : RISK-OFF CARRY TRADE 🐻\\n\\n" +
+
+"J. MOF JAPAN FX INTERVENTION :\\n" +
+"───────────────────────────────\\n" +
+"   Intervention verbale (MOF says 'watching closely', 'excessive moves') :\\n" +
+"   • 🇯🇵 USDJPY : INCLINATION VENTE MAIS NEUTRE | Alerte sans action\\n" +
+"   Intervention directe (BOJ buys Yen) :\\n" +
+"   • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Gap instantané 200-500 pips\\n\\n" +
+
+"K. BITCOIN ETF / HALVING / REGULATORY :\\n" +
+"────────────────────────────────────────\\n" +
+"   ETF Flows positifs (> 500M$ en une journée) :\\n" +
+"   • ₿ BITCOIN : ACHAT CHOC 🟢 | Demande institutionnelle confirmée\\n" +
+"   Regulatory crackdown (SEC, interdiction pays) :\\n" +
+"   • ₿ BITCOIN : VENTE CHOC 🔴 | Capitulation réglementaire\\n" +
+"   Halving approach (< 6 mois) :\\n" +
+"   • ₿ BITCOIN : INCLINATION ACHAT MAIS NEUTRE | Signal structurel long terme\\n\\n" +
     
         "<HARD_CONSTRAINTS>\n" +
         "CONTRAINTE 1 — SECTIONS INTERDITES :\n" +
