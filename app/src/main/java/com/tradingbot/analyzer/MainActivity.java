@@ -83,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
         instance = this;
 
         eventDb = EventDatabase.getInstance(this);
-
+        EventValidator.setAppContext(this);
         // Liaison des composants
         mainScrollView      = findViewById(R.id.mainScrollView);
         statusText          = findViewById(R.id.statusText);
@@ -139,8 +139,18 @@ public class MainActivity extends AppCompatActivity {
 
         botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
         addLog("📱 Terminal prêt pour l'acquisition.");
-        eventDb.diagnostiquerTableEvents();
-    }
+    eventDb.diagnostiquerTableEvents();
+
+    // ✅ Préchargement du calendrier économique au démarrage
+    new Thread(() -> {
+        try {
+            EventValidator.preloadCalendar();
+            runOnUiThread(() -> addLog("✅ Calendrier économique préchargé."));
+        } catch (Exception e) {
+            runOnUiThread(() -> addLog("⚠️ Erreur préchargement calendrier : " + e.getMessage()));
+        }
+    }).start();
+ }
 
     @Override
     protected void onResume() {
