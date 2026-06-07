@@ -1763,8 +1763,13 @@ scheduler.scheduleAtFixedRate(new Runnable() {
         u.contains("NAS100")              || u.contains("SPX")                     ||
         u.contains("US500")               || u.contains("USTECH")                  ||
         u.contains("SENTIMENT")           || u.contains("CONFIANCE")               || // ✅
-        u.contains("FLASH PMI")           || u.contains("COMPOSITE PMI")           || // ✅
-        u.contains("SERVICES PMI")        || u.contains("MANUFACTURING PMI")) {       // ✅
+        u.contains("FLASH PMI")           || u.contains("MANUFACTURING PMI")       ||
+        u.contains("COMPOSITE PMI")       || u.contains("SERVICES PMI")            ||
+        // ── Révisions de données — niveau 3 ──
+        u.contains("REVISED TO")          || u.contains("REVISED UP")              || // ✅
+        u.contains("REVISED DOWN")        || u.contains("UPWARD REVISION")         || // ✅
+        u.contains("DOWNWARD REVISION")   || u.contains("PRIOR REVISED")           || // ✅
+        u.contains("PREVIOUS REVISED")    || u.contains("DATA REVISION")) {           // ✅
         return 3;
     }
 
