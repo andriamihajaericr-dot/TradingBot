@@ -132,7 +132,70 @@ public class EconomicEventDetector {
             eventType   = "CHINA-MACRO";
             description = "Données Macroéconomiques Chine / PBOC";
             impact      = "Haute Volatilité";
+
+        // ── Treasury / Debt Ceiling ──
+        } else if (containsAny(unified, "TREASURY AUCTION", "BID TO COVER",
+                "DEBT CEILING", "BUDGET DEFICIT", "YIELD SPIKE",
+                "BOND SELLOFF", "FOREIGN SELLING TREASURIES")) {
+            eventType   = "TREASURY-MARKET";
+            description = "Marché Obligataire US — Pression sur les Taux";
+            impact      = "Haute Volatilité";
+
+        // ── Carry Trade / MOF Intervention ──
+        } else if (containsAny(unified, "CARRY TRADE", "FX INTERVENTION",
+                "MOF JAPAN", "VERBAL INTERVENTION", "WATCHING CLOSELY",
+                "EXCESSIVE MOVES", "SHARP YEN MOVES")) {
+            eventType   = "FX-INTERVENTION";
+            description = "Intervention FX / Carry Trade — Signal Yen Majeur";
+            impact      = "Haute Volatilité";
+
+        // ── Big Tech Earnings ──
+        } else if (containsAny(unified, "EARNINGS", "PROFIT WARNING", "GUIDANCE",
+                "REVENUE MISS", "REVENUE BEAT", "EPS BEAT", "EPS MISS",
+                "NVDA EARNINGS", "AAPL EARNINGS", "MSFT EARNINGS",
+                "AMZN EARNINGS", "META EARNINGS", "TESLA EARNINGS",
+                "ALPHABET EARNINGS")) {
+            eventType   = "TECH-EARNINGS";
+            description = "Résultats Trimestriels Big Tech — Impact NASDAQ/SP500";
+            impact      = "Haute Volatilité";
+
+        // ── Bitcoin ETF / Halving / Regulatory ──
+        } else if (containsAny(unified, "BITCOIN ETF", "ETF FLOWS", "IBIT",
+                "FBTC", "HALVING", "SEC CRYPTO", "CRYPTO BAN",
+                "EXCHANGE HACK", "CRYPTO REGULATION", "STABLECOIN CRISIS",
+                "TETHER DEPEG", "FTX", "CELSIUS", "EXCHANGE COLLAPSE")) {
+            eventType   = "CRYPTO-SPECIFIC";
+            description = "Événement Crypto Spécifique — Bitcoin Driver Majeur";
+            impact      = "Haute Volatilité";
+
+        // ── Systemic Risk / Bank Run ──
+        } else if (containsAny(unified, "BANK RUN", "SYSTEMIC RISK",
+                "BANK COLLAPSE", "BANK FAILURE", "BANKING CRISIS",
+                "CREDIT SUISSE", "SVB", "SILICON VALLEY BANK",
+                "CONTAGION", "BAILOUT", "FDIC")) {
+            eventType   = "SYSTEMIC-RISK";
+            description = "Risque Systémique Bancaire — Contagion Financière";
+            impact      = "Choc Géopolitique AUD/NASDAQ";
+
+        // ── Iron Ore / Copper — AUD proxy ──
+        } else if (containsAny(unified, "IRON ORE", "COPPER PRICE",
+                "COPPER DEMAND", "IRON ORE PRICE", "CHINA STEEL",
+                "CHINA INFRASTRUCTURE", "COMMODITY DEMAND")) {
+            eventType   = "COMMODITY-METALS";
+            description = "Métaux Industriels — Proxy AUD/Chine";
+            impact      = "Moyenne Volatilité";
+
+        // ── Sovereign Debt Crisis / Spreads ──
+        } else if (containsAny(unified, "BTP SPREAD", "OAT SPREAD",
+                "SOVEREIGN SPREAD", "ITALIAN BONDS", "FRENCH BONDS",
+                "CREDIT DEFAULT SWAP", "CDS SPREAD", "DEBT CRISIS",
+                "GREEK CRISIS", "SOVEREIGN DEBT")) {
+            eventType   = "SOVEREIGN-DEBT";
+            description = "Crise Souveraine Européenne — Spreads Obligataires";
+            impact      = "Haute Volatilité";
         }
+
+        // ── 2. EXTRACTION ET ACCUMULATION...
         // ── 2. EXTRACTION ET ACCUMULATION DU BIAIS DIRECTIONNEL FONDAMENTAL ──
         if (containsAny(unified, "HIGHER THAN EXPECTED", "BEATS ESTIMATES", "ABOVE FORECAST",
                        "ABOVE EXPECTATIONS", "BETTER THAN EXPECTED", "HAWKISH")) {
