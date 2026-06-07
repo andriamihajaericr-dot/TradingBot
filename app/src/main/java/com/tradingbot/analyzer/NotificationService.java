@@ -53,7 +53,7 @@ public class NotificationService extends NotificationListenerService {
     private static final long GEO_THROTTLE_MS   = 12 * 60 * 1000L;  // 12 minutes pour géo
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
-    //String regimeActuel = eventDb.detecterRegimeMarche(nowSec);
+    
     private static final String SYSTEM_PROMPT = 
     "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif d'élite.\n" +
         "Tu analyses le flux d'actualité en direct en appliquant une HIERARCHIE STRICTE DES DRIVERS sans aucune place à l'interprétation.\n\n" +
