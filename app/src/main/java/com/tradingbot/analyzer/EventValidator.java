@@ -1090,8 +1090,13 @@ public static void preloadCalendar() {
         int totalAffiche = 0;
 
         for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
-            if (event == null || event.indicator == null || event.timestamp == null) continue;
+    if (event == null || event.indicator == null || event.timestamp == null) continue;
 
+    // ✅ Filtrer les jours fériés et événements sans impact
+    String indUpper = event.indicator.toUpperCase(Locale.ROOT);
+    if (indUpper.contains("BANK HOLIDAY") || indUpper.contains("PUBLIC HOLIDAY") ||
+        indUpper.contains("MARKET HOLIDAY") || indUpper.contains("DAY OFF") ||
+        indUpper.contains("NATIONAL HOLIDAY")) continue;
             String currentDay = formatEventDay(event.timestamp);
             if (!currentDay.equals(lastDay)) {
                 report.append("\n📆 *").append(currentDay).append("*\n");
