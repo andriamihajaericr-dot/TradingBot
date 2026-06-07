@@ -1720,9 +1720,24 @@ scheduler.scheduleAtFixedRate(new Runnable() {
         u.contains("XI JINPING")          || u.contains("TSMC")                    || // ✅
         u.contains("SOUTH CHINA SEA")     ||                                          // ✅
         // ── Chine ── 
+        // ── Chine / PBOC ──
         u.contains("CAIXIN")              || u.contains("CHINA PMI")               ||
-        u.contains("CHINESE GDP")         || u.contains("CHINA GDP")               || // ✅
+        u.contains("CHINESE GDP")         || u.contains("CHINA GDP")               ||
         u.contains("CHINA TRADE")         || u.contains("CHINESE EXPORTS")         ||
+        u.contains("PBOC")                || u.contains("YUAN")                    || // ✅
+        u.contains("CNY")                 || u.contains("RENMINBI")                || // ✅
+        u.contains("CHINA CPI")           || u.contains("CHINA PPI")               || // ✅
+        u.contains("CHINA STIMULUS")      || u.contains("CHINA PROPERTY")          || // ✅
+        u.contains("EVERGRANDE")          || u.contains("POLITBURO")               || // ✅
+        u.contains("NPC CHINA")           || u.contains("XI JINPING ECONOMY")      || // ✅
+        // ── Nominations Banques Centrales ──
+        u.contains("NOMINATED")           || u.contains("APPOINTED")               || // ✅
+        u.contains("NOMINATION")          || u.contains("APPOINTMENT")             || // ✅
+        u.contains("REPLACE POWELL")      || u.contains("REPLACE LAGARDE")         || // ✅
+        u.contains("REPLACE UEDA")        || u.contains("FED VICE CHAIR")          || // ✅
+        u.contains("ECB PRESIDENT")       || u.contains("BOJ GOVERNOR")            || // ✅
+        u.contains("CENTRAL BANK CHIEF")  ||                                          // ✅
+        // ── DXY / Dollar Index ──
         u.contains("DXY")                 || u.contains("DOLLAR INDEX")            ||
         u.contains("DOLLAR STRENGTH")     || u.contains("DOLLAR WEAKNESS")) {        // ✅
         return 4;
