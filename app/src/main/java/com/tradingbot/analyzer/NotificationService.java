@@ -804,40 +804,120 @@ public class NotificationService extends NotificationListenerService {
         "   DÉSESCALADE TARIFAIRE (suspension, baisse, accord) :\n" +
         "   Inverser toutes les directions ci-dessus, conviction plafonnée à 50%.\n" +
         "   🏁 FLUX DOMINANT : RISK-ON / APPÉTIT POUR LE RISQUE 🐂\n\n" +
-        "H. TREASURY AUCTIONS / DEBT CEILING\\n" +
-"─────────────────────────────────────\\n" +
-"   Treasury auction WEAK (tail, bid-to-cover < 2.3) :\\n" +
-"   • 📈 US10Y : VENTE CHOC 🔴 | Yields montent — demande insuffisante\\n" +
-"   • 🏆 GOLD  : ACHAT CHOC 🟢 | Fuite vers l'or si doute sur la solvabilité US\\n" +
-"   Debt Ceiling crisis :\\n" +
-"   • 🏆 GOLD  : ACHAT CHOC 🟢 | Couverture souveraine\\n" +
-"   • 💻 NASDAQ : VENTE CHOC 🔴 | Risk-off institutionnel\\n" +
-"   • ₿ BITCOIN : VENTE CHOC 🔴 | Liquidation actifs spéculatifs\\n\\n" +
+        "H. TREASURY AUCTIONS / DEBT CEILING / CRISE BUDGÉTAIRE US\n" +
+        "──────────────────────────────────────────────────────────\n" +
+        "   Treasury Auction FAIBLE (tail, bid-to-cover < 2.3, yield > prévision) :\n" +
+        "   • 📈 US10Y   : VENTE CHOC 🔴 | Demande insuffisante → yields montent\n" +
+        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Méfiance envers la dette US\n" +
+        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Taux hauts compressent les valorisations\n" +
+        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
+        "   • Autres actifs : NEUTRE\n" +
+        "   Debt Ceiling Crisis (impasse au Congrès, risque de défaut) :\n" +
+        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Couverture souveraine maximale\n" +
+        "   • 📈 US10Y   : VENTE CHOC 🔴 | Prime de risque sur la dette US\n" +
+        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Risk-off institutionnel\n" +
+        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
+        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation actifs spéculatifs\n" +
+        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Yen refuge\n" +
+        "   🏁 FLUX DOMINANT : OR FORT / RISK-OFF SOUVERAIN 🐻\n\n" +
 
-"I. CARRY TRADE UNWINDING (Yen) :\\n" +
-"────────────────────────────────\\n" +
-"   Signal : USDJPY chute > 2% sur une session / Volatilité Yen extrême :\\n" +
-"   • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Débouclage carry trade massif\\n" +
-"   • 💻 NASDAQ  : VENTE CHOC 🔴 | Vente d'actifs risk-on pour rembourser les emprunts Yen\\n" +
-"   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\\n" +
-"   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge\\n" +
-"   🏁 FLUX DOMINANT : RISK-OFF CARRY TRADE 🐻\\n\\n" +
+        "I. CARRY TRADE UNWINDING / INTERVENTION MOF JAPON\n" +
+        "──────────────────────────────────────────────────\n" +
+        "   ATTENTION : Ce driver crée des mouvements violents et soudains.\n" +
+        "   Intervention VERBALE MOF ('watching closely', 'excessive moves') :\n" +
+        "   • 🇯🇵 USDJPY  : INCLINATION VENTE MAIS NEUTRE | Alerte sans action directe\n" +
+        "   • Autres actifs : NEUTRE\n" +
+        "   Intervention DIRECTE BOJ (achat massif de Yen confirmé) :\n" +
+        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Gap instantané 200-500 pips\n" +
+        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Fuite vers les refuges\n" +
+        "   • Autres actifs : NEUTRE\n" +
+        "   Carry Trade Unwinding (USDJPY chute > 2% sur une session) :\n" +
+        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Débouclage massif\n" +
+        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Vente d'actifs risk-on pour rembourser emprunts Yen\n" +
+        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
+        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge\n" +
+        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation amplifiée\n" +
+        "   🏁 FLUX DOMINANT : RISK-OFF CARRY TRADE / YEN FORT 🐻\n\n" +
 
-"J. MOF JAPAN FX INTERVENTION :\\n" +
-"───────────────────────────────\\n" +
-"   Intervention verbale (MOF says 'watching closely', 'excessive moves') :\\n" +
-"   • 🇯🇵 USDJPY : INCLINATION VENTE MAIS NEUTRE | Alerte sans action\\n" +
-"   Intervention directe (BOJ buys Yen) :\\n" +
-"   • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Gap instantané 200-500 pips\\n\\n" +
+        "J. BIG TECH EARNINGS (NASDAQ/SP500 DRIVER DIRECT)\n" +
+        "──────────────────────────────────────────────────\n" +
+        "   NVDA / AAPL / MSFT / AMZN / META / GOOGL / TESLA EARNINGS BEAT :\n" +
+        "   • 💻 NASDAQ  : ACHAT CHOC 🟢 | Valorisations soutenues\n" +
+        "   • 📊 SP500   : ACHAT CHOC 🟢 | Même direction NASDAQ obligatoire\n" +
+        "   • ₿ BITCOIN  : ACHAT CHOC 🟢 | Sentiment risk-on amplifié\n" +
+        "   • Autres actifs : NEUTRE\n" +
+        "   EARNINGS MISS / PROFIT WARNING / GUIDANCE BAISSIÈRE :\n" +
+        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Compression des valorisations\n" +
+        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
+        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Risk-off amplifié\n" +
+        "   • Autres actifs : NEUTRE\n" +
+        "   🏁 FLUX DOMINANT : TECH DRIVEN (NASDAQ LEADER) 💻\n\n" +
 
-"K. BITCOIN ETF / HALVING / REGULATORY :\\n" +
-"────────────────────────────────────────\\n" +
-"   ETF Flows positifs (> 500M$ en une journée) :\\n" +
-"   • ₿ BITCOIN : ACHAT CHOC 🟢 | Demande institutionnelle confirmée\\n" +
-"   Regulatory crackdown (SEC, interdiction pays) :\\n" +
-"   • ₿ BITCOIN : VENTE CHOC 🔴 | Capitulation réglementaire\\n" +
-"   Halving approach (< 6 mois) :\\n" +
-"   • ₿ BITCOIN : INCLINATION ACHAT MAIS NEUTRE | Signal structurel long terme\\n\\n" +
+        "K. BITCOIN DRIVERS SPÉCIFIQUES\n" +
+        "──────────────────────────────\n" +
+        "   Bitcoin ETF Flows POSITIFS (> 300M$ net inflow journalier) :\n" +
+        "   • ₿ BITCOIN  : ACHAT CHOC 🟢 | Demande institutionnelle confirmée\n" +
+        "   • 💻 NASDAQ  : INCLINATION ACHAT MAIS NEUTRE | Sentiment risk-on tech\n" +
+        "   Bitcoin ETF Flows NÉGATIFS (outflows > 200M$) :\n" +
+        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Retrait institutionnel\n" +
+        "   SEC Enforcement / Regulatory Crackdown :\n" +
+        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Capitulation réglementaire\n" +
+        "   • 💻 NASDAQ  : INCLINATION VENTE MAIS NEUTRE | Risque réglementaire tech\n" +
+        "   Exchange Hack / Collapse (FTX type) :\n" +
+        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Panique systémique crypto\n" +
+        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Contagion sentiment risk-off\n" +
+        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
+        "   🏁 FLUX DOMINANT : CRYPTO SPECIFIC (BITCOIN LEADER) ₿\n\n" +
+
+        "L. RISQUE SYSTÉMIQUE BANCAIRE\n" +
+        "──────────────────────────────\n" +
+        "   Bank Run / Bank Failure / Banking Crisis :\n" +
+        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge anti-système bancaire\n" +
+        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Contagion financière systémique\n" +
+        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
+        "   • 📈 US10Y   : ACHAT CHOC 🟢 | Fuite vers la sécurité des Treasuries\n" +
+        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Yen refuge\n" +
+        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation d'urgence actifs spéculatifs\n" +
+        "   • 🇦🇺 AUDUSD  : VENTE CHOC 🔴 | Devise risk-on pénalisée\n" +
+        "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴 | Contagion si banque européenne impliquée\n" +
+        "   • 🛢️ USOIL    : VENTE CHOC 🔴 | Demande anticipée en baisse\n" +
+        "   🏁 FLUX DOMINANT : RISK-OFF SYSTÉMIQUE / OR FORT 🐻\n\n" +
+
+        "M. CRISE SOUVERAINE EUROPÉENNE (Spreads BTP/OAT)\n" +
+        "──────────────────────────────────────────────────\n" +
+        "   BTP/Bund spread > 250bps ou OAT/Bund spread > 80bps :\n" +
+        "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴 | Crise de confiance en zone Euro\n" +
+        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge contre instabilité européenne\n" +
+        "   • 💻 NASDAQ  : NEUTRE | Pas d'impact direct actifs US\n" +
+        "   • 📊 SP500   : NEUTRE | Même direction NASDAQ obligatoire\n" +
+        "   • 🇬🇧 GBPUSD  : INCLINATION VENTE MAIS NEUTRE | Effet de bord modéré\n" +
+        "   🏁 FLUX DOMINANT : EURO FAIBLE / CRISE SOUVERAINE 🐻\n\n" +
+
+        "N. IRON ORE / COPPER — PROXY AUD/CHINE\n" +
+        "─────────────────────────────────────────\n" +
+        "   Iron Ore > +3% ou Copper > +2% (stimulus Chine, demande forte) :\n" +
+        "   • 🇦🇺 AUDUSD  : ACHAT CHOC 🟢 | Australie = 1er exportateur fer mondial\n" +
+        "   • 🛢️ USOIL    : INCLINATION ACHAT MAIS NEUTRE | Demande industrielle\n" +
+        "   • Autres actifs : NEUTRE\n" +
+        "   Iron Ore < -3% ou Copper < -2% (ralentissement Chine) :\n" +
+        "   • 🇦🇺 AUDUSD  : VENTE CHOC 🔴 | Corrélation directe iron ore/AUD\n" +
+        "   • 🛢️ USOIL    : INCLINATION VENTE MAIS NEUTRE | Demande industrielle faible\n" +
+        "   🏁 FLUX DOMINANT : AUD/CHINE CORRÉLATION MATIÈRES PREMIÈRES 🦘\n\n" +
+
+        "O. SPR / BAKER HUGHES / API CRUDE\n" +
+        "────────────────────────────────────\n" +
+        "   SPR Release (libération réserves stratégiques US > 1M barils) :\n" +
+        "   • 🛢️ USOIL    : VENTE CHOC 🔴 | Offre supplémentaire immédiate\n" +
+        "   • 🇨🇦 USDCAD  : ACHAT CHOC 🟢 | CAD s'affaiblit avec le pétrole\n" +
+        "   Baker Hughes Rig Count HAUSSE (> +10 rigs hebdomadaire) :\n" +
+        "   • 🛢️ USOIL    : INCLINATION VENTE MAIS NEUTRE | Offre future en hausse\n" +
+        "   Baker Hughes Rig Count BAISSE (< -10 rigs hebdomadaire) :\n" +
+        "   • 🛢️ USOIL    : INCLINATION ACHAT MAIS NEUTRE | Offre future en baisse\n" +
+        "   API Crude Stock HAUSSE surprise :\n" +
+        "   • 🛢️ USOIL    : VENTE CHOC 🔴 | Anticipation EIA confirm surplus\n" +
+        "   API Crude Stock BAISSE surprise :\n" +
+        "   • 🛢️ USOIL    : ACHAT CHOC 🟢 | Anticipation EIA confirm déficit\n" +
+        "   🏁 FLUX DOMINANT : USOIL SUPPLY DRIVEN 🛢️\n\n" +
         "<HARD_CONSTRAINTS>\n" +
         "CONTRAINTE 1 — SECTIONS INTERDITES :\n" +
         "   N'écris JAMAIS 'TIMING D'EFFET', 'ACTION TRADING', 'CONTEXTE' ou toute autre section\n" +
