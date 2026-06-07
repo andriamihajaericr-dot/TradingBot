@@ -251,8 +251,9 @@ public class MainActivity extends AppCompatActivity {
             if (currentText.contains("En attente de notifications...")) {
                 currentText = "";
             }
-            if (currentText.length() > 5000) {
-                currentText = currentText.substring(0, 2000);
+            // ✅ Garder plus de logs — 15000 chars max, tronquer à 8000
+            if (currentText.length() > 15000) {
+                 currentText = currentText.substring(currentText.length() - 8000);
             }
             logText.setText(currentText + "[" + ts + "] " + message + "\n");
             if (mainScrollView != null) {
