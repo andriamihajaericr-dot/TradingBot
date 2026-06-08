@@ -795,19 +795,36 @@ if (indUpper.contains("NFP") || indUpper.contains("NON-FARM") ||
                             "BACKFILL_" + event.indicator + "_" + event.timestamp);
 
                     // ✅ Sauvegarder dans la DB
-                    boolean wasSaved = eventDb.saveEvent(
-                            fingerprint,
-                            "com.tradingbot.backfill",
-                            "Historical Backfill / FMP",
-                            "CALENDAR-RESULT",
-                            event.indicator,
-                            content,
-                            assetsStr,
-                            "CALENDRIER ÉCONOMIQUE | " + event.indicator,
-                            eventTs,
-                            "synced",
-                            weight
-                    );
+                    // ✅ Construire l'impact avec biais directionnel pour detecterRegimeMarche
+String impactLabel = "CALENDRIER ÉCONOMIQUE | " + event.indicator;
+try {
+    double actual   = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
+    double forecast = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
+    double diff     = actual - forecast;
+    if (diff > 0) {
+        impactLabel += " | Haute Volatilité (Biais Haussier)"; // ✅ détecté par detecterRegimeMarche
+    } else if (diff < 0) {
+        impactLabel += " | Haute Volatilité (Biais Baissier)"; // ✅ détecté par detecterRegimeMarche
+    } else {
+        impactLabel += " | Haute Volatilité";
+    }
+} catch (Exception ignored) {
+    impactLabel += " | Haute Volatilité";
+}
+
+boolean wasSaved = eventDb.saveEvent(
+    fingerprint,
+    "com.tradingbot.backfill",
+    "Historical Backfill / FMP",
+    "CALENDAR-RESULT",
+    event.indicator,
+    content,
+    assetsStr,
+    impactLabel, // ✅ impact avec biais directionnel
+    eventTs,
+    "synced",
+    weight
+);
 
                     if (wasSaved) {
                         saved++;
