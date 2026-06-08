@@ -2543,7 +2543,7 @@ scheduler.scheduleAtFixedRate(new Runnable() {
                         String assetsStr = cursor.getString(cursor.getColumnIndexOrThrow("target_assets"));
                         long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("unix_timestamp")) * 1000;
 
-                        List<String> assets = Arrays.asList(assetsStr.split(", "));
+                        List<String> assets = Arrays.asList(assetsStr.split(","));
                         String historyContext = eventDb.getRecentEventsForAssets(assets, 5);
 
                         boolean success = executeAnalysisPipeline(source, feed, historyContext, assets, timestamp, fingerprint);
