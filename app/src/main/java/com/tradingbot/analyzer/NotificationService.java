@@ -50,7 +50,7 @@ public class NotificationService extends NotificationListenerService {
     private static final String PREF_MACRO_KEY  = "macro_api_key";
     private static final String PREFS_NAME      = "TradingBot";
     private static final long GLOBAL_THROTTLE_MS = 8 * 60 * 1000L;   // 8 minute
-    private static final long GEO_THROTTLE_MS   = 12 * 60 * 1000L;  // 12 minutes pour géo
+    private static final long GEO_THROTTLE_MS   = 20 * 60 * 1000L;  // 12 minutes pour géo
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
     
@@ -1336,10 +1336,8 @@ if (packageName.contains("financialjuice")) {
 // ✅ Nouvelles sources ajoutées
 } else if (packageName.contains("thomsonreuters")) {
     sourceName = "Reuters";
-} else if (packageName.contains("bloomberg.btva")) {
+} else if (packageName.contains("bloomberg")) {
     sourceName = "Bloomberg";
-} else if (packageName.contains("bloomberg.android.anywhere")) {
-    sourceName = "Bloomberg Pro";
 } else if (packageName.contains("cnbc.client")) {
     sourceName = "CNBC";
 } else if (packageName.contains("cointelegraph")) {
