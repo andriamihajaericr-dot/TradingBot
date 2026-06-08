@@ -2054,6 +2054,13 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
             }
         }
     }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
+    // ✅ Backfill au démarrage (délai 30s pour laisser le DB s'initialiser)
+scheduler.schedule(() -> runHistoricalBackfill(),
+    30, TimeUnit.SECONDS);
+
+// ✅ Re-vérification nocturne (dans le bloc de maintenance minuit existant)
+// Ajouter dans le runnable de minuit, après preloadCalendar() :
+runHistoricalBackfill();
     // Dans NotificationService.onCreate(), après la planification de minuit, ajouter :
 
 // Rafraîchissement du calendrier toutes les 6 heures (21600000 ms)
