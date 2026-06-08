@@ -29,7 +29,9 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
 import android.content.SharedPreferences;
-import java.util.regex.*;
+import java.util.regex.*; 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 public class NotificationService extends NotificationListenerService {
 
@@ -3517,21 +3519,29 @@ payload.put("messages", messages);
         return false;
     }
 
-    private String generateSecureHash(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes("UTF-8"));
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (Exception e) {
-            return String.valueOf(System.currentTimeMillis());
+
+private static String generateSecureHash(String input) {
+    if (input == null) return "";
+    
+    try {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        // StandardCharsets.UTF_8 évite de passer une String "UTF-8" sujette aux fautes de frappe
+        byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+        
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : hash) {
+            String hex = Integer.toHexString(0xff & b);
+            if (hex.length() == 1) hexString.append('0');
+            hexString.append(hex);
         }
+        return hexString.toString();
+        
+    } catch (Exception e) {
+        // ✅ En cas d'erreur, on logue et on utilise le hashCode stable du texte
+        android.util.Log.e("HashUtil", "Erreur SHA-256, repli sur hashCode", e);
+        return String.valueOf(input.hashCode());
     }
+}
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
