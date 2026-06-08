@@ -1969,7 +1969,7 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
 
     public static void sendToGroqAndTelegram(String source, String title, String body, List<String> assets, Context context) {
         if (context == null) return;
-        String fingerprint = String.valueOf((source + title + body).hashCode());
+        String fingerprint = generateSecureHash(source + title + body);
         NotificationService instance = serviceInstance;
     
         // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report
