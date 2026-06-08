@@ -1442,6 +1442,17 @@ if (packageName.contains("financialjuice")) {
                     if (finalCalculatedWeight >= 3 || currentSpeaker.equals("FED") || eventTypeStr.equals("GEOPOLITICAL")) {
                         isSupremeRank = true;
                     }
+
+                    // ✅ Directive conviction forcée pour les événements GEO suprêmes
+                    String geoConvictionOverride = "";
+                    if (eventTypeStr.equals("GEOPOLITICAL") && finalCalculatedWeight >= 4) {
+                    geoConvictionOverride =
+                    "⚠️ DIRECTIVE CONVICTION GÉOPOLITIQUE SUPRÊME :\n" +
+                    "Cet événement est un CHOC GÉOPOLITIQUE CONFIRMÉ (missiles, frappe militaire, escalade).\n" +
+                    "Conviction AUTORISÉE entre 70% et 85%.\n" +
+                    "Ne pas plafonner à 40% — ce n'est pas un signal macro ordinaire.\n" +
+                    "Appliquer immédiatement la CONTRAINTE 11 — Régime de dominance géopolitique.\n\n";
+                    }
     
                     // 4️⃣ Anti-spam / Protection contre les flux de paroles répétitifs des speakers
                     String speakerToken = currentSpeaker.trim();
