@@ -768,8 +768,22 @@ private void runHistoricalBackfill() {
 
                     // ✅ Calculer le poids via assignDriverWeight
                     int weight = assignDriverWeight(content);
-                    if (weight < 4) weight = 4; // Rang minimum pour backfill
 
+// ✅ Forcer poids 5 pour les indicateurs Rang Suprême
+// Pour que getMonthlyMacroRegistry() les inclue automatiquement
+String indUpper = event.indicator.toUpperCase(Locale.ROOT);
+if (indUpper.contains("NFP") || indUpper.contains("NON-FARM") ||
+    indUpper.contains("PAYROLL") || indUpper.contains("CPI") ||
+    indUpper.contains("CORE CPI") || indUpper.contains("PCE") ||
+    indUpper.contains("CORE PCE") || indUpper.contains("FOMC") ||
+    indUpper.contains("FEDERAL RESERVE") || indUpper.contains("RATE DECISION") ||
+    indUpper.contains("PPI") || indUpper.contains("GDP") ||
+    indUpper.contains("JOLTS") || indUpper.contains("ADP") ||
+    indUpper.contains("JOBLESS CLAIMS") || indUpper.contains("INITIAL CLAIMS")) {
+    weight = 5; // ✅ Rang Suprême — visible dans getMonthlyMacroRegistry
+} else if (weight < 4) {
+    weight = 4;
+}
                     // ✅ Récupérer les actifs liés
                     List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
                             event.indicator,
