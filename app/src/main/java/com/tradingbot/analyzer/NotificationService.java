@@ -1724,6 +1724,11 @@ if (packageName.contains("financialjuice")) {
                 // 8️⃣ Génération de la signature cryptographique et persistance SQLite en base de données
                 //String fingerprint = generateSecureHash(packageName + "_" + title + "_" + bodyTextRaw + "_" + (postTimeMs / 60000));
                  // 1. Nettoyage et normalisation stricte
+    String pack = sbn.getPackageName();
+    Bundle extras = sbn.getNotification().extras;
+    String rawTitle = extras.getString(Notification.EXTRA_TITLE, "");
+    String rawBody = extras.getString(Notification.EXTRA_TEXT, "");
+    long postTimeMs = sbn.getPostTime(); // Votre variable de temps
     String cleanSource = (pack != null)     ? pack.trim().toLowerCase() : "";
     String cleanTitle  = (rawTitle != null) ? rawTitle.trim().toLowerCase() : "";
     String cleanBody   = (rawBody != null)  ? rawBody.trim().toLowerCase() : "";
