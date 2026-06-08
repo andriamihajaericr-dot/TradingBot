@@ -152,7 +152,7 @@ public static List<CalendarEvent> fetchHistoricalEvents(Context context, int day
             String fromDate = sdf.format(new Date(windowStartMs));
             String toDate   = sdf.format(new Date(windowEndMs));
 
-            String urlString = "https://financialmodelingprep.com/api/v3/economic_calendar" +
+            String urlString = "https://financialmodelingprep.com/stable/economic-calendar" +
                     "?from=" + fromDate + "&to=" + toDate + "&apikey=" + apiKey;
 
             logToMain("🔄 [BACKFILL] Récupération " + fromDate + " → " + toDate);
