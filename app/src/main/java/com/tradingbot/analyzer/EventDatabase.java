@@ -167,13 +167,19 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
 
     public String getDailyMacroSummary(long currentUnixTime) {
-        SQLiteDatabase db = this.getReadableDatabase();
-        StringBuilder sb = new StringBuilder();
-        long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
-        String selection = "unix_timestamp >= ? AND (driver_weight >= 3 OR (impact LIKE '%GEO%' AND driver_weight >= 2))";
-        String[] whereArgs = new String[]{
-            String.valueOf(twentyFourHoursAgo)
-        };
+    // ✅ Pour les Rang Suprême (weight=5) — fenêtre élargie à 7 jours
+    // Pour les autres — fenêtre normale 24h
+    long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
+    long sevenDaysAgo       = currentUnixTime - (7L * 24 * 60 * 60);
+
+    String selection =
+        "(unix_timestamp >= ? AND driver_weight >= 3) OR " +     // 24h — tous drivers >= 3
+        "(unix_timestamp >= ? AND driver_weight = 5)";           // 7j — Rang Suprême uniquement
+
+    String[] whereArgs = new String[]{
+        String.valueOf(twentyFourHoursAgo),
+        String.valueOf(sevenDaysAgo)
+    };
     
         Cursor cursor = null;
         try {
