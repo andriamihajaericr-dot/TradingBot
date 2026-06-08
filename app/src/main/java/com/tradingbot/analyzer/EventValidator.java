@@ -1315,23 +1315,41 @@ private static void analyzeAndSendCalendarResult(EconomicCalendarAPI.CalendarEve
             content += " PREVIOUS: " + event.previous;
 
         // ✅ Détection surprise haussière / baissière
-        try {
-            double actual   = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
-            double forecast = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
-            double diff     = actual - forecast;
-            if      (diff > 0) content += " HIGHER THAN EXPECTED";
-            else if (diff < 0) content += " LOWER THAN EXPECTED";
-        } catch (Exception ignored) {}
+        // Dans la méthode analyzeAndSendCalendarResult
+// ... (code précédent d'assemblage du contenu)
 
-        // ✅ Récupération des actifs liés
-        List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
-                event.indicator,
-                event.country != null ? event.country : "United States");
+// ✅ Construction d'une chaîne brute propre et standardisée pour le parseur
+// On utilise un format naturel que EconomicAnalyzer sait décoder à l'aide de sa méthode traiterEvenementTextuel ou extraireChiffres
+String analyseInput = "Indicator: " + event.indicator + " | Actual: " + event.actual + " | Forecast: " + event.forecast;
 
-        // ✅ Envoi vers Groq + Telegram
-        NotificationService.sendToGroqAndTelegram(
-                "Calendrier Économique", title, content, assets, appContext);
+// ✅ Dérogation de l'analyse surprise à l'EconomicAnalyzer
+EconomicAnalyzer.EvaluationResult eval = EconomicAnalyzer.analyserEvenement(
+        event.indicator, 
+        analyseInput
+);
 
+// ✅ Alignement strict avec les retours de votre classe EconomicAnalyzer
+if (eval != null && eval.isParsed) {
+    if ("HAUSSIER".equals(eval.marketImpact)) {
+        content += " | Status: HIGHER THAN EXPECTED 🟢";
+    } else if ("BAISSIER".equals(eval.marketImpact)) {
+        content += " | Status: LOWER THAN EXPECTED 🔴";
+    } else {
+        content += " | Status: AS EXPECTED ⚪"; // Cas où actual == forecast
+    }
+} else {
+    // Si l'analyseur n'a pas pu extraire de chiffres (ex: données textuelles, révisions sans consensus)
+    content += " | Status: UNCHANGED/TEXTUAL ⚪"; 
+}
+
+// ✅ Récupération des actifs liés
+List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
+        event.indicator,
+        event.country != null ? event.country : "United States");
+
+// ✅ Envoi vers Groq + Telegram sécurisé (S'exécutera toujours sans lever d'exception)
+NotificationService.sendToGroqAndTelegram(
+        "Calendrier Économique", title, content, assets, appContext);
         logToMain("📤 Résultat calendaire : "
                 + event.indicator + " | " + event.actual + " vs " + event.forecast);
 
