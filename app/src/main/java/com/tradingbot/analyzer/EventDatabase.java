@@ -452,24 +452,41 @@ public class EventDatabase extends SQLiteOpenHelper {
     Cursor cursor = null;
     try {
         cursor = db.query(TABLE_EVENTS,
-            new String[]{"title", "impact", "unix_timestamp"},
-            "unix_timestamp >= ? AND (" +
-            "event_type LIKE '%GEO%' OR " +
-            "impact LIKE '%GÉOPOLITIQUE%' OR impact LIKE '%GEO%' OR " +
-            "title LIKE '%IRAN%' OR title LIKE '%iran%' OR " +
-            "title LIKE '%ISRAEL%' OR title LIKE '%israel%' OR " +
-            "title LIKE '%UKRAINE%' OR title LIKE '%ukraine%' OR " +
-            "title LIKE '%RUSSIA%' OR title LIKE '%russia%' OR " +
-            "title LIKE '%HORMUZ%' OR title LIKE '%hormuz%' OR " +
-            "title LIKE '%RED SEA%' OR title LIKE '%red sea%' OR " +
-            "title LIKE '%HEZBOLLAH%' OR title LIKE '%hezbollah%' OR " +
-            "title LIKE '%HOUTHI%' OR title LIKE '%houthi%' OR " +
-            "title LIKE '%GAZA%' OR title LIKE '%gaza%' OR " +
-            "title LIKE '%MISSILE%' OR title LIKE '%missile%' OR " +
-            "title LIKE '%TAIWAN%' OR title LIKE '%taiwan%' OR " +
-            "title LIKE '%PUTIN%' OR title LIKE '%putin%')",
-            new String[]{String.valueOf(fortyEightHoursAgo)},
-            null, null, "unix_timestamp DESC", "5");
+    new String[]{"title", "impact", "unix_timestamp"},
+    "unix_timestamp >= ? AND (" +
+    // ✅ Détection via event_type — le plus fiable
+    "event_type = 'GEOPOLITICAL' OR " +
+    "event_type LIKE '%GEO%' OR " +
+    // ✅ Détection via impact descriptif
+    "impact LIKE '%Choc Géopolitique%' OR " +
+    "impact LIKE '%GÉOPOLITIQUE%' OR " +
+    "impact LIKE '%GEO%' OR " +
+    // ✅ Détection via titre — élargi avec nouveaux mots-clés
+    "title LIKE '%IRAN%' OR title LIKE '%iran%' OR " +
+    "title LIKE '%ISRAEL%' OR title LIKE '%israel%' OR " +
+    "title LIKE '%TEHRAN%' OR title LIKE '%tehran%' OR " +
+    "title LIKE '%AIRSTRIKE%' OR title LIKE '%airstrike%' OR " +
+    "title LIKE '%STRIKE%' OR title LIKE '%strike%' OR " +
+    "title LIKE '%ATTACK%' OR title LIKE '%attack%' OR " +
+    "title LIKE '%MISSILE%' OR title LIKE '%missile%' OR " +
+    "title LIKE '%DRONE%' OR title LIKE '%drone%' OR " +
+    "title LIKE '%UKRAINE%' OR title LIKE '%ukraine%' OR " +
+    "title LIKE '%RUSSIA%' OR title LIKE '%russia%' OR " +
+    "title LIKE '%HORMUZ%' OR title LIKE '%hormuz%' OR " +
+    "title LIKE '%RED SEA%' OR title LIKE '%red sea%' OR " +
+    "title LIKE '%HEZBOLLAH%' OR title LIKE '%hezbollah%' OR " +
+    "title LIKE '%HOUTHI%' OR title LIKE '%houthi%' OR " +
+    "title LIKE '%GAZA%' OR title LIKE '%gaza%' OR " +
+    "title LIKE '%TAIWAN%' OR title LIKE '%taiwan%' OR " +
+    "title LIKE '%PUTIN%' OR title LIKE '%putin%' OR " +
+    "title LIKE '%WAR%' OR title LIKE '%war%' OR " +
+    "title LIKE '%CONFLICT%' OR title LIKE '%conflict%' OR " +
+    // ✅ Détection via feed_content aussi
+    "feed_content LIKE '%airstrike%' OR " +
+    "feed_content LIKE '%missile%' OR " +
+    "feed_content LIKE '%GEOPOLIT%')",
+    new String[]{String.valueOf(fortyEightHoursAgo)},
+    null, null, "unix_timestamp DESC", "5");
 
         if (cursor != null && cursor.moveToFirst()) {
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
