@@ -15,7 +15,10 @@ public class EventValidator {
     public static Map<String, EconomicCalendarAPI.CalendarEvent> getUpcomingEvents() {
         return Collections.unmodifiableMap(upcomingEvents);
     }
-    
+    // Dans EventValidator.java
+    public static Map<String, Long> getRecentFingerprints() {
+        return recentFingerprints;
+    }
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
     private static final long DUPLICATE_WINDOW_MS = 30 * 60 * 1000L; // 30 minutes
     private static final String TAG = "EventValidator";
