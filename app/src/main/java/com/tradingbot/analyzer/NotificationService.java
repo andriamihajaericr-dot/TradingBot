@@ -701,6 +701,20 @@ public class NotificationService extends NotificationListenerService {
        Log.d(TAG, msg);
     }
 
+    private long calculateMillisUntilHour(int targetHour) {
+    Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+    long nowMs = cal.getTimeInMillis();
+    cal.set(Calendar.HOUR_OF_DAY, targetHour);
+    cal.set(Calendar.MINUTE, 0);
+    cal.set(Calendar.SECOND, 0);
+    cal.set(Calendar.MILLISECOND, 0);
+    // Si l'heure est déjà passée aujourd'hui → planifier pour demain
+    if (cal.getTimeInMillis() <= nowMs) {
+        cal.add(Calendar.DAY_OF_YEAR, 1);
+    }
+    return cal.getTimeInMillis() - nowMs;
+    }
+
     // ✅ Pipeline de backfill automatique — reconstruit les données Rang Suprême manquantes
 // Appelé au démarrage + chaque nuit à minuit
 private void runHistoricalBackfill() {
