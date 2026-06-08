@@ -1976,7 +1976,19 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
         if (instance != null && instance.eventDb != null) {
             String assetsStr = assets != null ? android.text.TextUtils.join(",", assets) : "";
             // ✅ impact décrit correctement pour le Daily Report
-            String impactLabel = "CALENDRIER ÉCONOMIQUE | " + title;
+            
+String impactLabel = "CALENDRIER ÉCONOMIQUE | " + title;
+try {
+    // body contient "ACTUAL: X FORECAST: Y" (injecté par analyzeAndSendCalendarResult)
+    if (body.contains("HIGHER THAN EXPECTED"))
+        impactLabel += " | Haute Volatilité (Biais Haussier)";
+    else if (body.contains("LOWER THAN EXPECTED"))
+        impactLabel += " | Haute Volatilité (Biais Baissier)";
+    else
+        impactLabel += " | Haute Volatilité";
+} catch (Exception ignored) {
+    impactLabel += " | Haute Volatilité";
+}
             // ✅ Poids dynamique basé sur l'indicateur réel
             int calendarWeight = assignDriverWeight(title + " " + body);
            // Si le poids calculé est < 3, forcer à 3 minimum
