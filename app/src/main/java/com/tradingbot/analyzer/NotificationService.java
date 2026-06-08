@@ -1712,13 +1712,86 @@ if (packageName.contains("financialjuice")) {
                 }
 
                 // Sauvegarde de l'événement en base de données persistante avec injection du vrai poids macro calculé
-                boolean saved = eventDb.saveEvent(
-                        fingerprint, packageName, finalSourceName, eventTypeStr, title, bodyTextRaw,
-                        assetsSb.toString(), "pending", postTimeMs / 1000, "pending", finalCalculatedWeight);
+                // ✅ Construire un impact descriptif selon eventTypeStr
+// Visible par getDailyMacroSummary, detecterRegimeMarche, getDerniersDriversGeo
+String impactSave;
+switch (eventTypeStr) {
+    case "GEOPOLITICAL":
+        impactSave = "Choc Géopolitique | " + title;
+        break;
+    case "INFLATION-DATA":
+        impactSave = "Haute Volatilité | Inflation | " + title;
+        break;
+    case "FED-MONETARY-POLICY":
+        impactSave = "Haute Volatilité | Fed | " + title;
+        break;
+    case "EMPLOYMENT-REPORT":
+        impactSave = "Haute Volatilité | Emploi | " + title;
+        break;
+    case "CENTRAL-BANK-RATE":
+        impactSave = "Haute Volatilité | Banque Centrale | " + title;
+        break;
+    case "TREASURY-MARKET":
+        impactSave = "Haute Volatilité | Treasury | " + title;
+        break;
+    case "TECH-EARNINGS":
+        impactSave = "Haute Volatilité | Earnings | " + title;
+        break;
+    case "CRYPTO-SPECIFIC":
+        impactSave = "Haute Volatilité | Crypto | " + title;
+        break;
+    case "SYSTEMIC-RISK":
+        impactSave = "Choc Géopolitique | Risque Systémique | " + title;
+        break;
+    case "SOVEREIGN-DEBT":
+        impactSave = "Haute Volatilité | Dette Souveraine | " + title;
+        break;
+    case "TRADE-TARIFF":
+        impactSave = "Haute Volatilité | Tarifs | " + title;
+        break;
+    case "CHINA-MACRO":
+        impactSave = "Haute Volatilité | Chine | " + title;
+        break;
+    case "FX-INTERVENTION":
+        impactSave = "Haute Volatilité | Intervention FX | " + title;
+        break;
+    case "DOLLAR-INDEX":
+        impactSave = "Haute Volatilité | DXY | " + title;
+        break;
+    case "DATA-REVISION":
+        impactSave = "Moyenne Volatilité | Révision | " + title;
+        break;
+    case "ECONOMIC-GROWTH-DATA":
+        impactSave = "Moyenne Volatilité | Macro | " + title;
+        break;
+    default:
+        impactSave = "Haute Volatilité | " + title;
+        break;
+}
 
-                if (saved) {
-                    Log.i(TAG, "[DATABASE] Match " + eventTypeStr + " enregistré avec succès. Poids affecté : " + finalCalculatedWeight);
-                }
+// ✅ Ajouter le biais directionnel si détecté par EconomicAnalyzer
+if (ecoResult.isParsed) {
+    if (ecoResult.deviation > 0) {
+        impactSave += " (Biais Haussier)";
+    } else if (ecoResult.deviation < 0) {
+        impactSave += " (Biais Baissier)";
+    }
+}
+
+// Sauvegarde de l'événement en base de données persistante
+boolean saved = eventDb.saveEvent(
+        fingerprint, packageName, finalSourceName, eventTypeStr, title, bodyTextRaw,
+        assetsSb.toString(), impactSave, postTimeMs / 1000, "pending", finalCalculatedWeight);
+
+if (saved) {
+    Log.i(TAG, "[DATABASE] Match " + eventTypeStr + " enregistré. Poids : " +
+          finalCalculatedWeight + " | Impact : " + impactSave);
+    if (MainActivity.instance != null) {
+        MainActivity.instance.addLog("💾 [DB] " + eventTypeStr +
+                " | Poids: " + finalCalculatedWeight +
+                " | " + title.substring(0, Math.min(title.length(), 50)));
+    }
+}
 
                 // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
                 // 9️⃣ Enrichissement dynamique du Prompt Système IA
