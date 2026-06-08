@@ -766,8 +766,8 @@ public List<String> getMissingSupremeRankIndicators(long currentUnixTime) {
 // ✅ Vérifie si un événement spécifique existe déjà dans la DB (anti-doublon backfill)
 public boolean isEventAlreadySaved(String indicator, long unixTimestamp) {
     SQLiteDatabase db = this.getReadableDatabase();
-    long windowStart = unixTimestamp - (6 * 60 * 60); // ±6h
-    long windowEnd   = unixTimestamp + (6 * 60 * 60);
+    long windowStart = unixTimestamp - (2 * 60 * 60); // ±6h
+    long windowEnd   = unixTimestamp + (2 * 60 * 60);
     Cursor cursor = null;
     try {
         cursor = db.query(TABLE_EVENTS,
