@@ -1740,8 +1740,8 @@ if (packageName.contains("financialjuice")) {
 
     // 3. Barrière glissante temporelle (Beaucoup plus fiable que la division par 60000)
     long now = System.currentTimeMillis();
-    if (EventValidator.recentFingerprints.containsKey(fingerprint)) {
-        long lastSeen = EventValidator.recentFingerprints.get(fingerprint);
+    if (EventValidator.getRecentFingerprints().containsKey(fingerprint)) {
+        long lastSeen = EventValidator.getRecentFingerprints().get(fingerprint);
         
         // Bloque le doublon exact s'il réapparaît dans une fenêtre glissante de 30 minutes
         if ((now - lastSeen) < 30 * 60 * 1000L) { 
@@ -1751,7 +1751,7 @@ if (packageName.contains("financialjuice")) {
     }
 
     // Enregistrement du hash avec son vrai temps système
-    EventValidator.recentFingerprints.put(fingerprint, now);
+    EventValidator.getRecentFingerprints().put(fingerprint, now);
                     
                 StringBuilder assetsSb = new StringBuilder();
                 for (int i = 0; i < enrichedAssets.size(); i++) {
