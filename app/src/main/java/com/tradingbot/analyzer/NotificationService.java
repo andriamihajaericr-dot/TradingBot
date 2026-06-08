@@ -3717,30 +3717,20 @@ private static String generateSecureHash(String input) {
         // Sinon, on renvoie le prompt standard (la hiérarchie normale s'applique)
         return promptDeBase;
     }
-
-    @Override
-    public void onDestroy() {
-        // ✅ 1. Interruption du pool de threads principal du bot
-        if (this.pool != null && !this.pool.isShutdown()) {
-            try {
-                this.pool.shutdownNow();
-            } catch (Exception e) {
-                Log.e(TAG, "Erreur lors du shutdown de 'pool'", e);
-            }
-        }
-
-        // ✅ 2. Interruption de vos autres exécuteurs déjà présents
-        if (this.scheduler != null && !this.scheduler.isShutdown()) {
-            try { this.scheduler.shutdownNow(); } catch (Exception ignored) {}
-        }
-        if (this.exec != null && !this.exec.isShutdown()) {
-            try { this.exec.shutdownNow(); } catch (Exception ignored) {}
-        }
-
-        // ✅ 3. Nettoyage de l'instance pour le Garbage Collector
-        serviceInstance = null; 
-        
-        Log.d(TAG, "[SERVICE] Service arrêté proprement et tous les pools libérés");
-        super.onDestroy(); // Toujours appeler le super à la fin dans onDestroy
+@Override
+public void onDestroy() {
+    // ✅ 1. Interruption sécurisée des pools existants dans votre classe
+    if (this.scheduler != null && !this.scheduler.isShutdown()) {
+        try { this.scheduler.shutdownNow(); } catch (Exception ignored) {}
     }
+    if (this.exec != null && !this.exec.isShutdown()) {
+        try { this.exec.shutdownNow(); } catch (Exception ignored) {}
+    }
+
+    // ✅ 2. Libération du Singleton pour le Garbage Collector
+    serviceInstance = null; 
+    
+    Log.d(TAG, "[SERVICE] Service arrêté proprement et exécuteurs libérés");
+    super.onDestroy();
+}
 }
