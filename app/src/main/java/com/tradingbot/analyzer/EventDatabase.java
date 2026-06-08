@@ -762,33 +762,44 @@ public List<String> getMissingSupremeRankIndicators(long currentUnixTime) {
     }
     return missing;
 }
-
-// ✅ Vérifie si un événement spécifique existe déjà dans la DB (anti-doublon backfill)
-public boolean isEventAlreadySaved(String indicator, long unixTimestamp) {
+    
+ public boolean isEventAlreadySaved(String indicator, long unixTimestamp) {
+    if (indicator == null || indicator.trim().isEmpty()) return false;
+    
     SQLiteDatabase db = this.getReadableDatabase();
-    long windowStart = unixTimestamp - (2 * 60 * 60); // ±6h
-    long windowEnd   = unixTimestamp + (2 * 60 * 60);
-    Cursor cursor = null;
-    try {
-        cursor = db.query(TABLE_EVENTS,
+    if (db == null || !db.isOpen()) return false;
+    
+    // ✅ Sécurité : conversion automatique si le timestamp envoyé est par erreur en millisecondes
+    long secondsTimestamp = (unixTimestamp > 9999999999L) ? (unixTimestamp / 1000L) : unixTimestamp;
+    
+    long windowStart = secondsTimestamp - (2 * 60 * 60); // ±2h réelles
+    long windowEnd   = secondsTimestamp + (2 * 60 * 60);
+    
+    // Nettoyage de la chaîne de recherche pour le moteur SQLite
+    String searchPattern = "%" + indicator.trim() + "%";
+    
+    // ✅ Utilisation du try-with-resources : Garantit la fermeture automatique du Cursor et évite les Memory Leaks
+    try (Cursor cursor = db.query(
+            TABLE_EVENTS,
             new String[]{"COUNT(*)"},
-            "unix_timestamp >= ? AND unix_timestamp <= ? AND " +
-            "(title LIKE ? OR feed_content LIKE ?)",
+            "unix_timestamp >= ? AND unix_timestamp <= ? AND (title LIKE ? OR feed_content LIKE ?)",
             new String[]{
                 String.valueOf(windowStart),
                 String.valueOf(windowEnd),
-                "%" + indicator + "%",
-                "%" + indicator + "%"
+                searchPattern,
+                searchPattern
             },
-            null, null, null);
+            null, null, null)) {
+        
+        // ✅ Lecture du résultat du COUNT(*)
         if (cursor != null && cursor.moveToFirst()) {
-            return cursor.getInt(0) > 0;
+            return cursor.getInt(0) > 0; // Retourne true si l'événement existe déjà dans la fenêtre de 4h
         }
+        
     } catch (Exception e) {
-        Log.e(TAG, "Erreur isEventAlreadySaved", e);
-    } finally {
-        if (cursor != null) cursor.close();
+        Log.e(TAG, "Erreur lors de la vérification du doublon pour l'indicateur : " + indicator, e);
     }
-    return false;
-}
+    
+    return false; // Par défaut, si erreur ou non trouvé, on considère qu'il n'est pas sauvé
+} 
 }
