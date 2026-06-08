@@ -744,11 +744,28 @@ private void runHistoricalBackfill() {
                     // ✅ Vérifier si cet événement correspond à un manquant
                     boolean isNeeded = false;
                     for (String missing : missingIndicators) {
-                        if (indUpper.contains(missing)) {
-                            isNeeded = true;
-                            break;
-                        }
-                    }
+    // Expansion des alias FMP pour les indicateurs à acronyme
+    boolean matchesMissing = indUpper.contains(missing);
+    if (!matchesMissing) {
+        if (missing.equals("NFP"))
+            matchesMissing = indUpper.contains("NONFARM") || indUpper.contains("NON-FARM") || indUpper.contains("PAYROLL");
+        else if (missing.equals("CPI"))
+            matchesMissing = indUpper.contains("CONSUMER PRICE") || indUpper.contains("CORE CPI");
+        else if (missing.equals("PCE"))
+            matchesMissing = indUpper.contains("PERSONAL CONSUMPTION") || indUpper.contains("CORE PCE");
+        else if (missing.equals("PPI"))
+            matchesMissing = indUpper.contains("PRODUCER PRICE");
+        else if (missing.equals("GDP"))
+            matchesMissing = indUpper.contains("GROSS DOMESTIC");
+        else if (missing.equals("ADP"))
+            matchesMissing = indUpper.contains("ADP EMPLOYMENT");
+        else if (missing.equals("JOLTS"))
+            matchesMissing = indUpper.contains("JOB OPENINGS");
+        else if (missing.equals("JOBLESS CLAIMS"))
+            matchesMissing = indUpper.contains("INITIAL CLAIMS") || indUpper.contains("UNEMPLOYMENT CLAIMS");
+    }
+    if (matchesMissing) { isNeeded = true; break; }
+   }
                     if (!isNeeded) continue;
 
                     // ✅ Anti-doublon — vérifier si déjà en DB
