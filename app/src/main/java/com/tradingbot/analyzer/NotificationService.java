@@ -692,6 +692,144 @@ public class NotificationService extends NotificationListenerService {
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
+
+    // ✅ Pipeline de backfill automatique — reconstruit les données Rang Suprême manquantes
+// Appelé au démarrage + chaque nuit à minuit
+private void runHistoricalBackfill() {
+    scheduler.execute(new Runnable() {
+        @Override
+        public void run() {
+            try {
+                logToMain("🔄 [BACKFILL] Démarrage de la reconstruction historique...");
+
+                long nowSec = System.currentTimeMillis() / 1000;
+
+                // ── Étape 1 : Détecter les indicateurs manquants dans la DB ──
+                List<String> missingIndicators = eventDb.getMissingSupremeRankIndicators(nowSec);
+
+                if (missingIndicators.isEmpty()) {
+                    logToMain("✅ [BACKFILL] Base complète — aucun indicateur Rang 5 manquant.");
+                    return;
+                }
+
+                logToMain("⚠️ [BACKFILL] " + missingIndicators.size() +
+                          " indicateur(s) manquant(s) : " + missingIndicators.toString());
+
+                // ── Étape 2 : Récupérer les données historiques FMP (30 jours) ──
+                List<EconomicCalendarAPI.CalendarEvent> historicalEvents =
+                        EconomicCalendarAPI.fetchHistoricalEvents(30);
+
+                if (historicalEvents.isEmpty()) {
+                    logToMain("⚠️ [BACKFILL] Aucune donnée historique récupérée depuis FMP.");
+                    return;
+                }
+
+                // ── Étape 3 : Filtrer et sauvegarder uniquement les manquants ──
+                int saved = 0;
+                int skipped = 0;
+
+                for (EconomicCalendarAPI.CalendarEvent event : historicalEvents) {
+                    if (event == null || event.indicator == null) continue;
+
+                    String indUpper = event.indicator.toUpperCase(Locale.ROOT);
+                    long eventTs = 0;
+                    try { eventTs = Long.parseLong(event.timestamp); } catch (Exception ignored) {}
+
+                    // ✅ Vérifier si cet événement correspond à un manquant
+                    boolean isNeeded = false;
+                    for (String missing : missingIndicators) {
+                        if (indUpper.contains(missing)) {
+                            isNeeded = true;
+                            break;
+                        }
+                    }
+                    if (!isNeeded) continue;
+
+                    // ✅ Anti-doublon — vérifier si déjà en DB
+                    if (eventDb.isEventAlreadySaved(event.indicator, eventTs)) {
+                        skipped++;
+                        continue;
+                    }
+
+                    // ✅ Construire le contenu enrichi
+                    String content = event.indicator;
+                    if (!event.actual.equals("N/A"))   content += " ACTUAL: "   + event.actual;
+                    if (!event.forecast.equals("N/A")) content += " FORECAST: " + event.forecast;
+                    if (!event.previous.equals("N/A")) content += " PREVIOUS: " + event.previous;
+
+                    // ✅ Détection de surprise pour le biais directionnel
+                    try {
+                        double actual   = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
+                        double forecast = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
+                        double diff     = actual - forecast;
+                        if      (diff > 0) content += " HIGHER THAN EXPECTED";
+                        else if (diff < 0) content += " LOWER THAN EXPECTED";
+                    } catch (Exception ignored) {}
+
+                    // ✅ Calculer le poids via assignDriverWeight
+                    int weight = assignDriverWeight(content);
+                    if (weight < 4) weight = 4; // Rang minimum pour backfill
+
+                    // ✅ Récupérer les actifs liés
+                    List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
+                            event.indicator,
+                            event.country != null ? event.country : "United States");
+                    String assetsStr = android.text.TextUtils.join(",", assets);
+
+                    // ✅ Fingerprint unique pour ce backfill
+                    String fingerprint = generateSecureHash(
+                            "BACKFILL_" + event.indicator + "_" + event.timestamp);
+
+                    // ✅ Sauvegarder dans la DB
+                    boolean wasSaved = eventDb.saveEvent(
+                            fingerprint,
+                            "com.tradingbot.backfill",
+                            "Historical Backfill / FMP",
+                            "CALENDAR-RESULT",
+                            event.indicator,
+                            content,
+                            assetsStr,
+                            "CALENDRIER ÉCONOMIQUE | " + event.indicator,
+                            eventTs,
+                            "synced",
+                            weight
+                    );
+
+                    if (wasSaved) {
+                        saved++;
+                        logToMain("📥 [BACKFILL] Sauvegardé : " + event.indicator +
+                                  " | " + event.actual + " vs " + event.forecast +
+                                  " | Poids: " + weight);
+                    }
+                }
+
+                // ── Étape 4 : Rapport final ──
+                String report = "✅ [BACKFILL] Terminé :\n" +
+                        "  • Événements sauvegardés : " + saved + "\n" +
+                        "  • Doublons ignorés : " + skipped + "\n" +
+                        "  • Indicateurs reconstruits : " + missingIndicators.toString();
+
+                logToMain(report);
+
+                // ✅ Envoyer un résumé sur Telegram si des données ont été ajoutées
+                if (saved > 0) {
+                    sendTelegramSecure(
+                        "🔄 *BACKFILL AUTOMATIQUE COMPLÉTÉ*\n" +
+                        "📊 " + saved + " événement(s) Rang Suprême reconstruit(s)\n" +
+                        "📋 Indicateurs : " + missingIndicators.toString() + "\n" +
+                        "✅ Base de données enrichie pour l'analyse macro.",
+                        NotificationService.this
+                    );
+                }
+
+            } catch (Exception e) {
+                logToMain("❌ [BACKFILL] Erreur critique : " + e.getMessage());
+                Log.e(TAG, "Erreur runHistoricalBackfill", e);
+            }
+        }
+    });
+}
+
     private boolean estEvenementSuprême(String text) {
         String upper = text.toUpperCase(Locale.ROOT);
         return upper.contains("FOMC") || upper.contains("FED ") ||
