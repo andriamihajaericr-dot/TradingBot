@@ -1722,8 +1722,32 @@ if (packageName.contains("financialjuice")) {
                 }
 
                 // 8️⃣ Génération de la signature cryptographique et persistance SQLite en base de données
-                String fingerprint = generateSecureHash(packageName + "_" + title + "_" + bodyTextRaw + "_" + (postTimeMs / 60000));
+                //String fingerprint = generateSecureHash(packageName + "_" + title + "_" + bodyTextRaw + "_" + (postTimeMs / 60000));
+                 // 1. Nettoyage et normalisation stricte
+    String cleanSource = (pack != null)     ? pack.trim().toLowerCase() : "";
+    String cleanTitle  = (rawTitle != null) ? rawTitle.trim().toLowerCase() : "";
+    String cleanBody   = (rawBody != null)  ? rawBody.trim().toLowerCase() : "";
 
+    // 2. Construction de l'empreinte de CONTENU (indépendante du temps)
+    // L'usage du pipe | empêche les collisions de texte que le "_" peut provoquer
+    String rawInput = cleanSource + "|" + cleanTitle + "|" + cleanBody;
+    String fingerprint = generateSecureHash(rawInput);
+
+    // 3. Barrière glissante temporelle (Beaucoup plus fiable que la division par 60000)
+    long now = System.currentTimeMillis();
+    if (EventValidator.recentFingerprints.containsKey(fingerprint)) {
+        long lastSeen = EventValidator.recentFingerprints.get(fingerprint);
+        
+        // Bloque le doublon exact s'il réapparaît dans une fenêtre glissante de 30 minutes
+        if ((now - lastSeen) < 30 * 60 * 1000L) { 
+            Log.d(TAG, "🚫 Doublon détecté et bloqué à la milliseconde près : " + rawTitle);
+            return; 
+        }
+    }
+
+    // Enregistrement du hash avec son vrai temps système
+    EventValidator.recentFingerprints.put(fingerprint, now);
+                    
                 StringBuilder assetsSb = new StringBuilder();
                 for (int i = 0; i < enrichedAssets.size(); i++) {
                     assetsSb.append(enrichedAssets.get(i));
