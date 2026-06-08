@@ -1443,16 +1443,6 @@ if (packageName.contains("financialjuice")) {
                         isSupremeRank = true;
                     }
 
-                    // ✅ Directive conviction forcée pour les événements GEO suprêmes
-                    String geoConvictionOverride = "";
-                    if (eventTypeStr.equals("GEOPOLITICAL") && finalCalculatedWeight >= 4) {
-                    geoConvictionOverride =
-                    "⚠️ DIRECTIVE CONVICTION GÉOPOLITIQUE SUPRÊME :\n" +
-                    "Cet événement est un CHOC GÉOPOLITIQUE CONFIRMÉ (missiles, frappe militaire, escalade).\n" +
-                    "Conviction AUTORISÉE entre 70% et 85%.\n" +
-                    "Ne pas plafonner à 40% — ce n'est pas un signal macro ordinaire.\n" +
-                    "Appliquer immédiatement la CONTRAINTE 11 — Régime de dominance géopolitique.\n\n";
-                    }
     
                     // 4️⃣ Anti-spam / Protection contre les flux de paroles répétitifs des speakers
                     String speakerToken = currentSpeaker.trim();
@@ -1671,16 +1661,37 @@ if (hasForecast) {
         "Niveau de surprise : " + niveauSurprise + "\n" +
         "Déviation brute : " + String.format("%.4f", ecoResult.deviation) + "\n\n" +
         baseSystemPrompt;
+        // ✅ Log pour diagnostic MainActivity
+Log.d(TAG, "🔢 [SCORING] Déviation=" + String.format("%.4f", ecoResult.deviation) +
+      " | Surprise=" + niveauSurprise +
+      " | Direction=" + ecoResult.directionText);
+   if (MainActivity.instance != null) {
+      MainActivity.instance.addLog("🔢 [SCORING] Déviation=" + String.format("%.4f", ecoResult.deviation) +
+      " | Surprise=" + niveauSurprise +
+      " | Direction=" + ecoResult.directionText);
+   }
+}
 
-    // ✅ Log pour diagnostic MainActivity
-    Log.d(TAG, "🔢 [SCORING] Déviation=" + String.format("%.4f", ecoResult.deviation) +
-          " | Surprise=" + niveauSurprise +
-          " | Direction=" + ecoResult.directionText);
-       if (MainActivity.instance != null) {
-          MainActivity.instance.addLog("🔢 [SCORING] Déviation=" + String.format("%.4f", ecoResult.deviation) +
-          " | Surprise=" + niveauSurprise +
-          " | Direction=" + ecoResult.directionText);
-       }
+// ✅ Override conviction GEO — injecter EN TÊTE du prompt si choc géopolitique confirmé
+String geoConvictionOverride = "";
+if (eventTypeStr.equals("GEOPOLITICAL") && finalCalculatedWeight >= 4) {
+    geoConvictionOverride =
+        "⚠️ DIRECTIVE CONVICTION GÉOPOLITIQUE SUPRÊME — OVERRIDE ABSOLU :\n" +
+        "Cet événement est un CHOC GÉOPOLITIQUE CONFIRMÉ " +
+        "(missiles, frappe militaire, escalade, guerre).\n" +
+        "Conviction AUTORISÉE entre 70% et 85% — NE PAS plafonner à 40% ou 50%.\n" +
+        "Ce n'est PAS un signal macro ordinaire — c'est un choc de marché immédiat.\n" +
+        "Appliquer immédiatement la CONTRAINTE 11 — Régime de dominance géopolitique.\n" +
+        "GOLD et USOIL sont les actifs prioritaires — ACHAT CHOC 🟢 obligatoire.\n" +
+        "USDJPY : VENTE CHOC 🔴 obligatoire — Yen refuge activé.\n\n";
+
+    // ✅ Injecter EN TÊTE — avant baseSystemPrompt et avant le scoring quantitatif
+    promptAI = geoConvictionOverride + promptAI;
+
+    Log.d(TAG, "⚠️ [GEO OVERRIDE] Conviction forcée 70-85% pour : " + title);
+    if (MainActivity.instance != null) {
+        MainActivity.instance.addLog("⚠️ [GEO OVERRIDE] Conviction 70-85% forcée : " + title);
+    }
 }
 
 // 🔟 Exécution finale
