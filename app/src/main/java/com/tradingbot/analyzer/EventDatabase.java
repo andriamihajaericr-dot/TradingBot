@@ -180,7 +180,8 @@ public class EventDatabase extends SQLiteOpenHelper {
         String.valueOf(twentyFourHoursAgo),
         String.valueOf(sevenDaysAgo)
     };
-    
+        SQLiteDatabase db = this.getReadableDatabase();
+        StringBuilder sb = new StringBuilder();
         Cursor cursor = null;
         try {
             // CORRECTION : On récupère source et title en plus pour donner la matière exacte à l'IA
