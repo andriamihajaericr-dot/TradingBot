@@ -2114,15 +2114,17 @@ try {
             }
         }
     }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
-    // ✅ Backfill au démarrage (délai 30s pour laisser le DB s'initialiser)
-scheduler.schedule(() -> runHistoricalBackfill(),
-    30, TimeUnit.SECONDS);
 
-// ✅ Re-vérification nocturne (dans le bloc de maintenance minuit existant)
-// Ajouter dans le runnable de minuit, après preloadCalendar() :
-runHistoricalBackfill();
-    // Dans NotificationService.onCreate(), après la planification de minuit, ajouter :
+    // ✅ Backfill au démarrage — délai 30s pour laisser le DB s'initialiser
+    scheduler.schedule(() -> runHistoricalBackfill(), 30, TimeUnit.SECONDS);
 
+    // ✅ Backfill quotidien à 7h00 heure Madagascar
+    // Meilleur moment : connecté, marchés US fermés, données FMP stables
+    scheduler.scheduleAtFixedRate(() -> {
+        if (isDeviceOnline()) {
+            runHistoricalBackfill();
+        }
+    }, calculateMillisUntilHour(7), 24 * 60 * 60 * 1000L, TimeUnit.MILLISECONDS);
 // Rafraîchissement du calendrier toutes les 6 heures (21600000 ms)
 long sixHoursMillis = 6 * 60 * 60 * 1000L;
 scheduler.scheduleAtFixedRate(new Runnable() {
