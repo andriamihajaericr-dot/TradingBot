@@ -659,4 +659,93 @@ public String detecterRegimeMarche(long currentUnixTime) {
 
     return sb.toString();
 }
+
+  // ✅ Détecte les indicateurs Rang Suprême manquants dans les 30 derniers jours
+// Retourne une liste de (indicateur, date_attendue) manquants
+public List<String> getMissingSupremeRankIndicators(long currentUnixTime) {
+    SQLiteDatabase db = this.getReadableDatabase();
+    List<String> missing = new ArrayList<>();
+    long thirtyDaysAgo = currentUnixTime - (30L * 24 * 60 * 60);
+
+    // ✅ Liste des événements Rang 5 attendus mensuellement
+    String[][] supremeEvents = {
+        {"NFP", "NON-FARM", "PAYROLL", "EMPLOYMENT CHANGE"},          // 1er vendredi du mois
+        {"CPI", "CORE CPI", "CONSUMER PRICE"},                         // ~10-15 du mois
+        {"FOMC", "FEDERAL RESERVE", "RATE DECISION"},                  // 8 fois/an
+        {"PCE", "CORE PCE", "PERSONAL CONSUMPTION"},                   // fin du mois
+        {"PPI", "PRODUCER PRICE"},                                      // ~10-15 du mois
+        {"JOBLESS CLAIMS", "INITIAL CLAIMS"},                           // chaque jeudi
+        {"GDP", "GROSS DOMESTIC"},                                      // trimestriel
+        {"ADP", "ADP EMPLOYMENT"},                                      // 1er mercredi
+        {"JOLTS", "JOB OPENINGS"}                                       // 1er mardi
+    };
+
+    for (String[] keywords : supremeEvents) {
+        String mainKeyword = keywords[0];
+        StringBuilder whereClause = new StringBuilder();
+        whereClause.append("unix_timestamp >= ? AND driver_weight >= 4 AND (");
+        for (int i = 0; i < keywords.length; i++) {
+            if (i > 0) whereClause.append(" OR ");
+            whereClause.append("title LIKE ? OR feed_content LIKE ?");
+        }
+        whereClause.append(")");
+
+        List<String> args = new ArrayList<>();
+        args.add(String.valueOf(thirtyDaysAgo));
+        for (String kw : keywords) {
+            args.add("%" + kw + "%");
+            args.add("%" + kw + "%");
+        }
+
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_EVENTS, new String[]{"COUNT(*)"} ,
+                    whereClause.toString(),
+                    args.toArray(new String[0]),
+                    null, null, null);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                int count = cursor.getInt(0);
+                if (count == 0) {
+                    missing.add(mainKeyword);
+                    Log.d(TAG, "[BACKFILL] Manquant dans DB : " + mainKeyword);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur getMissingSupremeRankIndicators", e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+    return missing;
+}
+
+// ✅ Vérifie si un événement spécifique existe déjà dans la DB (anti-doublon backfill)
+public boolean isEventAlreadySaved(String indicator, long unixTimestamp) {
+    SQLiteDatabase db = this.getReadableDatabase();
+    long windowStart = unixTimestamp - (6 * 60 * 60); // ±6h
+    long windowEnd   = unixTimestamp + (6 * 60 * 60);
+    Cursor cursor = null;
+    try {
+        cursor = db.query(TABLE_EVENTS,
+            new String[]{"COUNT(*)"},
+            "unix_timestamp >= ? AND unix_timestamp <= ? AND " +
+            "(title LIKE ? OR feed_content LIKE ?)",
+            new String[]{
+                String.valueOf(windowStart),
+                String.valueOf(windowEnd),
+                "%" + indicator + "%",
+                "%" + indicator + "%"
+            },
+            null, null, null);
+        if (cursor != null && cursor.moveToFirst()) {
+            return cursor.getInt(0) > 0;
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur isEventAlreadySaved", e);
+    } finally {
+        if (cursor != null) cursor.close();
+    }
+    return false;
+}
 }
