@@ -167,62 +167,81 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
 
     public String getDailyMacroSummary(long currentUnixTime) {
-    // ✅ Pour les Rang Suprême (weight=5) — fenêtre élargie à 7 jours
-    // Pour les autres — fenêtre normale 24h
     long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
     long sevenDaysAgo       = currentUnixTime - (7L * 24 * 60 * 60);
 
+    // ✅ 3 fenêtres combinées :
+    // 1. 24h — tous drivers >= 3 (news + macro normaux)
+    // 2. 7j — Rang Suprême weight=5 (NFP/CPI de la semaine)
+    // 3. 7j — GEO event_type ou impact (Iran/Israël même si > 24h)
     String selection =
-        "(unix_timestamp >= ? AND driver_weight >= 3) OR " +     // 24h — tous drivers >= 3
-        "(unix_timestamp >= ? AND driver_weight = 5)";           // 7j — Rang Suprême uniquement
+        "(unix_timestamp >= ? AND driver_weight >= 3) OR " +
+        "(unix_timestamp >= ? AND driver_weight = 5) OR " +
+        "(unix_timestamp >= ? AND (" +
+            "event_type = 'GEOPOLITICAL' OR " +
+            "event_type LIKE '%GEO%' OR " +
+            "impact LIKE '%Choc Géopolitique%' OR " +
+            "impact LIKE '%GÉOPOLITIQUE%'" +
+        ") AND driver_weight >= 2)";
 
     String[] whereArgs = new String[]{
-        String.valueOf(twentyFourHoursAgo),
-        String.valueOf(sevenDaysAgo)
+        String.valueOf(twentyFourHoursAgo),  // fenêtre 1
+        String.valueOf(sevenDaysAgo),         // fenêtre 2
+        String.valueOf(sevenDaysAgo)          // fenêtre 3
     };
-        SQLiteDatabase db = this.getReadableDatabase();
-        StringBuilder sb = new StringBuilder();
-        Cursor cursor = null;
-        try {
-            // CORRECTION : On récupère source et title en plus pour donner la matière exacte à l'IA
-            cursor = db.query(TABLE_EVENTS, new String[]{"source", "title", "feed_content", "impact", "event_type"}, selection, whereArgs, null, null, "unix_timestamp ASC");
-            if (cursor != null && cursor.moveToFirst()) {
-                do {
-                    String src = cursor.getString(0);
-                    String title = cursor.getString(1);
-                    String content = cursor.getString(2);
-                    String impact = cursor.getString(3);
-                    String type    = cursor.getString(4); // ✅ nouveau
-                    // Nettoyage de l'en-tête temporel pour économiser les tokens de l'IA
-                    if (content.contains("\n\n")) {
-                        String[] parts = content.split("\n\n", 2);
-                        if (parts.length > 1) content = parts[1]; 
-                    }
-    
-                    // Formatage quantitatif hautement lisible pour Groq/Gemini
-                    // ✅ Différenciation calendaire vs news dans le Daily Report
-                    boolean isCalendarResult = "CALENDAR-RESULT".equals(type) ||
-                        (impact != null && impact.startsWith("CALENDRIER ÉCONOMIQUE"));
-                    
-                    if (isCalendarResult) {
-                        sb.append("--- 📅 RÉSULTAT CALENDAIRE OFFICIEL ---\n");
-                    } else {
-                        sb.append("--- ⚡ ALERTE MACRO / NEWS ---\n");
-                    }
-                    sb.append("Source: ").append(src).append("\n");
-                    sb.append("Titre: ").append(title).append("\n");
-                    sb.append("Contenu: ").append(content).append("\n");
-                    sb.append("Impact calculé: ").append(impact).append("\n\n");
-                } while (cursor.moveToNext());
-            }
-        } catch (Exception e) {
-            Log.e("EventDatabase", "Erreur construction Daily Macro Summary", e);
-        } finally {
-            if (cursor != null) cursor.close();
-        }
-        return sb.toString();
-    }
 
+    SQLiteDatabase db = this.getReadableDatabase();
+    StringBuilder sb = new StringBuilder();
+    Cursor cursor = null;
+    try {
+        cursor = db.query(TABLE_EVENTS,
+                new String[]{"source", "title", "feed_content", "impact", "event_type"},
+                selection, whereArgs, null, null, "unix_timestamp ASC");
+
+        if (cursor != null && cursor.moveToFirst()) {
+            do {
+                String src     = cursor.getString(0);
+                String title   = cursor.getString(1);
+                String content = cursor.getString(2);
+                String impact  = cursor.getString(3);
+                String type    = cursor.getString(4);
+
+                // ✅ Nettoyage de l'en-tête temporel pour économiser les tokens
+                if (content != null && content.contains("\n\n")) {
+                    String[] parts = content.split("\n\n", 2);
+                    if (parts.length > 1) content = parts[1];
+                }
+
+                // ✅ Différenciation calendaire / GEO / news
+                boolean isCalendarResult = "CALENDAR-RESULT".equals(type) ||
+                    (impact != null && impact.startsWith("CALENDRIER ÉCONOMIQUE"));
+                boolean isGeoEvent = "GEOPOLITICAL".equals(type) ||
+                    (type != null && type.contains("GEO")) ||
+                    (impact != null && impact.contains("Choc Géopolitique"));
+
+                if (isCalendarResult) {
+                    sb.append("--- 📅 RÉSULTAT CALENDAIRE OFFICIEL ---\n");
+                } else if (isGeoEvent) {
+                    sb.append("--- 🌍 ÉVÉNEMENT GÉOPOLITIQUE ---\n"); // ✅ ajout
+                } else {
+                    sb.append("--- ⚡ ALERTE MACRO / NEWS ---\n");
+                }
+
+                sb.append("Source: ").append(src).append("\n");
+                sb.append("Titre: ").append(title).append("\n");
+                sb.append("Contenu: ").append(content).append("\n");
+                sb.append("Impact calculé: ").append(impact).append("\n\n");
+
+            } while (cursor.moveToNext());
+        }
+    } catch (Exception e) {
+        Log.e("EventDatabase", "Erreur construction Daily Macro Summary", e);
+    } finally {
+        if (cursor != null) cursor.close();
+    }
+    return sb.toString();
+}
+    
     public String getMonthlyMacroRegistry(long currentUnixTime) {
         SQLiteDatabase db = this.getReadableDatabase();
         StringBuilder sb = new StringBuilder();
