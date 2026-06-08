@@ -1992,6 +1992,7 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
     @Override
     public void onCreate() {
         super.onCreate();
+        EconomicCalendarAPI.init(getApplicationContext());
         eventDb = EventDatabase.getInstance(this);
         
         // ── MISE À JOUR : Liaison du contexte pour l'extraction de la clé macro_api_key ──
