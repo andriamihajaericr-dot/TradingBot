@@ -692,6 +692,12 @@ public class NotificationService extends NotificationListenerService {
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
+    private void logToMain(String msg) {
+       if (MainActivity.instance != null) {
+        MainActivity.instance.addLog(msg);
+       }
+       Log.d(TAG, msg);
+    }
 
     // ✅ Pipeline de backfill automatique — reconstruit les données Rang Suprême manquantes
 // Appelé au démarrage + chaque nuit à minuit
@@ -771,7 +777,7 @@ private void runHistoricalBackfill() {
 
 // ✅ Forcer poids 5 pour les indicateurs Rang Suprême
 // Pour que getMonthlyMacroRegistry() les inclue automatiquement
-String indUpper = event.indicator.toUpperCase(Locale.ROOT);
+//String indUpper = event.indicator.toUpperCase(Locale.ROOT);
 if (indUpper.contains("NFP") || indUpper.contains("NON-FARM") ||
     indUpper.contains("PAYROLL") || indUpper.contains("CPI") ||
     indUpper.contains("CORE CPI") || indUpper.contains("PCE") ||
