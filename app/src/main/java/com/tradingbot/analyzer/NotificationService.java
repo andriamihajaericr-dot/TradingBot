@@ -3541,15 +3541,19 @@ payload.put("messages", messages);
     }
 
     private void registerNetworkCallback() {
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
-                @Override
-                public void onAvailable(Network network) {
-                    triggerQueueSynchronization();
-                }
-            });
-        }
+    ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+    if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                // Traitement des événements "pending" en DB
+                triggerQueueSynchronization();
+                // ✅ Reconstruction des indicateurs Rang Suprême manquants
+                // Délai 5s pour laisser la connexion se stabiliser avant les appels FMP
+                scheduler.schedule(() -> runHistoricalBackfill(), 5, TimeUnit.SECONDS);
+            }
+        });
+    }
     }
 
     private boolean isDeviceOnline() {
