@@ -3715,10 +3715,27 @@ private static String generateSecureHash(String input) {
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
-        serviceInstance = null;    // ✅ 
-        scheduler.shutdownNow();
-        exec.shutdownNow();
-        Log.d(TAG, "[SERVICE] Service arrêté");
+        // ✅ 1. Interruption du pool de threads principal du bot
+        if (this.pool != null && !this.pool.isShutdown()) {
+            try {
+                this.pool.shutdownNow();
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur lors du shutdown de 'pool'", e);
+            }
+        }
+
+        // ✅ 2. Interruption de vos autres exécuteurs déjà présents
+        if (this.scheduler != null && !this.scheduler.isShutdown()) {
+            try { this.scheduler.shutdownNow(); } catch (Exception ignored) {}
+        }
+        if (this.exec != null && !this.exec.isShutdown()) {
+            try { this.exec.shutdownNow(); } catch (Exception ignored) {}
+        }
+
+        // ✅ 3. Nettoyage de l'instance pour le Garbage Collector
+        serviceInstance = null; 
+        
+        Log.d(TAG, "[SERVICE] Service arrêté proprement et tous les pools libérés");
+        super.onDestroy(); // Toujours appeler le super à la fin dans onDestroy
     }
 }
