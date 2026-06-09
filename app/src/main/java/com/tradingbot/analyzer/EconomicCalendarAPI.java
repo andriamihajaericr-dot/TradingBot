@@ -16,9 +16,10 @@ public class EconomicCalendarAPI {
     private static final String PREFS_NAME     = "TradingBot";
     private static final String PREF_MACRO_KEY = "macro_api_key";
 
-    private static final String FMP_URL = "https://financialmodelingprep.com/stable/economic-calendar";
+    private static final String FMP_URL          = "https://financialmodelingprep.com/api/v3/economic_calendar";
     private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
     private static final String FF_URL_NEXT_WEEK = "https://nfs.faireconomy.media/ff_calendar_nextweek.json";
+    private static final String FF_URL_LAST_WEEK = "https://nfs.faireconomy.media/ff_calendar_lastweek.json";
 
     private static Context globalAppContext = null;
 
