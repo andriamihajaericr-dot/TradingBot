@@ -3644,12 +3644,15 @@ payload.put("messages", messages);
         cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
             @Override
             public void onAvailable(Network network) {
-                // Traitement des événements "pending" en DB
-                triggerQueueSynchronization();
-                // ✅ Reconstruction des indicateurs Rang Suprême manquants
-                // Délai 5s pour laisser la connexion se stabiliser avant les appels FMP
-                scheduler.schedule(() -> runHistoricalBackfill(), 5, TimeUnit.SECONDS);
-            }
+            triggerQueueSynchronization();
+             // ✅ Guard : backfill réseau max 1 fois par 30 minutes
+             long now = System.currentTimeMillis();
+            if (now - lastBackfillTime > 30 * 60 * 1000L) {
+             lastBackfillTime = now;
+               scheduler.schedule(() -> runHistoricalBackfill(),
+                5, TimeUnit.SECONDS);
+             }
+             }
         });
     }
     }
