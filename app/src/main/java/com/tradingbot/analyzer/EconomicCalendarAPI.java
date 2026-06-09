@@ -121,108 +121,48 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
     return fetchHistoricalEvents(globalAppContext, daysBack);
 }
 
-public static List<CalendarEvent> fetchHistoricalEvents(Context context, int daysBack) {
-    Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
+   public static List<CalendarEvent> fetchHistoricalEvents(Context context, int daysBack) {
     List<CalendarEvent> allEvents = new ArrayList<>();
-
-    if (targetContext == null) {
-        logToMain("⚠️ [BACKFILL] Contexte null — impossible de récupérer l'historique");
-        return allEvents;
-    }
+    logToMain("🔄 [BACKFILL] Récupération via ForexFactory (thisweek + lastweek)...");
 
     try {
-        String apiKey = MainActivity.MACRO_API_KEY;
-        if (apiKey == null || apiKey.isEmpty()) {
-            logToMain("⚠️ [BACKFILL] Clé API FMP manquante");
-            return allEvents;
-        }
-
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-        sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
-
-        long nowMs = System.currentTimeMillis();
-
-        // ✅ Découper en fenêtres de 7 jours pour éviter les timeouts
-        int windowDays = 7;
-        int windows = (daysBack / windowDays) + 1;
-
-        for (int w = 0; w < windows; w++) {
-            long windowEndMs   = nowMs - (w * windowDays * 24 * 60 * 60 * 1000L);
-            long windowStartMs = windowEndMs - (windowDays * 24 * 60 * 60 * 1000L);
-
-            String fromDate = sdf.format(new Date(windowStartMs));
-            String toDate   = sdf.format(new Date(windowEndMs));
-
-            String urlString = "https://financialmodelingprep.com/stable/economic-calendar" +
-                    "?from=" + fromDate + "&to=" + toDate + "&apikey=" + apiKey;
-
-            logToMain("🔄 [BACKFILL] Récupération " + fromDate + " → " + toDate);
-
-            try {
-                URL url = new URL(urlString);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
-                conn.setRequestMethod("GET");
-
-                if (conn.getResponseCode() == 200) {
-                    StringBuilder sb = new StringBuilder();
-                    BufferedReader br = new BufferedReader(
-                        new InputStreamReader(conn.getInputStream()));
-                    String line;
-                    while ((line = br.readLine()) != null) sb.append(line);
-                    br.close();
-
-                    JSONArray arr = new JSONArray(sb.toString());
-                    int addedThisWindow = 0;
-
-                    for (int i = 0; i < arr.length(); i++) {
-                        JSONObject obj = arr.getJSONObject(i);
-                        String eventName = obj.optString("event", "");
-                        String impact    = obj.optString("impact", "Low");
-                        String actual    = obj.optString("actual", "N/A");
-
-                        // ✅ Seulement les événements avec actual publié ET impact HIGH
-                        if (actual.equals("N/A") || actual.isEmpty()) continue;
-                        if (!impact.equalsIgnoreCase("High") && !isMediumHighImpact(eventName)) continue;
-
-                        CalendarEvent event = new CalendarEvent();
-                        event.indicator = eventName;
-                        event.country   = obj.optString("country", "United States");
-                        event.importance = impact.toUpperCase(Locale.ROOT);
-                        event.actual    = formatValue(actual);
-                        event.forecast  = formatValue(obj.optString("estimate", "N/A"));
-                        event.previous  = formatValue(obj.optString("previous", "N/A"));
-                        event.timestamp = convertFMPDateToUnixSeconds(obj.optString("date", ""));
-
-                        allEvents.add(event);
-                        addedThisWindow++;
-                    }
-
-                    logToMain("✅ [BACKFILL] Fenêtre " + fromDate + " : " +
-                              addedThisWindow + " événements HIGH récupérés");
-                } else {
-                    logToMain("⚠️ [BACKFILL] HTTP " + conn.getResponseCode() +
-                              " pour " + fromDate);
-                }
-                conn.disconnect();
-
-            } catch (Exception e) {
-                logToMain("⚠️ [BACKFILL] Erreur fenêtre " + fromDate + " : " + e.getMessage());
+        // ── 1. Semaine courante — actuals déjà publiés cette semaine ──
+        List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
+        int countThis = 0;
+        for (CalendarEvent e : thisWeek) {
+            boolean hasActual = e.actual != null
+                    && !e.actual.equals("N/A")
+                    && !e.actual.isEmpty();
+            if (hasActual) {
+                allEvents.add(e);
+                countThis++;
             }
-
-            // ✅ Pause entre les requêtes pour éviter le rate limit
-            Thread.sleep(500);
         }
+        logToMain("✅ [BACKFILL] thisweek : " + countThis + " événements avec actual");
+
+        // ── 2. Semaine précédente — contient NFP/CPI/etc. de la semaine passée ──
+        List<CalendarEvent> lastWeek = fetchFromForexFactoryUrl(FF_URL_LAST_WEEK, 168);
+        int countLast = 0;
+        for (CalendarEvent e : lastWeek) {
+            boolean hasActual = e.actual != null
+                    && !e.actual.equals("N/A")
+                    && !e.actual.isEmpty();
+            if (hasActual) {
+                allEvents.add(e);
+                countLast++;
+            }
+        }
+        logToMain("✅ [BACKFILL] lastweek : " + countLast + " événements avec actual");
 
     } catch (Exception e) {
-        logToMain("❌ [BACKFILL] Erreur globale : " + e.getMessage());
+        logToMain("❌ [BACKFILL] Erreur ForexFactory : " + e.getMessage());
         Log.e(TAG, "Erreur fetchHistoricalEvents", e);
     }
 
-    logToMain("📊 [BACKFILL] Total récupéré : " + allEvents.size() + " événements sur " + daysBack + " jours");
+    logToMain("📊 [BACKFILL] Total récupéré : " + allEvents.size()
+            + " événements (thisweek + lastweek)");
     return allEvents;
-    }
+} 
 
     private static List<CalendarEvent> fetchFromFMP(Context context, int hoursAhead) {
         List<CalendarEvent> events = new ArrayList<>();
