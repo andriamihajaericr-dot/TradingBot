@@ -11,7 +11,6 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class EconomicCalendarAPI {
-
     private static final String TAG            = "EconomicCalendarAPI";
     private static final String PREFS_NAME     = "TradingBot";
     private static final String PREF_MACRO_KEY = "macro_api_key";
