@@ -528,7 +528,10 @@ public class NotificationService extends NotificationListenerService {
         "═══════════════════════════════════════════════════════════════\n\n" +
         
         "RÈGLE 1 : CLASSEMENT ET DOMINANCE DE LA HIÉRARCHIE DES DRIVERS\n" +
-        "- RANG SUPRÊME : Politiques monétaires (FED, BCE, BoJ, BoE, RBA, BoC) et indicateurs clés (CPI, NFP, PPI, FOMC, PIB, Ventes au détail, Chômage).\n" +
+        "- RANG SUPRÊME : Politiques monétaires (FED — Powell et Warsh futur Chair, " +
+        "BCE, BoJ, BoE, RBA, BoC) et indicateurs clés (CPI, NFP, PPI, FOMC, " +
+        "GDP Advance, ISM Services, PMI Flash, Michigan Preliminary, " +
+        "Ventes au détail, Chômage).\n" +
         "- RANG SECONDAIRE : Données sectorielles majeures (Stocks d'énergie EIA, OPEC, rapports agricoles d'importance).\n" +
         "- RANG TACTIQUE : Événements géopolitiques, sanctions, taxes commerciales, indices de confiance/sentiment secondaires.\n" +
         "👉 LOI DE DOMINANCE ABSOLUE : Si un événement de RANG SUPRÊME est actif dans les données des 24h, c'est sa logique directionnelle qui dicte le comportement du marché. Un driver tactique (comme des tensions géopolitiques) ne peut ni inverser ni annuler la direction des actifs dictée par le driver suprême.\n\n" +
@@ -3248,7 +3251,10 @@ if (geoContext != null && !geoContext.isEmpty()) {
             "═══════════════════════════════════════════════════════════════\n\n" +
             
             "RÈGLE 1 : CLASSEMENT ET DOMINANCE DE LA HIÉRARCHIE DES DRIVERS\n" +
-            "- RANG SUPRÊME : Politiques monétaires (FED, BCE, BoJ, BoE, RBA, BoC) et indicateurs clés (CPI, NFP, PPI, FOMC, PIB, Ventes au détail, Chômage).\n" +
+            "- RANG SUPRÊME : Politiques monétaires (FED — Powell et Warsh futur Chair, " +
+            "BCE, BoJ, BoE, RBA, BoC) et indicateurs clés (CPI, NFP, PPI, FOMC, " +
+            "GDP Advance, ISM Services, PMI Flash, Michigan Preliminary, " +
+            "Ventes au détail, Chômage).\n" +
             "- RANG SECONDAIRE : Données sectorielles majeures (Stocks d'énergie EIA, OPEC, rapports agricoles d'importance).\n" +
             "- RANG TACTIQUE : Événements géopolitiques, sanctions, taxes commerciales, indices de confiance/sentiment secondaires.\n" +
             "👉 LOI DE DOMINANCE ABSOLUE : Si un événement de RANG SUPRÊME est actif dans les données des 24h, c'est sa logique directionnelle qui dicte le comportement du marché. Un driver tactique (comme des tensions géopolitiques) ne peut ni inverser ni annuler la direction des actifs dictée par le driver suprême.\n\n" +
