@@ -75,8 +75,8 @@ public class NotificationService extends NotificationListenerService {
         "NASDAQ VENTE CHOC, SP500 VENTE CHOC, GOLD VENTE CHOC, " +
         "EURUSD VENTE CHOC, USDJPY ACHAT CHOC. " +
         "Conviction plafonnée à 65% (modèle non officiel).\n"
-        "3. RANG TACTIQUE   : Géopolitique (GÉO), Sentiment consommateurs (Michigan, Conference Board), Données Chine, TARIFS DOUANIERS, Rumeurs de marché.\n\n" +
     
+        "3. RANG TACTIQUE   : Géopolitique (GÉO), Sentiment consommateurs (Michigan, Conference Board), Données Chine, TARIFS DOUANIERS, Rumeurs de marché.\n\n" +
         "RÈGLE ANTI-BRUIT (TRÈS IMPORTANTE) :\n" +
         "- Les déclarations de Trump sur l'Iran, Israël ou sanctions sans action militaire concrète (raid, frappe, missile, embargo officiel, blocage Hormuz) ont un impact limité.\n" +
         "- Ne transforme JAMAIS une simple déclaration diplomatique ou répétition de news en choc majeur.\n" +
