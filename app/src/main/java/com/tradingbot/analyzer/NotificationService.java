@@ -93,7 +93,9 @@ public class NotificationService extends NotificationListenerService {
         "════════════════════════════════════════════════════════\n\n" +
         "A. NEWS ÉTATS-UNIS — POLITIQUE MONÉTAIRE / CPI / NFP\n" +
         "───────────────────────────────────────────────────────\n" +
-        "   HAWKISH US (CPI > prévisions, NFP fort, Fed hawkish, discours ferme de Powell, nomination hawkish) :\n" +
+        "   HAWKISH US (CPI > prévisions, NFP fort, Fed hawkish, discours ferme " +
+        "de Powell, discours hawkish de Warsh = signal politique future restrictive, " +
+        "nomination hawkish) :\n" +
         "   • 📈 US10Y    : ACHAT CHOC 🟢  | Rendements montent avec les anticipations de hausse\n" +
         "   • 🇨🇦 USDCAD  : ACHAT CHOC 🟢  | Dollar fort face au CAD\n" +
         "   • 🇯🇵 USDJPY  : ACHAT CHOC 🟢  | Dollar fort face au Yen ← TOUJOURS ACHAT sur HAWKISH US\n" +
