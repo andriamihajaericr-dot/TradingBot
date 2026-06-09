@@ -2508,15 +2508,31 @@ scheduler.scheduleAtFixedRate(new Runnable() {
         u.contains("PANETTA")             || u.contains("BTP SPREAD")              ||
         u.contains("OAT SPREAD")          || u.contains("SOVEREIGN SPREAD")        ||
         u.contains("ITALIAN BONDS")       || u.contains("FRENCH BONDS")            ||
-
         // ── GBPUSD — drivers spécifiques ──
         u.contains("UK CPI")              || u.contains("UK INFLATION")            ||
         u.contains("UK GDP")              || u.contains("UK BUDGET")               ||
         u.contains("AUTUMN STATEMENT")    || u.contains("MPC VOTE")                ||
         u.contains("SPRING STATEMENT")    || u.contains("UK TRADE")                ||
-        u.contains("BREXIT")              || u.contains("NORTHERN IRELAND")) {
-        return 4; 
+        u.contains("BREXIT")              || u.contains("NORTHERN IRELAND")        ||
+
+        // ── ISM Services / Manufacturing — Leading Indicator US (80% économie) ──
+        u.contains("ISM SERVICES")        || u.contains("ISM NON-MANUFACTURING")   ||
+        u.contains("ISM MANUFACTURING")   || u.contains("ISM REPORT")              ||
+
+        // ── PMI Flash / Preliminary — Leading Indicator surprise fréquente ──
+        u.contains("FLASH PMI")           || u.contains("PMI FLASH")               ||
+        u.contains("PMI PRELIMINARY")     || u.contains("PRELIMINARY PMI")         ||
+        u.contains("COMPOSITE PMI")       || u.contains("SERVICES PMI")            ||
+        u.contains("MANUFACTURING PMI")   || u.contains("PMI MANUFACTURING")       ||
+        u.contains("PMI SERVICES")        ||
+
+        // ── Michigan Sentiment Preliminary — Proxy anticipations inflation Fed ──
+        u.contains("UNIVERSITY OF MICHIGAN") || u.contains("MICHIGAN SENTIMENT")   ||
+        u.contains("SENTIMENT PREL")      || u.contains("CONSUMER SENTIMENT PREL") ||
+        u.contains("MICHIGAN PRELIMINARY") || u.contains("UOM SENTIMENT")) {
+        return 4;
     }
+
 
     // ══════════════════════════════════════════════════════════
     // NIVEAU 3 — Impact moyen (PMI régionaux, sentiment, salaires)
