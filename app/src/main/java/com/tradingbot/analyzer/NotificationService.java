@@ -2508,6 +2508,7 @@ scheduler.scheduleAtFixedRate(new Runnable() {
         u.contains("PANETTA")             || u.contains("BTP SPREAD")              ||
         u.contains("OAT SPREAD")          || u.contains("SOVEREIGN SPREAD")        ||
         u.contains("ITALIAN BONDS")       || u.contains("FRENCH BONDS")            ||
+        
         // ── GBPUSD — drivers spécifiques ──
         u.contains("UK CPI")              || u.contains("UK INFLATION")            ||
         u.contains("UK GDP")              || u.contains("UK BUDGET")               ||
