@@ -127,7 +127,10 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
     try {
         // ── 1. Semaine courante — actuals déjà publiés cette semaine ──
         // ── Semaine courante — uniquement événements passés avec actual publié ──
-        List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
+        // ✅ Délai 3s pour éviter le rate limit ForexFactory
+        // Le calendrier principal vient de l'appeler au démarrage
+       Thread.sleep(3000);
+       List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
         int countThis = 0;
         long nowSec = System.currentTimeMillis() / 1000;
         for (CalendarEvent e : thisWeek) {
