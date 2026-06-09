@@ -64,7 +64,11 @@ public class NotificationService extends NotificationListenerService {
         "Kevin Warsh (Futur Chair Fed — profil HAWKISH agressif, chaque signal = " +
         "politique post-mai 2026 à pricer immédiatement), Lagarde, Schnabel, etc.), " +
         "Nominations Banques Centrales, CPI/PCE, NFP/Emploi.\n" +
-        "2. RANG SECONDAIRE : PIB/GDP, PMI, ISM, Ventes au détail, Stocks EIA, Stimulus Fiscal / Dépenses Publiques.\n" +
+        "2. RANG SECONDAIRE : PIB/GDP Advance (récession/expansion trimestrielle), " +
+        "ISM Services (80% économie US — leading indicator fort), " +
+        "ISM Manufacturing, PMI Flash/Preliminary (surprise fréquente), " +
+        "Michigan Sentiment Preliminary (proxy anticipations inflation Fed), " +
+        "Ventes au détail, Stocks EIA, Stimulus Fiscal / Dépenses Publiques.\n" +
         "3. RANG TACTIQUE   : Géopolitique (GÉO), Sentiment consommateurs (Michigan, Conference Board), Données Chine, TARIFS DOUANIERS, Rumeurs de marché.\n\n" +
     
         "RÈGLE ANTI-BRUIT (TRÈS IMPORTANTE) :\n" +
