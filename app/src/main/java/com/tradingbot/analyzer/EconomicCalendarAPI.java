@@ -19,7 +19,7 @@ public class EconomicCalendarAPI {
     private static final String FMP_URL          = "https://financialmodelingprep.com/api/v3/economic_calendar";
     private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
     private static final String FF_URL_NEXT_WEEK = "https://nfs.faireconomy.media/ff_calendar_nextweek.json";
-    private static final String FF_URL_LAST_WEEK = "https://nfs.faireconomy.media/ff_calendar_lastweek.json";
+    //private static final String FF_URL_LAST_WEEK = "https://nfs.faireconomy.media/ff_calendar_lastweek.json";
 
     private static Context globalAppContext = null;
 
@@ -139,12 +139,7 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
             }
         }
         logToMain("✅ [BACKFILL] thisweek : " + countThis + " événements avec actual");
-
-        // ── 2. Semaine précédente — contient NFP/CPI/etc. de la semaine passée ──
-        List<CalendarEvent> lastWeek = fetchFromForexFactoryUrl(FF_URL_LAST_WEEK, 168);
-        // ── 2. Événements passés de thisweek avec actual publié ──
-// thisweek contient toute la semaine courante lundi→vendredi
-// Les événements passés (date < now) ont leur actual rempli
+//pour lastweek
 int countPast = 0;
 long nowSec = System.currentTimeMillis() / 1000;
 for (CalendarEvent e : thisWeek) {
