@@ -122,6 +122,14 @@ if (containsAny(unified, "WARSH", "KEVIN WARSH")) {
             impact      = "Moyenne Volatilité";
         // Macro secondaire (Poids 2)
         // ── ISM Services / Manufacturing — Leading Indicator US (Poids 4) ──
+// ── GDP Advance — Rang Suprême Trimestriel (Poids 4) ──
+} else if (containsAny(unified, "GDP ADVANCE", "ADVANCE GDP",
+           "GDP GROWTH", "GROSS DOMESTIC PRODUCT", "GDP QOQ",
+           "GDP YOY", "GDP ANNUALIZED", "GDP FLASH")) {
+    eventType   = "GDP-ADVANCE";
+    description = "GDP Advance — Indicateur Récession/Expansion US";
+    impact      = "Haute Volatilité";
+
 } else if (containsAny(unified, "ISM SERVICES", "ISM NON-MANUFACTURING",
            "ISM MANUFACTURING", "ISM REPORT", "ISM PMI")) {
     eventType   = "ISM-INDICATOR";
