@@ -126,40 +126,27 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
 
     try {
         // ── 1. Semaine courante — actuals déjà publiés cette semaine ──
+        // ── Semaine courante — uniquement événements passés avec actual publié ──
         List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
         int countThis = 0;
+        long nowSec = System.currentTimeMillis() / 1000;
         for (CalendarEvent e : thisWeek) {
             boolean hasActual = e.actual != null
                     && !e.actual.equals("N/A")
                     && !e.actual.isEmpty();
-            if (hasActual) {
+            boolean isPast = false;
+            try {
+                long eventTs = Long.parseLong(e.timestamp);
+                isPast = eventTs < nowSec;
+            } catch (Exception ignored) {
+                isPast = hasActual;
+            }
+            if (hasActual && isPast) {
                 allEvents.add(e);
                 countThis++;
             }
         }
-        logToMain("✅ [BACKFILL] thisweek : " + countThis + " événements avec actual");
-//pour lastweek
-int countPast = 0;
-long nowSec = System.currentTimeMillis() / 1000;
-for (CalendarEvent e : thisWeek) {
-    boolean hasActual = e.actual != null
-            && !e.actual.equals("N/A")
-            && !e.actual.isEmpty();
-    // Garder seulement les événements déjà passés
-    boolean isPast = false;
-    try {
-        long eventTs = Long.parseLong(e.timestamp);
-        isPast = eventTs < nowSec;
-    } catch (Exception ignored) {
-        isPast = hasActual; // si timestamp illisible, actual suffit
-    }
-    if (hasActual && isPast) {
-        allEvents.add(e);
-        countPast++;
-    }
-}
-logToMain("✅ [BACKFILL] thisweek passés : " + countPast
-        + " événements avec actual");
+        logToMain("✅ [BACKFILL] thisweek passés avec actual : " + countThis + " événements");
     } catch (Exception e) {
         logToMain("❌ [BACKFILL] Erreur ForexFactory : " + e.getMessage());
         Log.e(TAG, "Erreur fetchHistoricalEvents", e);
