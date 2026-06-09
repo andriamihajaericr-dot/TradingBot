@@ -69,7 +69,7 @@ public class NotificationService extends NotificationListenerService {
         "ISM Manufacturing, PMI Flash/Preliminary (surprise fréquente), " +
         "Michigan Sentiment Preliminary (proxy anticipations inflation Fed), " +
         "Ventes au détail, Stocks EIA, Stimulus Fiscal / Dépenses Publiques.\n" +
-        "RÈGLE GDPNOW ATLANTA FED : GDPNow est une RÉVISION DE MODÈLE, " +
+        "⚠️ RÈGLE GDPNOW ATLANTA FED : GDPNow est une RÉVISION DE MODÈLE, " +
         "pas le GDP Advance officiel. Vecteur = HAWKISH si révisé à la hausse. " +
         "Application obligatoire de la règle A (HAWKISH US) : " +
         "NASDAQ VENTE CHOC, SP500 VENTE CHOC, GOLD VENTE CHOC, " +
