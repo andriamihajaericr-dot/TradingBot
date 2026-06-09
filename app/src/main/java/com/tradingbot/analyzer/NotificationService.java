@@ -3644,15 +3644,15 @@ payload.put("messages", messages);
         cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
             @Override
             public void onAvailable(Network network) {
-            triggerQueueSynchronization();
-             // ✅ Guard : backfill réseau max 1 fois par 30 minutes
-             long now = System.currentTimeMillis();
-            if (now - lastBackfillTime > 30 * 60 * 1000L) {
-             lastBackfillTime = now;
-               scheduler.schedule(() -> runHistoricalBackfill(),
+    triggerQueueSynchronization();
+    // ✅ Guard : backfill réseau max 1 fois par 30 minutes
+    long now = System.currentTimeMillis();
+    if (now - lastBackfillTime > 30 * 60 * 1000L) {
+        lastBackfillTime = now;
+        scheduler.schedule(() -> runHistoricalBackfill(),
                 5, TimeUnit.SECONDS);
-             }
-             }
+    }
+            }
         });
     }
     }
