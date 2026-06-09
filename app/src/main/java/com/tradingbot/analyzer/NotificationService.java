@@ -441,6 +441,12 @@ public class NotificationService extends NotificationListenerService {
          "- GEO ESCALADE active (< 48h) + tout driver HAWKISH = Double choc — Or et Pétrole prioritaires\n" +
          "- GEO ESCALADE active + DOVISH = Annulation partielle — conviction GEO plafonnée à 60%\n" +
          "- FOMC réunion dans < 7 jours = tout CPI/NFP reçoit +20% de conviction additionnelle\n" +
+         "- WARSH HAWKISH (< 48h) + CPI/NFP FORT = DOUBLE SIGNAL RESTRICTIF — " +
+         "Conviction +20%, dollar fort prioritaire sur tous actifs\n" +
+         "- WARSH HAWKISH (< 48h) + CPI/NFP FAIBLE = SIGNAL CONTRADICTOIRE — " +
+         "Conviction plafonnée à 55%, signaler divergence marché vs futur Chair\n" +
+         "- WARSH DOVISH inattendu = SURPRISE MAXIMALE — Conviction +25%, " +
+         "repricing immédiat des anticipations de taux\n" +
         "</HARD_CONSTRAINTS>\n\n" +
     
         "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
