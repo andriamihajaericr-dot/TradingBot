@@ -2287,7 +2287,7 @@ scheduler.scheduleAtFixedRate(new Runnable() {
     
         int weight = assignDriverWeight(feed);
     
-        if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 70) {
+        if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 60) {
             weight = Math.max(weight, 4);
         }
     
