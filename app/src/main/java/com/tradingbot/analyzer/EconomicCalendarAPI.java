@@ -106,12 +106,8 @@ public class EconomicCalendarAPI {
             logToMain("✅ [CALENDRIER] ForexFactory : " + events.size() + " événements chargés");
             return events;
         }
-        logToMain("⚠️ [CALENDRIER] ForexFactory vide — activation du Fallback institutionnel");
-    
-        // ── Fallback institutionnel ──
-        List<CalendarEvent> fallback = generateInstitutionalExhaustiveFallback();
-        logToMain("🔁 [CALENDRIER] Fallback activé : " + fallback.size() + " drivers institutionnels injectés");
-        return fallback;
+        logToMain("⚠️ [CALENDRIER] ForexFactory indisponible — retry dans 6h. Aucun fallback fictif injecté.");
+        return new ArrayList<>();
     }
 
     // ✅ Récupération des événements historiques (jusqu'à 30 jours en arrière)
