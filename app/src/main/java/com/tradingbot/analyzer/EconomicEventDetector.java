@@ -114,10 +114,35 @@ public class EconomicEventDetector {
             description = "Révision de Donnée Macro — Impact sur Sentiment";
             impact      = "Moyenne Volatilité";
         // Macro secondaire (Poids 2)
-        } else if (containsAny(unified, "RETAIL SALES", "CONSUMER CONFIDENCE", "CONSUMER SENTIMENT", "GDP", "PMI", "ISM", "MICHIGAN")) {
-            eventType   = "ECONOMIC-GROWTH-DATA";
-            description = "Données Macroéconomiques Secondaires";
-            impact      = "Moyenne Volatilité";
+        // ── ISM Services / Manufacturing — Leading Indicator US (Poids 4) ──
+} else if (containsAny(unified, "ISM SERVICES", "ISM NON-MANUFACTURING",
+           "ISM MANUFACTURING", "ISM REPORT", "ISM PMI")) {
+    eventType   = "ISM-INDICATOR";
+    description = "ISM — Baromètre Industrie/Services US";
+    impact      = "Haute Volatilité";
+
+// ── PMI Flash / Preliminary — Leading Indicator (Poids 3) ──
+} else if (containsAny(unified, "PMI FLASH", "FLASH PMI", "PMI PRELIMINARY",
+           "PRELIMINARY PMI", "COMPOSITE PMI", "SERVICES PMI",
+           "MANUFACTURING PMI", "PMI MANUFACTURING", "PMI SERVICES")) {
+    eventType   = "PMI-FLASH";
+    description = "PMI Flash — Indicateur Avancé Croissance";
+    impact      = "Moyenne Volatilité (Forte Impulsion)";
+
+// ── Michigan Sentiment Preliminary — Proxy Inflation Fed (Poids 3) ──
+} else if (containsAny(unified, "MICHIGAN", "CONSUMER SENTIMENT PREL",
+           "SENTIMENT PRELIMINARY", "SENTIMENT PREL", "UOM SENTIMENT",
+           "UNIVERSITY OF MICHIGAN")) {
+    eventType   = "MICHIGAN-SENTIMENT";
+    description = "Michigan Sentiment Preliminary — Proxy Anticipations Inflation";
+    impact      = "Moyenne Volatilité (Forte Impulsion)";
+
+// ── Macro secondaire (Poids 2) — indicateurs de confirmation ──
+} else if (containsAny(unified, "RETAIL SALES", "CONSUMER CONFIDENCE",
+           "CONSUMER SENTIMENT", "GDP", "PMI", "ISM", "MICHIGAN")) {
+    eventType   = "ECONOMIC-GROWTH-DATA";
+    description = "Données Macroéconomiques Secondaires";
+    impact      = "Moyenne Volatilité";
          
         } else if (containsAny(unified, "DXY", "DOLLAR INDEX", "DOLLAR STRENGTH", "DOLLAR WEAKNESS")) {
             eventType   = "DOLLAR-INDEX";
