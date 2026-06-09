@@ -142,18 +142,30 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
 
         // ── 2. Semaine précédente — contient NFP/CPI/etc. de la semaine passée ──
         List<CalendarEvent> lastWeek = fetchFromForexFactoryUrl(FF_URL_LAST_WEEK, 168);
-        int countLast = 0;
-        for (CalendarEvent e : lastWeek) {
-            boolean hasActual = e.actual != null
-                    && !e.actual.equals("N/A")
-                    && !e.actual.isEmpty();
-            if (hasActual) {
-                allEvents.add(e);
-                countLast++;
-            }
-        }
-        logToMain("✅ [BACKFILL] lastweek : " + countLast + " événements avec actual");
-
+        // ── 2. Événements passés de thisweek avec actual publié ──
+// thisweek contient toute la semaine courante lundi→vendredi
+// Les événements passés (date < now) ont leur actual rempli
+int countPast = 0;
+long nowSec = System.currentTimeMillis() / 1000;
+for (CalendarEvent e : thisWeek) {
+    boolean hasActual = e.actual != null
+            && !e.actual.equals("N/A")
+            && !e.actual.isEmpty();
+    // Garder seulement les événements déjà passés
+    boolean isPast = false;
+    try {
+        long eventTs = Long.parseLong(e.timestamp);
+        isPast = eventTs < nowSec;
+    } catch (Exception ignored) {
+        isPast = hasActual; // si timestamp illisible, actual suffit
+    }
+    if (hasActual && isPast) {
+        allEvents.add(e);
+        countPast++;
+    }
+}
+logToMain("✅ [BACKFILL] thisweek passés : " + countPast
+        + " événements avec actual");
     } catch (Exception e) {
         logToMain("❌ [BACKFILL] Erreur ForexFactory : " + e.getMessage());
         Log.e(TAG, "Erreur fetchHistoricalEvents", e);
