@@ -2198,8 +2198,10 @@ scheduler.scheduleAtFixedRate(new Runnable() {
                         upFeed.contains("BOC")  || upFeed.contains("PIB")  || 
                         upFeed.contains("GDP")  || upFeed.contains("OPEC") ||
                         upFeed.contains("INFLATION") || upFeed.contains("INTEREST RATE") ||
-                        upFeed.contains("POWELL") || upFeed.contains("WARSH") || upFeed.contains("LAGARDE") ||
-                        upFeed.contains("PMI") || upFeed.contains("ISM") ||
+                        upFeed.contains("POWELL")  || upFeed.contains("WARSH")    ||
+                        upFeed.contains("LAGARDE") || upFeed.contains("BAILEY")   ||
+                        upFeed.contains("UEDA")    || upFeed.contains("MACKLEM")  ||
+                        upFeed.contains("PMI")     || upFeed.contains("ISM")      ||
                         upFeed.contains("FEDERAL RESERVE") ||
                         upFeed.contains("FED CHAIR")       ||
                         upFeed.contains("EMERGENCY")       ||
