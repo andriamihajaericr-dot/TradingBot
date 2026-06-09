@@ -110,7 +110,10 @@ public class NotificationService extends NotificationListenerService {
         "   • 🇨🇦 USDCAD  : ACHAT CHOC 🟢  | Dollar fort face au CAD\n" +
         "   • 🇯🇵 USDJPY  : ACHAT CHOC 🟢  | Dollar fort face au Yen ← TOUJOURS ACHAT sur HAWKISH US\n" +
         "   • 🏆 GOLD    : VENTE CHOC 🔴  | Dollar fort pénalise l'or\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Taux hauts compressent les valorisations tech\n" +
+        "   • 💻 NASDAQ  : VENTE CHOC 🔴  | " +
+        "⚠️ RÈGLE ABSOLUE : croissance forte = taux hauts = compression PE tech. " +
+        "INTERDICTION FORMELLE de mettre ACHAT sur NASDAQ lors d'un signal HAWKISH US, " +
+        "même si la croissance paraît positive pour les bénéfices.\n"
         "   • 📊 SP500   : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Actif risk-on pénalisé par le resserrement (effet amplifié x2 à x3)\n" +
         "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴  | Dollar fort écrase l'Euro\n" +
