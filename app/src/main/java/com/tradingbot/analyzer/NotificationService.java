@@ -108,8 +108,8 @@ public class NotificationService extends NotificationListenerService {
         "   • 🇦🇺 AUDUSD  : VENTE CHOC 🔴  | Devise risk-on pénalisée\n" +
         "   • 🛢️ USOIL    : NEUTRE          | Pas d'impact direct sauf si contexte GÉO simultané\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : DOLLAR FORT (MKT RISK-OFF) 🐻\n\n" +
-    
-        "   DOVISH US (CPI < prévisions, NFP faible, Fed dovish, discours accommodant de Powell, anticipation de baisses de taux) :\n" +
+        "   DOVISH US (CPI < prévisions, NFP faible, Fed dovish, discours " +
+        "accommodant de Powell, signal accommodant inattendu de Warsh) :\n" +
         "   • 📈 US10Y    : VENTE CHOC 🔴  | Rendements baissent avec les anticipations de baisse\n" +
         "   • 🇨🇦 USDCAD  : VENTE CHOC 🔴  | Dollar faible face au CAD\n" +
         "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴  | Dollar faible face au Yen ← TOUJOURS VENTE sur DOVISH US\n" +
