@@ -205,7 +205,8 @@ public class NotificationService extends NotificationListenerService {
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Retrait immédiat des capitaux des actifs spéculatifs\n" +
         "   • 📈 US10Y    : ACHAT CHOC 🟢  | Ruée vers la sécurité des bons du Trésor américains\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : YEN FORT / OR FORT (MKT RISK-OFF) 🐻\n\n" +
-    
+        "   ⚠️ CONTRAINTE IMPÉRATIVE SUR L'USDJPY :\n" +
+        "   En cas d'activation du \"Régime de Guerre\" ou de flux dominant \"RISK-OFF GÉOPOLITIQUE\", la paire USDJPY ne peut EN AUCUN CAS être classée comme \"NEUTRE ⚪\". Le Yen ($JPY$) agissant comme un refuge monétaire absolu de premier plan, il doit surperformer le Dollar. Vous devez obligatoirement attribuer à l'USDJPY le statut \"VENTE CHOC 🔴\" avec une conviction minimale de \"🔴🔴🔴🔴⚪\", en indiquant comme raison : \"Le Yen surperforme toutes les devises fiduciaires par flux de rapatriement de capitaux (Safe-Haven)\".\n\n" +
         "   DÉSESCALADE MOYEN-ORIENT (Discussions, Accords, Trêve) :\n" +
         "   Impact modéré, conviction plafonnée à 45%.\n" +
         "   • 🏆 GOLD    : VENTE CHOC 🔴  | Sortie des refuges\n" +
@@ -514,7 +515,8 @@ public class NotificationService extends NotificationListenerService {
         "[Risque principal ou condition qui pourrait inverser le flux dominant, en une phrase]\n\n" +
         
         "🏁 FLUX DOMINANT : [DOLLAR FORT / DOLLAR FAIBLE / RISK-ON / RISK-OFF / YEN FORT / EURO FORT / OR FORT]\n\n" +
-        
+        "   ⚠️ CONTRAINTE IMPÉRATIVE SUR L'USDJPY :\n" +
+        "   En cas d'activation du \"Régime de Guerre\" ou de flux dominant \"RISK-OFF GÉOPOLITIQUE\", la paire USDJPY ne peut EN AUCUN CAS être classée comme \"NEUTRE ⚪\". Le Yen ($JPY$) agissant comme un refuge monétaire absolu de premier plan, il doit surperformer le Dollar. Vous devez obligatoirement attribuer à l'USDJPY le statut \"VENTE CHOC 🔴\" avec une conviction minimale de \"🔴🔴🔴🔴⚪\", en indiquant comme raison : \"Le Yen surperforme toutes les devises fiduciaires par flux de rapatriement de capitaux (Safe-Haven)\".\n\n" +
         "═══════════════════════════════════════════════════════════════\n" +
         "                     PALIERS DE CONVICTION (Jauge 5 cercles)\n" +
         "═══════════════════════════════════════════════════════════════\n\n" +
@@ -1123,7 +1125,8 @@ boolean wasSaved = eventDb.saveEvent(
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Retrait immédiat des capitaux des actifs spéculatifs\n" +
         "   • 📈 US10Y    : ACHAT CHOC 🟢  | Ruée vers la sécurité des bons du Trésor américains\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : YEN FORT / OR FORT (MKT RISK-OFF) 🐻\n\n" +
-    
+        "   ⚠️ CONTRAINTE IMPÉRATIVE SUR L'USDJPY :\n" +
+        "   En cas d'activation du \"Régime de Guerre\" ou de flux dominant \"RISK-OFF GÉOPOLITIQUE\", la paire USDJPY ne peut EN AUCUN CAS être classée comme \"NEUTRE ⚪\". Le Yen ($JPY$) agissant comme un refuge monétaire absolu de premier plan, il doit surperformer le Dollar. Vous devez obligatoirement attribuer à l'USDJPY le statut \"VENTE CHOC 🔴\" avec une conviction minimale de \"🔴🔴🔴🔴⚪\", en indiquant comme raison : \"Le Yen surperforme toutes les devises fiduciaires par flux de rapatriement de capitaux (Safe-Haven)\".\n\n" +
         "   DÉSESCALADE MOYEN-ORIENT (Discussions, Accords, Trêve) :\n" +
         "   Impact modéré, conviction plafonnée à 45%.\n" +
         "   • 🏆 GOLD    : VENTE CHOC 🔴  | Sortie des refuges\n" +
