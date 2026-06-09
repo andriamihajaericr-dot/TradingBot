@@ -2191,21 +2191,35 @@ scheduler.scheduleAtFixedRate(new Runnable() {
         // Détection élargie de TOUTES les actualités majeures
         String upFeed = feed.toUpperCase(Locale.ROOT);
         boolean isSupremeNews = upFeed.contains("FOMC") || upFeed.contains("FED ") || 
-                                upFeed.contains("CPI")  || upFeed.contains("PCE")  || 
-                                upFeed.contains("NFP")  || upFeed.contains("BCE")  || 
-                                upFeed.contains("ECB")  || upFeed.contains("BOJ")  || 
-                                upFeed.contains("BOE")  || upFeed.contains("RBA")  || 
-                                upFeed.contains("BOC")  || upFeed.contains("PIB")  || 
-                                upFeed.contains("GDP")  || upFeed.contains("OPEC") ||
-                                upFeed.contains("INFLATION") || upFeed.contains("INTEREST RATE") ||
-                                upFeed.contains("POWELL") || upFeed.contains("LAGARDE") ||
-                                upFeed.contains("PMI") || upFeed.contains("ISM") ||
-                                upFeed.contains("FEDERAL RESERVE") || // ✅ ajout
-                                upFeed.contains("FED CHAIR")       || // ✅ ajout
-                                upFeed.contains("EMERGENCY")       || // ✅ réunion urgence
-                                upFeed.contains("RATE DECISION")   ||
-                                upFeed.contains("RATE CUT")        || // ✅ ajout
-                                upFeed.contains("RATE HIKE");         // ✅ ajout
+                        upFeed.contains("CPI")  || upFeed.contains("PCE")  || 
+                        upFeed.contains("NFP")  || upFeed.contains("BCE")  || 
+                        upFeed.contains("ECB")  || upFeed.contains("BOJ")  || 
+                        upFeed.contains("BOE")  || upFeed.contains("RBA")  || 
+                        upFeed.contains("BOC")  || upFeed.contains("PIB")  || 
+                        upFeed.contains("GDP")  || upFeed.contains("OPEC") ||
+                        upFeed.contains("INFLATION") || upFeed.contains("INTEREST RATE") ||
+                        upFeed.contains("POWELL") || upFeed.contains("WARSH") || upFeed.contains("LAGARDE") ||
+                        upFeed.contains("PMI") || upFeed.contains("ISM") ||
+                        upFeed.contains("FEDERAL RESERVE") ||
+                        upFeed.contains("FED CHAIR")       ||
+                        upFeed.contains("EMERGENCY")       ||
+                        upFeed.contains("RATE DECISION")   ||
+                        upFeed.contains("RATE CUT")        ||
+                        upFeed.contains("RATE HIKE")       ||
+                        // ✅ Leading indicators promus Niveau 4
+                        upFeed.contains("ISM SERVICES")        ||
+                        upFeed.contains("ISM MANUFACTURING")   ||
+                        upFeed.contains("PMI FLASH")           ||
+                        upFeed.contains("FLASH PMI")           ||
+                        upFeed.contains("COMPOSITE PMI")       ||
+                        upFeed.contains("SERVICES PMI")        ||
+                        upFeed.contains("MANUFACTURING PMI")   ||
+                        upFeed.contains("UNIVERSITY OF MICHIGAN") ||
+                        upFeed.contains("MICHIGAN SENTIMENT")  ||
+                        upFeed.contains("SENTIMENT PREL")      ||
+                        upFeed.contains("GDP ADVANCE")         ||
+                        upFeed.contains("ADVANCE GDP")         ||
+                        upFeed.contains("GDP FLASH");
     
         int weight = assignDriverWeight(feed);
     
