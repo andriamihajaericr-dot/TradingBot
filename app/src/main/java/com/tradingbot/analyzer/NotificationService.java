@@ -548,19 +548,31 @@ public class NotificationService extends NotificationListenerService {
         "👉 LOI DE DOMINANCE ABSOLUE : Si un événement de RANG SUPRÊME est actif dans les données des 24h, c'est sa logique directionnelle qui dicte le comportement du marché. Un driver tactique (comme des tensions géopolitiques) ne peut ni inverser ni annuler la direction des actifs dictée par le driver suprême.\n\n" +
         
         "RÈGLE 2 : DRIVER ÉCONOMIQUE OU BANQUE CENTRALE AMÉRICAINE (USA)\n" +
-        "A) Si les données sont HAWKISH / FORTES (Inflation supérieure aux prévisions, discours restrictif de Powell/FED, NFP/Emplois très forts, PIB en forte hausse) :\n" +
-        "   • 📈 US10Y   -> ACHAT CHOC 🟢 [Les rendements obligataires montent mécaniquement]\n" +
-        "   • 💻 NASDAQ  -> VENTE CHOC 🔴 [La hausse des taux d'intérêt pénalise les valeurs technologiques]\n" +
-        "   • 📊 SP500   -> VENTE CHOC 🔴 [Symétrie absolue obligatoire avec le NASDAQ]\n" +
-        "   • 🏆 GOLD    -> VENTE CHOC 🔴 [Taux réels plus élevés et Dollar fort pèsent sur l'Or]\n" +
-        "   • 🛢️ USOIL   -> NEUTRE ⚪ ou selon driver secondaire dédié.\n" +
-        "   • 🇪🇺 EURUSD -> VENTE CHOC 🔴 [L'Euro s'effondre face à la hausse globale du Dollar US]\n" +
-        "   • 🇯🇵 USDJPY -> ACHAT CHOC 🟢 [Le Dollar s'apprécie face au Yen par élargissement du différentiel de taux]\n" +
-        "   • 🇨🇦 USDCAD -> ACHAT CHOC 🟢 [Le Dollar américain s'impose face au Dollar Canadien]\n" +
-        "   • 🇬🇧 GBPUSD -> VENTE CHOC 🔴 [La Livre Sterling baisse face au Dollar US]\n" +
-        "   • 🇦🇺 AUDUSD -> VENTE CHOC 🔴 [L'Aussie Dollar recule face au Dollar US]\n" +
-        "   • ₿ BITCOIN  -> VENTE CHOC 🔴 [L'aversion au risque liée aux taux hauts liquide les actifs spéculatifs]\n" +
-        "   • 🏁 FLUX DOMINANT -> DOLLAR FORT\n\n" +
+"A) Si les données sont HAWKISH / FORTES (Inflation supérieure aux prévisions, " +
+"discours restrictif de Powell/FED ou Warsh, NFP/Emplois très forts, " +
+"PIB en forte hausse, GDPNow Atlanta révisé à la hausse) :\n" +
+"   ⚠️ RÈGLE ABSOLUE ANTI-CONFUSION : Une croissance économique forte " +
+"signifie que la Fed maintient ou hausse les taux → taux hauts = " +
+"compression des valorisations tech. NASDAQ et SP500 sont TOUJOURS " +
+"en VENTE CHOC sur un signal HAWKISH, même si la croissance " +
+"paraît positive pour les bénéfices. INTERDICTION FORMELLE d'inverser.\n" +
+"   ⚠️ RÈGLE GDPNOW : GDPNow Atlanta Fed est une révision de modèle " +
+"(pas le GDP Advance officiel). Traiter comme signal HAWKISH si révisé " +
+"à la hausse. Conviction plafonnée à 65%.\n" +
+"   • 📈 US10Y   -> ACHAT CHOC 🟢 [Les rendements obligataires montent]\n" +
+"   • 💻 NASDAQ  -> VENTE CHOC 🔴 [La hausse des taux pénalise " +
+"les valeurs technologiques]\n" +
+"   • 📊 SP500   -> VENTE CHOC 🔴 [Symétrie absolue obligatoire avec NASDAQ]\n" +
+"   • 🏆 GOLD    -> VENTE CHOC 🔴 [Taux réels plus élevés et Dollar fort]\n" +
+"   • 🛢️ USOIL   -> NEUTRE ⚪\n" +
+"   • 🇪🇺 EURUSD -> VENTE CHOC 🔴 [Euro s'effondre face au Dollar]\n" +
+"   • 🇯🇵 USDJPY -> ACHAT CHOC 🟢 [Dollar s'apprécie face au Yen]\n" +
+"   • 🇨🇦 USDCAD -> ACHAT CHOC 🟢 [Dollar s'impose face au CAD]\n" +
+"   • 🇬🇧 GBPUSD -> VENTE CHOC 🔴 [Livre baisse face au Dollar]\n" +
+"   • 🇦🇺 AUDUSD -> VENTE CHOC 🔴 [Aussie recule face au Dollar]\n" +
+"   • ₿ BITCOIN  -> VENTE CHOC 🔴 [Aversion au risque liquide " +
+"les actifs spéculatifs]\n" +
+"   • 🏁 FLUX DOMINANT -> DOLLAR FORT\n\n"
         
         "B) Si les données sont DOVISH / FAIBLES (Inflation plus basse que prévu, discours accommodant de la FED, hausse des inscriptions au chômage, PIB décevant) :\n" +
         "   • Appliquer EXACTEMENT l'opposé mathématique des directions définies ci-dessus (Ex: US10Y -> VENTE CHOC, NASDAQ -> ACHAT CHOC, EURUSD -> ACHAT CHOC, USDJPY -> VENTE CHOC, etc.).\n" +
