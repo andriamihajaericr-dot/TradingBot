@@ -3368,7 +3368,7 @@ if (geoContext != null && !geoContext.isEmpty()) {
 "   • 🇦🇺 AUDUSD -> VENTE CHOC 🔴 [Aussie recule face au Dollar]\n" +
 "   • ₿ BITCOIN  -> VENTE CHOC 🔴 [Aversion au risque liquide " +
 "les actifs spéculatifs]\n" +
-"   • 🏁 FLUX DOMINANT -> DOLLAR FORT\n\n"
+"   • 🏁 FLUX DOMINANT -> DOLLAR FORT\n\n" +
             
             "B) Si les données sont DOVISH / FAIBLES (Inflation plus basse que prévu, discours accommodant de la FED, hausse des inscriptions au chômage, PIB décevant) :\n" +
             "   • Appliquer EXACTEMENT l'opposé mathématique des directions définies ci-dessus (Ex: US10Y -> VENTE CHOC, NASDAQ -> ACHAT CHOC, EURUSD -> ACHAT CHOC, USDJPY -> VENTE CHOC, etc.).\n" +
