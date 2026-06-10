@@ -113,7 +113,7 @@ public class NotificationService extends NotificationListenerService {
         "   • 💻 NASDAQ  : VENTE CHOC 🔴  | " +
         "⚠️ RÈGLE ABSOLUE : croissance forte = taux hauts = compression PE tech. " +
         "INTERDICTION FORMELLE de mettre ACHAT sur NASDAQ lors d'un signal HAWKISH US, " +
-        "même si la croissance paraît positive pour les bénéfices.\n"
+        "même si la croissance paraît positive pour les bénéfices.\n" +
         "   • 📊 SP500   : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Actif risk-on pénalisé par le resserrement (effet amplifié x2 à x3)\n" +
         "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴  | Dollar fort écrase l'Euro\n" +
@@ -572,7 +572,7 @@ public class NotificationService extends NotificationListenerService {
 "   • 🇦🇺 AUDUSD -> VENTE CHOC 🔴 [Aussie recule face au Dollar]\n" +
 "   • ₿ BITCOIN  -> VENTE CHOC 🔴 [Aversion au risque liquide " +
 "les actifs spéculatifs]\n" +
-"   • 🏁 FLUX DOMINANT -> DOLLAR FORT\n\n"
+"   • 🏁 FLUX DOMINANT -> DOLLAR FORT\n\n" +
         
         "B) Si les données sont DOVISH / FAIBLES (Inflation plus basse que prévu, discours accommodant de la FED, hausse des inscriptions au chômage, PIB décevant) :\n" +
         "   • Appliquer EXACTEMENT l'opposé mathématique des directions définies ci-dessus (Ex: US10Y -> VENTE CHOC, NASDAQ -> ACHAT CHOC, EURUSD -> ACHAT CHOC, USDJPY -> VENTE CHOC, etc.).\n" +
