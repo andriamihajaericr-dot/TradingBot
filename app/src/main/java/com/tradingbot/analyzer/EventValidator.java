@@ -150,109 +150,139 @@ try {
 } catch (Exception e) {
     Log.e(TAG, "Erreur lors de l'extraction brute des actifs", e);
  }
-         // =========================================================================
-// ⚡ INTERCEPTION & DÉROGATION ABSOLUE : FORMAT CALENDRIER ÉCONOMIQUE CHIFFRÉ
+        // =========================================================================
+// ⚡ INTERCEPTION & DÉROGATION ABSOLUE : VERSION SOUVERAINE FINANCIALJUICE
 // =========================================================================
-// Capture les structures de publications brutes (comme FinancialJuice ou alertes chiffrées)
-if (upperCombined.contains("ACTUAL:") && (upperCombined.contains("FORECAST:") || upperCombined.contains("PREVIOUS:"))) {
+
+// 1️⃣ Normalisation de sécurité contre les caprices de formatage des flux bruts
+String normalizedInput = upperCombined.replace(" :", ":").trim();
+
+// 2️⃣ Détection adaptative : Valide la présence d'ACTUAL et d'une métrique de comparaison
+if (normalizedInput.contains("ACTUAL:") && (normalizedInput.contains("FORECAST:") || normalizedInput.contains("PREVIOUS:"))) {
     
-    // 1️⃣ ── RANG SUPRÊME & MACRO US : LES PILIERS ET INDICATEURS MAJEURS SUR LE DOLLAR ──
-    if (upperCombined.contains("CPI") || upperCombined.contains("PCE") || upperCombined.contains("INFLATION") || 
-        upperCombined.contains("HICP") || upperCombined.contains("CONSUMER PRICE") || upperCombined.contains("PPI") || 
-        upperCombined.contains("PRODUCER PRICE") || upperCombined.contains("FOMC") || upperCombined.contains(" FED ") || 
-        upperCombined.contains("POWELL") || upperCombined.contains("RATE DECISION") || upperCombined.contains("INTEREST RATE") || 
-        upperCombined.contains("PAYROLL") || upperCombined.contains("NFP") || upperCombined.contains("UNEMPLOYMENT") || 
-        upperCombined.contains("JOBLESS") || upperCombined.contains("CLAIMS") || upperCombined.contains("GDP") || 
-        upperCombined.contains(" PIB ") || upperCombined.contains("GROSS DOMESTIC") || upperCombined.contains("ISM") || 
-        upperCombined.contains("PMI") || upperCombined.contains("PURCHASING MANAGERS") || upperCombined.contains("ADP") || 
-        upperCombined.contains("JOLTS") || upperCombined.contains("JOB OPENINGS") || upperCombined.contains("RETAIL SALES") || 
-        upperCombined.contains("MICHIGAN") || upperCombined.contains("CONSUMER SENTIMENT") || upperCombined.contains("DURABLE GOODS") || 
-        upperCombined.contains("DXY") || upperCombined.contains("DOLLAR INDEX") || upperCombined.contains("TREASURY AUCTION") || 
-        upperCombined.contains("YIELD SPIKE") || upperCombined.contains("BOND SELLOFF")) {
+    // ── BLOC 1 : RANG SUPRÊME / MACRO US ──
+    // (Impact : GOLD, NASDAQ, USDJPY, US10Y, SP500, USOIL)
+    if (normalizedInput.contains("US ") || normalizedInput.contains("USA ") || normalizedInput.contains("UNITED STATES") || 
+        normalizedInput.contains("FOMC") || normalizedInput.contains("FED ") || normalizedInput.contains("POWELL") ||
+        normalizedInput.contains("NFP") || normalizedInput.contains("PAYROLL") || normalizedInput.contains("TREASURY")) {
         
-        if (!detectedAssets.contains("GOLD")) detectedAssets.add("GOLD");
-        if (!detectedAssets.contains("NASDAQ")) detectedAssets.add("NASDAQ");
-        if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
-        if (!detectedAssets.contains("US10Y")) detectedAssets.add("US10Y");
-        if (!detectedAssets.contains("SP500")) detectedAssets.add("SP500");
-        if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL"); // ✅ Corrigé : Intégration de l'USOIL au Rang Suprême
+        if (normalizedInput.contains("CPI") || normalizedInput.contains("PCE") || normalizedInput.contains("INFLATION") || 
+            normalizedInput.contains("PPI") || normalizedInput.contains("RATE DECISION") || normalizedInput.contains("INTEREST RATE") || 
+            normalizedInput.contains("TAUX") || normalizedInput.contains("PAYROLL") || normalizedInput.contains("NFP") || 
+            normalizedInput.contains("UNEMPLOYMENT") || normalizedInput.contains("CHÔMAGE") || normalizedInput.contains("JOBLESS") || 
+            normalizedInput.contains("CLAIMS") || normalizedInput.contains("GDP") || normalizedInput.contains("PIB") || 
+            normalizedInput.contains("ISM") || normalizedInput.contains("PMI") || normalizedInput.contains("ADP") || 
+            normalizedInput.contains("JOLTS") || normalizedInput.contains("RETAIL") || normalizedInput.contains("VENTES AU DÉTAIL") || 
+            normalizedInput.contains("MICHIGAN") || normalizedInput.contains("CONSUMER CONFIDENCE") || 
+            normalizedInput.contains("DURABLE GOODS") || normalizedInput.contains("INDUSTRIAL PRODUCTION") || 
+            normalizedInput.contains("HOUSING") || normalizedInput.contains("BEIGE BOOK") || normalizedInput.contains("MINUTES")) {
+            
+            if (!detectedAssets.contains("GOLD")) detectedAssets.add("GOLD");
+            if (!detectedAssets.contains("NASDAQ")) detectedAssets.add("NASDAQ");
+            if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
+            if (!detectedAssets.contains("US10Y")) detectedAssets.add("US10Y");
+            if (!detectedAssets.contains("SP500")) detectedAssets.add("SP500");
+            if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL"); 
+        }
     }
 
-    // 2️⃣ ── LES AUTRES CALENDRIERS ET ACTIFS DE LA MATRICE GLOBALE ──
-    
-    // Zone Euro 🇪🇺 -> Impact direct EURUSD (et spreads obligataires)
-    if (upperCombined.contains("ECB") || upperCombined.contains("BCE") || upperCombined.contains("LAGARDE") || 
-        upperCombined.contains("EUROZONE") || upperCombined.contains("GERMAN") || upperCombined.contains(" IFO ") || 
-        upperCombined.contains(" ZEW ") || upperCombined.contains("SPREAD") || upperCombined.contains(" BTP ") || 
-        upperCombined.contains(" OAT ")) {
-        if (!detectedAssets.contains("EURUSD")) detectedAssets.add("EURUSD");
+    // ── BLOC 2 : ZONE EURO 🇪🇺 ──
+    // (Impact : EURUSD)
+    if (normalizedInput.contains("EUROZONE") || normalizedInput.contains("GERMANY") || normalizedInput.contains("FRANCE") || 
+        normalizedInput.contains("ITALY") || normalizedInput.contains("ECB") || normalizedInput.contains("BCE") || normalizedInput.contains("LAGARDE")) {
+        
+        if (normalizedInput.contains("CPI") || normalizedInput.contains("HICP") || normalizedInput.contains("INFLATION") || 
+            normalizedInput.contains("PMI") || normalizedInput.contains("ZEW") || normalizedInput.contains("IFO") || 
+            normalizedInput.contains("GDP") || normalizedInput.contains("PIB") || normalizedInput.contains("RATE") || 
+            normalizedInput.contains("TAUX") || normalizedInput.contains("SPREAD") || normalizedInput.contains("BTP") || normalizedInput.contains("OAT")) {
+            if (!detectedAssets.contains("EURUSD")) detectedAssets.add("EURUSD");
+        }
     }
     
-    // Royaume-Uni 🇬🇧 -> Impact direct GBPUSD
-    if (upperCombined.contains("BOE") || upperCombined.contains("BAILEY") || upperCombined.contains(" UK ") || 
-        upperCombined.contains("BRITISH") || upperCombined.contains("MPC VOTE") || upperCombined.contains("UK BUDGET") || 
-        upperCombined.contains("CLAIMANT COUNT") || upperCombined.contains("AVERAGE EARNINGS")) {
-        if (!detectedAssets.contains("GBPUSD")) detectedAssets.add("GBPUSD");
+    // ── BLOC 3 : ROYAUME-UNI 🇬🇧 ──
+    // (Impact : GBPUSD)
+    if (normalizedInput.contains("UK ") || normalizedInput.contains("UNITED KINGDOM") || normalizedInput.contains("BRITAIN") || 
+        normalizedInput.contains("BOE") || normalizedInput.contains("BAILEY") || normalizedInput.contains("MPC")) {
+        
+        if (normalizedInput.contains("CPI") || normalizedInput.contains("INFLATION") || normalizedInput.contains("GDP") || 
+            normalizedInput.contains("PIB") || normalizedInput.contains("PMI") || normalizedInput.contains("EARNINGS") || 
+            normalizedInput.contains("WAGES") || normalizedInput.contains("SALAIRES") || normalizedInput.contains("UNEMPLOYMENT") || 
+            normalizedInput.contains("CLAIMANT") || normalizedInput.contains("RATE") || normalizedInput.contains("BUDGET")) {
+            if (!detectedAssets.contains("GBPUSD")) detectedAssets.add("GBPUSD");
+        }
     }
     
-    // Canada 🇨🇦 -> Impact direct USDCAD & USOIL (Corrélation étroite Pétrole/Loonie)
-    if (upperCombined.contains("BOC") || upperCombined.contains("MACKLEM") || upperCombined.contains("CANADA") || 
-        upperCombined.contains("CANADIAN")) {
-        if (!detectedAssets.contains("USDCAD")) detectedAssets.add("USDCAD");
+    // ── BLOC 4 : CANADA 🇨🇦 ──
+    // (Impact : USDCAD, USOIL)
+    if (normalizedInput.contains("CANADA") || normalizedInput.contains("CANADIAN") || normalizedInput.contains("BOC") || normalizedInput.contains("MACKLEM")) {
+        if (normalizedInput.contains("CPI") || normalizedInput.contains("INFLATION") || normalizedInput.contains("GDP") || 
+            normalizedInput.contains("RATE") || normalizedInput.contains("TAUX") || normalizedInput.contains("EMPLOYMENT") || normalizedInput.contains("UNEMPLOYMENT")) {
+            if (!detectedAssets.contains("USDCAD")) detectedAssets.add("USDCAD");
+            if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL");
+        }
+    }
+    
+    // ── BLOC 5 : AUSTRALIE & CHINE 🇦🇺 🇨🇳 ──
+    // (Impact : AUDUSD)
+    if (normalizedInput.contains("AUSTRALIA") || normalizedInput.contains("AUSTRALIAN") || normalizedInput.contains("RBA") || 
+        normalizedInput.contains("BULLOCK") || normalizedInput.contains("CHINA") || normalizedInput.contains("CHINESE") || 
+        normalizedInput.contains("PBOC") || normalizedInput.contains("CNY") || normalizedInput.contains("YUAN")) {
+        
+        if (normalizedInput.contains("CPI") || normalizedInput.contains("INFLATION") || normalizedInput.contains("GDP") || 
+            normalizedInput.contains("PMI") || normalizedInput.contains("RATE") || normalizedInput.contains("TAUX") || 
+            normalizedInput.contains("CAIXIN") || normalizedInput.contains("TRADE BALANCE") || normalizedInput.contains("BALANCE COMMERCIALE") || 
+            normalizedInput.contains("TARIFF") || normalizedInput.contains("TRADE WAR") || normalizedInput.contains("STIMULUS")) {
+            if (!detectedAssets.contains("AUDUSD")) detectedAssets.add("AUDUSD");
+        }
+    }
+    
+    // ── BLOC 6 : JAPON 🇯🇵 ──
+    // (Impact : USDJPY)
+    if (normalizedInput.contains("JAPAN") || normalizedInput.contains("JAPANESE") || normalizedInput.contains("TOKYO") || 
+        normalizedInput.contains("BOJ") || normalizedInput.contains("UEDA") || normalizedInput.contains("MOF")) {
+        
+        if (normalizedInput.contains("CPI") || normalizedInput.contains("INFLATION") || normalizedInput.contains("RATE") || 
+            normalizedInput.contains("TAUX") || normalizedInput.contains("YCC") || normalizedInput.contains("YIELD CURVE") || 
+            normalizedInput.contains("TANKAN") || normalizedInput.contains("INTERVENTION") || normalizedInput.contains("YEN")) {
+            if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
+        }
+    }
+    
+    // ── BLOC 7 : SÉCURITÉ MATIÈRES PREMIÈRES & CRYPTO (Indépendant du pays) ──
+    if (normalizedInput.contains("EIA") || normalizedInput.contains("API") || normalizedInput.contains("OPEC") || 
+        normalizedInput.contains("CRUDE") || normalizedInput.contains("OIL INVENTORIES") || normalizedInput.contains("NATURAL GAS") || 
+        normalizedInput.contains("PÉTROLE") || normalizedInput.contains("STOCKS")) {
         if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL");
     }
-    
-    // Australie & Chine 🇦🇺 🇨🇳 -> Impact direct AUDUSD (Proxy matières premières et croissance asiatique)
-    if (upperCombined.contains("RBA") || upperCombined.contains("BULLOCK") || upperCombined.contains("AUSTRALIA") || 
-        upperCombined.contains("CHINA") || upperCombined.contains("PBOC") || upperCombined.contains("CNY") || 
-        upperCombined.contains("YUAN") || upperCombined.contains("CAIXIN") || upperCombined.contains("POLITBURO") || 
-        upperCombined.contains("COPPER") || upperCombined.contains("IRON ORE")) {
-        if (!detectedAssets.contains("AUDUSD")) detectedAssets.add("AUDUSD");
-    }
-    
-    // Japon 🇯🇵 -> Impact direct USDJPY (BOJ, MOF, Inflation & Crises du Carry Trade)
-    if (upperCombined.contains("BOJ") || upperCombined.contains("UEDA") || upperCombined.contains("JAPAN") || 
-        upperCombined.contains("TOKYO") || upperCombined.contains("YEN") || upperCombined.contains("USDJPY") || 
-        upperCombined.contains("MOF") || upperCombined.contains("INTERVENTION") || upperCombined.contains("CARRY TRADE") || 
-        upperCombined.contains("TANKAN")) {
-        if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY"); // ✅ Corrigé : Blindage sémantique pour l'inflation nippone et abréviation USDJPY
-    }
-    
-    // 3️⃣ ── CALENDRIERS SPÉCIFIQUES DES MATIÈRES PREMIÈRES & CRYPTO ──
-    
-    // Stocks Énergétiques US & OPEC 🛢️ -> Impact direct USOIL
-    if (upperCombined.contains(" EIA ") || upperCombined.contains(" API ") || upperCombined.contains("CRUDE STOCKS") || 
-        upperCombined.contains("OIL INVENTORIES") || upperCombined.contains("OPEC") || upperCombined.contains("NATURAL GAS") || 
-        upperCombined.contains(" SPR ") || upperCombined.contains("RIG COUNT") || upperCombined.contains("BAKER HUGHES")) {
-        if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL");
-    }
-    
-    // Calendrier Régulateur Crypto & Flux ETF ⚡ -> Impact direct BITCOIN
-    if (upperCombined.contains(" SEC ") || upperCombined.contains("ETF") || upperCombined.contains("BITCOIN") || 
-        upperCombined.contains("CRYPTO") || upperCombined.contains("BINANCE") || upperCombined.contains("HALVING") || 
-        upperCombined.contains("TETHER") || upperCombined.contains("USDT") || upperCombined.contains("FTX")) {
+    if (normalizedInput.contains("SEC ") || normalizedInput.contains("ETF") || normalizedInput.contains("BITCOIN") || 
+        normalizedInput.contains("CRYPTO") || normalizedInput.contains("BINANCE")) {
         if (!detectedAssets.contains("BITCOIN")) detectedAssets.add("BITCOIN");
     }
 
-    // 4️⃣ ── ALERTES DE RISQUES SYSTÉMIQUES DIRECTS (Sécurité intermarché Or & Indices) ──
-    if (upperCombined.contains("BANK RUN") || upperCombined.contains("SYSTEMIC RISK") || 
-        upperCombined.contains("BANK COLLAPSE") || upperCombined.contains("BANKING CRISIS") || 
-        upperCombined.contains("FDIC") || upperCombined.contains("BAILOUT") || upperCombined.contains("CONTAGION")) {
+    // ── BLOC 8 : SÉCURITÉ RENDEMENTS & EARNINGS CORPORATE ──
+    if (normalizedInput.contains("REAL YIELDS") || normalizedInput.contains("REAL RATES") || 
+        normalizedInput.contains("GOLD RESERVES") || normalizedInput.contains("TIPS")) {
         if (!detectedAssets.contains("GOLD")) detectedAssets.add("GOLD");
+        if (!detectedAssets.contains("US10Y")) detectedAssets.add("US10Y");
+    }
+    if (normalizedInput.contains("EARNINGS") || normalizedInput.contains("PROFIT WARNING") || normalizedInput.contains("GUIDANCE") || 
+        normalizedInput.contains("EPS ") || normalizedInput.contains("REVENUE") || normalizedInput.contains("NVDA") || 
+        normalizedInput.contains("AAPL") || normalizedInput.contains("MSFT") || normalizedInput.contains("AMZN")) {
         if (!detectedAssets.contains("NASDAQ")) detectedAssets.add("NASDAQ");
         if (!detectedAssets.contains("SP500")) detectedAssets.add("SP500");
     }
 
-    // Finalisation souveraine des résultats de l'interception
-    result.confidence = 100; // Statut Souverain Institutionnel
-    result.isConfirmed = true;
-    result.reason = "Notification Calendrier Économique Reçue (Forçage Chiffres Actifs Globaux)";
-    result.assetsEnriched = !detectedAssets.isEmpty();
-
-    logToMain("🟢 [FORÇAGE CALENDRIER GLOBAL] Validation immédiate des chiffres bruts. Actifs liés : " + detectedAssets);
-    return result; // 🚀 Sortie immédiate ! On évite l'anti-doublon, l'inertie et le filtre de confiance.
+    // Validation et sortie souveraine de la dérogation
+    if (!detectedAssets.isEmpty()) {
+        result.confidence = 100;
+        result.isConfirmed = true;
+        result.reason = "Interception Complète Calendrier FinancialJuice (" + detectedAssets.toString() + ")";
+        result.assetsEnriched = true;
+        logToMain("🟢 [FJ PRODUCTION INTERCEPT] Intégrité 100% validée pour : " + detectedAssets);
+        return result;
+    }
 }
-// =========================================================================
+
         // ── ÉTAPE 1 : Anti-Doublons (très haut dans le flux) ─────────────
         if (isRecentDuplicate(title, content)) {
             result.confidence  = 0;
