@@ -79,6 +79,89 @@ public class EconomicCalendarAPI {
     public static List<CalendarEvent> fetchUpcomingEvents(int hoursAhead) {
         return fetchUpcomingEvents(globalAppContext, hoursAhead);
     }
+    // =========================================================================
+    // 🌍 MOTEUR DE PARSING FOREXFACTORY (RÉSOLUTIONS DES ERREURS DE COMPILATION)
+    // =========================================================================
+
+    private static List<CalendarEvent> fetchFromForexFactory(int hoursAhead) throws Exception {
+        // Charge par défaut la semaine en cours
+        return fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, hoursAhead);
+    }
+
+    private static List<CalendarEvent> fetchFromForexFactoryUrl(String urlString, int hoursAhead) throws Exception {
+        List<CalendarEvent> events = new ArrayList<>();
+        HttpURLConnection conn = null;
+        BufferedReader reader = null;
+
+        try {
+            URL url = new URL(urlString);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode != 200) {
+                throw new IOException("HTTP error code: " + responseCode);
+            }
+
+            InputStream in = new BufferedInputStream(conn.getInputStream());
+            reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+
+            JSONArray jsonArray = new JSONArray(sb.toString());
+            long nowMs = System.currentTimeMillis();
+            long maxFutureMs = nowMs + ((long) hoursAhead * 3600 * 1000);
+
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONObject obj = jsonArray.getJSONObject(i);
+
+                String title    = obj.optString("title", "");
+                String country  = obj.optString("country", "");
+                String dateStr  = obj.optString("date", ""); // ISO8601 string
+                String impact   = obj.optString("impact", "Medium");
+                String forecast = obj.optString("forecast", "N/A");
+                String previous = obj.optString("previous", "N/A");
+                String actual   = obj.optString("actual", "N/A");
+
+                // Filtrage strict sur vos devises clés pour ne pas surcharger la mémoire
+                if (!isTrackedCurrency(country)) continue;
+
+                // Conversion sécurisée de la date ForexFactory
+                long eventMs = convertForexFactoryDateToMs(dateStr);
+
+                // Ne capture que les événements pertinents selon la fenêtre horaire (hoursAhead)
+                // Si hoursAhead est négatif ou très grand (Backfill/History), on adapte la logique
+                if (hoursAhead == 168 || eventMs <= maxFutureMs) { 
+                    CalendarEvent event = new CalendarEvent();
+                    event.timestamp  = String.valueOf(eventMs / 1000);
+                    event.country    = currencyToCountry(country);
+                    event.indicator  = title;
+                    event.importance = impact.equalsIgnoreCase("High") ? "HIGH" : (impact.equalsIgnoreCase("Low") ? "LOW" : "MEDIUM");
+                    event.forecast   = formatValue(forecast);
+                    event.previous   = formatValue(previous);
+                    event.actual     = formatValue(actual);
+                    
+                    // Injection automatique de la matrice d'intermarché des 11 actifs
+                    event.affectedAssets = mapIndicatorToAssetsIntermarket(event.indicator, event.country);
+
+                    // Filtrage optionnel : Conserver uniquement les impacts Medium/High pour vos actifs
+                    if (isMediumHighImpact(event.indicator) || event.importance.equals("HIGH")) {
+                        events.add(event);
+                    }
+                }
+            }
+        } finally {
+            if (reader != null) { try { reader.close(); } catch (IOException ignored) {} }
+            if (conn != null) conn.disconnect();
+        }
+        return events;
+     }
 
     /**
      * Point d'entrée principal (Pipeline de données à 3 niveaux)
