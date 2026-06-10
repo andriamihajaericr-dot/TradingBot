@@ -76,32 +76,80 @@ public class EventValidator {
         String upperCombined = (title + " " + content).toUpperCase(Locale.ROOT);
         
         // ── EXTRACTION PRIORITAIRE ET SYSTÉMATIQUE DES ACTIFS (Sécurité Rang Suprême) ──
-        try {
-            List<String> rawExtracted = new ArrayList<>();
-            String textToScan = upperCombined;
-    
-            if (textToScan.contains("EURUSD") || textToScan.contains("EUR/") || textToScan.contains("EURO")) rawExtracted.add("EURUSD");
-            if (textToScan.contains("USDJPY") || textToScan.contains("JPY")  || textToScan.contains("YEN"))  rawExtracted.add("USDJPY");
-            if (textToScan.contains("GBPUSD") || textToScan.contains("GBP/") || textToScan.contains("POUND")) rawExtracted.add("GBPUSD");
-            if (textToScan.contains("AUDUSD") || textToScan.contains("AUD/")) rawExtracted.add("AUDUSD");
-            if (textToScan.contains("USDCAD") || textToScan.contains("CAD/")) rawExtracted.add("USDCAD");
-            if (textToScan.contains("GOLD")   || textToScan.contains("XAU")) rawExtracted.add("GOLD");
-            if (textToScan.contains("USOIL")  || textToScan.contains("CRUDE") || textToScan.contains("WTI") || textToScan.contains("PETROLE") || textToScan.contains("BRENT")) rawExtracted.add("USOIL");
-            if (textToScan.contains("NASDAQ") || textToScan.contains("NAS100")|| textToScan.contains("USTECH") || textToScan.contains("TECH")) rawExtracted.add("NASDAQ");
-            if (textToScan.contains("SP500")  || textToScan.contains("S&P")   || textToScan.contains("SPX"))   rawExtracted.add("SP500");
-            if (textToScan.contains("BITCOIN")|| textToScan.contains("BTC"))  rawExtracted.add("BITCOIN");
-            if (textToScan.contains("US10Y")  || textToScan.contains("TREASURY") || textToScan.contains("YIELD") || textToScan.contains("10-YEAR")) rawExtracted.add("US10Y");
-    
-            // ✅ new ArrayList() n'est jamais null
-            for (String asset : rawExtracted) {
-                    if (asset != null && !detectedAssets.contains(asset)) {
-                        detectedAssets.add(asset);
-                    }
-                }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur lors de l'extraction brute des actifs", e);
+        // ── EXTRACTION PRIORITAIRE ET SYSTÉMATIQUE DES ACTIFS (Optimisé FinancialJuice & Interbancaire) ──
+try {
+    List<String> rawExtracted = new ArrayList<>();
+    String textToScan = upperCombined;
+
+    // 1. EURUSD
+    if (textToScan.contains("EURUSD") || textToScan.contains("EUR/") || textToScan.contains("EURO") || 
+        textToScan.contains("EUROZONE") || textToScan.contains("ECB") || textToScan.contains("BCE") || 
+        textToScan.contains("LAGARDE") || textToScan.contains(" EZ ")) {
+        rawExtracted.add("EURUSD");
+    }
+    // 2. USDJPY
+    if (textToScan.contains("USDJPY") || textToScan.contains("JPY") || textToScan.contains("YEN") || 
+        textToScan.contains("BOJ") || textToScan.contains("UEDA") || textToScan.contains("JGB")) {
+        rawExtracted.add("USDJPY");
+    }
+    // 3. GBPUSD
+    if (textToScan.contains("GBPUSD") || textToScan.contains("GBP/") || textToScan.contains("POUND") || 
+        textToScan.contains("CABLE") || textToScan.contains("BOE") || textToScan.contains("BAILEY") || textToScan.contains(" UK ")) {
+        rawExtracted.add("GBPUSD");
+    }
+    // 4. AUDUSD
+    if (textToScan.contains("AUDUSD") || textToScan.contains("AUD/") || textToScan.contains("AUSSIE") || 
+        textToScan.contains("RBA") || textToScan.contains("BULLOCK")) {
+        rawExtracted.add("AUDUSD");
+    }
+    // 5. USDCAD
+    if (textToScan.contains("USDCAD") || textToScan.contains("CAD/") || textToScan.contains("LOONIE") || 
+        textToScan.contains("BOC") || textToScan.contains("MACKLEM")) {
+        rawExtracted.add("USDCAD");
+    }
+    // 6. GOLD
+    if (textToScan.contains("GOLD") || textToScan.contains("XAU") || textToScan.contains(" OR ") || 
+        textToScan.contains("BULLION") || textToScan.contains("PRECIOUS METALS")) {
+        rawExtracted.add("GOLD");
+    }
+    // 7. USOIL
+    if (textToScan.contains("USOIL") || textToScan.contains("CRUDE") || textToScan.contains("WTI") || 
+        textToScan.contains("PETROLE") || textToScan.contains("BRENT") || textToScan.contains("OPEC") || 
+        textToScan.contains("OPEP") || textToScan.contains(" EIA ") || textToScan.contains(" API ")) {
+        rawExtracted.add("USOIL");
+    }
+    // 8. NASDAQ
+    if (textToScan.contains("NASDAQ") || textToScan.contains("NAS100") || textToScan.contains("USTECH") || 
+        textToScan.contains("TECH") || textToScan.contains("NVIDIA") || textToScan.contains(" SOX ")) {
+        rawExtracted.add("NASDAQ");
+    }
+    // 9. SP500
+    if (textToScan.contains("SP500") || textToScan.contains("S&P") || textToScan.contains("SPX") || 
+        textToScan.contains("WALL STREET") || textToScan.contains("US STOCKS") || textToScan.contains("MARKET CAP")) {
+        rawExtracted.add("SP500");
+    }
+    // 10. BITCOIN
+    if (textToScan.contains("BITCOIN") || textToScan.contains("BTC") || textToScan.contains("CRYPTO")) {
+        rawExtracted.add("BITCOIN");
+    }
+    // 11. US10Y
+    if (textToScan.contains("US10Y") || textToScan.contains("TREASURY") || textToScan.contains("YIELD") || 
+        textToScan.contains("10-YEAR") || textToScan.contains("BOND") || textToScan.contains("T-NOTE") || 
+        textToScan.contains("TREASURIES") || textToScan.contains("AUCTION") || textToScan.contains("POWELL") || 
+        textToScan.contains("FOMC") || textToScan.contains(" FED ")) {
+        rawExtracted.add("US10Y");
+    }
+
+    // Transfert sécurisé sans doublon
+    for (String asset : rawExtracted) {
+        if (asset != null && !detectedAssets.contains(asset)) {
+            detectedAssets.add(asset);
         }
+    }
+    
+} catch (Exception e) {
+    Log.e(TAG, "Erreur lors de l'extraction brute des actifs", e);
+ }
     
         // ── ÉTAPE 1 : Anti-Doublons (très haut dans le flux) ─────────────
         if (isRecentDuplicate(title, content)) {
