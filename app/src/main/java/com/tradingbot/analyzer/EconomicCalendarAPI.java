@@ -87,17 +87,7 @@ public class EconomicCalendarAPI {
         Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
     
         // ── Tentative FMP ──
-        if (targetContext != null) {
-            logToMain("🔄 [CALENDRIER] Chargement FMP en cours...");
-            List<CalendarEvent> events = fetchWithRetry(h -> fetchFromFMP(targetContext, h), hoursAhead);
-            if (!events.isEmpty()) {
-                logToMain("✅ [CALENDRIER] FMP : " + events.size() + " événements chargés (" + hoursAhead + "h)");
-                return events;
-            }
-            logToMain("⚠️ [CALENDRIER] FMP vide ou indisponible — bascule sur ForexFactory");
-        } else {
-            logToMain("⚠️ [CALENDRIER] Contexte FMP null — bascule directe sur ForexFactory");
-        }
+        
     
         // ── Tentative ForexFactory ──
         logToMain("🔄 [CALENDRIER] Chargement ForexFactory en cours...");
