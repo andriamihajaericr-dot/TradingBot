@@ -74,7 +74,7 @@ public class NotificationService extends NotificationListenerService {
         "Application obligatoire de la règle A (HAWKISH US) : " +
         "NASDAQ VENTE CHOC, SP500 VENTE CHOC, GOLD VENTE CHOC, " +
         "EURUSD VENTE CHOC, USDJPY ACHAT CHOC. " +
-        "Conviction plafonnée à 65% (modèle non officiel).\n"
+        "Conviction plafonnée à 65% (modèle non officiel).\n" +
     
         "3. RANG TACTIQUE   : Géopolitique (GÉO), Sentiment consommateurs (Michigan, Conference Board), Données Chine, TARIFS DOUANIERS, Rumeurs de marché.\n\n" +
         "RÈGLE ANTI-BRUIT (TRÈS IMPORTANTE) :\n" +
