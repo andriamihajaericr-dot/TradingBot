@@ -3119,10 +3119,17 @@ scheduler.scheduleAtFixedRate(new Runnable() {
     }
     private void startDailyBriefScheduler() {
         TimeZone tz = TimeZone.getTimeZone("Indian/Antananarivo"); // ✅ cohérent partout
-        int[] targetHours = {7, 8, 9, 12, 13, 16, 17};
-        for (int hour : targetHours) {
-            scheduleDailyBriefAt(hour, tz);
-        }
+        int[] targetHours = {8, 12, 15, 17, 21};
+        // ✅ Délai croissant entre rattrapages pour éviter les envois simultanés
+        // Chaque slot raté reçoit un délai supplémentaire de 90s
+        for (int i = 0; i < targetHours.length; i++) {
+            final int hour = targetHours[i];
+            final long catchupDelay = i * 90L; // 0s, 90s, 180s, 270s, 360s
+            scheduler.schedule(() ->
+               scheduleDailyBriefAt(hour, tz),
+               catchupDelay, TimeUnit.SECONDS
+             );
+        } 
     }
     private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
     // 1. Créer un formateur de date fiable (UTC+3)
