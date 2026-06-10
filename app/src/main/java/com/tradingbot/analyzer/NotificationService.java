@@ -1054,7 +1054,7 @@ boolean wasSaved = eventDb.saveEvent(
         "   • 💻 NASDAQ  : VENTE CHOC 🔴  | " +
         "⚠️ RÈGLE ABSOLUE : croissance forte = taux hauts = compression PE tech. " +
         "INTERDICTION FORMELLE de mettre ACHAT sur NASDAQ lors d'un signal HAWKISH US, " +
-        "même si la croissance paraît positive pour les bénéfices.\n"
+        "même si la croissance paraît positive pour les bénéfices.\n" +
         "   • 📊 SP500   : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Actif risk-on pénalisé par le resserrement (effet amplifié x2 à x3)\n" +
         "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴  | Dollar fort écrase l'Euro\n" +
