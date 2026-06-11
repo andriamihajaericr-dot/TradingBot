@@ -68,14 +68,21 @@ public class EventValidator {
 
     /**
      * Méthode principale de validation et d'enrichissement de la matrice d'actifs
-     */
-    public static ValidationResult validate(Context context, String title, String content, long timestamp, List<String> detectedAssets) {
+     */public static ValidationResult validate(Context context, String title, String content, long timestamp, List<String> detectedAssets) {
         ValidationResult result = new ValidationResult();
     
         if (title == null) title = "";
         if (content == null) content = "";
         if (detectedAssets == null) detectedAssets = new ArrayList<>();
     
+        // ✅ AJOUT SECURITY : Rejet immédiat si le flux contient du code source ou fichier local
+        String testUpper = (title + " " + content).toUpperCase(Locale.ROOT);
+        if (testUpper.contains(".JAVA") || testUpper.contains("PUBLIC CLASS") || testUpper.contains("IMPORT ANDROID.") || title.endsWith(".db")) {
+            result.isConfirmed = false;
+            result.reason = "Bruit système : Code source ou fichier local détecté";
+            return result;
+        }
+
         String combined = (title + " " + content).toLowerCase(Locale.ROOT);
         String upperCombined = (title + " " + content).toUpperCase(Locale.ROOT);
         
