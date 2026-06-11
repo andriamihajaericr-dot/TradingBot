@@ -2150,53 +2150,58 @@ public class NotificationService extends NotificationListenerService {
 
     public static void sendToGroqAndTelegram(String source, String title, String body, List<String> assets, Context context) {
         if (context == null) return;
+        
+        // ✅ Utilisation du hash sécurisé global pour éviter les doublons
         String fingerprint = generateSecureHash(source + title + body);
         NotificationService instance = serviceInstance;
     
-        // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report
-        if (instance != null && instance.eventDb != null) {
-            String assetsStr = assets != null ? android.text.TextUtils.join(",", assets) : "";
-            // ✅ impact décrit correctement pour le Daily Report
-            
+        // ✅ Récupération sécurisée du Singleton de la base de données
+        EventDatabase db = EventDatabase.getInstance(context);
+        if (db != null) {
+            // ✅ Remplacement de TextUtils par String.join pour une robustesse maximale
+            String assetsStr = (assets != null && !assets.isEmpty()) ? String.join(",", assets) : "";
             String impactLabel = "CALENDRIER ÉCONOMIQUE | " + title;
-            try {
-                // body contient "ACTUAL: X FORECAST: Y" (injecté par analyzeAndSendCalendarResult)
-                if (body.contains("HIGHER THAN EXPECTED"))
-                    impactLabel += " | Haute Volatilité (Biais Haussier)";
-                else if (body.contains("LOWER THAN EXPECTED"))
-                    impactLabel += " | Haute Volatilité (Biais Baissier)";
-                else
-                    impactLabel += " | Haute Volatilité";
-            } catch (Exception ignored) {
+            
+            // ✅ Sécurisation stricte des conditions avec des accolades {}
+            if (body.contains("HIGHER THAN EXPECTED")) {
+                impactLabel += " | Haute Volatilité (Biais Haussier)";
+            } else if (body.contains("LOWER THAN EXPECTED")) {
+                impactLabel += " | Haute Volatilité (Biais Baissier)";
+            } else {
                 impactLabel += " | Haute Volatilité";
             }
-            // ✅ Poids dynamique basé sur l'indicateur réel
+    
+            // ✅ Poids dynamique (Force à 3 minimum pour garantir l'inclusion dans le Daily Report)
             int calendarWeight = assignDriverWeight(title + " " + body);
-           // Si le poids calculé est < 3, forcer à 3 minimum
-           // car tout résultat calendaire avec actual mérite d'être dans le Daily Report
-           if (calendarWeight < 3) calendarWeight = 3;
-            instance.eventDb.saveEvent(
-            fingerprint,
-           "com.tradingbot.calendar",
-           source,
-           "CALENDAR-RESULT",
-           title,
-           body,
-           assetsStr,
-           impactLabel,
-           System.currentTimeMillis() / 1000,
-           "synced",
-           calendarWeight  // ✅ CPI → 5, GDP → 4, PMI → 3
-           );
+            if (calendarWeight < 3) {
+                calendarWeight = 3;
+            }
+    
+            // ✅ Sauvegarde brute et garantie dans SQLite
+            db.saveEvent(
+                fingerprint,
+                "com.tradingbot.calendar",
+                source,
+                "CALENDAR-RESULT",
+                title,
+                body,
+                assetsStr,
+                impactLabel,
+                System.currentTimeMillis() / 1000,
+                "synced",
+                calendarWeight
+            );
         }
     
+        // ✅ Dispatch vers l'IA ou envoi Telegram de secours si l'instance est instable
         if (instance != null) {
-            instance.processAnalysisWithAI(
-                source, title, body, assets, fingerprint, SYSTEM_PROMPT, true);
+            // ⚠️ Remplacer "PROMPT_SYSTEM_MACRO" par votre constante système réelle si nécessaire
+            instance.processAnalysisWithAI(source, title, body, assets, fingerprint, PROMPT_SYSTEM_MACRO, true);
         } else {
+            Log.w("NotificationService", "[CALENDAR] serviceInstance est null, envoi Telegram direct sans IA.");
             String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
             sendTelegramSecure(msg, context);
-                        }
+        }
     }
 
     @Override
