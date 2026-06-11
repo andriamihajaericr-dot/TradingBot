@@ -3051,15 +3051,29 @@ public class NotificationService extends NotificationListenerService {
               }
                 // ====================== ENVOI TELEGRAM ======================
                 if (activeSignalsCount > 0) {
-                int convictionPercent = extrairePourcentageConviction(aiReport);
-                
-                // ✅ Poids géo/macro selon conviction — cohérent avec processIncomingMacroFeed
-                int geoWeight = (convictionPercent >= 80) ? 4 : (convictionPercent >= 60) ? 3 : 1;
-                
-                // Mettre à jour le poids de l'événement dans votre table SQLite si nécessaire
-                db.mettreAJourPoidsEvenement(fingerprint, geoWeight); 
-            
-                if (convictionPercent >= 40 || isSupremeRank) {
+               // ─── METTEZ CECI À LA LIGNE 3064 (Dans le bloc Groq) ───
+                    int convictionPercent = extrairePourcentageConviction(aiReport);
+                    
+                    // ✅ Calcul dynamique du Poids géo/macro selon la conviction du rapport IA
+                    int geoWeight = (convictionPercent >= 80) ? 4 : (convictionPercent >= 60) ? 3 : 1;
+                    
+                    // ✅ Mise à jour directe du poids dans SQLite (Évite les erreurs de compilation de db.markEventAsSynced)
+                    try {
+                        android.database.sqlite.SQLiteDatabase writeableDb = db.getWritableDatabase();
+                        android.content.ContentValues cv = new android.content.ContentValues();
+                        cv.put("weight", geoWeight);
+                        writeableDb.update("events", cv, "fingerprint = ?", new String[]{fingerprint});
+                    } catch (Exception e) {
+                        Log.e(TAG, "Erreur lors de la mise à jour dynamique du poids pour " + fingerprint, e);
+                    }
+                    
+                    // ✅ On marque maintenant l'événement comme synchronisé avec la méthode officielle
+                    db.markEventAsSynced(fingerprint); 
+                    
+                    // ✅ Définition de isSupremeRank basée sur le rapport de l'IA
+                    boolean isSupremeRank = aiReport.contains("SUPREME_RANK") || convictionPercent >= 80;
+                    
+                    if (convictionPercent >= 40 || isSupremeRank) {
                     String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUES Pipeline*\n"
                             + "🕒 " + timeString + " (Mada)\n"
                             + "📡 Source : " + source + "\n"
