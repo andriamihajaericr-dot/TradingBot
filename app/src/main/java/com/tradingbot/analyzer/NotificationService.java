@@ -2266,8 +2266,12 @@ public class NotificationService extends NotificationListenerService {
             }
         }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
     
-        // ✅ Backfill au démarrage — délai 30s pour laisser le DB s'initialiser
-        scheduler.schedule(() -> runHistoricalBackfill(), 30, TimeUnit.SECONDS);
+       // ✅ Backfill au démarrage — délai 30s + initialiser lastBackfillTime immédiatement
+        lastBackfillTime = System.currentTimeMillis(); // bloque le NetworkCallback pendant 30min
+        scheduler.schedule(() -> {
+            lastBackfillTime = System.currentTimeMillis(); // reset au moment réel d'exécution
+            runHistoricalBackfill();
+        }, 30, TimeUnit.SECONDS);
     
         // ✅ Backfill quotidien à 7h00 heure Madagascar
         // Meilleur moment : connecté, marchés US fermés, données FMP stables
