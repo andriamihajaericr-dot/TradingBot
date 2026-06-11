@@ -731,7 +731,49 @@ public class NotificationService extends NotificationListenerService {
         "- Carry Trade Unwinding + GEO = Double risk-off → USDJPY et GOLD prioritaires\n" +
         "- Bank Failure + GEO = Risque systémique maximal → Conviction maximale autorisée\n"
         ;
-                
+    /**
+     * Formatage précis du prix selon le type d'actif.
+     * Aligné sur les standards professionnels du marché.
+     */
+    private String formatPrixActif(String nomActif, double prix) {
+        switch (nomActif) {
+            case "BITCOIN":
+                // BTC → entier, séparateur de milliers
+                return String.format(Locale.US, "%,.0f$", prix);
+    
+            case "GOLD":
+                // Or → 2 décimales, unité oz
+                return String.format(Locale.US, "%,.2f$/oz", prix);
+    
+            case "USOIL":
+                // Pétrole → 2 décimales, unité baril
+                return String.format(Locale.US, "%.2f$/b", prix);
+    
+            case "SP500":
+            case "NASDAQ":
+                // ETF indices → 2 décimales
+                return String.format(Locale.US, "%.2f$", prix);
+    
+            case "USDJPY":
+                // JPY → 3 décimales (standard marché)
+                return String.format(Locale.US, "%.3f", prix);
+    
+            case "EURUSD":
+            case "GBPUSD":
+            case "AUDUSD":
+            case "USDCAD":
+                // Forex majeurs → 5 décimales (standard pip)
+                return String.format(Locale.US, "%.5f", prix);
+    
+            case "US10Y":
+                // TLT ETF → 2 décimales
+                return String.format(Locale.US, "%.2f$ (TLT)", prix);
+    
+            default:
+                return String.format(Locale.US, "%.4f", prix);
+        }
+    }  
+
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
