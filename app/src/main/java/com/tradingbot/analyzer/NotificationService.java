@@ -32,7 +32,7 @@ import android.content.SharedPreferences;
 import java.util.regex.*; 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-
+import com.tradingbot.analyzer.MarketDataFetcher;
 public class NotificationService extends NotificationListenerService {
 
     private static final String TAG = "NotificationService";
