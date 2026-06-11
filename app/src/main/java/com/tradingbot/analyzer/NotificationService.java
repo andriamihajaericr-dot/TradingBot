@@ -3950,22 +3950,33 @@ public class NotificationService extends NotificationListenerService {
                     }
             
                     // Ligne principale
+                   // ── Formatage précis selon le type d'actif ──
+                    String prixFormaté = formatPrixActif(nomActif, data.price);
+                    
                     prixContext.append(String.format(Locale.US,
-                        "• %-8s : %,.4f | %+.2f%% (%s)%s\n",
-                        nomActif, data.price, data.changePercent, tendance, positionRange));
+                        "• %-8s : %s | %+.2f%% (%s)%s\n",
+                        nomActif, prixFormaté, data.changePercent,
+                        tendance, positionRange));
                 }
             
                 if (!hasPrix) {
                     prixContext.setLength(0); // aucun actif pertinent → pas d'injection
                 } else {
                     prixContext.append("──────────────────────────────────────────\n");
-                    prixContext.append("⚠️ RÈGLE DE CALIBRATION CONVICTION :\n");
-                    prixContext.append("- Actif à FORTE HAUSSE pré-existante + news bullish → ");
-                    prixContext.append("conviction -10% (momentum déjà pricé)\n");
-                    prixContext.append("- Actif à FORTE BAISSE pré-existante + news bearish → ");
-                    prixContext.append("conviction -10% (momentum déjà pricé)\n");
-                    prixContext.append("- Actif STABLE + news surprise forte → ");
-                    prixContext.append("conviction +10% (pas encore pricé)\n");
+                    prixContext.append("⚠️ RÈGLE DE CALIBRATION CONVICTION (OBLIGATOIRE) :\n");
+                    prixContext.append("Appliquer AVANT de calculer la conviction finale :\n\n");
+                    prixContext.append("  Si actif en FORTE HAUSSE (>1.5%) ET signal bullish :\n");
+                    prixContext.append("  → Momentum déjà intégré → PLAFONNER conviction à 65%\n\n");
+                    prixContext.append("  Si actif en FORTE BAISSE (>1.5%) ET signal bearish :\n");
+                    prixContext.append("  → Momentum déjà intégré → PLAFONNER conviction à 65%\n\n");
+                    prixContext.append("  Si actif en FORTE HAUSSE (>1.5%) ET signal bearish :\n");
+                    prixContext.append("  → Retournement probable → BONUS +10% sur conviction\n\n");
+                    prixContext.append("  Si actif STABLE (<0.15%) ET signal surprise (>10% écart) :\n");
+                    prixContext.append("  → Pas encore pricé → BONUS +10% sur conviction\n\n");
+                    prixContext.append("  Si actif Proche HIGH du jour ET signal bullish :\n");
+                    prixContext.append("  → Résistance proche → PLAFONNER conviction à 60%\n\n");
+                    prixContext.append("  Si actif Proche LOW du jour ET signal bearish :\n");
+                    prixContext.append("  → Support proche → PLAFONNER conviction à 60%\n");
                 }
             
             } catch (Exception ignored) {
