@@ -75,20 +75,18 @@ public class EventValidator {
         if (title == null) title = "";
         if (content == null) content = "";
         if (detectedAssets == null) detectedAssets = new ArrayList<>();
-    
-        // ✅ AJOUT ARBITRAGE : 0. Sécurité de Source (Anti-Bruit Fichiers / Chrome)
+        // ✅ 0. Sécurité de Source (Anti-Bruit Fichiers / Chrome)
         String testUpper = (title + " " + content).toUpperCase(Locale.ROOT);
         if (testUpper.contains(".JAVA") || testUpper.contains("PUBLIC CLASS") || testUpper.contains("IMPORT ANDROID.") || title.endsWith(".db")) {
             result.isConfirmed = false;
             result.reason = "Bruit système : Code source ou fichier local détecté";
             return result;
         }
-
         String combined = (title + " " + content).toLowerCase(Locale.ROOT);
-        String upperCombined = (title + " " + content).toUpperCase(Locale.ROOT);
+        String upperCombined = testUpper; // Réutilisation directe de la variable en majuscule
         
-        // Extraction de rawExtracted si elle est définie ou utilisée plus bas (optionnel selon votre structure)
-        String rawExtracted = upperCombined.replace(" :", ":").trim(); 
+        // Nettoyage de la chaîne pour l'interception et le traitement des espacements de métriques
+        String rawExtracted = upperCombined.replace(" :", ":").trim();
 
         // ✅ AJOUT ARBITRAGE : 1. Gestion de crise et désescalade événementielle
         GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
