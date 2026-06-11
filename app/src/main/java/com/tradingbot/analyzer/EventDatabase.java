@@ -123,7 +123,19 @@ public class EventDatabase extends SQLiteOpenHelper {
         cv.put("impact", finalImpact);
         db.update(TABLE_EVENTS, cv, "fingerprint = ?", new String[]{fingerprint});
     }
-
+    
+    public synchronized void updateEventWeight(String hash, int weight) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("weight", weight);
+        
+        try {
+            db.update(TABLE_EVENTS, values, "fingerprint = ?", new String[]{hash});
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur lors de la mise à jour du poids pour le hash : " + hash, e);
+        }
+    }
+    
     public String getRecentEventsForAssets(List<String> assets, int limit) {
         SQLiteDatabase db = this.getReadableDatabase();
         StringBuilder sb = new StringBuilder();
