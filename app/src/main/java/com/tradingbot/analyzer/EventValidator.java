@@ -121,17 +121,17 @@ public class EventValidator {
 
         // ✅ AJOUT ARBITRAGE : 2. Filtrage du Calendrier Suprême / Banques si la guerre est en cours
         if (isWarRegimeActive) {
-    // upperCombined contient déjà tout le texte en majuscules, il suffit de le tester directement
-    if (upperCombined.contains("DOVISH") || upperCombined.contains("HAWKISH") || 
-        upperCombined.contains("FED ") || upperCombined.contains("FOMC") || 
-        upperCombined.contains("BANQUE CENTRALE") || upperCombined.contains("CENTRAL BANK") ||
-        upperCombined.contains("CPI") || upperCombined.contains("PCE") || 
-        upperCombined.contains("PPI") || upperCombined.contains("INFLATION") ||
-        upperCombined.contains("RATE STATEMENT") || upperCombined.contains("INTEREST RATE")) {
-                // Forçage de l'alignement USDJPY en VENTE CHOC (Force du Yen refuge) pour éviter la neutralité
+            if (upperCombined.contains("DOVISH") || upperCombined.contains("HAWKISH") || 
+                upperCombined.contains("FED ") || upperCombined.contains("FOMC") || 
+                upperCombined.contains("BANQUE CENTRALE") || upperCombined.contains("CENTRAL BANK") ||
+                upperCombined.contains("CPI") || upperCombined.contains("PCE") || 
+                upperCombined.contains("PPI") || upperCombined.contains("INFLATION") ||
+                upperCombined.contains("RATE STATEMENT") || upperCombined.contains("INTEREST RATE")) {
+                
+                // Forçage de l'alignement USDJPY en VENTE CHOC (Yen refuge) pour éviter la neutralité spéculative
                 if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
                 
-                result.isConfirmed = false; // Bloque l'envoi de la réévaluation à Groq
+                result.isConfirmed = false; // Bloque l'envoi de la réévaluation standard à Groq
                 result.reason = "Régime de Guerre actif : Arbitrage prioritaire. Flux structurel (Banque/Inflation/Supreme) filtré.";
                 logToMain("🛡️ [ARBITRAGE] Flux Suprême (Inflation/Bancaire) intercepté sous Régime de Guerre.");
                 return result;
@@ -139,11 +139,8 @@ public class EventValidator {
         }
 
         // ── ⚡ INTERCEPTION & DÉROGATION ABSOLUE : VERSION SOUVERAINE FINANCIALJUICE ──
-        String normalizedInput = upperCombined.replace(" :", ":").trim();
-
-// 2️⃣ Détection adaptative : Valide la présence d'ACTUAL et d'une métrique de comparaison
-if (normalizedInput.contains("ACTUAL:") && (normalizedInput.contains("FORECAST:") || normalizedInput.contains("PREVIOUS:"))) {
-    
+        // Utilisation directe de la variable unifiée rawExtracted
+        if (rawExtracted.contains("ACTUAL:") && (rawExtracted.contains("FORECAST:") || rawExtracted.contains("PREVIOUS:"))) {
     // ── BLOC 1 : RANG SUPRÊME / MACRO US ──
     // (Impact : GOLD, NASDAQ, USDJPY, US10Y, SP500, USOIL)
     if (normalizedInput.contains("US ") || normalizedInput.contains("USA ") || normalizedInput.contains("UNITED STATES") || 
