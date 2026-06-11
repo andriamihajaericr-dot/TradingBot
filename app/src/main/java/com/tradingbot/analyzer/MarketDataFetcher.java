@@ -193,6 +193,10 @@ public class MarketDataFetcher {
     // ══════════════════════════════════════════════════════════════
     // REQUÊTE UNIFIÉE TWELVE DATA AVEC GESTION D'ERREUR AMÉLIORÉE
     // ══════════════════════════════════════════════════════════════
+    // ✅ Public pour injection dans NotificationService
+    public static MarketData fetchMarketDataPublic(String symbol) {
+        return fetchMarketData(symbol);
+    }
     private static MarketData fetchMarketData(String symbol) {
         String urlStr = "https://api.twelvedata.com/quote?symbol=" + symbol + "&apikey=" + TWELVE_DATA_KEY;
         HttpURLConnection conn = null;
