@@ -29,10 +29,8 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
 import android.content.SharedPreferences;
-import java.util.regex.*; 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import com.tradingbot.analyzer.MarketDataFetcher;
+import java.util.regex.*;
+
 public class NotificationService extends NotificationListenerService {
 
     private static final String TAG = "NotificationService";
@@ -52,31 +50,16 @@ public class NotificationService extends NotificationListenerService {
     private static final String PREF_MACRO_KEY  = "macro_api_key";
     private static final String PREFS_NAME      = "TradingBot";
     private static final long GLOBAL_THROTTLE_MS = 8 * 60 * 1000L;   // 8 minute
-    private static final long GEO_THROTTLE_MS   = 20 * 60 * 1000L;  // 12 minutes pour géo
+    private static final long GEO_THROTTLE_MS   = 12 * 60 * 1000L;  // 12 minutes pour géo
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
-    private volatile long lastBackfillTime = 0L;
-    private static final String SYSTEM_PROMPT = 
-    "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif d'élite.\n" +
+    private static final String SYSTEM_PROMPT = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif d'élite.\n" +
         "Tu analyses le flux d'actualité en direct en appliquant une HIERARCHIE STRICTE DES DRIVERS sans aucune place à l'interprétation.\n\n" +
         "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
-        "1. RANG SUPRÊME    : Politique Monétaire (Interventions de Powell, " +
-        "Kevin Warsh (Futur Chair Fed — profil HAWKISH agressif, chaque signal = " +
-        "politique post-mai 2026 à pricer immédiatement), Lagarde, Schnabel, etc.), " +
-        "Nominations Banques Centrales, CPI/PCE, NFP/Emploi.\n" +
-        "2. RANG SECONDAIRE : PIB/GDP Advance (récession/expansion trimestrielle), " +
-        "ISM Services (80% économie US — leading indicator fort), " +
-        "ISM Manufacturing, PMI Flash/Preliminary (surprise fréquente), " +
-        "Michigan Sentiment Preliminary (proxy anticipations inflation Fed), " +
-        "Ventes au détail, Stocks EIA, Stimulus Fiscal / Dépenses Publiques.\n" +
-        "⚠️ RÈGLE GDPNOW ATLANTA FED : GDPNow est une RÉVISION DE MODÈLE, " +
-        "pas le GDP Advance officiel. Vecteur = HAWKISH si révisé à la hausse. " +
-        "Application obligatoire de la règle A (HAWKISH US) : " +
-        "NASDAQ VENTE CHOC, SP500 VENTE CHOC, GOLD VENTE CHOC, " +
-        "EURUSD VENTE CHOC, USDJPY ACHAT CHOC. " +
-        "Conviction plafonnée à 65% (modèle non officiel).\n" +
-    
+        "1. RANG SUPRÊME    : Politique Monétaire (Interventions de Powell, Lagarde, Schnabel, etc.), Nominations Banques Centrales, CPI/PCE, NFP/Emploi.\n" +
+        "2. RANG SECONDAIRE : PIB/GDP, PMI, ISM, Ventes au détail, Stocks EIA, Stimulus Fiscal / Dépenses Publiques.\n" +
         "3. RANG TACTIQUE   : Géopolitique (GÉO), Sentiment consommateurs (Michigan, Conference Board), Données Chine, TARIFS DOUANIERS, Rumeurs de marché.\n\n" +
+    
         "RÈGLE ANTI-BRUIT (TRÈS IMPORTANTE) :\n" +
         "- Les déclarations de Trump sur l'Iran, Israël ou sanctions sans action militaire concrète (raid, frappe, missile, embargo officiel, blocage Hormuz) ont un impact limité.\n" +
         "- Ne transforme JAMAIS une simple déclaration diplomatique ou répétition de news en choc majeur.\n" +
@@ -97,23 +80,18 @@ public class NotificationService extends NotificationListenerService {
         "- Dans ce cas, utilise exclusivement les mentions 'INCLINATION ACHAT MAIS NEUTRE' ou 'INCLINATION VENTE MAIS NEUTRE' sur les actifs concernés.\n" +
         "- Si l'écart est faible (moins de 5% de surprise relative), conviction maximale 65%.\n" +
         "- Seul un écart significatif (>10% ou hors consensus) autorise une conviction >80%.\n\n" +
-
+    
         "════════════════════════════════════════════════════════\n" +
         " RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS — EXHAUSTIVES\n" +
         "════════════════════════════════════════════════════════\n\n" +
         "A. NEWS ÉTATS-UNIS — POLITIQUE MONÉTAIRE / CPI / NFP\n" +
         "───────────────────────────────────────────────────────\n" +
-        "   HAWKISH US (CPI > prévisions, NFP fort, Fed hawkish, discours ferme " +
-        "de Powell, discours hawkish de Warsh = signal politique future restrictive, " +
-        "nomination hawkish) :\n" +
+        "   HAWKISH US (CPI > prévisions, NFP fort, Fed hawkish, discours ferme de Powell, nomination hawkish) :\n" +
         "   • 📈 US10Y    : ACHAT CHOC 🟢  | Rendements montent avec les anticipations de hausse\n" +
         "   • 🇨🇦 USDCAD  : ACHAT CHOC 🟢  | Dollar fort face au CAD\n" +
         "   • 🇯🇵 USDJPY  : ACHAT CHOC 🟢  | Dollar fort face au Yen ← TOUJOURS ACHAT sur HAWKISH US\n" +
         "   • 🏆 GOLD    : VENTE CHOC 🔴  | Dollar fort pénalise l'or\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴  | " +
-        "⚠️ RÈGLE ABSOLUE : croissance forte = taux hauts = compression PE tech. " +
-        "INTERDICTION FORMELLE de mettre ACHAT sur NASDAQ lors d'un signal HAWKISH US, " +
-        "même si la croissance paraît positive pour les bénéfices.\n" +
+        "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Taux hauts compressent les valorisations tech\n" +
         "   • 📊 SP500   : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Actif risk-on pénalisé par le resserrement (effet amplifié x2 à x3)\n" +
         "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴  | Dollar fort écrase l'Euro\n" +
@@ -121,8 +99,8 @@ public class NotificationService extends NotificationListenerService {
         "   • 🇦🇺 AUDUSD  : VENTE CHOC 🔴  | Devise risk-on pénalisée\n" +
         "   • 🛢️ USOIL    : NEUTRE          | Pas d'impact direct sauf si contexte GÉO simultané\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : DOLLAR FORT (MKT RISK-OFF) 🐻\n\n" +
-        "   DOVISH US (CPI < prévisions, NFP faible, Fed dovish, discours " +
-        "accommodant de Powell, signal accommodant inattendu de Warsh) :\n" +
+    
+        "   DOVISH US (CPI < prévisions, NFP faible, Fed dovish, discours accommodant de Powell, anticipation de baisses de taux) :\n" +
         "   • 📈 US10Y    : VENTE CHOC 🔴  | Rendements baissent avec les anticipations de baisse\n" +
         "   • 🇨🇦 USDCAD  : VENTE CHOC 🔴  | Dollar faible face au CAD\n" +
         "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴  | Dollar faible face au Yen ← TOUJOURS VENTE sur DOVISH US\n" +
@@ -214,8 +192,7 @@ public class NotificationService extends NotificationListenerService {
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Retrait immédiat des capitaux des actifs spéculatifs\n" +
         "   • 📈 US10Y    : ACHAT CHOC 🟢  | Ruée vers la sécurité des bons du Trésor américains\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : YEN FORT / OR FORT (MKT RISK-OFF) 🐻\n\n" +
-        "   ⚠️ CONTRAINTE IMPÉRATIVE SUR L'USDJPY :\n" +
-        "   En cas d'activation du \"Régime de Guerre\" ou de flux dominant \"RISK-OFF GÉOPOLITIQUE\", la paire USDJPY ne peut EN AUCUN CAS être classée comme \"NEUTRE ⚪\". Le Yen ($JPY$) agissant comme un refuge monétaire absolu de premier plan, il doit surperformer le Dollar. Vous devez obligatoirement attribuer à l'USDJPY le statut \"VENTE CHOC 🔴\" avec une conviction minimale de \"🔴🔴🔴🔴⚪\", en indiquant comme raison : \"Le Yen surperforme toutes les devises fiduciaires par flux de rapatriement de capitaux (Safe-Haven)\".\n\n" +
+    
         "   DÉSESCALADE MOYEN-ORIENT (Discussions, Accords, Trêve) :\n" +
         "   Impact modéré, conviction plafonnée à 45%.\n" +
         "   • 🏆 GOLD    : VENTE CHOC 🔴  | Sortie des refuges\n" +
@@ -259,121 +236,7 @@ public class NotificationService extends NotificationListenerService {
         "   DÉSESCALADE TARIFAIRE (suspension, baisse, accord) :\n" +
         "   Inverser toutes les directions ci-dessus, conviction plafonnée à 50%.\n" +
         "   🏁 FLUX DOMINANT : RISK-ON / APPÉTIT POUR LE RISQUE 🐂\n\n" +
-        "H. TREASURY AUCTIONS / DEBT CEILING / CRISE BUDGÉTAIRE US\n" +
-        "──────────────────────────────────────────────────────────\n" +
-        "   Treasury Auction FAIBLE (tail, bid-to-cover < 2.3, yield > prévision) :\n" +
-        "   • 📈 US10Y   : VENTE CHOC 🔴 | Demande insuffisante → yields montent\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Méfiance envers la dette US\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Taux hauts compressent les valorisations\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   Debt Ceiling Crisis (impasse au Congrès, risque de défaut) :\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Couverture souveraine maximale\n" +
-        "   • 📈 US10Y   : VENTE CHOC 🔴 | Prime de risque sur la dette US\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Risk-off institutionnel\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation actifs spéculatifs\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Yen refuge\n" +
-        "   🏁 FLUX DOMINANT : OR FORT / RISK-OFF SOUVERAIN 🐻\n\n" +
-
-        "I. CARRY TRADE UNWINDING / INTERVENTION MOF JAPON\n" +
-        "──────────────────────────────────────────────────\n" +
-        "   ATTENTION : Ce driver crée des mouvements violents et soudains.\n" +
-        "   Intervention VERBALE MOF ('watching closely', 'excessive moves') :\n" +
-        "   • 🇯🇵 USDJPY  : INCLINATION VENTE MAIS NEUTRE | Alerte sans action directe\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   Intervention DIRECTE BOJ (achat massif de Yen confirmé) :\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Gap instantané 200-500 pips\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Fuite vers les refuges\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   Carry Trade Unwinding (USDJPY chute > 2% sur une session) :\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Débouclage massif\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Vente d'actifs risk-on pour rembourser emprunts Yen\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation amplifiée\n" +
-        "   🏁 FLUX DOMINANT : RISK-OFF CARRY TRADE / YEN FORT 🐻\n\n" +
-
-        "J. BIG TECH EARNINGS (NASDAQ/SP500 DRIVER DIRECT)\n" +
-        "──────────────────────────────────────────────────\n" +
-        "   NVDA / AAPL / MSFT / AMZN / META / GOOGL / TESLA EARNINGS BEAT :\n" +
-        "   • 💻 NASDAQ  : ACHAT CHOC 🟢 | Valorisations soutenues\n" +
-        "   • 📊 SP500   : ACHAT CHOC 🟢 | Même direction NASDAQ obligatoire\n" +
-        "   • ₿ BITCOIN  : ACHAT CHOC 🟢 | Sentiment risk-on amplifié\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   EARNINGS MISS / PROFIT WARNING / GUIDANCE BAISSIÈRE :\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Compression des valorisations\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Risk-off amplifié\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   🏁 FLUX DOMINANT : TECH DRIVEN (NASDAQ LEADER) 💻\n\n" +
-
-        "K. BITCOIN DRIVERS SPÉCIFIQUES\n" +
-        "──────────────────────────────\n" +
-        "   Bitcoin ETF Flows POSITIFS (> 300M$ net inflow journalier) :\n" +
-        "   • ₿ BITCOIN  : ACHAT CHOC 🟢 | Demande institutionnelle confirmée\n" +
-        "   • 💻 NASDAQ  : INCLINATION ACHAT MAIS NEUTRE | Sentiment risk-on tech\n" +
-        "   Bitcoin ETF Flows NÉGATIFS (outflows > 200M$) :\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Retrait institutionnel\n" +
-        "   SEC Enforcement / Regulatory Crackdown :\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Capitulation réglementaire\n" +
-        "   • 💻 NASDAQ  : INCLINATION VENTE MAIS NEUTRE | Risque réglementaire tech\n" +
-        "   Exchange Hack / Collapse (FTX type) :\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Panique systémique crypto\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Contagion sentiment risk-off\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   🏁 FLUX DOMINANT : CRYPTO SPECIFIC (BITCOIN LEADER) ₿\n\n" +
-
-        "L. RISQUE SYSTÉMIQUE BANCAIRE\n" +
-        "──────────────────────────────\n" +
-        "   Bank Run / Bank Failure / Banking Crisis :\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge anti-système bancaire\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Contagion financière systémique\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   • 📈 US10Y   : ACHAT CHOC 🟢 | Fuite vers la sécurité des Treasuries\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Yen refuge\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation d'urgence actifs spéculatifs\n" +
-        "   • 🇦🇺 AUDUSD  : VENTE CHOC 🔴 | Devise risk-on pénalisée\n" +
-        "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴 | Contagion si banque européenne impliquée\n" +
-        "   • 🛢️ USOIL    : VENTE CHOC 🔴 | Demande anticipée en baisse\n" +
-        "   🏁 FLUX DOMINANT : RISK-OFF SYSTÉMIQUE / OR FORT 🐻\n\n" +
-
-        "M. CRISE SOUVERAINE EUROPÉENNE (Spreads BTP/OAT)\n" +
-        "──────────────────────────────────────────────────\n" +
-        "   BTP/Bund spread > 250bps ou OAT/Bund spread > 80bps :\n" +
-        "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴 | Crise de confiance en zone Euro\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge contre instabilité européenne\n" +
-        "   • 💻 NASDAQ  : NEUTRE | Pas d'impact direct actifs US\n" +
-        "   • 📊 SP500   : NEUTRE | Même direction NASDAQ obligatoire\n" +
-        "   • 🇬🇧 GBPUSD  : INCLINATION VENTE MAIS NEUTRE | Effet de bord modéré\n" +
-        "   🏁 FLUX DOMINANT : EURO FAIBLE / CRISE SOUVERAINE 🐻\n\n" +
-
-        "N. IRON ORE / COPPER — PROXY AUD/CHINE\n" +
-        "─────────────────────────────────────────\n" +
-        "   Iron Ore > +3% ou Copper > +2% (stimulus Chine, demande forte) :\n" +
-        "   • 🇦🇺 AUDUSD  : ACHAT CHOC 🟢 | Australie = 1er exportateur fer mondial\n" +
-        "   • 🛢️ USOIL    : INCLINATION ACHAT MAIS NEUTRE | Demande industrielle\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   Iron Ore < -3% ou Copper < -2% (ralentissement Chine) :\n" +
-        "   • 🇦🇺 AUDUSD  : VENTE CHOC 🔴 | Corrélation directe iron ore/AUD\n" +
-        "   • 🛢️ USOIL    : INCLINATION VENTE MAIS NEUTRE | Demande industrielle faible\n" +
-        "   🏁 FLUX DOMINANT : AUD/CHINE CORRÉLATION MATIÈRES PREMIÈRES 🦘\n\n" +
-
-        "O. SPR / BAKER HUGHES / API CRUDE\n" +
-        "────────────────────────────────────\n" +
-        "   SPR Release (libération réserves stratégiques US > 1M barils) :\n" +
-        "   • 🛢️ USOIL    : VENTE CHOC 🔴 | Offre supplémentaire immédiate\n" +
-        "   • 🇨🇦 USDCAD  : ACHAT CHOC 🟢 | CAD s'affaiblit avec le pétrole\n" +
-        "   Baker Hughes Rig Count HAUSSE (> +10 rigs hebdomadaire) :\n" +
-        "   • 🛢️ USOIL    : INCLINATION VENTE MAIS NEUTRE | Offre future en hausse\n" +
-        "   Baker Hughes Rig Count BAISSE (< -10 rigs hebdomadaire) :\n" +
-        "   • 🛢️ USOIL    : INCLINATION ACHAT MAIS NEUTRE | Offre future en baisse\n" +
-        "   API Crude Stock HAUSSE surprise :\n" +
-        "   • 🛢️ USOIL    : VENTE CHOC 🔴 | Anticipation EIA confirm surplus\n" +
-        "   API Crude Stock BAISSE surprise :\n" +
-        "   • 🛢️ USOIL    : ACHAT CHOC 🟢 | Anticipation EIA confirm déficit\n" +
-        "   🏁 FLUX DOMINANT : USOIL SUPPLY DRIVEN 🛢️\n\n" +
-
+    
         "<HARD_CONSTRAINTS>\n" +
         "CONTRAINTE 1 — SECTIONS INTERDITES :\n" +
         "   N'écris JAMAIS 'TIMING D'EFFET', 'ACTION TRADING', 'CONTEXTE' ou toute autre section\n" +
@@ -443,20 +306,6 @@ public class NotificationService extends NotificationListenerService {
         "     * 🇯🇵 USDJPY  : VENTE CHOC 🔴 [Régime de dominance géopolitique – Yen refuge prioritaire]\n" +
         "     * 🇨🇦 USDCAD  : NEUTRE ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
         "   - Le modèle doit mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans le FAIT MARQUANT.\n\n" +
-    
-         "RÈGLES DE CORRÉLATION TEMPORELLE (Priorité maximale) :\n" +
-         "- NFP FORT (derniers 7 jours) + CPI FORT aujourd'hui = CONFIRMATION HAWKISH — Conviction +15%\n" +
-         "- NFP FAIBLE (derniers 7 jours) + CPI FAIBLE aujourd'hui = CONFIRMATION DOVISH — Conviction +15%\n" +
-         "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE — Conviction plafonnée à 55%, signaler divergence\n" +
-         "- GEO ESCALADE active (< 48h) + tout driver HAWKISH = Double choc — Or et Pétrole prioritaires\n" +
-         "- GEO ESCALADE active + DOVISH = Annulation partielle — conviction GEO plafonnée à 60%\n" +
-         "- FOMC réunion dans < 7 jours = tout CPI/NFP reçoit +20% de conviction additionnelle\n" +
-         "- WARSH HAWKISH (< 48h) + CPI/NFP FORT = DOUBLE SIGNAL RESTRICTIF — " +
-         "Conviction +20%, dollar fort prioritaire sur tous actifs\n" +
-         "- WARSH HAWKISH (< 48h) + CPI/NFP FAIBLE = SIGNAL CONTRADICTOIRE — " +
-         "Conviction plafonnée à 55%, signaler divergence marché vs futur Chair\n" +
-         "- WARSH DOVISH inattendu = SURPRISE MAXIMALE — Conviction +25%, " +
-         "repricing immédiat des anticipations de taux\n" +
         "</HARD_CONSTRAINTS>\n\n" +
     
         "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
@@ -524,8 +373,7 @@ public class NotificationService extends NotificationListenerService {
         "[Risque principal ou condition qui pourrait inverser le flux dominant, en une phrase]\n\n" +
         
         "🏁 FLUX DOMINANT : [DOLLAR FORT / DOLLAR FAIBLE / RISK-ON / RISK-OFF / YEN FORT / EURO FORT / OR FORT]\n\n" +
-        "   ⚠️ CONTRAINTE IMPÉRATIVE SUR L'USDJPY :\n" +
-        "   En cas d'activation du \"Régime de Guerre\" ou de flux dominant \"RISK-OFF GÉOPOLITIQUE\", la paire USDJPY ne peut EN AUCUN CAS être classée comme \"NEUTRE ⚪\". Le Yen ($JPY$) agissant comme un refuge monétaire absolu de premier plan, il doit surperformer le Dollar. Vous devez obligatoirement attribuer à l'USDJPY le statut \"VENTE CHOC 🔴\" avec une conviction minimale de \"🔴🔴🔴🔴⚪\", en indiquant comme raison : \"Le Yen surperforme toutes les devises fiduciaires par flux de rapatriement de capitaux (Safe-Haven)\".\n\n" +
+        
         "═══════════════════════════════════════════════════════════════\n" +
         "                     PALIERS DE CONVICTION (Jauge 5 cercles)\n" +
         "═══════════════════════════════════════════════════════════════\n\n" +
@@ -539,39 +387,24 @@ public class NotificationService extends NotificationListenerService {
         "═══════════════════════════════════════════════════════════════\n\n" +
         
         "RÈGLE 1 : CLASSEMENT ET DOMINANCE DE LA HIÉRARCHIE DES DRIVERS\n" +
-        "- RANG SUPRÊME : Politiques monétaires (FED — Powell et Warsh futur Chair, " +
-        "BCE, BoJ, BoE, RBA, BoC) et indicateurs clés (CPI, NFP, PPI, FOMC, " +
-        "GDP Advance, ISM Services, PMI Flash, Michigan Preliminary, " +
-        "Ventes au détail, Chômage).\n" +
+        "- RANG SUPRÊME : Politiques monétaires (FED, BCE, BoJ, BoE, RBA, BoC) et indicateurs clés (CPI, NFP, PPI, FOMC, PIB, Ventes au détail, Chômage).\n" +
         "- RANG SECONDAIRE : Données sectorielles majeures (Stocks d'énergie EIA, OPEC, rapports agricoles d'importance).\n" +
         "- RANG TACTIQUE : Événements géopolitiques, sanctions, taxes commerciales, indices de confiance/sentiment secondaires.\n" +
         "👉 LOI DE DOMINANCE ABSOLUE : Si un événement de RANG SUPRÊME est actif dans les données des 24h, c'est sa logique directionnelle qui dicte le comportement du marché. Un driver tactique (comme des tensions géopolitiques) ne peut ni inverser ni annuler la direction des actifs dictée par le driver suprême.\n\n" +
         
         "RÈGLE 2 : DRIVER ÉCONOMIQUE OU BANQUE CENTRALE AMÉRICAINE (USA)\n" +
-        "A) Si les données sont HAWKISH / FORTES (Inflation supérieure aux prévisions, " +
-        "discours restrictif de Powell/FED ou Warsh, NFP/Emplois très forts, " +
-        "PIB en forte hausse, GDPNow Atlanta révisé à la hausse) :\n" +
-        "   ⚠️ RÈGLE ABSOLUE ANTI-CONFUSION : Une croissance économique forte " +
-        "signifie que la Fed maintient ou hausse les taux → taux hauts = " +
-        "compression des valorisations tech. NASDAQ et SP500 sont TOUJOURS " +
-        "en VENTE CHOC sur un signal HAWKISH, même si la croissance " +
-        "paraît positive pour les bénéfices. INTERDICTION FORMELLE d'inverser.\n" +
-        "   ⚠️ RÈGLE GDPNOW : GDPNow Atlanta Fed est une révision de modèle " +
-        "(pas le GDP Advance officiel). Traiter comme signal HAWKISH si révisé " +
-        "à la hausse. Conviction plafonnée à 65%.\n" +
-        "   • 📈 US10Y   -> ACHAT CHOC 🟢 [Les rendements obligataires montent]\n" +
-        "   • 💻 NASDAQ  -> VENTE CHOC 🔴 [La hausse des taux pénalise " +
-        "les valeurs technologiques]\n" +
-        "   • 📊 SP500   -> VENTE CHOC 🔴 [Symétrie absolue obligatoire avec NASDAQ]\n" +
-        "   • 🏆 GOLD    -> VENTE CHOC 🔴 [Taux réels plus élevés et Dollar fort]\n" +
-        "   • 🛢️ USOIL   -> NEUTRE ⚪\n" +
-        "   • 🇪🇺 EURUSD -> VENTE CHOC 🔴 [Euro s'effondre face au Dollar]\n" +
-        "   • 🇯🇵 USDJPY -> ACHAT CHOC 🟢 [Dollar s'apprécie face au Yen]\n" +
-        "   • 🇨🇦 USDCAD -> ACHAT CHOC 🟢 [Dollar s'impose face au CAD]\n" +
-        "   • 🇬🇧 GBPUSD -> VENTE CHOC 🔴 [Livre baisse face au Dollar]\n" +
-        "   • 🇦🇺 AUDUSD -> VENTE CHOC 🔴 [Aussie recule face au Dollar]\n" +
-        "   • ₿ BITCOIN  -> VENTE CHOC 🔴 [Aversion au risque liquide " +
-        "les actifs spéculatifs]\n" +
+        "A) Si les données sont HAWKISH / FORTES (Inflation supérieure aux prévisions, discours restrictif de Powell/FED, NFP/Emplois très forts, PIB en forte hausse) :\n" +
+        "   • 📈 US10Y   -> ACHAT CHOC 🟢 [Les rendements obligataires montent mécaniquement]\n" +
+        "   • 💻 NASDAQ  -> VENTE CHOC 🔴 [La hausse des taux d'intérêt pénalise les valeurs technologiques]\n" +
+        "   • 📊 SP500   -> VENTE CHOC 🔴 [Symétrie absolue obligatoire avec le NASDAQ]\n" +
+        "   • 🏆 GOLD    -> VENTE CHOC 🔴 [Taux réels plus élevés et Dollar fort pèsent sur l'Or]\n" +
+        "   • 🛢️ USOIL   -> NEUTRE ⚪ ou selon driver secondaire dédié.\n" +
+        "   • 🇪🇺 EURUSD -> VENTE CHOC 🔴 [L'Euro s'effondre face à la hausse globale du Dollar US]\n" +
+        "   • 🇯🇵 USDJPY -> ACHAT CHOC 🟢 [Le Dollar s'apprécie face au Yen par élargissement du différentiel de taux]\n" +
+        "   • 🇨🇦 USDCAD -> ACHAT CHOC 🟢 [Le Dollar américain s'impose face au Dollar Canadien]\n" +
+        "   • 🇬🇧 GBPUSD -> VENTE CHOC 🔴 [La Livre Sterling baisse face au Dollar US]\n" +
+        "   • 🇦🇺 AUDUSD -> VENTE CHOC 🔴 [L'Aussie Dollar recule face au Dollar US]\n" +
+        "   • ₿ BITCOIN  -> VENTE CHOC 🔴 [L'aversion au risque liée aux taux hauts liquide les actifs spéculatifs]\n" +
         "   • 🏁 FLUX DOMINANT -> DOLLAR FORT\n\n" +
         
         "B) Si les données sont DOVISH / FAIBLES (Inflation plus basse que prévu, discours accommodant de la FED, hausse des inscriptions au chômage, PIB décevant) :\n" +
@@ -619,370 +452,12 @@ public class NotificationService extends NotificationListenerService {
         "═══════════════════════════════════════════════════════════════\n\n" +
         "1. SYMÉTRIE STRICTE DES INDICES : Le couple 💻 NASDAQ et 📊 SP500 doit pointer impérativement dans le même sens (soit deux ACHAT CHOC, soit deux VENTE CHOC, soit deux NEUTRE). Aucune divergence n'est tolérée.\n" +
         "2. AMPLIFICATION DES CRYPTOS : L'actif ₿ BITCOIN est traité comme un indicateur de bêta élevé lié au sentiment technologique. Il doit calquer sa direction sur celle du 💻 NASDAQ.\n" +
-        "3. EXCLUSION ET CONCISION : Pas de politesse, pas de salutations, pas de résumés verbeux des actualités passées. Calculez les directions comme un algorithme purement déterministe. Les 11 actifs doivent figurer sur le rapport, sans omission.\n\n" +
-
-        "═══════════════════════════════════════════════════════════════\n" +
-        "         RÈGLES ADDITIONNELLES — DRIVERS SPÉCIFIQUES PAR ACTIF\n" +
-        "═══════════════════════════════════════════════════════════════\n\n" +
-        
-        "RÈGLE 6 : TREASURY AUCTIONS / DEBT CEILING\n" +
-        "- Treasury Auction FAIBLE (tail, bid-to-cover < 2.3) :\n" +
-        "  • 📈 US10Y : VENTE CHOC 🔴 | Demande insuffisante → yields montent\n" +
-        "  • 🏆 GOLD  : ACHAT CHOC 🟢 | Méfiance envers la dette US\n" +
-        "  • 💻 NASDAQ : VENTE CHOC 🔴 | Taux hauts compressent les valorisations\n" +
-        "  • 📊 SP500  : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "- Debt Ceiling Crisis :\n" +
-        "  • 🏆 GOLD  : ACHAT CHOC 🟢 | Couverture souveraine maximale\n" +
-        "  • 📈 US10Y : VENTE CHOC 🔴 | Prime de risque sur la dette US\n" +
-        "  • 💻 NASDAQ : VENTE CHOC 🔴 | Risk-off institutionnel\n" +
-        "  • 📊 SP500  : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "  • ₿ BITCOIN : VENTE CHOC 🔴 | Liquidation actifs spéculatifs\n" +
-        "  • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Yen refuge\n" +
-        "  🏁 FLUX DOMINANT : OR FORT / RISK-OFF SOUVERAIN 🐻\n\n" +
-        
-        "RÈGLE 7 : CARRY TRADE UNWINDING / INTERVENTION MOF JAPON\n" +
-        "- Intervention VERBALE MOF ('watching closely', 'excessive moves') :\n" +
-        "  • 🇯🇵 USDJPY : INCLINATION VENTE MAIS NEUTRE | Alerte sans action\n" +
-        "- Intervention DIRECTE BOJ :\n" +
-        "  • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Gap instantané 200-500 pips\n" +
-        "  • 🏆 GOLD : ACHAT CHOC 🟢 | Refuge\n" +
-        "- Carry Trade Unwinding (USDJPY chute > 2% sur une session) :\n" +
-        "  • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Débouclage massif\n" +
-        "  • 💻 NASDAQ : VENTE CHOC 🔴 | Vente actifs risk-on pour rembourser emprunts Yen\n" +
-        "  • 📊 SP500  : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "  • 🏆 GOLD  : ACHAT CHOC 🟢 | Refuge\n" +
-        "  • ₿ BITCOIN : VENTE CHOC 🔴 | Liquidation amplifiée\n" +
-        "  🏁 FLUX DOMINANT : RISK-OFF CARRY TRADE / YEN FORT 🐻\n\n" +
-        
-        "RÈGLE 8 : BIG TECH EARNINGS (NASDAQ/SP500)\n" +
-        "- NVDA / AAPL / MSFT / AMZN / META / GOOGL / TESLA EARNINGS BEAT :\n" +
-        "  • 💻 NASDAQ : ACHAT CHOC 🟢 | Valorisations soutenues\n" +
-        "  • 📊 SP500  : ACHAT CHOC 🟢 | Même direction NASDAQ obligatoire\n" +
-        "  • ₿ BITCOIN : ACHAT CHOC 🟢 | Sentiment risk-on amplifié\n" +
-        "  • Autres actifs : NEUTRE\n" +
-        "- EARNINGS MISS / PROFIT WARNING / GUIDANCE BAISSIÈRE :\n" +
-        "  • 💻 NASDAQ : VENTE CHOC 🔴 | Compression valorisations\n" +
-        "  • 📊 SP500  : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "  • ₿ BITCOIN : VENTE CHOC 🔴 | Risk-off amplifié\n" +
-        "  • Autres actifs : NEUTRE\n\n" +
-        
-        "RÈGLE 9 : BITCOIN DRIVERS SPÉCIFIQUES\n" +
-        "- ETF Flows POSITIFS (> 300M$ net inflow) :\n" +
-        "  • ₿ BITCOIN : ACHAT CHOC 🟢 | Demande institutionnelle confirmée\n" +
-        "- ETF Flows NÉGATIFS (outflows > 200M$) :\n" +
-        "  • ₿ BITCOIN : VENTE CHOC 🔴 | Retrait institutionnel\n" +
-        "- SEC Enforcement / Regulatory Crackdown :\n" +
-        "  • ₿ BITCOIN : VENTE CHOC 🔴 | Capitulation réglementaire\n" +
-        "- Exchange Hack / Collapse :\n" +
-        "  • ₿ BITCOIN : VENTE CHOC 🔴 | Panique systémique crypto\n" +
-        "  • 💻 NASDAQ : VENTE CHOC 🔴 | Contagion sentiment\n" +
-        "  • 📊 SP500  : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n\n" +
-        
-        "RÈGLE 10 : RISQUE SYSTÉMIQUE BANCAIRE\n" +
-        "- Bank Run / Bank Failure / Banking Crisis :\n" +
-        "  • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge anti-système bancaire\n" +
-        "  • 💻 NASDAQ  : VENTE CHOC 🔴 | Contagion financière systémique\n" +
-        "  • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "  • 📈 US10Y   : ACHAT CHOC 🟢 | Fuite vers les Treasuries\n" +
-        "  • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Yen refuge\n" +
-        "  • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation d'urgence\n" +
-        "  • 🇦🇺 AUDUSD : VENTE CHOC 🔴 | Devise risk-on pénalisée\n" +
-        "  • 🇪🇺 EURUSD : VENTE CHOC 🔴 | Contagion si banque européenne impliquée\n" +
-        "  • 🛢️ USOIL   : VENTE CHOC 🔴 | Demande anticipée en baisse\n" +
-        "  🏁 FLUX DOMINANT : RISK-OFF SYSTÉMIQUE / OR FORT 🐻\n\n" +
-        
-        "RÈGLE 11 : CRISE SOUVERAINE EUROPÉENNE\n" +
-        "- BTP/Bund spread > 250bps ou OAT/Bund spread > 80bps :\n" +
-        "  • 🇪🇺 EURUSD : VENTE CHOC 🔴 | Crise de confiance zone Euro\n" +
-        "  • 🏆 GOLD   : ACHAT CHOC 🟢 | Refuge contre instabilité\n" +
-        "  • 💻 NASDAQ : NEUTRE | Pas d'impact direct actifs US\n" +
-        "  • 📊 SP500  : NEUTRE | Même direction NASDAQ obligatoire\n" +
-        "  • 🇬🇧 GBPUSD : INCLINATION VENTE MAIS NEUTRE | Effet de bord modéré\n" +
-        "  🏁 FLUX DOMINANT : EURO FAIBLE / CRISE SOUVERAINE 🐻\n\n" +
-        
-        "RÈGLE 12 : IRON ORE / COPPER — PROXY AUD/CHINE\n" +
-        "- Iron Ore > +3% ou Copper > +2% (demande forte Chine) :\n" +
-        "  • 🇦🇺 AUDUSD : ACHAT CHOC 🟢 | Australie 1er exportateur fer mondial\n" +
-        "  • 🛢️ USOIL   : INCLINATION ACHAT MAIS NEUTRE | Demande industrielle\n" +
-        "  • Autres actifs : NEUTRE\n" +
-        "- Iron Ore < -3% ou Copper < -2% :\n" +
-        "  • 🇦🇺 AUDUSD : VENTE CHOC 🔴 | Corrélation directe iron ore/AUD\n" +
-        "  🏁 FLUX DOMINANT : AUD/CHINE CORRÉLATION MATIÈRES PREMIÈRES 🦘\n\n" +
-        
-        "RÈGLE 13 : SPR / BAKER HUGHES / API CRUDE\n" +
-        "- SPR Release > 1M barils :\n" +
-        "  • 🛢️ USOIL   : VENTE CHOC 🔴 | Offre supplémentaire immédiate\n" +
-        "  • 🇨🇦 USDCAD : ACHAT CHOC 🟢 | CAD s'affaiblit avec le pétrole\n" +
-        "- Baker Hughes Rig Count HAUSSE > +10 rigs :\n" +
-        "  • 🛢️ USOIL   : INCLINATION VENTE MAIS NEUTRE | Offre future en hausse\n" +
-        "- Baker Hughes Rig Count BAISSE < -10 rigs :\n" +
-        "  • 🛢️ USOIL   : INCLINATION ACHAT MAIS NEUTRE | Offre future en baisse\n" +
-        "- API Crude Stock HAUSSE surprise :\n" +
-        "  • 🛢️ USOIL   : VENTE CHOC 🔴 | Anticipation EIA surplus\n" +
-        "- API Crude Stock BAISSE surprise :\n" +
-        "  • 🛢️ USOIL   : ACHAT CHOC 🟢 | Anticipation EIA déficit\n\n" +
-        
-        "RÈGLE 14 : CORRÉLATIONS TEMPORELLES INTER-DRIVERS\n" +
-        "- NFP FORT (7j) + CPI FORT aujourd'hui = CONFIRMATION HAWKISH → Conviction +15%\n" +
-        "- NFP FAIBLE (7j) + CPI FAIBLE aujourd'hui = CONFIRMATION DOVISH → Conviction +15%\n" +
-        "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE → Conviction plafonnée 55%\n" +
-        "- GEO ESCALADE active (48h) + HAWKISH = Double choc → Or et Pétrole prioritaires\n" +
-        "- FOMC dans < 7 jours = tout CPI/NFP reçoit +20% conviction additionnelle\n" +
-        "- Carry Trade Unwinding + GEO = Double risk-off → USDJPY et GOLD prioritaires\n" +
-        "- Bank Failure + GEO = Risque systémique maximal → Conviction maximale autorisée\n"
-        ;
-    /**
-     * Formatage précis du prix selon le type d'actif.
-     * Aligné sur les standards professionnels du marché.
-     */
-    private String formatPrixActif(String nomActif, double prix) {
-        switch (nomActif) {
-            case "BITCOIN":
-                // BTC → entier, séparateur de milliers
-                return String.format(Locale.US, "%,.0f$", prix);
-    
-            case "GOLD":
-                // Or → 2 décimales, unité oz
-                return String.format(Locale.US, "%,.2f$/oz", prix);
-    
-            case "USOIL":
-                // Pétrole → 2 décimales, unité baril
-                return String.format(Locale.US, "%.2f$/b", prix);
-    
-            case "SP500":
-            case "NASDAQ":
-                // ETF indices → 2 décimales
-                return String.format(Locale.US, "%.2f$", prix);
-    
-            case "USDJPY":
-                // JPY → 3 décimales (standard marché)
-                return String.format(Locale.US, "%.3f", prix);
-    
-            case "EURUSD":
-            case "GBPUSD":
-            case "AUDUSD":
-            case "USDCAD":
-                // Forex majeurs → 5 décimales (standard pip)
-                return String.format(Locale.US, "%.5f", prix);
-    
-            case "US10Y":
-                // TLT ETF → 2 décimales
-                return String.format(Locale.US, "%.2f$ (TLT)", prix);
-    
-            default:
-                return String.format(Locale.US, "%.4f", prix);
-        }
-    }  
-
+        "3. EXCLUSION ET CONCISION : Pas de politesse, pas de salutations, pas de résumés verbeux des actualités passées. Calculez les directions comme un algorithme purement déterministe. Les 11 actifs doivent figurer sur le rapport, sans omission."
+    ;
+                
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
-    private void logToMain(String msg) {
-       if (MainActivity.instance != null) {
-        MainActivity.instance.addLog(msg);
-       }
-       Log.d(TAG, msg);
-    }
-
-    private long calculateMillisUntilHour(int targetHour) {
-        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
-        long nowMs = cal.getTimeInMillis();
-        cal.set(Calendar.HOUR_OF_DAY, targetHour);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        // Si l'heure est déjà passée aujourd'hui → planifier pour demain
-        if (cal.getTimeInMillis() <= nowMs) {
-            cal.add(Calendar.DAY_OF_YEAR, 1);
-        }
-        return cal.getTimeInMillis() - nowMs;
-    }
-
-    // ✅ Pipeline de backfill automatique — reconstruit les données Rang Suprême manquantes
-// Appelé au démarrage + chaque nuit à minuit
-    private void runHistoricalBackfill() {
-        scheduler.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    logToMain("🔄 [BACKFILL] Démarrage de la reconstruction historique...");
-    
-                    long nowSec = System.currentTimeMillis() / 1000;
-    
-                    // ── Étape 1 : Détecter les indicateurs manquants dans la DB ──
-                    List<String> missingIndicators = eventDb.getMissingSupremeRankIndicators(nowSec);
-    
-                    if (missingIndicators.isEmpty()) {
-                        logToMain("✅ [BACKFILL] Base complète — aucun indicateur Rang 5 manquant.");
-                        return;
-                    }
-    
-                    logToMain("⚠️ [BACKFILL] " + missingIndicators.size() +
-                              " indicateur(s) manquant(s) : " + missingIndicators.toString());
-    
-                    // ── Étape 2 : Récupérer les données historiques FMP (30 jours) ──
-                    List<EconomicCalendarAPI.CalendarEvent> historicalEvents =
-                            EconomicCalendarAPI.fetchHistoricalEvents(30);
-    
-                    if (historicalEvents.isEmpty()) {
-                        logToMain("⚠️ [BACKFILL] Aucune donnée historique récupérée depuis FMP.");
-                        return;
-                    }
-    
-                    // ── Étape 3 : Filtrer et sauvegarder uniquement les manquants ──
-                    int saved = 0;
-                    int skipped = 0;
-    
-                    for (EconomicCalendarAPI.CalendarEvent event : historicalEvents) {
-                        if (event == null || event.indicator == null) continue;
-    
-                        String indUpper = event.indicator.toUpperCase(Locale.ROOT);
-                        long eventTs = 0;
-                        try { eventTs = Long.parseLong(event.timestamp); } catch (Exception ignored) {}
-    
-                        // ✅ Vérifier si cet événement correspond à un manquant
-                        boolean isNeeded = false;
-                        for (String missing : missingIndicators) {
-                        // Expansion des alias FMP pour les indicateurs à acronyme
-                        boolean matchesMissing = indUpper.contains(missing);
-                        if (!matchesMissing) {
-                            if (missing.equals("NFP"))
-                                matchesMissing = indUpper.contains("NONFARM") || indUpper.contains("NON-FARM") || indUpper.contains("PAYROLL");
-                            else if (missing.equals("CPI"))
-                                matchesMissing = indUpper.contains("CONSUMER PRICE") || indUpper.contains("CORE CPI");
-                            else if (missing.equals("PCE"))
-                                matchesMissing = indUpper.contains("PERSONAL CONSUMPTION") || indUpper.contains("CORE PCE");
-                            else if (missing.equals("PPI"))
-                                matchesMissing = indUpper.contains("PRODUCER PRICE");
-                            else if (missing.equals("GDP"))
-                                matchesMissing = indUpper.contains("GROSS DOMESTIC");
-                            else if (missing.equals("ADP"))
-                                matchesMissing = indUpper.contains("ADP EMPLOYMENT");
-                            else if (missing.equals("JOLTS"))
-                                matchesMissing = indUpper.contains("JOB OPENINGS");
-                            else if (missing.equals("JOBLESS CLAIMS"))
-                                matchesMissing = indUpper.contains("INITIAL CLAIMS") || indUpper.contains("UNEMPLOYMENT CLAIMS");
-                        }
-                        if (matchesMissing) { isNeeded = true; break; }
-                       }
-                        if (!isNeeded) continue;
-    
-                        // ✅ Anti-doublon — vérifier si déjà en DB
-                        if (eventDb.isEventAlreadySaved(event.indicator, eventTs)) {
-                            skipped++;
-                            continue;
-                        }
-    
-                        // ✅ Construire le contenu enrichi
-                        String content = event.indicator;
-                        if (!event.actual.equals("N/A"))   content += " ACTUAL: "   + event.actual;
-                        if (!event.forecast.equals("N/A")) content += " FORECAST: " + event.forecast;
-                        if (!event.previous.equals("N/A")) content += " PREVIOUS: " + event.previous;
-    
-                        // ✅ Détection de surprise pour le biais directionnel
-                        try {
-                            double actual   = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
-                            double forecast = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
-                            double diff     = actual - forecast;
-                            if      (diff > 0) content += " HIGHER THAN EXPECTED";
-                            else if (diff < 0) content += " LOWER THAN EXPECTED";
-                        } catch (Exception ignored) {}
-    
-                        // ✅ Calculer le poids via assignDriverWeight
-                        int weight = assignDriverWeight(content);
-    
-                        // ✅ Forcer poids 5 pour les indicateurs Rang Suprême
-                        // Pour que getMonthlyMacroRegistry() les inclue automatiquement
-                        //String indUpper = event.indicator.toUpperCase(Locale.ROOT);
-                        if (indUpper.contains("NFP") || indUpper.contains("NON-FARM") ||
-                            indUpper.contains("PAYROLL") || indUpper.contains("CPI") ||
-                            indUpper.contains("CORE CPI") || indUpper.contains("PCE") ||
-                            indUpper.contains("CORE PCE") || indUpper.contains("FOMC") ||
-                            indUpper.contains("FEDERAL RESERVE") || indUpper.contains("RATE DECISION") ||
-                            indUpper.contains("PPI") || indUpper.contains("GDP") ||
-                            indUpper.contains("JOLTS") || indUpper.contains("ADP") ||
-                            indUpper.contains("JOBLESS CLAIMS") || indUpper.contains("INITIAL CLAIMS")) {
-                            weight = 5; // ✅ Rang Suprême — visible dans getMonthlyMacroRegistry
-                        } else if (weight < 4) {
-                            weight = 4;
-                        }
-                        // ✅ Récupérer les actifs liés
-                        List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
-                                event.indicator,
-                                event.country != null ? event.country : "United States");
-                        String assetsStr = android.text.TextUtils.join(",", assets);
-    
-                        // ✅ Fingerprint unique pour ce backfill
-                        String fingerprint = generateSecureHash(
-                                "BACKFILL_" + event.indicator + "_" + event.timestamp);
-    
-                        // ✅ Sauvegarder dans la DB
-                        // ✅ Construire l'impact avec biais directionnel pour detecterRegimeMarche
-                        String impactLabel = "CALENDRIER ÉCONOMIQUE | " + event.indicator;
-                        try {
-                            double actual   = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
-                            double forecast = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
-                            double diff     = actual - forecast;
-                            if (diff > 0) {
-                                impactLabel += " | Haute Volatilité (Biais Haussier)"; // ✅ détecté par detecterRegimeMarche
-                            } else if (diff < 0) {
-                                impactLabel += " | Haute Volatilité (Biais Baissier)"; // ✅ détecté par detecterRegimeMarche
-                            } else {
-                                impactLabel += " | Haute Volatilité";
-                            }
-                        } catch (Exception ignored) {
-                            impactLabel += " | Haute Volatilité";
-                        }
-                        
-                        boolean wasSaved = eventDb.saveEvent(
-                            fingerprint,
-                            "com.tradingbot.backfill",
-                            "Historical Backfill / FMP",
-                            "CALENDAR-RESULT",
-                            event.indicator,
-                            content,
-                            assetsStr,
-                            impactLabel, // ✅ impact avec biais directionnel
-                            eventTs,
-                            "synced",
-                            weight
-                        );
-    
-                        if (wasSaved) {
-                            saved++;
-                            logToMain("📥 [BACKFILL] Sauvegardé : " + event.indicator +
-                                      " | " + event.actual + " vs " + event.forecast +
-                                      " | Poids: " + weight);
-                        }
-                    }
-    
-                    // ── Étape 4 : Rapport final ──
-                    String report = "✅ [BACKFILL] Terminé :\n" +
-                            "  • Événements sauvegardés : " + saved + "\n" +
-                            "  • Doublons ignorés : " + skipped + "\n" +
-                            "  • Indicateurs reconstruits : " + missingIndicators.toString();
-    
-                    logToMain(report);
-    
-                    // ✅ Envoyer un résumé sur Telegram si des données ont été ajoutées
-                    if (saved > 0) {
-                        sendTelegramSecure(
-                            "🔄 *BACKFILL AUTOMATIQUE COMPLÉTÉ*\n" +
-                            "📊 " + saved + " événement(s) Rang Suprême reconstruit(s)\n" +
-                            "📋 Indicateurs : " + missingIndicators.toString() + "\n" +
-                            "✅ Base de données enrichie pour l'analyse macro.",
-                            NotificationService.this
-                        );
-                    }
-    
-                } catch (Exception e) {
-                    logToMain("❌ [BACKFILL] Erreur critique : " + e.getMessage());
-                    Log.e(TAG, "Erreur runHistoricalBackfill", e);
-                }
-            }
-        });
-    }
-
     private boolean estEvenementSuprême(String text) {
         String upper = text.toUpperCase(Locale.ROOT);
         return upper.contains("FOMC") || upper.contains("FED ") ||
@@ -1040,25 +515,11 @@ public class NotificationService extends NotificationListenerService {
 
     private void processAnalysisWithAI(final String sourceName, final String title, final String body, final List<String> enrichedAssets, final String fingerprint, final String customSystemPrompt, final boolean isSupremeRank){
         // 1. Intégration de votre SYSTEM_PROMPT (Le moule et les contraintes strictes)
-        final String systemPrompt =  "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif d'élite.\n" +
-        "Tu analyses le flux d'actualité en direct en appliquant une HIERARCHIE STRICTE DES DRIVERS sans aucune place à l'interprétation.\n\n" +
+        final String systemPrompt = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
+        "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
         "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
-        "1. RANG SUPRÊME    : Politique Monétaire (Interventions de Powell, " +
-        "Kevin Warsh (Futur Chair Fed — profil HAWKISH agressif, chaque signal = " +
-        "politique post-mai 2026 à pricer immédiatement), Lagarde, Schnabel, etc.), " +
-        "Nominations Banques Centrales, CPI/PCE, NFP/Emploi.\n" +
-        "2. RANG SECONDAIRE : PIB/GDP Advance (récession/expansion trimestrielle), " +
-        "ISM Services (80% économie US — leading indicator fort), " +
-        "ISM Manufacturing, PMI Flash/Preliminary (surprise fréquente), " +
-        "Michigan Sentiment Preliminary (proxy anticipations inflation Fed), " +
-        "Ventes au détail, Stocks EIA, Stimulus Fiscal / Dépenses Publiques \n" +
-        "⚠️ RÈGLE GDPNOW ATLANTA FED : GDPNow est une RÉVISION DE MODÈLE, " +
-        "pas le GDP Advance officiel. Vecteur = HAWKISH si révisé à la hausse. " +
-        "Application obligatoire de la règle A (HAWKISH US) : " +
-        "NASDAQ VENTE CHOC, SP500 VENTE CHOC, GOLD VENTE CHOC, " +
-        "EURUSD VENTE CHOC, USDJPY ACHAT CHOC. " +
-        "Conviction plafonnée à 65% (modèle non officiel).\n" +
-            
+        "1. RANG SUPRÊME    : Politique Monétaire, Nominations Banques Centrales, CPI/PCE, NFP/Emploi.\n" +
+        "2. RANG SECONDAIRE : PIB/GDP, PMI, ISM, Ventes au détail, Stocks EIA, Stimulus Fiscal / Dépenses Publiques.\n" +
         "3. RANG TACTIQUE   : Géopolitique (GÉO), Sentiment consommateurs (Michigan, Conference Board), Données Chine, TARIFS DOUANIERS, Rumeurs de marché.\n\n" +
         "RÈGLE ANTI-BRUIT (TRÈS IMPORTANTE) :\n" +
         "- Les déclarations de Trump sur l'Iran, Israël ou sanctions sans action militaire concrète (raid, frappe, missile, embargo officiel, blocage Hormuz) ont un impact limité.\n" +
@@ -1067,313 +528,171 @@ public class NotificationService extends NotificationListenerService {
         "- Les nouvelles sur des 'accords pour rouvrir Hormuz', 'discussions', 'possibilités d'apaisement' = baisse de tension → impact RISK-ON modéré, conviction plafonnée à 45%.\n" +
         "- Ne jamais transformer une simple rumeur ou accident isolé en choc majeur.\n" +
         "- ₿ BITCOIN : Actif amplificateur, pas initiateur. Il suit les mouvements risk-on/risk-off des indices actions (NASDAQ/SP500) avec une amplitude x2 à x3 mais ne crée pas le driver. Ne jamais lui attribuer une conviction supérieure à celle du driver principal.\n\n" +
-    
-        "RÈGLE DE CONTRADICTION TEMPORELLE ET STATUT PENDING :\n" +
-        "- Si l'historique récent (moins de 30 min) montre un flux inverse :\n" +
-        "  * Un driver de RANG SUPÉRIEUR ANNULE ET REMPLACE le sentiment précédent.\n" +
-        "  * Un RANG TACTIQUE (GÉO, Sentiment, TARIFS) ne peut JAMAIS annuler un RANG SUPRÊME (CPI, NFP, Fed).\n" +
-        "  * En cas de coexistence impossible, signale les deux drivers sans forcer l'arbitrage.\n" +
-        "- Tout événement ou décision majeure annoncée comme reportée, mise en attente ou non finalisée doit être explicitement classifiée sous le statut terminologique strict de [pending]. Aucun signal de choc immédiat ne peut être émis tant que le statut reste [pending].\n\n" +
-    
+        "RÈGLE DE CONTRADICTION TEMPORELLE :\n" +
+        "Si l'historique récent (moins de 30 min) montre un flux inverse :\n" +
+        "- Un driver de RANG SUPÉRIEUR ANNULE ET REMPLACE le sentiment précédent.\n" +
+        "- Un RANG TACTIQUE (GÉO, Sentiment, TARIFS) ne peut JAMAIS annuler un RANG SUPRÊME (CPI, NFP, Fed).\n" +
+        "- En cas de coexistence impossible, signale les deux drivers sans forcer l'arbitrage.\n\n" +
         "RÈGLE POUR LES SURPRISES VS CONFORMITÉ :\n" +
         "- Si l'actualité est CONFORME aux prévisions (actual == forecast ou dans la fourchette attendue), la conviction est plafonnée à 50% (jauge orange 🟠).\n" +
         "- Dans ce cas, utilise exclusivement les mentions 'INCLINATION ACHAT MAIS NEUTRE' ou 'INCLINATION VENTE MAIS NEUTRE' sur les actifs concernés.\n" +
         "- Si l'écart est faible (moins de 5% de surprise relative), conviction maximale 65%.\n" +
         "- Seul un écart significatif (>10% ou hors consensus) autorise une conviction >80%.\n\n" +
-
         "════════════════════════════════════════════════════════\n" +
         " RÈGLES DE DIRECTIONNALITÉ INTER-MARCHÉS — EXHAUSTIVES\n" +
         "════════════════════════════════════════════════════════\n\n" +
         "A. NEWS ÉTATS-UNIS — POLITIQUE MONÉTAIRE / CPI / NFP\n" +
         "───────────────────────────────────────────────────────\n" +
-        "   HAWKISH US (CPI > prévisions, NFP fort, Fed hawkish, discours ferme " +
-        "de Powell, discours hawkish de Warsh = signal politique future restrictive, " +
-        "nomination hawkish) :\n" +
+        "   HAWKISH US (CPI > prévisions, NFP fort, Fed hawkish, nomination hawkish) :\n" +
         "   • 📈 US10Y    : ACHAT CHOC 🟢  | Rendements montent avec les anticipations de hausse\n" +
-        "   • 🇨🇦 USDCAD  : ACHAT CHOC 🟢  | Dollar fort face au CAD\n" +
-        "   • 🇯🇵 USDJPY  : ACHAT CHOC 🟢  | Dollar fort face au Yen ← TOUJOURS ACHAT sur HAWKISH US\n" +
+        "   • 🇨🇦 USDCAD : ACHAT CHOC 🟢  | Dollar fort face au CAD\n" +
+        "   • 🇯🇵 USDJPY : ACHAT CHOC 🟢  | Dollar fort face au Yen ← TOUJOURS ACHAT sur HAWKISH US\n" +
         "   • 🏆 GOLD    : VENTE CHOC 🔴  | Dollar fort pénalise l'or\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴  | " +
-        "⚠️ RÈGLE ABSOLUE : croissance forte = taux hauts = compression PE tech. " +
-        "INTERDICTION FORMELLE de mettre ACHAT sur NASDAQ lors d'un signal HAWKISH US, " +
-        "même si la croissance paraît positive pour les bénéfices.\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
+        "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Taux hauts compressent les valorisations tech\n" +
+        "   • 📊 SP500    : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Actif risk-on pénalisé par le resserrement (effet amplifié x2 à x3)\n" +
-        "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴  | Dollar fort écrase l'Euro\n" +
-        "   • 🇬🇧 GBPUSD  : VENTE CHOC 🔴  | Dollar fort écrase la Livre\n" +
-        "   • 🇦🇺 AUDUSD  : VENTE CHOC 🔴  | Devise risk-on pénalisée\n" +
+        "   • 🇪🇺 EURUSD : VENTE CHOC 🔴  | Dollar fort écrase l'Euro\n" +
+        "   • 🇬🇧 GBPUSD : VENTE CHOC 🔴  | Dollar fort écrase la Livre\n" +
+        "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴  | Devise risk-on pénalisée\n" +
         "   • 🛢️ USOIL    : NEUTRE          | Pas d'impact direct sauf si contexte GÉO simultané\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : DOLLAR FORT (MKT RISK-OFF) 🐻\n\n" +
-        "   DOVISH US (CPI < prévisions, NFP faible, Fed dovish, discours " +
-        "accommodant de Powell, signal accommodant inattendu de Warsh) :\n" +
+        "   DOVISH US (CPI < prévisions, NFP faible, Fed dovish, anticipation de baisses de taux) :\n" +
         "   • 📈 US10Y    : VENTE CHOC 🔴  | Rendements baissent avec les anticipations de baisse\n" +
-        "   • 🇨🇦 USDCAD  : VENTE CHOC 🔴  | Dollar faible face au CAD\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴  | Dollar faible face au Yen ← TOUJOURS VENTE sur DOVISH US\n" +
+        "   • 🇨🇦 USDCAD : VENTE CHOC 🔴  | Dollar faible face au CAD\n" +
+        "   • 🇯🇵 USDJPY : VENTE CHOC 🔴  | Dollar faible face au Yen ← TOUJOURS VENTE sur DOVISH US\n" +
         "   • 🏆 GOLD    : ACHAT CHOC 🟢  | Dollar faible propulse l'or\n" +
         "   • 💻 NASDAQ  : ACHAT CHOC 🟢  | Taux bas soutiennent les valorisations tech\n" +
-        "   • 📊 SP500   : ACHAT CHOC 🟢  | Même direction que NASDAQ — obligatoire\n" +
+        "   • 📊 SP500    : ACHAT CHOC 🟢  | Même direction que NASDAQ — obligatoire\n" +
         "   • ₿ BITCOIN  : ACHAT CHOC 🟢  | Liquidité favorable aux actifs risk-on (effet amplifié x2 à x3)\n" +
-        "   • 🇪🇺 EURUSD  : ACHAT CHOC 🟢  | Dollar faible renforce l'Euro\n" +
-        "   • 🇬🇧 GBPUSD  : ACHAT CHOC 🟢  | Dollar faible renforce la Livre\n" +
-        "   • 🇦🇺 AUDUSD  : ACHAT CHOC 🟢  | Devise risk-on bénéficie du Dollar faible\n" +
+        "   • 🇪🇺 EURUSD : ACHAT CHOC 🟢  | Dollar faible renforce l'Euro\n" +
+        "   • 🇬🇧 GBPUSD : ACHAT CHOC 🟢  | Dollar faible renforce la Livre\n" +
+        "   • 🇦🇺 AUDUSD : ACHAT CHOC 🟢  | Devise risk-on bénéficie du Dollar faible\n" +
         "   • 🛢️ USOIL    : NEUTRE          | Pas d'impact direct sauf si contexte GÉO simultané\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : DOLLAR FAIBLE (MKT RISK-ON) 🐂\n\n" +
-    
         "   CAS MIXTE (ex: CPI core baisse mais headline monte) :\n" +
         "   Utilise le composant le plus surveillé par la Fed (Core > Headline).\n" +
         "   Signale la divergence dans le FAIT MARQUANT. Conviction plafonnée à 65%.\n\n" +
-    
         "B. NEWS SENTIMENT CONSOMMATEURS (Michigan, Conference Board)\n" +
         "─────────────────────────────────────────────────────────────\n" +
         "   Rang TACTIQUE — impact modéré, conviction plafonnée à 70%.\n" +
         "   Sentiment BAS (< prévisions) → Signal DOVISH modéré :\n" +
         "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Crainte de ralentissement de la consommation\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
+        "   • 📊 SP500    : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
         "   • 🏆 GOLD    : ACHAT CHOC 🟢  | Refuge en cas de pessimisme économique\n" +
         "   • 📈 US10Y    : NEUTRE          | Pas de signal monétaire direct\n" +
-        "   • 🇯🇵 USDJPY  : NEUTRE          | Pas de choc suffisant pour déplacer le Yen\n" +
+        "   • 🇯🇵 USDJPY : NEUTRE          | Pas de choc suffisant pour déplacer le Yen\n" +
         "   • 🛢️ USOIL    : VENTE CHOC 🔴  | Demande anticipée en baisse\n" +
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Actif risk-on pénalisé (amplitude corrélée aux indices)\n" +
         "   • 🇪🇺 EURUSD, 🇬🇧 GBPUSD, 🇦🇺 AUDUSD, 🇨🇦 USDCAD : NEUTRE\n" +
         "   🏁 FLUX DOMINANT : RISK-OFF MODÉRÉ (MKT INCERTAIN) ⚠️\n\n" +
-    
         "   Sentiment HAUT (> prévisions) → Signal HAWKISH modéré :\n" +
         "   Inverser toutes les directions ci-dessus.\n" +
         "   🏁 FLUX DOMINANT : RISK-ON MODÉRÉ (MKT CONFIANT) 🐂\n\n" +
-    
         "C. NEWS BANQUES CENTRALES ÉTRANGÈRES (BoJ, BCE/ECB, BoE, RBA, BoC)\n" +
         "────────────────────────────────────────────────────────────────\n" +
         "   VERROU MONÉTAIRE ABSOLU : La devise locale réagit exclusivement à sa propre banque centrale.\n" +
         "   Sauf mention explicite d'un choc global, les actifs américains (📈 US10Y, 💻 NASDAQ, 📊 SP500) et le ₿ BITCOIN DOIVENT IMPÉRATIVEMENT RESTER [NEUTRE].\n" +
         "   Interdiction formelle d'attribuer une faiblesse ou force de l'économie américaine sur une news provenant de l'étranger.\n\n" +
-    
-        "   DOVISH étranger (Discours accommodants de Lagarde/Schnabel, statu quo baissier BoJ) → La devise locale s'effondre face au dollar par effet de flux net :\n" +
-        "   • 🇪🇺 BCE/ECB DOVISH  → 🇪🇺 EURUSD: VENTE CHOC 🔴 | 🇬🇧 GBPUSD: NEUTRE | 🇦🇺 AUDUSD: NEUTRE | 🇨🇦 USDCAD: NEUTRE | 🇯🇵 USDJPY: NEUTRE | 🛢️ USOIL: VENTE CHOC 🔴 | 🏆 GOLD: NEUTRE\n" +
+        "   DOVISH étranger → La devise locale s'effondre, provoquant une hausse mécanique du Dollar américain par effet de flux (Dollar Fort par différentiel) :\n" +
+        "   • 🇪🇺 BCE/ECB DOVISH  → 🇪🇺 EURUSD: VENTE CHOC 🔴 | 🇬🇧 GBPUSD: VENTE CHOC 🔴 | 🇦🇺 AUDUSD: VENTE CHOC 🔴 | 🇨🇦 USDCAD: ACHAT CHOC 🟢 | 🇯🇵 USDJPY: ACHAT CHOC 🟢 | 🛢️ USOIL: VENTE CHOC 🔴 | 🏆 GOLD: NEUTRE\n" +
         "   • 🇯🇵 BoJ DOVISH      → 🇯🇵 USDJPY: ACHAT CHOC 🟢 | 🇪🇺 EURUSD: NEUTRE | 🇬🇧 GBPUSD: NEUTRE | 🇦🇺 AUDUSD: NEUTRE | 🇨🇦 USDCAD: NEUTRE | 🛢️ USOIL: NEUTRE | 🏆 GOLD: NEUTRE\n" +
         "   • 🇨🇦 BoC DOVISH      → 🇨🇦 USDCAD: ACHAT CHOC 🟢 | 🛢️ USOIL: VENTE CHOC 🔴 | 🇪🇺 EURUSD: NEUTRE | 🇬🇧 GBPUSD: NEUTRE | 🇦🇺 AUDUSD: NEUTRE | 🇯🇵 USDJPY: NEUTRE | 🏆 GOLD: NEUTRE\n" +
         "   • 🇬🇧 BoE DOVISH      → 🇬🇧 GBPUSD: VENTE CHOC 🔴 | 🇪🇺 EURUSD: NEUTRE | 🇯🇵 USDJPY: NEUTRE | 🇨🇦 USDCAD: NEUTRE | 🇦🇺 AUDUSD: NEUTRE | 🛢️ USOIL: NEUTRE | 🏆 GOLD: NEUTRE\n" +
         "   • 🇦🇺 RBA DOVISH      → 🇦🇺 AUDUSD: VENTE CHOC 🔴 | 🛢️ USOIL: VENTE CHOC 🔴 | 🇪🇺 EURUSD: NEUTRE | 🇬🇧 GBPUSD: NEUTRE | 🇨🇦 USDCAD: NEUTRE | 🇯🇵 USDJPY: NEUTRE | 🏆 GOLD: NEUTRE\n" +
-        "   🏁 FLUX DOMINANT OBLIGATOIRE : [DEVISE_LOCALE] FAIBLE / DOLLAR REFORCÉ par différentiel 🐻\n\n" +
-    
-        "   HAWKISH étranger (Discours restrictifs de Lagarde/Schnabel, hausses de taux surprise BoJ) → La devise locale explose face au dollar par effet de flux net :\n" +
-        "   • 🇪🇺 BCE/ECB HAWKISH → 🇪🇺 EURUSD: ACHAT CHOC 🟢 | 🇬🇧 GBPUSD: NEUTRE | 🇦🇺 AUDUSD: NEUTRE | 🇨🇦 USDCAD: NEUTRE | 🇯🇵 USDJPY: NEUTRE | 🛢️ USOIL: ACHAT CHOC 🟢 | 🏆 GOLD: NEUTRE\n" +
+        "   🏁 FLUX DOMINANT OBLIGATOIRE : [DEVISE_LOCALE] FAIBLE / DOLLAR FORT par différentiel 🐻\n\n" +
+        "   HAWKISH étranger → La devise locale explose, provoquant une baisse mécanique du Dollar américain par effet de flux (Dollar Faible par différentiel) :\n" +
+        "   • 🇪🇺 BCE/ECB HAWKISH → 🇪🇺 EURUSD: ACHAT CHOC 🟢 | 🇬🇧 GBPUSD: ACHAT CHOC 🟢 | 🇦🇺 AUDUSD: ACHAT CHOC 🟢 | 🇨🇦 USDCAD: VENTE CHOC 🔴 | 🇯🇵 USDJPY: VENTE CHOC 🔴 | 🛢️ USOIL: ACHAT CHOC 🟢 | 🏆 GOLD: NEUTRE\n" +
         "   • 🇯🇵 BoJ HAWKISH     → 🇯🇵 USDJPY: VENTE CHOC 🔴 | 🇪🇺 EURUSD: NEUTRE | 🇬🇧 GBPUSD: NEUTRE | 🇦🇺 AUDUSD: NEUTRE | 🇨🇦 USDCAD: NEUTRE | 🛢️ USOIL: NEUTRE | 🏆 GOLD: NEUTRE\n" +
         "   • 🇨🇦 BoC HAWKISH     → 🇨🇦 USDCAD: VENTE CHOC 🔴 | 🛢️ USOIL: ACHAT CHOC 🟢 | 🇪🇺 EURUSD: NEUTRE | 🇬🇧 GBPUSD: NEUTRE | 🇦🇺 AUDUSD: NEUTRE | 🇯🇵 USDJPY: NEUTRE | 🏆 GOLD: NEUTRE\n" +
         "   • 🇬🇧 BoE HAWKISH     → 🇬🇧 GBPUSD: ACHAT CHOC 🟢 | 🇪🇺 EURUSD: NEUTRE | 🇯🇵 USDJPY: NEUTRE | 🇨🇦 USDCAD: NEUTRE | 🇦🇺 AUDUSD: NEUTRE | 🛢️ USOIL: NEUTRE | 🏆 GOLD: NEUTRE\n" +
         "   • 🇦🇺 RBA HAWKISH     → 🇦🇺 AUDUSD: ACHAT CHOC 🟢 | 🛢️ USOIL: ACHAT CHOC 🟢 | 🇪🇺 EURUSD: NEUTRE | 🇬🇧 GBPUSD: NEUTRE | 🇨🇦 USDCAD: NEUTRE | 🇯🇵 USDJPY: NEUTRE | 🏆 GOLD: NEUTRE\n" +
-        "   🏁 FLUX DOMINANT OBLIGATOIRE : [DEVISE_LOCALE] FORTE / DOLLAR AFFAIBLI par différentiel 🐂\n\n" +
+        "   🏁 FLUX DOMINANT OBLIGATOIRE : [DEVISE_LOCALE] FORTE / DOLLAR FAIBLE par différentiel 🐂\n\n" +
         "   NOTE CANADA/PÉTROLE : Le CAD et USOIL sont corrélés. BoC HAWKISH = économie forte = demande pétrolière = USOIL ACHAT. BoC DOVISH = économie faible = USOIL VENTE.\n\n" +
-    
         "D. GÉO — STIMULUS MILITAIRE / DÉPENSES DE DÉFENSE EUROPÉENNES (OTAN, 2% PIB)\n" +
         "─────────────────────────────────────────────────────────────────────────────\n" +
-        "   VECTEUR = LIQUIDITÉ. Relance budgétaire localisée sur la zone Euro.\n" +
-        "   • 🇪🇺 EURUSD : ACHAT CHOC 🟢  | Soutien budgétaire direct et relance de l'économie européenne\n" +
-        "   • 🛢️ USOIL    : ACHAT CHOC 🟢  | Augmentation de la demande d'énergie logistique militaire\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢  | Appréciation réflexe de couverture sur relance par la dette\n" +
+        "   VECTEUR = LIQUIDITÉ. C'est un stimulus fiscal localisé (relance budgétaire) sur l'Europe.\n" +
+        "   • 🇪🇺 EURUSD : ACHAT CHOC 🟢  | Soutien budgétaire et relance de l'économie européenne\n" +
+        "   • 🇬🇧 GBPUSD : ACHAT CHOC 🟢  | Alignement stratégique des dépenses de l'OTAN / UK\n" +
+        "   • 🛢️ USOIL    : ACHAT CHOC 🟢  | Augmentation mécanique de la demande d'énergie militaire\n" +
+        "   • 🇯🇵 USDJPY : VENTE CHOC 🔴  | Le Yen s'apprécie comme actif refuge face aux incertitudes budgétaires\n" +
+        "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Crainte d'inflation par creusement du deficit budgétaire public\n" +
+        "   • 📊 SP500    : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
+        "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Risk-off immédiat sur les actifs spéculatifs (liquidation forcée)\n" +
         "   • 📈 US10Y    : NEUTRE\n" +
-        "   • 💻 NASDAQ  : NEUTRE          | Zone euro uniquement - pas d'impact direct sur les indices US\n" +
-        "   • 📊 SP500   : NEUTRE          | Même direction logique que NASDAQ — obligatoire\n" +
-        "   • ₿ BITCOIN  : NEUTRE          | Pas de driver d'actif tech US enclenché\n" +
-        "   • 🇯🇵 USDJPY  : NEUTRE\n" +
-        "   • 🇨🇦 USDCAD  : NEUTRE\n" +
-        "   • 🇬🇧 GBPUSD  : NEUTRE\n" +
-        "   • 🇦🇺 AUDUSD  : NEUTRE\n" +
-        "   🏁 FLUX DOMINANT OBLIGATOIRE : EURO FORT / OR FORT (MKT LIQUIDITÉ SIBIB) 🐂\n\n" +
-    
+        "   • 🏆 GOLD    : NEUTRE\n" +
+        "   • 🇨🇦 USDCAD : VENTE CHOC 🔴  | Effet de flux : le Dollar fléchit face aux devises européennes/refuges\n" +
+        "   • 🇦🇺 AUDUSD : ACHAT CHOC 🟢  | Devise cyclique soutenue par l'injection globale de liquidité fiscale\n" +
+        "   🏁 FLUX DOMINANT OBLIGATOIRE : EURO FORT / YEN FORT (MKT RISK-OFF) 🐻\n\n" +
         "E1. GÉO — CONFLITS / PANIQUE / MOYEN-ORIENT / CHINE\n" +
         "────────────────────────────────────────────────────\n" +
         "   VECTEUR = GÉO. RISK-OFF classique, fuite vers les refuges.\n" +
         "   CHOC GÉOPOLITIQUE / ESCALADE :\n" +
         "   • 🏆 GOLD    : ACHAT CHOC 🟢  | Refuge universel absolu\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴  | Le Yen s'apprécie comme refuge supérieur au dollar (le graphique baisse)\n" +
-        "   • 🛢️ USOIL    : ACHAT CHOC 🟢  | Si Moyen-Orient / Détroit d'Ormuz impliqué (menace sur l'offre)\n" +
+        "   • 🇯🇵 USDJPY : VENTE CHOC 🔴  | Le Yen s'apprécie comme refuge supérieur au dollar (le graphique baisse)\n" +
+        "   • 🛢️ USOIL    : ACHAT CHOC 🟢  | Si Moyen-Orient / Detroit d'Ormuz impliqué (menace sur l'offre)\n" +
         "                  NEUTRE          | Si conflit local sans aucun impact sur les routes pétrolières\n" +
-        "   • 🇦🇺 AUDUSD  : VENTE CHOC 🔴  | Devise risk-on fortement pénalisée en RISK-OFF\n" +
-        "   • 🇨🇦 USDCAD  : [ACHAT CHOC si USOIL NEUTRE] / [NEUTRE si USOIL ACHAT] | Justification selon la divergence pétrole/cad. Mentionner obligatoirement la divergence dans le FAIT MARQUANT.\n" +
-        "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴  | L'Euro subit le choc de l'instabilité internationale\n" +
-        "   • 🇬🇧 GBPUSD  : VENTE CHOC 🔴  | La Livre subit la baisse générale de l'aversion au risque\n" +
+        "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴  | Devise risk-on fortement pénalisée en RISK-OFF\n" +
+        "   • 🇨🇦 USDCAD : [ACHAT CHOC si USOIL NEUTRE] / [NEUTRE si USOIL ACHAT] | Justification selon la divergence pétrole/cad. Mentionner obligatoirement la divergence dans le FAIT MARQUANT.\n" +
+        "   • 🇪🇺 EURUSD : VENTE CHOC 🔴  | L'Euro subit le choc de l'instabilité internationale\n" +
+        "   • 🇬🇧 GBPUSD : VENTE CHOC 🔴  | La Livre subit la baisse générale de l'aversion au risque\n" +
         "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Les marchés actions capitulent face à l'incertitude\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
+        "   • 📊 SP500    : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Retrait immédiat des capitaux des actifs spéculatifs\n" +
         "   • 📈 US10Y    : ACHAT CHOC 🟢  | Ruée vers la sécurité des bons du Trésor américains\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : YEN FORT / OR FORT (MKT RISK-OFF) 🐻\n\n" +
-        "   ⚠️ CONTRAINTE IMPÉRATIVE SUR L'USDJPY :\n" +
-        "   En cas d'activation du \"Régime de Guerre\" ou de flux dominant \"RISK-OFF GÉOPOLITIQUE\", la paire USDJPY ne peut EN AUCUN CAS être classée comme \"NEUTRE ⚪\". Le Yen ($JPY$) agissant comme un refuge monétaire absolu de premier plan, il doit surperformer le Dollar. Vous devez obligatoirement attribuer à l'USDJPY le statut \"VENTE CHOC 🔴\" avec une conviction minimale de \"🔴🔴🔴🔴⚪\", en indiquant comme raison : \"Le Yen surperforme toutes les devises fiduciaires par flux de rapatriement de capitaux (Safe-Haven)\".\n\n" +
         "   DÉSESCALADE MOYEN-ORIENT (Discussions, Accords, Trêve) :\n" +
         "   Impact modéré, conviction plafonnée à 45%.\n" +
         "   • 🏆 GOLD    : VENTE CHOC 🔴  | Sortie des refuges\n" +
         "   • 🛢️ USOIL    : VENTE CHOC 🔴  | Prime de risque géopolitique s'efface sur le brut\n" +
         "   • 💻 NASDAQ  : ACHAT CHOC 🟢  | Soulagement des indices actions\n" +
-        "   • 📊 SP500   : ACHAT CHOC 🟢  | Même direction que NASDAQ — obligatoire\n" +
-        "   • 🇯🇵 USDJPY  : ACHAT CHOC 🟢  | Le Yen capitule comme refuge\n" +
-        "   • 🇨🇦 USDCAD  : ACHAT CHOC 🟢  | Pétrole baisse = le CAD s'affaiblit mécaniquement face au USD\n" +
-        "   • 🇦🇺 AUDUSD  : ACHAT CHOC 🟢  | Retour de l'appétit pour le risque sur les devises cycliques\n" +
+        "   • 📊 SP500    : ACHAT CHOC 🟢  | Même direction que NASDAQ — obligatoire\n" +
+        "   • 🇯🇵 USDJPY : ACHAT CHOC 🟢  | Le Yen capitule comme refuge\n" +
+        "   • 🇨🇦 USDCAD : ACHAT CHOC 🟢  | Pétrole baisse = le CAD s'affaiblit mécaniquement face au USD\n" +
+        "   • 🇦🇺 AUDUSD : ACHAT CHOC 🟢  | Retour de l'appétit pour le risque sur les devises cycliques\n" +
         "   • ₿ BITCOIN  : ACHAT CHOC 🟢  | Retour des flux spéculatifs (amplitude x2 à x3 par rapport aux actions)\n" +
         "   • 📈 US10Y, 🇪🇺 EURUSD, 🇬🇧 GBPUSD : NEUTRE | Retrait ordonné sans panique\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : RISK-ON RETOUR (MKT APPAISÉ) 🐂\n\n" +
-    
         "F. STOCKS PÉTROLE EIA / OPEC\n" +
         "─────────────────────────────\n" +
         "   Rang SECONDAIRE. Impact principal sur USOIL et CAD.\n" +
         "   Stocks EIA > prévisions (surplus) → offre excédentaire :\n" +
         "   • 🛢️ USOIL    : VENTE CHOC 🔴\n" +
-        "   • 🇨🇦 USDCAD  : ACHAT CHOC 🟢  | Le CAD s'affaiblit en corrélation directe avec la chute du brut\n" +
+        "   • 🇨🇦 USDCAD : ACHAT CHOC 🟢  | Le CAD s'affaiblit en corrélation directe avec la chute du brut\n" +
         "   • Tous les autres actifs : NEUTRE\n" +
         "   Stocks EIA < prévisions (déficit) → tension sur l'offre :\n" +
         "   • 🛢️ USOIL    : ACHAT CHOC 🟢\n" +
-        "   • 🇨🇦 USDCAD  : VENTE CHOC 🔴  | Le CAD se renforce en même temps que le pétrole grimpe\n" +
+        "   • 🇨🇦 USDCAD : VENTE CHOC 🔴  | Le CAD se renforce en même temps que le pétrole grimpe\n" +
         "   • Tous les autres actifs : NEUTRE\n\n" +
-    
         "G. TARIFS DOUANIERS (Chine, UE, USA, etc.)\n" +
         "────────────────────────────────────────────\n" +
         "   Rang TACTIQUE, impact modéré à élevé selon l'ampleur. Conviction plafonnée à 70%.\n" +
         "   Annonce de SURTAXE / GUERRE COMMERCIALE (ex: +25% sur produits chinois) :\n" +
         "   • 💻 NASDAQ  : VENTE CHOC 🔴  | Crainte sur les chaînes d'approvisionnement tech\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
-        "   • 🇨🇳 AUDUSD  : VENTE CHOC 🔴  | Devise proxy de la Chine, fortement pénalisée\n" +
+        "   • 📊 SP500    : VENTE CHOC 🔴  | Même direction que NASDAQ — obligatoire\n" +
+        "   • 🇨🇳 AUDUSD : VENTE CHOC 🔴  | Devise proxy de la Chine, fortement pénalisée\n" +
         "   • 🛢️ USOIL    : VENTE CHOC 🔴  | Anticipation de ralentissement de la demande mondiale\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴  | Yen refuge s'apprécie (le graphique baisse)\n" +
+        "   • 🇯🇵 USDJPY : VENTE CHOC 🔴  | Yen refuge s'apprécie (le graphique baisse)\n" +
         "   • 🏆 GOLD    : ACHAT CHOC 🟢  | Valeur refuge\n" +
         "   • 🇪🇺 EURUSD, 🇬🇧 GBPUSD, 🇨🇦 USDCAD : NEUTRE\n" +
         "   • ₿ BITCOIN  : VENTE CHOC 🔴  | Risk-off sur actifs spéculatifs\n" +
         "   • 📈 US10Y    : NEUTRE\n" +
         "   🏁 FLUX DOMINANT : RISK-OFF / YEN FORT / OR FORT 🐻\n\n" +
-    
         "   DÉSESCALADE TARIFAIRE (suspension, baisse, accord) :\n" +
         "   Inverser toutes les directions ci-dessus, conviction plafonnée à 50%.\n" +
         "   🏁 FLUX DOMINANT : RISK-ON / APPÉTIT POUR LE RISQUE 🐂\n\n" +
-        "H. TREASURY AUCTIONS / DEBT CEILING / CRISE BUDGÉTAIRE US\n" +
-        "──────────────────────────────────────────────────────────\n" +
-        "   Treasury Auction FAIBLE (tail, bid-to-cover < 2.3, yield > prévision) :\n" +
-        "   • 📈 US10Y   : VENTE CHOC 🔴 | Demande insuffisante → yields montent\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Méfiance envers la dette US\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Taux hauts compressent les valorisations\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   Debt Ceiling Crisis (impasse au Congrès, risque de défaut) :\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Couverture souveraine maximale\n" +
-        "   • 📈 US10Y   : VENTE CHOC 🔴 | Prime de risque sur la dette US\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Risk-off institutionnel\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation actifs spéculatifs\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Yen refuge\n" +
-        "   🏁 FLUX DOMINANT : OR FORT / RISK-OFF SOUVERAIN 🐻\n\n" +
-
-        "I. CARRY TRADE UNWINDING / INTERVENTION MOF JAPON\n" +
-        "──────────────────────────────────────────────────\n" +
-        "   ATTENTION : Ce driver crée des mouvements violents et soudains.\n" +
-        "   Intervention VERBALE MOF ('watching closely', 'excessive moves') :\n" +
-        "   • 🇯🇵 USDJPY  : INCLINATION VENTE MAIS NEUTRE | Alerte sans action directe\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   Intervention DIRECTE BOJ (achat massif de Yen confirmé) :\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Gap instantané 200-500 pips\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Fuite vers les refuges\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   Carry Trade Unwinding (USDJPY chute > 2% sur une session) :\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Débouclage massif\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Vente d'actifs risk-on pour rembourser emprunts Yen\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation amplifiée\n" +
-        "   🏁 FLUX DOMINANT : RISK-OFF CARRY TRADE / YEN FORT 🐻\n\n" +
-
-        "J. BIG TECH EARNINGS (NASDAQ/SP500 DRIVER DIRECT)\n" +
-        "──────────────────────────────────────────────────\n" +
-        "   NVDA / AAPL / MSFT / AMZN / META / GOOGL / TESLA EARNINGS BEAT :\n" +
-        "   • 💻 NASDAQ  : ACHAT CHOC 🟢 | Valorisations soutenues\n" +
-        "   • 📊 SP500   : ACHAT CHOC 🟢 | Même direction NASDAQ obligatoire\n" +
-        "   • ₿ BITCOIN  : ACHAT CHOC 🟢 | Sentiment risk-on amplifié\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   EARNINGS MISS / PROFIT WARNING / GUIDANCE BAISSIÈRE :\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Compression des valorisations\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Risk-off amplifié\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   🏁 FLUX DOMINANT : TECH DRIVEN (NASDAQ LEADER) 💻\n\n" +
-
-        "K. BITCOIN DRIVERS SPÉCIFIQUES\n" +
-        "──────────────────────────────\n" +
-        "   Bitcoin ETF Flows POSITIFS (> 300M$ net inflow journalier) :\n" +
-        "   • ₿ BITCOIN  : ACHAT CHOC 🟢 | Demande institutionnelle confirmée\n" +
-        "   • 💻 NASDAQ  : INCLINATION ACHAT MAIS NEUTRE | Sentiment risk-on tech\n" +
-        "   Bitcoin ETF Flows NÉGATIFS (outflows > 200M$) :\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Retrait institutionnel\n" +
-        "   SEC Enforcement / Regulatory Crackdown :\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Capitulation réglementaire\n" +
-        "   • 💻 NASDAQ  : INCLINATION VENTE MAIS NEUTRE | Risque réglementaire tech\n" +
-        "   Exchange Hack / Collapse (FTX type) :\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Panique systémique crypto\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Contagion sentiment risk-off\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   🏁 FLUX DOMINANT : CRYPTO SPECIFIC (BITCOIN LEADER) ₿\n\n" +
-
-        "L. RISQUE SYSTÉMIQUE BANCAIRE\n" +
-        "──────────────────────────────\n" +
-        "   Bank Run / Bank Failure / Banking Crisis :\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge anti-système bancaire\n" +
-        "   • 💻 NASDAQ  : VENTE CHOC 🔴 | Contagion financière systémique\n" +
-        "   • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-        "   • 📈 US10Y   : ACHAT CHOC 🟢 | Fuite vers la sécurité des Treasuries\n" +
-        "   • 🇯🇵 USDJPY  : VENTE CHOC 🔴 | Yen refuge\n" +
-        "   • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation d'urgence actifs spéculatifs\n" +
-        "   • 🇦🇺 AUDUSD  : VENTE CHOC 🔴 | Devise risk-on pénalisée\n" +
-        "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴 | Contagion si banque européenne impliquée\n" +
-        "   • 🛢️ USOIL    : VENTE CHOC 🔴 | Demande anticipée en baisse\n" +
-        "   🏁 FLUX DOMINANT : RISK-OFF SYSTÉMIQUE / OR FORT 🐻\n\n" +
-
-        "M. CRISE SOUVERAINE EUROPÉENNE (Spreads BTP/OAT)\n" +
-        "──────────────────────────────────────────────────\n" +
-        "   BTP/Bund spread > 250bps ou OAT/Bund spread > 80bps :\n" +
-        "   • 🇪🇺 EURUSD  : VENTE CHOC 🔴 | Crise de confiance en zone Euro\n" +
-        "   • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge contre instabilité européenne\n" +
-        "   • 💻 NASDAQ  : NEUTRE | Pas d'impact direct actifs US\n" +
-        "   • 📊 SP500   : NEUTRE | Même direction NASDAQ obligatoire\n" +
-        "   • 🇬🇧 GBPUSD  : INCLINATION VENTE MAIS NEUTRE | Effet de bord modéré\n" +
-        "   🏁 FLUX DOMINANT : EURO FAIBLE / CRISE SOUVERAINE 🐻\n\n" +
-
-        "N. IRON ORE / COPPER — PROXY AUD/CHINE\n" +
-        "─────────────────────────────────────────\n" +
-        "   Iron Ore > +3% ou Copper > +2% (stimulus Chine, demande forte) :\n" +
-        "   • 🇦🇺 AUDUSD  : ACHAT CHOC 🟢 | Australie = 1er exportateur fer mondial\n" +
-        "   • 🛢️ USOIL    : INCLINATION ACHAT MAIS NEUTRE | Demande industrielle\n" +
-        "   • Autres actifs : NEUTRE\n" +
-        "   Iron Ore < -3% ou Copper < -2% (ralentissement Chine) :\n" +
-        "   • 🇦🇺 AUDUSD  : VENTE CHOC 🔴 | Corrélation directe iron ore/AUD\n" +
-        "   • 🛢️ USOIL    : INCLINATION VENTE MAIS NEUTRE | Demande industrielle faible\n" +
-        "   🏁 FLUX DOMINANT : AUD/CHINE CORRÉLATION MATIÈRES PREMIÈRES 🦘\n\n" +
-
-        "O. SPR / BAKER HUGHES / API CRUDE\n" +
-        "────────────────────────────────────\n" +
-        "   SPR Release (libération réserves stratégiques US > 1M barils) :\n" +
-        "   • 🛢️ USOIL    : VENTE CHOC 🔴 | Offre supplémentaire immédiate\n" +
-        "   • 🇨🇦 USDCAD  : ACHAT CHOC 🟢 | CAD s'affaiblit avec le pétrole\n" +
-        "   Baker Hughes Rig Count HAUSSE (> +10 rigs hebdomadaire) :\n" +
-        "   • 🛢️ USOIL    : INCLINATION VENTE MAIS NEUTRE | Offre future en hausse\n" +
-        "   Baker Hughes Rig Count BAISSE (< -10 rigs hebdomadaire) :\n" +
-        "   • 🛢️ USOIL    : INCLINATION ACHAT MAIS NEUTRE | Offre future en baisse\n" +
-        "   API Crude Stock HAUSSE surprise :\n" +
-        "   • 🛢️ USOIL    : VENTE CHOC 🔴 | Anticipation EIA confirm surplus\n" +
-        "   API Crude Stock BAISSE surprise :\n" +
-        "   • 🛢️ USOIL    : ACHAT CHOC 🟢 | Anticipation EIA confirm déficit\n" +
-        "   🏁 FLUX DOMINANT : USOIL SUPPLY DRIVEN 🛢️\n\n" +
-
         "<HARD_CONSTRAINTS>\n" +
         "CONTRAINTE 1 — SECTIONS INTERDITES :\n" +
         "   N'écris JAMAIS 'TIMING D'EFFET', 'ACTION TRADING', 'CONTEXTE' ou toute autre section\n" +
         "   absente du FORMAT DE SORTIE ci-dessous. STRICTEMENT INTERDIT.\n\n" +
-    
         "CONTRAINTE 2 — ÉMOJI UNIQUE :\n" +
         "   Le symbole '📢' est STRICTEMENT RÉSERVÉ au seul 'FAIT MARQUANT'. Un seul et unique '📢' par réponse.\n\n" +
-    
         "CONTRAINTE 3 — SYMÉTRIE NASDAQ/SP500 ABSOLUE :\n" +
         "   💻 NASDAQ et 📊 SP500 ont TOUJOURS exactement la même directionnalité (Achat, Vente ou Neutre).\n" +
         "   Aucune exception tolérée.\n\n" +
-    
         "CONTRAINTE 4 — COHÉRENCE USDJPY / FLUX DOMINANT :\n" +
         "   - Si 🇯🇵 USDJPY is in VENTE CHOC 🔴 → Le FLUX DOMINANT a l'interdiction formelle d'écrire 'DOLLAR FORT'.\n" +
         "   - Si 🇯🇵 USDJPY is in ACHAT CHOC 🟢 → Le FLUX DOMINANT a l'interdiction formelle d'écrire 'YEN FORT'.\n" +
         "   - En cas de contradiction, le flux doit mentionner YEN FORT si USDJPY est en VENTE.\n\n" +
-    
         "CONTRAINTE 5 — JAUGE CONVICTION OBLIGATOIRE :\n" +
         "   Tu dois obligatoirement générer la jauge visuelle d'émojis avant le pourcentage. Format strict :\n" +
         "   📊 CONVICTION : [EMOJIS] XX%\n" +
@@ -1383,32 +702,27 @@ public class NotificationService extends NotificationListenerService {
         "   - Pourcentage 61-80% → 🟡🟡🟡🟡⚪\n" +
         "   - Pourcentage > 81%  → 🔴🔴🔴🔴🔴\n" +
         "   Exemple valide : 📊 CONVICTION : 🟡🟡🟡🟡⚪ 75%\n\n" +
-    
         "CONTRAINTE 6 — INTERDICTION D'OMISSION :\n" +
         "   Les 11 actifs listés dans le FORMAT DE SORTIE doivent TOUS apparaître explicitement dans la réponse,\n" +
-        "   sans aucune exception, même s'ils reçoivent la mention NEUTRE ou une INCLINATION.\n\n" +
-    
+        "   sans aucune exception, même s'ils reçoivent la mention NEUTRE ou une INCLINATION.\n" +
         "CONTRAINTE 7 — SÉCURITÉ BANQUES CENTRALES ÉTRANGÈRES (BASÉE SUR LE CONTENU) :\n" +
-        "   - Si le texte du flux (le contenu) mentionne une banque centrale étrangère (BCE, ECB, BOJ, BOE, RBA, BOC) ou ses speakers officiels (Lagarde, Schnabel, etc.), tu as l'INTERDICTION ABSOLUE de mettre ACHAT CHOC, VENTE CHOC ou toute INCLINATION sur NASDAQ, SP500, US10Y et BITCOIN. Ils doivent obligatoirement être marqués [NEUTRE] avec la raison exacte suivante : \"Pas d'impact direct – actif américain / crypto\".\n" +
+        "   - Si le texte du flux (le contenu) mentionne une banque centrale étrangère (BCE, ECB, BOJ, BOE, RBA, BOC), tu as l'INTERDICTION ABSOLUE de mettre ACHAT CHOC, VENTE CHOC ou toute INCLINATION sur NASDAQ, SP500, US10Y et BITCOIN. Ils doivent obligatoirement être marqués [NEUTRE] avec la raison exacte suivante : \"Pas d'impact direct – actif américain / crypto\".\n" +
         "   - Quelle que soit la source ou l'émetteur de la notification (Twitter, FinancialJuice, etc.), c'est la nature du contenu textuel qui déclenche cette règle.\n" +
         "   - RÈGLE DE DIRECTIONNALITÉ DE LA DEVISE LOCALE :\n" +
-        "     * Banque centrale étrangère DOVISH (baisse des taux, ton accommodant) -> sa devise locale baisse face au USD. Exemple strict : BCE DOVISH = EURUSD VENTE CHOC 🔴.\n" +
+        "     * Banque centrale étrangère DOVISH (baisse des taux, ton accommodant) -> sa devise locale baisse face au USD. Exemple strict : BCE DOVISH = EURUSD VENTE CHOC 🔴. (Mettre ACHAT est une erreur éliminatoire).\n" +
         "     * Banque centrale étrangère HAWKISH (hausse des taux, ton restrictif) -> sa devise locale monte face au USD. Exemple strict : BCE HAWKISH = EURUSD ACHAT CHOC 🟢.\n" +
-        "   - Les autres paires de devises (GBPUSD, AUDUSD, USDJPY, USDCAD) et actifs (GOLD, USOIL) se conforment strictement aux directives de flux de la RÈGLE C, ou restent [NEUTRE] s'ils ne subissent aucun effet de bord direct.\n" +
+        "   - Les autres paires de devises (GBPUSD, AUDUSD, USDJPY, USDCAD) et actifs (GOLD, USOIL) se conforment strictement aux directives de flux et de corrélation de la RÈGLE C (Différentiel de taux / effet dollar), ou restent [NEUTRE] s'ils ne sont pas mentionnés.\n\n" +
         "   - ⚠️ TOUTE INFRACTION À CETTE RÈGLE (ex: BCE HAWKISH → EURUSD VENTE) ENTRAÎNE LE REJET AUTOMATIQUE DE LA RÉPONSE. CETTE RÈGLE PRÉVAUT SUR TOUTE AUTRE CONSIDÉRATION.\n\n" +
-    
         "CONTRAINTE 8 — COMPLÉTUDE ABSOLUE DE LA MATRICE :\n" +
         "   - Tu dois obligatoirement copier-coller la liste complète des 11 actifs dans l'ordre exact du format de sortie. Aucune ligne ne peut être omise ou supprimée, sous aucun prétexte.\n" +
         "   - Si un actif n'est pas directement touché ou doit rester neutre par application de la CONTRAINTE 7, sa mention réglementaire stricte doit être : `NEUTRE | Pas d'impact direct de ce driver.` (ou la raison spécifique exigée par la contrainte 7).\n" +
         "   - Cette règle de complétude prévaut sur toute logique de concision.\n\n" +
-    
         "CONTRAINTE 9 — NOMBRE EXACT DE LIGNES D'IMPACTS :\n" +
         "   ⚠️ TOUTE RÉPONSE DOIT CONTENIR EXACTEMENT 11 LIGNES D’IMPACTS (une par actif), même si l'actif est neutre.\n" +
         "   Aucune ligne ne peut être omise, supprimée ou ajoutée. Le non-respect de cette règle entraîne le rejet automatique de la réponse.\n\n" +
-    
-        "CONTRAINTE 10 — VALEUR EXACTE DU VECTEUR CIBLE :\n" + 
+        "CONTRAINTE 10 — VALEUR EXACTE DU VECTEUR CIBLE :\n" +
         "   Le champ 🎯 VECTEUR CIBLE doit être choisi UNIQUEMENT parmi : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS.\n" +
-        "   Toute autre valeur est interdite.\n" +
+        "   Toute autre valeur (ex: \"RANG SECONDAIRE - INFLATION\") is interdite et invalide la réponse.\n" +
         "   La réponse doit utiliser exactement un de ces six termes, sans ajout ni modification.\n\n" +
         "CONTRAINTE 11 — HIÉRARCHIE ABSOLUE ET EXCEPTION DE CRISE :\n" +
         "   - En règle générale, le RANG SUPRÊME (Politique Monétaire, CPI, PCE) l'emporte sur le RANG TACTIQUE (GÉO).\n" +
@@ -1426,36 +740,20 @@ public class NotificationService extends NotificationListenerService {
         "     * 🇯🇵 USDJPY  : VENTE CHOC 🔴 [Régime de dominance géopolitique – Yen refuge prioritaire]\n" +
         "     * 🇨🇦 USDCAD  : NEUTRE ou VENTE CHOC 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
         "   - Le modèle doit mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans le FAIT MARQUANT.\n\n" +
-    
-         "RÈGLES DE CORRÉLATION TEMPORELLE (Priorité maximale) :\n" +
-         "- NFP FORT (derniers 7 jours) + CPI FORT aujourd'hui = CONFIRMATION HAWKISH — Conviction +15%\n" +
-         "- NFP FAIBLE (derniers 7 jours) + CPI FAIBLE aujourd'hui = CONFIRMATION DOVISH — Conviction +15%\n" +
-         "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE — Conviction plafonnée à 55%, signaler divergence\n" +
-         "- GEO ESCALADE active (< 48h) + tout driver HAWKISH = Double choc — Or et Pétrole prioritaires\n" +
-         "- GEO ESCALADE active + DOVISH = Annulation partielle — conviction GEO plafonnée à 60%\n" +
-         "- FOMC réunion dans < 7 jours = tout CPI/NFP reçoit +20% de conviction additionnelle\n" +
-         "- WARSH HAWKISH (< 48h) + CPI/NFP FORT = DOUBLE SIGNAL RESTRICTIF — " +
-         "Conviction +20%, dollar fort prioritaire sur tous actifs\n" +
-         "- WARSH HAWKISH (< 48h) + CPI/NFP FAIBLE = SIGNAL CONTRADICTOIRE — " +
-         "Conviction plafonnée à 55%, signaler divergence marché vs futur Chair\n" +
-         "- WARSH DOVISH inattendu = SURPRISE MAXIMALE — Conviction +25%, " +
-         "repricing immédiat des anticipations de taux\n" +
         "</HARD_CONSTRAINTS>\n\n" +
-    
         "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
         "   Si l'actualité dit : \"BCE dovish, Schnabel s'inquiète de la croissance européenne\", la réponse DOIT copier l'intégralité des 11 lignes ainsi :\n" +
         "   • 📈 US10Y   : NEUTRE | Pas d'impact direct de ce driver.\n" +
         "   • 💻 NASDAQ  : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
         "   • 📊 SP500   : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
         "   • 🏆 GOLD    : NEUTRE | Pas d'impact direct de ce driver.\n" +
-        "   • 🛢️ USOIL   : VENTE CHOC 🔴 | Ralentissement anticipé de la demande en zone Euro.\n" +
+        "   • 🛢️ USOIL   : NEUTRE | Pas d'impact direct de ce driver.\n" +
         "   • 🇪🇺 EURUSD : VENTE CHOC 🔴 | BCE dovish -> baisse et affaiblissement de l'euro.\n" +
-        "   • 🇯🇵 USDJPY : NEUTRE | Pas d'impact direct de ce driver.\n" +
-        "   • 🇨🇦 USDCAD : NEUTRE | Pas d'impact direct de ce driver.\n" +
-        "   • 🇬🇧 GBPUSD : NEUTRE | Pas d'impact direct de ce driver.\n" +
-        "   • 🇦🇺 AUDUSD : NEUTRE | Pas d'impact direct de ce driver.\n" +
-        "   • ₿ BITCOIN  : NEUTRE | Pas d'impact direct – actif américain / crypto.\n\n" +
-    
+        "   • 🇯🇵 USDJPY : ACHAT CHOC 🟢 | Hausse mécanique par différentiel (Dollar Fort face au Yen).\n" +
+        "   • 🇨🇦 USDCAD : ACHAT CHOC 🟢 | Hausse mécanique par différentiel (Dollar Fort face au CAD).\n" +
+        "   • 🇬🇧 GBPUSD : VENTE CHOC 🔴 | Baisse mécanique par différentiel (Dollar Fort écrase la Livre).\n" +
+        "   • 🇦🇺 AUDUSD : VENTE CHOC 🔴 | Baisse mécanique par différentiel (Dollar Fort écrase l'Aussie).\n" +
+        "   • ₿ BITCOIN  : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
         "FORMAT DE SORTIE STRICT ET OBLIGATOIRE :\n" +
         "🚨 [NOM DE L'EMETTEUR OU SOURCE]\n" +
         "🕒 [Insère ici la date et l'heure fournies dans le CONTEXTE TEMPOREL au début du message] (Mada)\n" +
@@ -1475,7 +773,8 @@ public class NotificationService extends NotificationListenerService {
         "• 🇦🇺 AUDUSD : [ACHAT CHOC 🟢 / VENTE CHOC 🔴 / NEUTRE / INCLINATION ACHAT MAIS NEUTRE / INCLINATION VENTE MAIS NEUTRE] | [raison succincte]\n" +
         "• ₿ BITCOIN  : [ACHAT CHOC 🟢 / VENTE CHOC 🔴 / NEUTRE / INCLINATION ACHAT MAIS NEUTRE / INCLINATION VENTE MAIS NEUTRE] | [raison succincte]\n\n" +
         "🏁 FLUX DOMINANT : [Chaîne de caractères exacte issue des règles de directionnalité]"
-    ;
+    ; 
+
     // 2. Génération dynamique de l'horodatage actuel au format de Madagascar (EAT)
     java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
     sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
@@ -1666,9 +965,8 @@ public class NotificationService extends NotificationListenerService {
         // Détection et filtrage immédiat des packages sources autorisés
         String packageName = sbn.getPackageName().toLowerCase(Locale.ROOT);
         String sourceName = "Source Institutionnelle";
-        
         if (packageName.contains("financialjuice")) {
-            sourceName = "FinancialJuice";
+        sourceName = "FinancialJuice";
         } else if (packageName.contains("nikkei")) {
             sourceName = "TradingEconomics";
         } else if (packageName.contains("forex.portal")) {
@@ -1676,17 +974,7 @@ public class NotificationService extends NotificationListenerService {
         } else if (packageName.contains("twitter") || packageName.contains("periscope")) {
             sourceName = "X /Twitter";
         } else if (packageName.contains("chrome") || packageName.equals("com.android.chrome")) {
-            sourceName = "Forex Factory";
-        
-        // ✅ Nouvelles sources ajoutées
-        } else if (packageName.contains("thomsonreuters")) {
-            sourceName = "Reuters";
-        } else if (packageName.contains("bloomberg")) {
-            sourceName = "Bloomberg";
-        } else if (packageName.contains("cnbc.client")) {
-            sourceName = "CNBC";
-        } else if (packageName.contains("cointelegraph")) {
-            sourceName = "CoinTelegraph";
+            sourceName = "Chrome";
         } else {
             return; // Ignore immédiatement tout le reste
         }
@@ -1785,7 +1073,6 @@ public class NotificationService extends NotificationListenerService {
                     if (finalCalculatedWeight >= 3 || currentSpeaker.equals("FED") || eventTypeStr.equals("GEOPOLITICAL")) {
                         isSupremeRank = true;
                     }
-
     
                     // 4️⃣ Anti-spam / Protection contre les flux de paroles répétitifs des speakers
                     String speakerToken = currentSpeaker.trim();
@@ -1873,342 +1160,80 @@ public class NotificationService extends NotificationListenerService {
                 }
 
                 // 8️⃣ Génération de la signature cryptographique et persistance SQLite en base de données
-                //String fingerprint = generateSecureHash(packageName + "_" + title + "_" + bodyTextRaw + "_" + (postTimeMs / 60000));
-                 // 1. Nettoyage et normalisation stricte
-                String pack = sbn.getPackageName();
-                Bundle extras = sbn.getNotification().extras;
-                String rawTitle = extras.getString(Notification.EXTRA_TITLE, "");
-                String rawBody = extras.getString(Notification.EXTRA_TEXT, "");
-                long postTimeMs = sbn.getPostTime(); // Votre variable de temps
-                String cleanSource = (pack != null)     ? pack.trim().toLowerCase() : "";
-                String cleanTitle  = (rawTitle != null) ? rawTitle.trim().toLowerCase() : "";
-                String cleanBody   = (rawBody != null)  ? rawBody.trim().toLowerCase() : "";
-            
-                // 2. Construction de l'empreinte de CONTENU (indépendante du temps)
-                // L'usage du pipe | empêche les collisions de texte que le "_" peut provoquer
-                String rawInput = cleanSource + "|" + cleanTitle + "|" + cleanBody;
-                String fingerprint = generateSecureHash(rawInput);
-            
-                // 3. Barrière glissante temporelle (Beaucoup plus fiable que la division par 60000)
-                long now = System.currentTimeMillis();
-                if (EventValidator.getRecentFingerprints().containsKey(fingerprint)) {
-                    long lastSeen = EventValidator.getRecentFingerprints().get(fingerprint);
-                    
-                    // Bloque le doublon exact s'il réapparaît dans une fenêtre glissante de 30 minutes
-                    if ((now - lastSeen) < 30 * 60 * 1000L) { 
-                        Log.d(TAG, "🚫 Doublon détecté et bloqué à la milliseconde près : " + rawTitle);
-                        return; 
-                    }
+                String fingerprint = generateSecureHash(packageName + "_" + title + "_" + bodyTextRaw + "_" + (postTimeMs / 60000));
+
+                StringBuilder assetsSb = new StringBuilder();
+                for (int i = 0; i < enrichedAssets.size(); i++) {
+                    assetsSb.append(enrichedAssets.get(i));
+                    if (i < enrichedAssets.size() - 1) assetsSb.append(",");
                 }
-            
-                // Enregistrement du hash avec son vrai temps système
-                EventValidator.getRecentFingerprints().put(fingerprint, now);
-                                
-                            StringBuilder assetsSb = new StringBuilder();
-                            for (int i = 0; i < enrichedAssets.size(); i++) {
-                                assetsSb.append(enrichedAssets.get(i));
-                                if (i < enrichedAssets.size() - 1) assetsSb.append(",");
-                            }
 
                 // Sauvegarde de l'événement en base de données persistante avec injection du vrai poids macro calculé
-                // ✅ Construire un impact descriptif selon eventTypeStr
-                // Visible par getDailyMacroSummary, detecterRegimeMarche, getDerniersDriversGeo
-                String impactSave;
-                switch (eventTypeStr) {
-                    case "GEOPOLITICAL":
-                        impactSave = "Choc Géopolitique | " + title;
-                        break;
-                    case "INFLATION-DATA":
-                        impactSave = "Haute Volatilité | Inflation | " + title;
-                        break;
-                    case "FED-MONETARY-POLICY":
-                        impactSave = "Haute Volatilité | Fed | " + title;
-                        break;
-                    case "EMPLOYMENT-REPORT":
-                        impactSave = "Haute Volatilité | Emploi | " + title;
-                        break;
-                    case "CENTRAL-BANK-RATE":
-                        impactSave = "Haute Volatilité | Banque Centrale | " + title;
-                        break;
-                    case "TREASURY-MARKET":
-                        impactSave = "Haute Volatilité | Treasury | " + title;
-                        break;
-                    case "TECH-EARNINGS":
-                        impactSave = "Haute Volatilité | Earnings | " + title;
-                        break;
-                    case "CRYPTO-SPECIFIC":
-                        impactSave = "Haute Volatilité | Crypto | " + title;
-                        break;
-                    case "SYSTEMIC-RISK":
-                        impactSave = "Choc Géopolitique | Risque Systémique | " + title;
-                        break;
-                    case "SOVEREIGN-DEBT":
-                        impactSave = "Haute Volatilité | Dette Souveraine | " + title;
-                        break;
-                    case "TRADE-TARIFF":
-                        impactSave = "Haute Volatilité | Tarifs | " + title;
-                        break;
-                    case "CHINA-MACRO":
-                        impactSave = "Haute Volatilité | Chine | " + title;
-                        break;
-                    case "FX-INTERVENTION":
-                        impactSave = "Haute Volatilité | Intervention FX | " + title;
-                        break;
-                    case "DOLLAR-INDEX":
-                        impactSave = "Haute Volatilité | DXY | " + title;
-                        break;
-                    case "DATA-REVISION":
-                        impactSave = "Moyenne Volatilité | Révision | " + title;
-                        break;
-                    case "ECONOMIC-GROWTH-DATA":
-                        impactSave = "Moyenne Volatilité | Macro | " + title;
-                        break;
-                    default:
-                        impactSave = "Haute Volatilité | " + title;
-                        break;
-                }
-                
-                // ✅ Ajouter le biais directionnel si détecté par EconomicAnalyzer
-                if (ecoResult.isParsed) {
-                    if (ecoResult.deviation > 0) {
-                        impactSave += " (Biais Haussier)";
-                    } else if (ecoResult.deviation < 0) {
-                        impactSave += " (Biais Baissier)";
-                    }
-                }
-                
-                // Sauvegarde de l'événement en base de données persistante
                 boolean saved = eventDb.saveEvent(
                         fingerprint, packageName, finalSourceName, eventTypeStr, title, bodyTextRaw,
-                        assetsSb.toString(), impactSave, postTimeMs / 1000, "pending", finalCalculatedWeight);
-                
+                        assetsSb.toString(), "pending", postTimeMs / 1000, "pending", finalCalculatedWeight);
+
                 if (saved) {
-                    Log.i(TAG, "[DATABASE] Match " + eventTypeStr + " enregistré. Poids : " +
-                          finalCalculatedWeight + " | Impact : " + impactSave);
-                    if (MainActivity.instance != null) {
-                        MainActivity.instance.addLog("💾 [DB] " + eventTypeStr +
-                                " | Poids: " + finalCalculatedWeight +
-                                " | " + title.substring(0, Math.min(title.length(), 50)));
-                    }
+                    Log.i(TAG, "[DATABASE] Match " + eventTypeStr + " enregistré avec succès. Poids affecté : " + finalCalculatedWeight);
                 }
-                
-                                // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
-                                // 9️⃣ Enrichissement dynamique du Prompt Système IA
-                String baseSystemPrompt = SYSTEM_PROMPT;
-                // ✅ Injection du régime de marché dynamique en tête du prompt
-                try {
-                    String regimeActuel = eventDb.detecterRegimeMarche(
-                        System.currentTimeMillis() / 1000);
-                    if (regimeActuel != null && !regimeActuel.isEmpty()) {
-                        baseSystemPrompt =
-                            "⚠️ RÉGIME DE MARCHÉ ACTUEL (7 derniers jours) :\n" +
-                            regimeActuel + "\n" +
-                            "Toute analyse doit être cohérente avec ce régime. " +
-                            "Un signal contraire = DIVERGENCE à signaler explicitement.\n\n" +
-                            SYSTEM_PROMPT;
-                    }
-                } catch (Exception e) {
-                    Log.w(TAG, "Impossible de détecter le régime", e);
-                }
-                
+
+                // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
+                // 9️⃣ Enrichissement dynamique du Prompt Système IA
+                String baseSystemPrompt = SYSTEM_PROMPT;  // Utilise la constante de classe
+
                 String promptAI = baseSystemPrompt;
                 if (ecoResult.isParsed) {
-                    
-                    // ✅ Calcul du scoring de conviction mathématique
-                    double absDeviation = Math.abs(ecoResult.deviation);
-                    String convictionDirective;
-                    String niveauSurprise;
-                
-                // ✅ Priorité 1 — Calcul en % si forecast disponible (plus précis)
-                boolean hasForecast = !Double.isNaN(ecoResult.forecast) && ecoResult.forecast != 0.0;
-                
-                if (hasForecast) {
-                    double surprisePercent = (absDeviation / Math.abs(ecoResult.forecast)) * 100.0;
-                
-                    if (surprisePercent < 1.0) {
-                        convictionDirective =
-                            "⚠️ DIRECTIVE CONVICTION : Surprise NULLE < 1% " +
-                            "(Actual=" + String.format("%.4f", ecoResult.actual) +
-                            " vs Forecast=" + String.format("%.4f", ecoResult.forecast) + ") → " +
-                            "Conviction PLAFONNÉE à 50% 🟠. Utiliser INCLINATION uniquement.\n";
-                        niveauSurprise = "CONFORME (< 1%)";
-                
-                    } else if (surprisePercent <= 5.0) {
-                        convictionDirective =
-                            "⚠️ DIRECTIVE CONVICTION : Surprise FAIBLE de " +
-                            String.format("%.1f", surprisePercent) + "% " +
-                            "(Actual=" + String.format("%.4f", ecoResult.actual) +
-                            " vs Forecast=" + String.format("%.4f", ecoResult.forecast) + ") → " +
-                            "Conviction PLAFONNÉE à 65%.\n";
-                        niveauSurprise = "FAIBLE (" + String.format("%.1f", surprisePercent) + "%)";
-                
-                    } else if (surprisePercent <= 10.0) {
-                        convictionDirective =
-                            "⚠️ DIRECTIVE CONVICTION : Surprise MODÉRÉE de " +
-                            String.format("%.1f", surprisePercent) + "% " +
-                            "(Actual=" + String.format("%.4f", ecoResult.actual) +
-                            " vs Forecast=" + String.format("%.4f", ecoResult.forecast) + ") → " +
-                            "Conviction AUTORISÉE jusqu'à 75%.\n";
-                        niveauSurprise = "MODÉRÉE (" + String.format("%.1f", surprisePercent) + "%)";
-                
-                    } else {
-                        convictionDirective =
-                            "⚠️ DIRECTIVE CONVICTION : Surprise MAJEURE de " +
-                            String.format("%.1f", surprisePercent) + "% " +
-                            "(Actual=" + String.format("%.4f", ecoResult.actual) +
-                            " vs Forecast=" + String.format("%.4f", ecoResult.forecast) + ") → " +
-                            "Conviction AUTORISÉE > 80%. CHOC MACRO CONFIRMÉ.\n";
-                        niveauSurprise = "MAJEURE (" + String.format("%.1f", surprisePercent) + "%)";
-                    }
-                
-                // ✅ Priorité 2 — Fallback déviation brute si forecast absent
-                } else {
-                    if (absDeviation == 0.0) {
-                        convictionDirective =
-                            "⚠️ DIRECTIVE CONVICTION : Écart NUL → " +
-                            "Conviction PLAFONNÉE à 50% 🟠. Utiliser INCLINATION uniquement.\n";
-                        niveauSurprise = "CONFORME";
-                
-                    } else if (absDeviation <= 5.0) {
-                        convictionDirective =
-                            "⚠️ DIRECTIVE CONVICTION : Écart FAIBLE " +
-                            "(déviation=" + String.format("%.4f", ecoResult.deviation) + ") → " +
-                            "Conviction PLAFONNÉE à 65%.\n";
-                        niveauSurprise = "FAIBLE";
-                
-                    } else if (absDeviation <= 15.0) {
-                        convictionDirective =
-                            "⚠️ DIRECTIVE CONVICTION : Écart MODÉRÉ " +
-                            "(déviation=" + String.format("%.4f", ecoResult.deviation) + ") → " +
-                            "Conviction AUTORISÉE jusqu'à 75%.\n";
-                        niveauSurprise = "MODÉRÉE";
-                
-                    } else {
-                        convictionDirective =
-                            "⚠️ DIRECTIVE CONVICTION : Écart MAJEUR " +
-                            "(déviation=" + String.format("%.4f", ecoResult.deviation) + ") → " +
-                            "Conviction AUTORISÉE > 80%. CHOC MACRO CONFIRMÉ.\n";
-                        niveauSurprise = "MAJEURE";
-                      }
-                    }
-                
-                
-                    // ✅ Direction mathématique confirmée
-                    String directionConfirmee = ecoResult.deviation > 0
-                        ? "📈 DIRECTION MATHÉMATIQUE : HAUSSIÈRE (actual > forecast)"
-                        : "📉 DIRECTION MATHÉMATIQUE : BAISSIÈRE (actual < forecast)";
-                
-                    // ✅ Construction du prompt enrichi
-                    promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE — SCORING QUANTITATIF] :\n" +
-                        convictionDirective +
-                        directionConfirmee + "\n" +
-                        "Direction recommandée par l'analyseur : " + ecoResult.directionText + "\n" +
-                        "Niveau de surprise : " + niveauSurprise + "\n" +
-                        "Déviation brute : " + String.format("%.4f", ecoResult.deviation) + "\n\n" +
-                        baseSystemPrompt;
-                        // ✅ Log pour diagnostic MainActivity
-                Log.d(TAG, "🔢 [SCORING] Déviation=" + String.format("%.4f", ecoResult.deviation) +
-                      " | Surprise=" + niveauSurprise +
-                      " | Direction=" + ecoResult.directionText);
-                   if (MainActivity.instance != null) {
-                      MainActivity.instance.addLog("🔢 [SCORING] Déviation=" + String.format("%.4f", ecoResult.deviation) +
-                      " | Surprise=" + niveauSurprise +
-                      " | Direction=" + ecoResult.directionText);
-                   }
-                }
-                
-                // ✅ Override conviction GEO — injecter EN TÊTE du prompt si choc géopolitique confirmé
-                String geoConvictionOverride = "";
-                if (eventTypeStr.equals("GEOPOLITICAL") && finalCalculatedWeight >= 4) {
-                    geoConvictionOverride =
-                        "⚠️ DIRECTIVE CONVICTION GÉOPOLITIQUE SUPRÊME — OVERRIDE ABSOLU :\n" +
-                        "Cet événement est un CHOC GÉOPOLITIQUE CONFIRMÉ " +
-                        "(missiles, frappe militaire, escalade, guerre).\n" +
-                        "Conviction AUTORISÉE entre 70% et 85% — NE PAS plafonner à 40% ou 50%.\n" +
-                        "Ce n'est PAS un signal macro ordinaire — c'est un choc de marché immédiat.\n" +
-                        "Appliquer immédiatement la CONTRAINTE 11 — Régime de dominance géopolitique.\n" +
-                        "GOLD et USOIL sont les actifs prioritaires — ACHAT CHOC 🟢 obligatoire.\n" +
-                        "USDJPY : VENTE CHOC 🔴 obligatoire — Yen refuge activé.\n\n";
-                
-                    // ✅ Injecter EN TÊTE — avant baseSystemPrompt et avant le scoring quantitatif
-                    promptAI = geoConvictionOverride + promptAI;
-                
-                    Log.d(TAG, "⚠️ [GEO OVERRIDE] Conviction forcée 70-85% pour : " + title);
-                    if (MainActivity.instance != null) {
-                        MainActivity.instance.addLog("⚠️ [GEO OVERRIDE] Conviction 70-85% forcée : " + title);
-                    }
-                }
-                
-                // 🔟 Exécution finale
+                promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
+                    "L'analyseur mathématique déterministe a détecté un écart type. " +
+                    "Direction recommandée : " + ecoResult.directionText + "\n\n" + baseSystemPrompt;
+                 }
+
+                // 🔟 Exécution finale de l'analyse cognitive LLM (Requête API Groq, génération de la matrice et envoi Telegram)
+                // 🔟 Exécution finale de l'analyse cognitive LLM
                 processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank);
-                                
-                            } catch (Exception e) {
-                                Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
-                            }
-                        }
-                        });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
+            }
+        }
+        });
     }
 
     public static void sendToGroqAndTelegram(String source, String title, String body, List<String> assets, Context context) {
         if (context == null) return;
-        
-        // ✅ Utilisation du hash sécurisé global pour éviter les doublons
-        String fingerprint = generateSecureHash(source + title + body);
+        String fingerprint = String.valueOf((source + title + body).hashCode());
         NotificationService instance = serviceInstance;
     
-        // ✅ Récupération sécurisée du Singleton de la base de données
-        EventDatabase db = EventDatabase.getInstance(context);
-        if (db != null) {
-            // ✅ Remplacement de TextUtils par String.join pour une robustesse maximale
-            String assetsStr = (assets != null && !assets.isEmpty()) ? String.join(",", assets) : "";
-            String impactLabel = "CALENDRIER ÉCONOMIQUE | " + title;
-            
-            // ✅ Sécurisation stricte des conditions avec des accolades {}
-            if (body.contains("HIGHER THAN EXPECTED")) {
-                impactLabel += " | Haute Volatilité (Biais Haussier)";
-            } else if (body.contains("LOWER THAN EXPECTED")) {
-                impactLabel += " | Haute Volatilité (Biais Baissier)";
-            } else {
-                impactLabel += " | Haute Volatilité";
-            }
-    
-            // ✅ Poids dynamique (Force à 3 minimum pour garantir l'inclusion dans le Daily Report)
-            int calendarWeight = assignDriverWeight(title + " " + body);
-            if (calendarWeight < 3) {
-                calendarWeight = 3;
-            }
-    
-            // ✅ Sauvegarde brute et garantie dans SQLite
-            db.saveEvent(
+        // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report
+        if (instance != null && instance.eventDb != null) {
+            String assetsStr = assets != null ? android.text.TextUtils.join(",", assets) : "";
+            instance.eventDb.saveEvent(
                 fingerprint,
-                "com.tradingbot.calendar",
-                source,
-                "CALENDAR-RESULT",
+                "com.tradingbot.calendar",   // package
+                source,                       // "Calendrier Économique"
+                "CALENDAR-RESULT",            // eventType
                 title,
                 body,
                 assetsStr,
-                impactLabel,
+                "pending",
                 System.currentTimeMillis() / 1000,
-                "synced",
-                calendarWeight
+                "pending",
+                4                             // poids élevé — résultat calendaire confirmé
             );
         }
     
-        // ✅ Dispatch vers l'IA ou envoi Telegram de secours si l'instance est instable
         if (instance != null) {
-            // ⚠️ Remplacer "PROMPT_SYSTEM_MACRO" par votre constante système réelle si nécessaire
-            instance.processAnalysisWithAI(source, title, body, assets, fingerprint, PROMPT_SYSTEM_MACRO, true);
+            instance.processAnalysisWithAI(
+                source, title, body, assets, fingerprint, SYSTEM_PROMPT, true);
         } else {
-            Log.w("NotificationService", "[CALENDAR] serviceInstance est null, envoi Telegram direct sans IA.");
             String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
             sendTelegramSecure(msg, context);
-        }
+                        }
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
-        EconomicCalendarAPI.init(getApplicationContext());
         eventDb = EventDatabase.getInstance(this);
         
         // ── MISE À JOUR : Liaison du contexte pour l'extraction de la clé macro_api_key ──
@@ -2238,104 +1263,49 @@ public class NotificationService extends NotificationListenerService {
         
         // Planification unifiée : purge SQLite + nettoyage RAM + préchargement toutes les 12 heures
         // Calcul du délai initial requis pour atteindre le tout prochain minuit à Madagascar
-        long initialDelayMillis = calculateMillisUntilNextMadaMidnight();
-        // Périodicité stricte de 24 heures pour s'exécuter à chaque minuit
-        long period24HoursMillis = 24 * 60 * 60 * 1000L; 
-    
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                if (isSyncing) return;
-                isSyncing = true;
-                try {
-                    Log.d(TAG, "🕒 [MAINTENANCE] Déclenchement automatique de minuit (Heure de Madagascar)...");
-                    
-                    // 1. Purge SQLite des événements ayant dépassé la fenêtre de validité de 48 heures
-                    long thresholdSeconds = (System.currentTimeMillis() - (48 * 60 * 60 * 1000L)) / 1000;
-                    eventDb.purgeOldEvents(thresholdSeconds); 
-                    Log.d(TAG, "[MAINTENANCE] Base de données SQLite purgée des données > 48h.");
-    
-                    // 2. Nettoyage de la table des empreintes pour éviter les fuites RAM
-                    EventValidator.cleanupOldFingerprints();
-                    Log.d(TAG, "[MAINTENANCE] Table des empreintes mémoires RAM nettoyée.");
-    
-                    // 3. Re-synchronisation du calendrier pour la nouvelle journée
-                    EventValidator.preloadCalendar();
-                    Log.d(TAG, "[MAINTENANCE] Calendrier économique mis à jour.");
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "[MAINTENANCE] Erreur lors de la maintenance à minuit", e);
-                } finally {
-                    isSyncing = false;
-                }
-            }
-        }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
-    
-       // ✅ Backfill au démarrage — délai 30s + initialiser lastBackfillTime immédiatement
-        lastBackfillTime = System.currentTimeMillis(); // bloque le NetworkCallback pendant 30min
-        scheduler.schedule(() -> {
-            lastBackfillTime = System.currentTimeMillis(); // reset au moment réel d'exécution
-            runHistoricalBackfill();
-        }, 30, TimeUnit.SECONDS);
-    
-        // ✅ Backfill quotidien à 7h00 heure Madagascar
-        // Meilleur moment : connecté, marchés US fermés, données FMP stables
-        scheduler.scheduleAtFixedRate(() -> {
-            if (isDeviceOnline()) {
-                runHistoricalBackfill();
-            }
-        }, calculateMillisUntilHour(7), 24 * 60 * 60 * 1000L, TimeUnit.MILLISECONDS);
-        // Rafraîchissement du calendrier toutes les 6 heures (21600000 ms)
-        long sixHoursMillis = 6 * 60 * 60 * 1000L;
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                EventValidator.preloadCalendar();
-            }
-        }, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
-        
-        // ✅ Alertes préventives toutes les 5 minutes
-        long fiveMinutesMillis = 5 * 60 * 1000L;
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    EventValidator.checkUpcomingAlerts();
-                } catch (Exception e) {
-                    Log.e(TAG, "[ALERTE] Erreur vérification alertes", e);
-                }
-            }
-        }, fiveMinutesMillis, fiveMinutesMillis, TimeUnit.MILLISECONDS);
+    long initialDelayMillis = calculateMillisUntilNextMadaMidnight();
+    // Périodicité stricte de 24 heures pour s'exécuter à chaque minuit
+    long period24HoursMillis = 24 * 60 * 60 * 1000L; 
 
-        // ✅ Pre-Market Scanner — toutes les 15 min pendant la fenêtre pre-market
-        long fifteenMinMs = 15 * 60 * 1000L;
-        scheduler.scheduleAtFixedRate(() -> {
+    scheduler.scheduleAtFixedRate(new Runnable() {
+        @Override
+        public void run() {
+            if (isSyncing) return;
+            isSyncing = true;
             try {
-                if (!MarketDataFetcher.PreMarketScanner.isPreMarketWindow()) return;
-                MarketDataFetcher.PreMarketScanner.scan((rapport, isChoc) -> {
-                    if (isChoc) {
-                        // Choc violent → Telegram immédiat + analyse Groq
-                        sendTelegramSecure(rapport, NotificationService.this);
-                        processAnalysisWithAI(
-                            "PreMarket-Scanner",
-                            "PRE-MARKET MOVEMENT DETECTED",
-                            rapport,
-                            Arrays.asList("SP500","NASDAQ","GOLD","BITCOIN",
-                                          "USOIL","EURUSD","USDJPY","GBPUSD",
-                                          "AUDUSD","USDCAD","US10Y"),
-                            generateSecureHash("premarket_" + System.currentTimeMillis()),
-                            SYSTEM_PROMPT,
-                            true  // isSupremeRank → bypass throttle
-                        );
-                    } else {
-                        // Alerte modérée → Telegram simple sans Groq
-                        sendTelegramSecure(rapport, NotificationService.this);
-                    }
-                });
+                Log.d(TAG, "🕒 [MAINTENANCE] Déclenchement automatique de minuit (Heure de Madagascar)...");
+                
+                // 1. Purge SQLite des événements ayant dépassé la fenêtre de validité de 48 heures
+                long thresholdSeconds = (System.currentTimeMillis() - (48 * 60 * 60 * 1000L)) / 1000;
+                eventDb.purgeOldEvents(thresholdSeconds); 
+                Log.d(TAG, "[MAINTENANCE] Base de données SQLite purgée des données > 48h.");
+
+                // 2. Nettoyage de la table des empreintes pour éviter les fuites RAM
+                EventValidator.cleanupOldFingerprints();
+                Log.d(TAG, "[MAINTENANCE] Table des empreintes mémoires RAM nettoyée.");
+
+                // 3. Re-synchronisation du calendrier pour la nouvelle journée
+                EventValidator.preloadCalendar();
+                Log.d(TAG, "[MAINTENANCE] Calendrier économique mis à jour.");
+                
             } catch (Exception e) {
-                Log.e(TAG, "[PRE-MARKET] Erreur scanner", e);
+                Log.e(TAG, "[MAINTENANCE] Erreur lors de la maintenance à minuit", e);
+            } finally {
+                isSyncing = false;
             }
-        }, fifteenMinMs, fifteenMinMs, TimeUnit.MILLISECONDS);
+        }
+    }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
+    // Dans NotificationService.onCreate(), après la planification de minuit, ajouter :
+
+// Rafraîchissement du calendrier toutes les 6 heures (21600000 ms)
+    long sixHoursMillis = 6 * 60 * 60 * 1000L;
+    scheduler.scheduleAtFixedRate(new Runnable() {
+        @Override
+        public void run() {
+            Log.d(TAG, "[CALENDAR] Rafraîchissement périodique du calendrier économique...");
+            EventValidator.preloadCalendar();
+        }
+    }, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
     }
 
 
@@ -2367,41 +1337,19 @@ public class NotificationService extends NotificationListenerService {
         // Détection élargie de TOUTES les actualités majeures
         String upFeed = feed.toUpperCase(Locale.ROOT);
         boolean isSupremeNews = upFeed.contains("FOMC") || upFeed.contains("FED ") || 
-                        upFeed.contains("CPI")  || upFeed.contains("PCE")  || 
-                        upFeed.contains("NFP")  || upFeed.contains("BCE")  || 
-                        upFeed.contains("ECB")  || upFeed.contains("BOJ")  || 
-                        upFeed.contains("BOE")  || upFeed.contains("RBA")  || 
-                        upFeed.contains("BOC")  || upFeed.contains("PIB")  || 
-                        upFeed.contains("GDP")  || upFeed.contains("OPEC") ||
-                        upFeed.contains("INFLATION") || upFeed.contains("INTEREST RATE") ||
-                        upFeed.contains("POWELL")  || upFeed.contains("WARSH")    ||
-                        upFeed.contains("LAGARDE") || upFeed.contains("BAILEY")   ||
-                        upFeed.contains("UEDA")    || upFeed.contains("MACKLEM")  ||
-                        upFeed.contains("PMI")     || upFeed.contains("ISM")      ||
-                        upFeed.contains("FEDERAL RESERVE") ||
-                        upFeed.contains("FED CHAIR")       ||
-                        upFeed.contains("EMERGENCY")       ||
-                        upFeed.contains("RATE DECISION")   ||
-                        upFeed.contains("RATE CUT")        ||
-                        upFeed.contains("RATE HIKE")       ||
-                        // ✅ Leading indicators promus Niveau 4
-                        upFeed.contains("ISM SERVICES")        ||
-                        upFeed.contains("ISM MANUFACTURING")   ||
-                        upFeed.contains("PMI FLASH")           ||
-                        upFeed.contains("FLASH PMI")           ||
-                        upFeed.contains("COMPOSITE PMI")       ||
-                        upFeed.contains("SERVICES PMI")        ||
-                        upFeed.contains("MANUFACTURING PMI")   ||
-                        upFeed.contains("UNIVERSITY OF MICHIGAN") ||
-                        upFeed.contains("MICHIGAN SENTIMENT")  ||
-                        upFeed.contains("SENTIMENT PREL")      ||
-                        upFeed.contains("GDP ADVANCE")         ||
-                        upFeed.contains("ADVANCE GDP")         ||
-                        upFeed.contains("GDP FLASH");
+                                upFeed.contains("CPI")  || upFeed.contains("PCE")  || 
+                                upFeed.contains("NFP")  || upFeed.contains("BCE")  || 
+                                upFeed.contains("ECB")  || upFeed.contains("BOJ")  || 
+                                upFeed.contains("BOE")  || upFeed.contains("RBA")  || 
+                                upFeed.contains("BOC")  || upFeed.contains("PIB")  || 
+                                upFeed.contains("GDP")  || upFeed.contains("OPEC") ||
+                                upFeed.contains("INFLATION") || upFeed.contains("INTEREST RATE") ||
+                                upFeed.contains("POWELL") || upFeed.contains("LAGARDE") ||
+                                upFeed.contains("PMI") || upFeed.contains("ISM");
     
         int weight = assignDriverWeight(feed);
     
-        if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 60) {
+        if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 70) {
             weight = Math.max(weight, 4);
         }
     
@@ -2453,21 +1401,12 @@ public class NotificationService extends NotificationListenerService {
         }
     
         long timestampSec = System.currentTimeMillis() / 1000;
-         // ✅ Poids géo selon conviction — cohérent avec processIncomingMacroFeed
-        int geoWeight = (vr.confidence >= 80) ? 4 : (vr.confidence >= 60) ? 3 : 1;
-        
-        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, timestampSec, "pending", geoWeight);
+        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
+                String.join(", ", targetAssets), initialImpact, timestampSec, "pending", weight);
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
         }
-        // ✅ Diagnostic log pour confirmer l'enregistrement
-        if (weight >= 4) {
-        String diagnostic = eventDb.diagnostiquerDriverSpecifique(title);
-           Log.d(TAG, diagnostic);  // ✅ Logcat toujours accessible
-           if (MainActivity.instance != null) {
-               MainActivity.instance.addLog(diagnostic);  // ✅ MainActivity
-           }
-        }
+    
         // ✅ PIPELINE ASYNCHRONE SÉCURISÉ
         if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
             Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié (Poids=" + weight + ") → Préparation du pipeline.");
@@ -2524,255 +1463,43 @@ public class NotificationService extends NotificationListenerService {
         }
     }
 
-    private static int assignDriverWeight(String text) {
-    String u = text.toUpperCase();
-
-    // ✅ Détection BREAKING + contexte macro/géo → poids 2 minimum
-    boolean isBreaking = u.contains("BREAKING")      || u.contains("BREAKING NEWS") ||
-                         u.contains("URGENT")         || u.contains("FLASH:")        ||
-                         u.contains("JUST IN")        || u.contains("ALERTE")        ||
-                         u.contains("ALERT:")         || u.contains("DEVELOPING")    ||
-                         u.contains("JUST RELEASED")  || u.contains("EXCLUSIVE:");
-
-    // ══════════════════════════════════════════════════════════
-    // NIVEAU 5 — Rang Suprême (Volatilité maximale garantie)
-    // ══════════════════════════════════════════════════════════
-    if (u.contains("CPI")               || u.contains("CORE CPI")         || u.contains("PCE")              ||
-        u.contains("CORE PCE")          || u.contains("INFLATION")         || u.contains("NFP")              ||
-        u.contains("NON-FARM")          || u.contains("NONFARM")           || u.contains("PAYROLL")          ||
-        u.contains("PAYROLLS")          || u.contains("FOMC")              || u.contains("INTEREST RATE")    ||
-        u.contains("RATE DECISION")     || u.contains("RATE CUT")          || u.contains("RATE HIKE")        || // ✅
-        u.contains("EMERGENCY MEETING") || u.contains("EMERGENCY CUT")     || u.contains("EMERGENCY RATE")   || // ✅
-        u.contains("FEDERAL RESERVE")   || u.contains("FED CHAIR")         || u.contains("FED MEETING")      || // ✅
-        u.contains("MONETARY POLICY")   || u.contains("POLICY DECISION")   || u.contains("POLICY RATE")      || // ✅
-        u.contains("POWELL")            || u.contains("WARSH")             || u.contains("BARKIN")           ||
-        u.contains("GOOLSBEE")          || u.contains("HAMMACK")           || u.contains("WALLER")           || // ✅ membres FOMC
-        u.contains("WILLIAMS")          || u.contains("KUGLER")            || u.contains("RATE STANDS")      ||
-        u.contains("ECB")               || u.contains("BCE")               || u.contains("LAGARDE")          ||
-        u.contains("BOE")               || u.contains("BAILEY")            || u.contains("MPC")              || // ✅ Monetary Policy Committee
-        u.contains("BOJ")               || u.contains("UEDA")              || u.contains("YCC")              || // ✅ Yield Curve Control
-        u.contains("BOC")               || u.contains("MACKLEM")           ||
-        u.contains("RBA")               || u.contains("BULLOCK")           ||
-        u.contains("CABLE")             || u.contains("STERLING")          || u.contains("AUSSIE")           || // ✅ surnoms devises
-        u.contains("LOONIE")            || u.contains("SWISSY")            || u.contains("KIWI")) {           // ✅
-        return 5;
-    }
-
-    // ══════════════════════════════════════════════════════════
-    // NIVEAU 4 — Haut impact (Données macro, Géo, Pétrole)
-    // ══════════════════════════════════════════════════════════
-    if (u.contains("GDP")                 || u.contains("PIB")                     ||
-        u.contains("GROSS DOMESTIC")      || u.contains("ECONOMIC GROWTH")         || // ✅
-        u.contains("RETAIL SALES")        || u.contains("EMPLOYMENT")              ||
-        u.contains("EMPLOYMENT CHANGE")   || u.contains("UNEMPLOYMENT RATE")       || // ✅
-        u.contains("JOBLESS")             || u.contains("INITIAL CLAIMS")          ||
-        u.contains("CONTINUING CLAIMS")   || u.contains("WEEKLY CLAIMS")           || // ✅
-        u.contains("ADP")                 || u.contains("JOLTS")                   ||
-        u.contains("JOB OPENINGS")        || u.contains("LABOR TURNOVER")          || // ✅
-        u.contains("PPI")                 || u.contains("PRODUCER PRICE")          ||
-        u.contains("WHOLESALE PRICE")     ||                                           // ✅
-        u.contains("DURABLE GOODS")       || u.contains("CAPITAL GOODS")           || // ✅
-        u.contains("TRADE BALANCE")       || u.contains("TRADE DEFICIT")           || // ✅
-        u.contains("TRADE SURPLUS")       || u.contains("CURRENT ACCOUNT")         ||
-        u.contains("BALANCE OF PAYMENTS") ||                                           // ✅
-        u.contains("INDUSTRIAL PRODUCTION") || u.contains("CAPACITY UTILIZATION")  ||
-        u.contains("FACTORY OUTPUT")      ||                                           // ✅
-        u.contains("PHILLY FED")          || u.contains("PHILADELPHIA FED")        || // ✅
-        u.contains("EMPIRE STATE")        || u.contains("NY FED")                  || // ✅
-        u.contains("CHICAGO PMI")         || u.contains("BEIGE BOOK")              ||
-        u.contains("FED MINUTES")         || u.contains("FOMC MINUTES")            || // ✅
-        u.contains("PERSONAL SPENDING")   || u.contains("PERSONAL INCOME")         ||
-        u.contains("PERSONAL CONSUMPTION") ||                                          // ✅
-        u.contains("HOUSING STARTS")      || u.contains("BUILDING PERMITS")        ||
-        u.contains("NEW HOME SALES")      || u.contains("EXISTING HOME SALES")     || // ✅
-        u.contains("PENDING HOME SALES")  || u.contains("HOME SALES")              ||
-        u.contains("EXISTING HOME")       || u.contains("NEW HOME")                ||
-        // ── Pétrole / Énergie ──
-        u.contains("EIA")                 || u.contains("CRUDE OIL")               ||
-        u.contains("OIL INVENTORIES")     || u.contains("CRUDE INVENTORIES")       || // ✅
-        u.contains("DISTILLATE")          || u.contains("GASOLINE")                || // ✅
-        u.contains("OPEC")                || u.contains("OPEC+")                   ||
-        u.contains("OIL PRODUCTION")      || u.contains("PRODUCTION CUTS")         || // ✅
-        u.contains("WTI")                 || u.contains("BRENT")                   ||
-        u.contains("XAUUSD")              || u.contains("GOLD")                    ||
-        // ── Géopolitique Moyen-Orient ──
-        u.contains("HORMUZ")              || u.contains("ORMUZ")                   ||
-        u.contains("RED SEA")             || u.contains("MER ROUGE")               || // ✅
-        u.contains("IRAN")                || u.contains("ISRAEL")                  ||
-        u.contains("HEZBOLLAH")           || u.contains("HOUTHI")                  || // ✅
-        u.contains("HAMAS")               || u.contains("GAZA")                    || // ✅
-        u.contains("LEBANON")             || u.contains("LIBAN")                   || // ✅
-        u.contains("MIDDLE EAST")         || u.contains("MOYEN-ORIENT")            || // ✅
-        u.contains("AIRSTRIKE")           || u.contains("FRAPPE MILITAIRE")        || // ✅
-        u.contains("MISSILE")             || u.contains("DRONE ATTACK")            || // ✅
-        u.contains("INVASION")            || u.contains("BLOCUS")                  || // ✅
-        u.contains("STRIKE")              || u.contains("GEOPOLITIC")              ||
-        // ── Géopolitique Europe de l'Est ──
-        u.contains("UKRAINE")             || u.contains("RUSSIA")                  || // ✅
-        u.contains("PUTIN")               || u.contains("ZELENSKY")                || // ✅
-        u.contains("NATO")                || u.contains("OTAN")                    || // ✅
-        u.contains("ESCALATION")          || u.contains("ESCALADE")                || // ✅
-        // ── Géopolitique Asie-Pacifique ──
-        u.contains("TAIWAN")              || u.contains("TAIWAN STRAIT")           || // ✅
-        u.contains("XI JINPING")          || u.contains("TSMC")                    || // ✅
-        u.contains("SOUTH CHINA SEA")     ||                                          // ✅
-        // ── Chine ── 
-        // ── Chine / PBOC ──
-        u.contains("CAIXIN")              || u.contains("CHINA PMI")               ||
-        u.contains("CHINESE GDP")         || u.contains("CHINA GDP")               ||
-        u.contains("CHINA TRADE")         || u.contains("CHINESE EXPORTS")         ||
-        u.contains("PBOC")                || u.contains("YUAN")                    || // ✅
-        u.contains("CNY")                 || u.contains("RENMINBI")                || // ✅
-        u.contains("CHINA CPI")           || u.contains("CHINA PPI")               || // ✅
-        u.contains("CHINA STIMULUS")      || u.contains("CHINA PROPERTY")          || // ✅
-        u.contains("EVERGRANDE")          || u.contains("POLITBURO")               || // ✅
-        u.contains("NPC CHINA")           || u.contains("XI JINPING ECONOMY")      || // ✅
-        // ── Nominations Banques Centrales ──
-        u.contains("NOMINATED")           || u.contains("APPOINTED")               || // ✅
-        u.contains("NOMINATION")          || u.contains("APPOINTMENT")             || // ✅
-        u.contains("REPLACE POWELL")      || u.contains("REPLACE LAGARDE")         || // ✅
-        u.contains("REPLACE UEDA")        || u.contains("FED VICE CHAIR")          || // ✅
-        u.contains("ECB PRESIDENT")       || u.contains("BOJ GOVERNOR")            || // ✅
-        u.contains("CENTRAL BANK CHIEF")  ||                                          // ✅
-        // ── DXY / Dollar Index ──
-        u.contains("DXY")                 || u.contains("DOLLAR INDEX")            ||
-        u.contains("DOLLAR STRENGTH")     || u.contains("DOLLAR WEAKNESS")         ||
-
-        // ── US10Y / Treasury ──
-        u.contains("TREASURY AUCTION")    || u.contains("BID TO COVER")            ||
-        u.contains("DEBT CEILING")        || u.contains("BUDGET DEFICIT")          ||
-        u.contains("TREASURY YIELD")      || u.contains("BOND SELLOFF")            ||
-        u.contains("YIELD SPIKE")         || u.contains("FOREIGN SELLING")         ||
-
-        // ── GOLD — drivers spécifiques ──
-        u.contains("REAL YIELDS")         || u.contains("REAL RATES")              ||
-        u.contains("PBOC GOLD")           || u.contains("GOLD RESERVES")           ||
-        u.contains("CENTRAL BANK GOLD")   || u.contains("GOLD DEMAND")             ||
-
-        // ── USOIL — drivers spécifiques ──
-        u.contains("SPR RELEASE")         || u.contains("SPR REFILL")              ||
-        u.contains("STRATEGIC PETROLEUM") || u.contains("BAKER HUGHES")            ||
-        u.contains("RIG COUNT")           || u.contains("API CRUDE")               ||
-        u.contains("API WEEKLY")          || u.contains("HURRICANE")               ||
-        u.contains("TROPICAL STORM")      || u.contains("GULF OF MEXICO")          ||
-        u.contains("VIENNA AGREEMENT")    || u.contains("OPEC QUOTA")              ||
-
-        // ── NASDAQ/SP500 — drivers spécifiques ──
-        u.contains("EARNINGS")            || u.contains("PROFIT WARNING")          ||
-        u.contains("GUIDANCE")            || u.contains("REVENUE MISS")            ||
-        u.contains("REVENUE BEAT")        || u.contains("VIX")                     ||
-        u.contains("BANK RUN")            || u.contains("SYSTEMIC RISK")           ||
-        u.contains("NVDA")                || u.contains("NVIDIA")                  ||
-        u.contains("AAPL")                || u.contains("APPLE EARNINGS")          ||
-        u.contains("MICROSOFT EARNINGS")  || u.contains("MSFT")                    ||
-        u.contains("AMAZON EARNINGS")     || u.contains("AMZN")                    ||
-        u.contains("GOOGLE EARNINGS")     || u.contains("ALPHABET EARNINGS")       ||
-        u.contains("META EARNINGS")       || u.contains("TESLA EARNINGS")          ||
-
-        // ── USDJPY — drivers spécifiques ──
-        u.contains("MOF JAPAN")           || u.contains("FX INTERVENTION")         ||
-        u.contains("CARRY TRADE")         || u.contains("VERBAL INTERVENTION")     ||
-        u.contains("JAPAN MOF")           || u.contains("WATCHING CLOSELY")        ||
-        u.contains("EXCESSIVE MOVES")     || u.contains("SHARP MOVES")             ||
-        u.contains("JAPAN CPI")           || u.contains("JAPAN INFLATION")         ||
-
-        // ── AUDUSD — drivers spécifiques ──
-        u.contains("IRON ORE")            || u.contains("COPPER PRICE")            ||
-        u.contains("AUSTRALIA EMPLOYMENT")|| u.contains("AUSTRALIA JOBS")          ||
-        u.contains("AUSTRALIA CPI")       || u.contains("AUSTRALIA TRADE")         ||
-        u.contains("CHINA STEEL")         || u.contains("CHINA INFRASTRUCTURE")    ||
-
-        // ── USDCAD — drivers spécifiques ──
-        u.contains("CANADA EMPLOYMENT")   || u.contains("CANADA JOBS")             ||
-        u.contains("CANADA CPI")          || u.contains("KEYSTONE")                ||
-        u.contains("PIPELINE")            || u.contains("USMCA")                   ||
-        u.contains("CANADA TRADE")        ||
-
-        // ── BITCOIN — drivers spécifiques ──
-        u.contains("BITCOIN ETF")         || u.contains("ETF FLOWS")               ||
-        u.contains("IBIT")                || u.contains("FBTC")                    ||
-        u.contains("HALVING")             || u.contains("SEC CRYPTO")              ||
-        u.contains("CRYPTO BAN")          || u.contains("EXCHANGE HACK")           ||
-        u.contains("CRYPTO REGULATION")   || u.contains("STABLECOIN")              ||
-        u.contains("TETHER")              || u.contains("USDT")                    ||
-
-        // ── EURUSD — drivers spécifiques ──
-        u.contains("PMI FLASH")           || u.contains("FLASH PMI EUROZONE")      ||
-        u.contains("SCHNABEL")            || u.contains("LANE ECB")                ||
-        u.contains("PANETTA")             || u.contains("BTP SPREAD")              ||
-        u.contains("OAT SPREAD")          || u.contains("SOVEREIGN SPREAD")        ||
-        u.contains("ITALIAN BONDS")       || u.contains("FRENCH BONDS")            ||
-        
-        // ── GBPUSD — drivers spécifiques ──
-        u.contains("UK CPI")              || u.contains("UK INFLATION")            ||
-        u.contains("UK GDP")              || u.contains("UK BUDGET")               ||
-        u.contains("AUTUMN STATEMENT")    || u.contains("MPC VOTE")                ||
-        u.contains("SPRING STATEMENT")    || u.contains("UK TRADE")                ||
-        u.contains("BREXIT")              || u.contains("NORTHERN IRELAND")        ||
-
-        // ── ISM Services / Manufacturing — Leading Indicator US (80% économie) ──
-        u.contains("ISM SERVICES")        || u.contains("ISM NON-MANUFACTURING")   ||
-        u.contains("ISM MANUFACTURING")   || u.contains("ISM REPORT")              ||
-
-        // ── PMI Flash / Preliminary — Leading Indicator surprise fréquente ──
-        u.contains("FLASH PMI")           || u.contains("PMI FLASH")               ||
-        u.contains("PMI PRELIMINARY")     || u.contains("PRELIMINARY PMI")         ||
-        u.contains("COMPOSITE PMI")       || u.contains("SERVICES PMI")            ||
-        u.contains("MANUFACTURING PMI")   || u.contains("PMI MANUFACTURING")       ||
-        u.contains("PMI SERVICES")        ||
-
-        // ── Michigan Sentiment Preliminary — Proxy anticipations inflation Fed ──
-        u.contains("UNIVERSITY OF MICHIGAN") || u.contains("MICHIGAN SENTIMENT")   ||
-        u.contains("SENTIMENT PREL")      || u.contains("CONSUMER SENTIMENT PREL") ||
-        u.contains("MICHIGAN PRELIMINARY") || u.contains("UOM SENTIMENT")) {
-        return 4;
-    }
-
-
-    // ══════════════════════════════════════════════════════════
-    // NIVEAU 3 — Impact moyen (PMI régionaux, sentiment, salaires)
-    // ══════════════════════════════════════════════════════════
-    if (u.contains("PMI")                || u.contains("ISM")                     ||
-        u.contains("PURCHASING MANAGERS") ||                                          // ✅
-        u.contains("MICHIGAN")           || u.contains("UNC MICHIGAN")             || // ✅
-        u.contains("CONSUMER CONFIDENCE") || u.contains("CONSUMER SENTIMENT")      ||
-        u.contains("IMPORT PRICE")        || u.contains("EXPORT PRICE")            ||
-        u.contains("NATURAL GAS")         || u.contains("GAS INVENTORIES")         || // ✅
-        u.contains("IFO")                 || u.contains("ZEW")                     ||
-        u.contains("GERMAN BUSINESS")     || u.contains("GERMAN SENTIMENT")        || // ✅
-        u.contains("TANKAN")              || u.contains("JAPAN BUSINESS")          || // ✅
-        u.contains("AVERAGE EARNINGS")    || u.contains("HOURLY EARNINGS")         || // ✅
-        u.contains("WAGE GROWTH")         || u.contains("WAGES")                   || // ✅
-        u.contains("CLAIMANT COUNT")      || u.contains("UK JOBLESS")              || // ✅
-        u.contains("CHALLENGER")          || u.contains("LAYOFFS")                 || // ✅
-        u.contains("CAPACITY")            || u.contains("UTILIZATION")             || // ✅
-        u.contains("NAS100")              || u.contains("SPX")                     ||
-        u.contains("US500")               || u.contains("USTECH")                  ||
-        u.contains("SENTIMENT")           || u.contains("CONFIANCE")               || // ✅
-        u.contains("FLASH PMI")           || u.contains("MANUFACTURING PMI")       ||
-        u.contains("COMPOSITE PMI")       || u.contains("SERVICES PMI")            ||
-        // ── Révisions de données — niveau 3 ──
-        u.contains("REVISED TO")          || u.contains("REVISED UP")              ||
-        u.contains("REVISED DOWN")        || u.contains("UPWARD REVISION")         ||
-        u.contains("DOWNWARD REVISION")   || u.contains("PRIOR REVISED")           ||
-        u.contains("PREVIOUS REVISED")    || u.contains("DATA REVISION")           ||
-
-        // ── Indicateurs de marché secondaires ──
-        u.contains("CREDIT DEFAULT SWAP") || u.contains("CDS SPREAD")              ||
-        u.contains("LIBOR")               || u.contains("SOFR")                    ||
-        u.contains("REPO RATE")           || u.contains("OVERNIGHT RATE")          ||
-        u.contains("MONEY MARKET")        || u.contains("LIQUIDITY CRISIS")        ||
-        u.contains("VIX SPIKE")           || u.contains("FEAR INDEX")) {
-        return 3;
-    } 
-        // ══════════════════════════════════════════════════════════
-        // NIVEAU 2 — Breaking news sans mot-clé macro identifié
-        // ══════════════════════════════════════════════════════════
-        if (isBreaking) return 2;
     
-        // ══════════════════════════════════════════════════════════
-        // NIVEAU 1 — Bruit de fond / non qualifié
-        // ══════════════════════════════════════════════════════════
+    private int assignDriverWeight(String text) {
+        String u = text.toUpperCase();
+        
+        // CORRECTION ACTIFS CRUCIAUX : Ajout de la détection des synonymes/surnoms institutionnels
+        if (u.contains("CPI")            || u.contains("INFLATION")       || u.contains("NFP")          ||
+            u.contains("NON-FARM PAYROLLS") || u.contains("FOMC")           || u.contains("INTEREST RATE") ||
+            u.contains("RBA")            || u.contains("BOC")             || u.contains("BOJ")           ||
+            u.contains("BOE")            || u.contains("ECB")             || u.contains("BCE")           ||
+            u.contains("LAGARDE")        || u.contains("BAILEY")          || u.contains("MACKLEM")       ||
+            u.contains("BULLOCK")        || u.contains("UEDA")            || u.contains("CABLE")         || 
+            u.contains("STERLING")       || u.contains("AUSSIE")          || u.contains("LOONIE")        ||
+            u.contains("WARSH")          || u.contains("POWELL")) return 5;
+            
+        if (u.contains("GDP")                || u.contains("PIB")                    ||
+            u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT RATE")        ||
+            u.contains("STOCKS")             || u.contains("JOBLESS")                ||
+            u.contains("ADP")                || u.contains("JOLTS")                  ||
+            u.contains("JOB OPENINGS")       || u.contains("PPI")                    ||
+            u.contains("PRODUCER PRICE")     || u.contains("DURABLE GOODS")          ||
+            u.contains("TRADE BALANCE")      || u.contains("CURRENT ACCOUNT")        ||
+            u.contains("INDUSTRIAL PRODUCTION") || u.contains("CAPACITY UTILIZATION") ||
+            u.contains("PHILLY FED")         || u.contains("EMPIRE STATE")           ||
+            u.contains("CHICAGO PMI")        || u.contains("BEIGE BOOK")             ||
+            u.contains("PERSONAL SPENDING")  || u.contains("PERSONAL INCOME")        ||
+            u.contains("HOUSING STARTS")     || u.contains("BUILDING PERMITS")       ||
+            u.contains("WTI")                || u.contains("BRENT")                  || 
+            u.contains("CRUDE OIL")          || u.contains("XAUUSD")                 ||
+            u.contains("HOME SALES")         || u.contains("CHALLENGER")) return 4;
+            
+        if (u.contains("PMI")               || u.contains("ISM")                  ||
+            u.contains("MICHIGAN")          || u.contains("CONSUMER CONFIDENCE")   ||
+            u.contains("CONSUMER SENTIMENT")|| u.contains("IMPORT PRICE")          ||
+            u.contains("NAS100")            || u.contains("SPX")                  ||
+            u.contains("US500")             || u.contains("USTECH")                ||
+            u.contains("EXPORT PRICE")      || u.contains("NATURAL GAS")) return 3;
+            
         return 1;
     }
 
@@ -2813,7 +1540,7 @@ public class NotificationService extends NotificationListenerService {
                         String assetsStr = cursor.getString(cursor.getColumnIndexOrThrow("target_assets"));
                         long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("unix_timestamp")) * 1000;
 
-                        List<String> assets = Arrays.asList(assetsStr.split(","));
+                        List<String> assets = Arrays.asList(assetsStr.split(", "));
                         String historyContext = eventDb.getRecentEventsForAssets(assets, 5);
 
                         boolean success = executeAnalysisPipeline(source, feed, historyContext, assets, timestamp, fingerprint);
@@ -3056,80 +1783,63 @@ public class NotificationService extends NotificationListenerService {
                   }
               }
                 // ====================== ENVOI TELEGRAM ======================
-                if (activeSignalsCount > 0) {
-               // ─── METTEZ CECI À LA LIGNE 3064 (Dans le bloc Groq) ───
-                    int convictionPercent = extrairePourcentageConviction(aiReport);
-                    
-                    // ✅ Calcul dynamique du Poids géo/macro selon la conviction du rapport IA
-                    int geoWeight = (convictionPercent >= 80) ? 4 : (convictionPercent >= 60) ? 3 : 1;
-                    
-                    // ✅ Mise à jour directe du poids dans SQLite (Évite les erreurs de compilation de db.markEventAsSynced)
-                    try {
-                        android.database.sqlite.SQLiteDatabase writeableDb = db.getWritableDatabase();
-                        android.content.ContentValues cv = new android.content.ContentValues();
-                        cv.put("weight", geoWeight);
-                        writeableDb.update("events", cv, "fingerprint = ?", new String[]{fingerprint});
-                    } catch (Exception e) {
-                        Log.e(TAG, "Erreur lors de la mise à jour dynamique du poids pour " + fingerprint, e);
-                    }
-                    
-                    // ✅ On marque maintenant l'événement comme synchronisé avec la méthode officielle
-                    db.markEventAsSynced(fingerprint); 
-                    
-                    // ✅ Définition de isSupremeRank basée sur le rapport de l'IA
-                    boolean isSupremeRank = aiReport.contains("SUPREME_RANK") || convictionPercent >= 80;
-                    
-                    if (convictionPercent >= 40 || isSupremeRank) {
-                    String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUES Pipeline*\n"
-                            + "🕒 " + timeString + " (Mada)\n"
-                            + "📡 Source : " + source + "\n"
-                            + filteredMessage.toString().trim();
-            
-                    if (finalPayload.length() < 200) {
-                        eventDb.markEventAsSynced(fingerprint, "TOO_SHORT");
-                        return true;
-                    }
-            
-                    Log.d(TAG, "📤 Envoi Telegram pour fingerprint=" + fingerprint + ", signaux impactants=" + activeSignalsCount);
-                    
-                    if (MainActivity.instance != null) {
-                        MainActivity.instance.addLog(source + ": Envoi Telegram " + fingerprint);
-                    }
-                    sendTelegramSecure(finalPayload, this);
-                    
-                    lastAnalysisTime = System.currentTimeMillis();
-                    if (isGeoEvent) {
-                        lastGeoTime = System.currentTimeMillis();
-                    }
-                    
-                    eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
-                    return true;
-                    } else {
-                        Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
-                        eventDb.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
-                        return true;
-                    }
-                    } else {
-                        // Aucun signal fort → on marque comme filtré
-                        eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
-                        Log.d(TAG, "Tous les actifs neutres → pas d'envoi Telegram");
-                        return true;
-                    }
-                    } else {
-                        throw new Exception("API Error: " + conn.getResponseCode());
-                    }
-            
-                    } catch (Exception e) {
-                            attempt++;
-                            Log.e(TAG, "Tentative " + attempt + "/" + maxRetries + " échouée", e);
-                            if (attempt < maxRetries) {
-                                try { Thread.sleep(2000 * attempt); } catch (InterruptedException ie) { return false; }
-                            }
-                        } finally {
-                            if (conn != null) conn.disconnect();
-                        }
-                    }
-                    return false;
+    if (activeSignalsCount > 0) {
+    // Extraction précise du pourcentage de conviction depuis aiResult
+    int convictionPercent = extrairePourcentageConviction(aiResult);
+    boolean isSupremeRank = estEvenementSuprême(feed); // feed = le texte brut de l'événement
+
+    // Seuil : conviction >= 40% OU événement de Rang Suprême (Fed, CPI, NFP, etc.)
+    if (convictionPercent >= 40 || isSupremeRank) {
+        String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUES Pipeline*\n"
+                + "🕒 " + timeString + " (Mada)\n"
+                + "📡 Source : " + source + "\n"
+                + filteredMessage.toString().trim();
+
+        if (finalPayload.length() < 200) {
+            eventDb.markEventAsSynced(fingerprint, "TOO_SHORT");
+            return true;
+        }
+
+        Log.d(TAG, "📤 Envoi Telegram pour fingerprint=" + fingerprint + ", signaux impactants=" + activeSignalsCount);
+        
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog(source + ": Envoi Telegram " + fingerprint);
+        }
+        sendTelegramSecure(finalPayload, this);
+        
+        lastAnalysisTime = System.currentTimeMillis();
+        if (isGeoEvent) {
+            lastGeoTime = System.currentTimeMillis();
+        }
+        
+        eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
+        return true;
+        } else {
+            Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
+            eventDb.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
+            return true;
+        }
+        } else {
+            // Aucun signal fort → on marque comme filtré
+            eventDb.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+            Log.d(TAG, "Tous les actifs neutres → pas d'envoi Telegram");
+            return true;
+        }
+        } else {
+            throw new Exception("API Error: " + conn.getResponseCode());
+        }
+
+        } catch (Exception e) {
+                attempt++;
+                Log.e(TAG, "Tentative " + attempt + "/" + maxRetries + " échouée", e);
+                if (attempt < maxRetries) {
+                    try { Thread.sleep(2000 * attempt); } catch (InterruptedException ie) { return false; }
+                }
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }
+        return false;
     }
 
     private List<String> filterActiveAssets(String text) {
@@ -3219,17 +1929,10 @@ public class NotificationService extends NotificationListenerService {
     }
     private void startDailyBriefScheduler() {
         TimeZone tz = TimeZone.getTimeZone("Indian/Antananarivo"); // ✅ cohérent partout
-        int[] targetHours = {8, 12, 15, 17, 21};
-        // ✅ Délai croissant entre rattrapages pour éviter les envois simultanés
-        // Chaque slot raté reçoit un délai supplémentaire de 90s
-        for (int i = 0; i < targetHours.length; i++) {
-            final int hour = targetHours[i];
-            final long catchupDelay = i * 90L; // 0s, 90s, 180s, 270s, 360s
-            scheduler.schedule(() ->
-               scheduleDailyBriefAt(hour, tz),
-               catchupDelay, TimeUnit.SECONDS
-             );
-        } 
+        int[] targetHours = {7, 8, 9, 12, 13, 16, 17};
+        for (int hour : targetHours) {
+            scheduleDailyBriefAt(hour, tz);
+        }
     }
     private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
     // 1. Créer un formateur de date fiable (UTC+3)
@@ -3291,59 +1994,9 @@ public class NotificationService extends NotificationListenerService {
     try {
         String apiKey = getGroqApiKey();
         if (apiKey.isEmpty()) return;
+
         long nowSec = System.currentTimeMillis() / 1000;
         String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
-        
-        // ✅ Mémoire contextuelle inter-sessions — Registre macro 30 derniers jours
-        String monthlyRegistry = eventDb.getMonthlyMacroRegistry(nowSec);
-        
-        // ✅ Régime de marché dynamique — basé sur les 7 derniers jours
-        String regimeMarche = eventDb.detecterRegimeMarche(nowSec);
-        Log.d(TAG, "📈 [RÉGIME] " + regimeMarche.split("\n")[0]);
-        if (MainActivity.instance != null) {
-            MainActivity.instance.addLog("📈 [RÉGIME] " + regimeMarche.split("\n")[0]);
-        }
-        StringBuilder upcomingContext = new StringBuilder();
-        upcomingContext.append("\n\n═══ CALENDRIER ÉCONOMIQUE À VENIR (72H) ═══\n");
-        
-        List<EconomicCalendarAPI.CalendarEvent> upcomingList =
-            new ArrayList<>(EventValidator.getUpcomingEvents().values());
-        
-        Collections.sort(upcomingList, (a, b) -> {
-            long tsA = 0, tsB = 0;
-            try { tsA = Long.parseLong(a.timestamp); } catch (Exception ignored) {}
-            try { tsB = Long.parseLong(b.timestamp); } catch (Exception ignored) {}
-            return Long.compare(tsA, tsB);
-        });
-        
-        SimpleDateFormat sdfEvent = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
-        sdfEvent.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
-        long nowMs = System.currentTimeMillis();
-        
-        for (EconomicCalendarAPI.CalendarEvent ev : upcomingList) {
-            if (ev == null || ev.indicator == null || ev.timestamp == null) continue;
-            long evTs = 0;
-            try { evTs = Long.parseLong(ev.timestamp) * 1000; } catch (Exception ignored) { continue; }
-            if (evTs < nowMs) continue;
-            if (evTs > nowMs + 72 * 60 * 60 * 1000L) continue;
-        
-            String evTime = sdfEvent.format(new Date(evTs));
-            String icon = "HIGH".equals(ev.importance) ? "🔴" :
-                          "MEDIUM".equals(ev.importance) ? "🟠" : "⚪";
-            upcomingContext.append(icon).append(" ").append(evTime)
-                           .append(" [").append(ev.country).append("] ")
-                           .append(ev.indicator);
-            if (ev.forecast != null && !ev.forecast.equals("N/A"))
-                upcomingContext.append(" | Prévu: ").append(ev.forecast);
-            upcomingContext.append("\n");
-        }
-        
-        // ✅ Contexte géopolitique actif (derniers drivers GEO 48h)
-        String geoContext = eventDb.getDerniersDriversGeo(nowSec);
-        if (geoContext != null && !geoContext.isEmpty()) {
-            upcomingContext.append("\n═══ CONTEXTE GÉOPOLITIQUE ACTIF ═══\n")
-                           .append(geoContext);
-       }
 
         // Date locale pour le message (Mada UTC+3)
         SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
@@ -3431,39 +2084,24 @@ public class NotificationService extends NotificationListenerService {
             "═══════════════════════════════════════════════════════════════\n\n" +
             
             "RÈGLE 1 : CLASSEMENT ET DOMINANCE DE LA HIÉRARCHIE DES DRIVERS\n" +
-            "- RANG SUPRÊME : Politiques monétaires (FED — Powell et Warsh futur Chair, " +
-            "BCE, BoJ, BoE, RBA, BoC) et indicateurs clés (CPI, NFP, PPI, FOMC, " +
-            "GDP Advance, ISM Services, PMI Flash, Michigan Preliminary, " +
-            "Ventes au détail, Chômage).\n" +
+            "- RANG SUPRÊME : Politiques monétaires (FED, BCE, BoJ, BoE, RBA, BoC) et indicateurs clés (CPI, NFP, PPI, FOMC, PIB, Ventes au détail, Chômage).\n" +
             "- RANG SECONDAIRE : Données sectorielles majeures (Stocks d'énergie EIA, OPEC, rapports agricoles d'importance).\n" +
             "- RANG TACTIQUE : Événements géopolitiques, sanctions, taxes commerciales, indices de confiance/sentiment secondaires.\n" +
             "👉 LOI DE DOMINANCE ABSOLUE : Si un événement de RANG SUPRÊME est actif dans les données des 24h, c'est sa logique directionnelle qui dicte le comportement du marché. Un driver tactique (comme des tensions géopolitiques) ne peut ni inverser ni annuler la direction des actifs dictée par le driver suprême.\n\n" +
             
             "RÈGLE 2 : DRIVER ÉCONOMIQUE OU BANQUE CENTRALE AMÉRICAINE (USA)\n" +
-            "A) Si les données sont HAWKISH / FORTES (Inflation supérieure aux prévisions, " +
-            "discours restrictif de Powell/FED ou Warsh, NFP/Emplois très forts, " +
-            "PIB en forte hausse, GDPNow Atlanta révisé à la hausse) :\n" +
-            "   ⚠️ RÈGLE ABSOLUE ANTI-CONFUSION : Une croissance économique forte " +
-            "signifie que la Fed maintient ou hausse les taux → taux hauts = " +
-            "compression des valorisations tech. NASDAQ et SP500 sont TOUJOURS " +
-            "en VENTE CHOC sur un signal HAWKISH, même si la croissance " +
-            "paraît positive pour les bénéfices. INTERDICTION FORMELLE d'inverser.\n" +
-            "   ⚠️ RÈGLE GDPNOW : GDPNow Atlanta Fed est une révision de modèle " +
-            "(pas le GDP Advance officiel). Traiter comme signal HAWKISH si révisé " +
-            "à la hausse. Conviction plafonnée à 65%.\n" +
-            "   • 📈 US10Y   -> ACHAT CHOC 🟢 [Les rendements obligataires montent]\n" +
-            "   • 💻 NASDAQ  -> VENTE CHOC 🔴 [La hausse des taux pénalise " +
-            "les valeurs technologiques]\n" +
-            "   • 📊 SP500   -> VENTE CHOC 🔴 [Symétrie absolue obligatoire avec NASDAQ]\n" +
-            "   • 🏆 GOLD    -> VENTE CHOC 🔴 [Taux réels plus élevés et Dollar fort]\n" +
-            "   • 🛢️ USOIL   -> NEUTRE ⚪\n" +
-            "   • 🇪🇺 EURUSD -> VENTE CHOC 🔴 [Euro s'effondre face au Dollar]\n" +
-            "   • 🇯🇵 USDJPY -> ACHAT CHOC 🟢 [Dollar s'apprécie face au Yen]\n" +
-            "   • 🇨🇦 USDCAD -> ACHAT CHOC 🟢 [Dollar s'impose face au CAD]\n" +
-            "   • 🇬🇧 GBPUSD -> VENTE CHOC 🔴 [Livre baisse face au Dollar]\n" +
-            "   • 🇦🇺 AUDUSD -> VENTE CHOC 🔴 [Aussie recule face au Dollar]\n" +
-            "   • ₿ BITCOIN  -> VENTE CHOC 🔴 [Aversion au risque liquide " +
-            "les actifs spéculatifs]\n" +
+            "A) Si les données sont HAWKISH / FORTES (Inflation supérieure aux prévisions, discours restrictif de Powell/FED, NFP/Emplois très forts, PIB en forte hausse) :\n" +
+            "   • 📈 US10Y   -> ACHAT CHOC 🟢 [Les rendements obligataires montent mécaniquement]\n" +
+            "   • 💻 NASDAQ  -> VENTE CHOC 🔴 [La hausse des taux d'intérêt pénalise les valeurs technologiques]\n" +
+            "   • 📊 SP500   -> VENTE CHOC 🔴 [Symétrie absolue obligatoire avec le NASDAQ]\n" +
+            "   • 🏆 GOLD    -> VENTE CHOC 🔴 [Taux réels plus élevés et Dollar fort pèsent sur l'Or]\n" +
+            "   • 🛢️ USOIL   -> NEUTRE ⚪ ou selon driver secondaire dédié.\n" +
+            "   • 🇪🇺 EURUSD -> VENTE CHOC 🔴 [L'Euro s'effondre face à la hausse globale du Dollar US]\n" +
+            "   • 🇯🇵 USDJPY -> ACHAT CHOC 🟢 [Le Dollar s'apprécie face au Yen par élargissement du différentiel de taux]\n" +
+            "   • 🇨🇦 USDCAD -> ACHAT CHOC 🟢 [Le Dollar américain s'impose face au Dollar Canadien]\n" +
+            "   • 🇬🇧 GBPUSD -> VENTE CHOC 🔴 [La Livre Sterling baisse face au Dollar US]\n" +
+            "   • 🇦🇺 AUDUSD -> VENTE CHOC 🔴 [L'Aussie Dollar recule face au Dollar US]\n" +
+            "   • ₿ BITCOIN  -> VENTE CHOC 🔴 [L'aversion au risque liée aux taux hauts liquide les actifs spéculatifs]\n" +
             "   • 🏁 FLUX DOMINANT -> DOLLAR FORT\n\n" +
             
             "B) Si les données sont DOVISH / FAIBLES (Inflation plus basse que prévu, discours accommodant de la FED, hausse des inscriptions au chômage, PIB décevant) :\n" +
@@ -3511,214 +2149,74 @@ public class NotificationService extends NotificationListenerService {
             "═══════════════════════════════════════════════════════════════\n\n" +
             "1. SYMÉTRIE STRICTE DES INDICES : Le couple 💻 NASDAQ et 📊 SP500 doit pointer impérativement dans le même sens (soit deux ACHAT CHOC, soit deux VENTE CHOC, soit deux NEUTRE). Aucune divergence n'est tolérée.\n" +
             "2. AMPLIFICATION DES CRYPTOS : L'actif ₿ BITCOIN est traité comme un indicateur de bêta élevé lié au sentiment technologique. Il doit calquer sa direction sur celle du 💻 NASDAQ.\n" +
-            "3. EXCLUSION ET CONCISION : Pas de politesse, pas de salutations, pas de résumés verbeux des actualités passées. Calculez les directions comme un algorithme purement déterministe. Les 11 actifs doivent figurer sur le rapport, sans omission.\n\n" +
-
-            "═══════════════════════════════════════════════════════════════\n" +
-            "         RÈGLES ADDITIONNELLES — DRIVERS SPÉCIFIQUES PAR ACTIF\n" +
-            "═══════════════════════════════════════════════════════════════\n\n" +
-            
-            "RÈGLE 6 : TREASURY AUCTIONS / DEBT CEILING\n" +
-            "- Treasury Auction FAIBLE (tail, bid-to-cover < 2.3) :\n" +
-            "  • 📈 US10Y : VENTE CHOC 🔴 | Demande insuffisante → yields montent\n" +
-            "  • 🏆 GOLD  : ACHAT CHOC 🟢 | Méfiance envers la dette US\n" +
-            "  • 💻 NASDAQ : VENTE CHOC 🔴 | Taux hauts compressent les valorisations\n" +
-            "  • 📊 SP500  : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-            "- Debt Ceiling Crisis :\n" +
-            "  • 🏆 GOLD  : ACHAT CHOC 🟢 | Couverture souveraine maximale\n" +
-            "  • 📈 US10Y : VENTE CHOC 🔴 | Prime de risque sur la dette US\n" +
-            "  • 💻 NASDAQ : VENTE CHOC 🔴 | Risk-off institutionnel\n" +
-            "  • 📊 SP500  : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-            "  • ₿ BITCOIN : VENTE CHOC 🔴 | Liquidation actifs spéculatifs\n" +
-            "  • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Yen refuge\n" +
-            "  🏁 FLUX DOMINANT : OR FORT / RISK-OFF SOUVERAIN 🐻\n\n" +
-            
-            "RÈGLE 7 : CARRY TRADE UNWINDING / INTERVENTION MOF JAPON\n" +
-            "- Intervention VERBALE MOF ('watching closely', 'excessive moves') :\n" +
-            "  • 🇯🇵 USDJPY : INCLINATION VENTE MAIS NEUTRE | Alerte sans action\n" +
-            "- Intervention DIRECTE BOJ :\n" +
-            "  • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Gap instantané 200-500 pips\n" +
-            "  • 🏆 GOLD : ACHAT CHOC 🟢 | Refuge\n" +
-            "- Carry Trade Unwinding (USDJPY chute > 2% sur une session) :\n" +
-            "  • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Débouclage massif\n" +
-            "  • 💻 NASDAQ : VENTE CHOC 🔴 | Vente actifs risk-on pour rembourser emprunts Yen\n" +
-            "  • 📊 SP500  : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-            "  • 🏆 GOLD  : ACHAT CHOC 🟢 | Refuge\n" +
-            "  • ₿ BITCOIN : VENTE CHOC 🔴 | Liquidation amplifiée\n" +
-            "  🏁 FLUX DOMINANT : RISK-OFF CARRY TRADE / YEN FORT 🐻\n\n" +
-            
-            "RÈGLE 8 : BIG TECH EARNINGS (NASDAQ/SP500)\n" +
-            "- NVDA / AAPL / MSFT / AMZN / META / GOOGL / TESLA EARNINGS BEAT :\n" +
-            "  • 💻 NASDAQ : ACHAT CHOC 🟢 | Valorisations soutenues\n" +
-            "  • 📊 SP500  : ACHAT CHOC 🟢 | Même direction NASDAQ obligatoire\n" +
-            "  • ₿ BITCOIN : ACHAT CHOC 🟢 | Sentiment risk-on amplifié\n" +
-            "  • Autres actifs : NEUTRE\n" +
-            "- EARNINGS MISS / PROFIT WARNING / GUIDANCE BAISSIÈRE :\n" +
-            "  • 💻 NASDAQ : VENTE CHOC 🔴 | Compression valorisations\n" +
-            "  • 📊 SP500  : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-            "  • ₿ BITCOIN : VENTE CHOC 🔴 | Risk-off amplifié\n" +
-            "  • Autres actifs : NEUTRE\n\n" +
-            
-            "RÈGLE 9 : BITCOIN DRIVERS SPÉCIFIQUES\n" +
-            "- ETF Flows POSITIFS (> 300M$ net inflow) :\n" +
-            "  • ₿ BITCOIN : ACHAT CHOC 🟢 | Demande institutionnelle confirmée\n" +
-            "- ETF Flows NÉGATIFS (outflows > 200M$) :\n" +
-            "  • ₿ BITCOIN : VENTE CHOC 🔴 | Retrait institutionnel\n" +
-            "- SEC Enforcement / Regulatory Crackdown :\n" +
-            "  • ₿ BITCOIN : VENTE CHOC 🔴 | Capitulation réglementaire\n" +
-            "- Exchange Hack / Collapse :\n" +
-            "  • ₿ BITCOIN : VENTE CHOC 🔴 | Panique systémique crypto\n" +
-            "  • 💻 NASDAQ : VENTE CHOC 🔴 | Contagion sentiment\n" +
-            "  • 📊 SP500  : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n\n" +
-            
-            "RÈGLE 10 : RISQUE SYSTÉMIQUE BANCAIRE\n" +
-            "- Bank Run / Bank Failure / Banking Crisis :\n" +
-            "  • 🏆 GOLD    : ACHAT CHOC 🟢 | Refuge anti-système bancaire\n" +
-            "  • 💻 NASDAQ  : VENTE CHOC 🔴 | Contagion financière systémique\n" +
-            "  • 📊 SP500   : VENTE CHOC 🔴 | Même direction NASDAQ obligatoire\n" +
-            "  • 📈 US10Y   : ACHAT CHOC 🟢 | Fuite vers les Treasuries\n" +
-            "  • 🇯🇵 USDJPY : VENTE CHOC 🔴 | Yen refuge\n" +
-            "  • ₿ BITCOIN  : VENTE CHOC 🔴 | Liquidation d'urgence\n" +
-            "  • 🇦🇺 AUDUSD : VENTE CHOC 🔴 | Devise risk-on pénalisée\n" +
-            "  • 🇪🇺 EURUSD : VENTE CHOC 🔴 | Contagion si banque européenne impliquée\n" +
-            "  • 🛢️ USOIL   : VENTE CHOC 🔴 | Demande anticipée en baisse\n" +
-            "  🏁 FLUX DOMINANT : RISK-OFF SYSTÉMIQUE / OR FORT 🐻\n\n" +
-            
-            "RÈGLE 11 : CRISE SOUVERAINE EUROPÉENNE\n" +
-            "- BTP/Bund spread > 250bps ou OAT/Bund spread > 80bps :\n" +
-            "  • 🇪🇺 EURUSD : VENTE CHOC 🔴 | Crise de confiance zone Euro\n" +
-            "  • 🏆 GOLD   : ACHAT CHOC 🟢 | Refuge contre instabilité\n" +
-            "  • 💻 NASDAQ : NEUTRE | Pas d'impact direct actifs US\n" +
-            "  • 📊 SP500  : NEUTRE | Même direction NASDAQ obligatoire\n" +
-            "  • 🇬🇧 GBPUSD : INCLINATION VENTE MAIS NEUTRE | Effet de bord modéré\n" +
-            "  🏁 FLUX DOMINANT : EURO FAIBLE / CRISE SOUVERAINE 🐻\n\n" +
-            
-            "RÈGLE 12 : IRON ORE / COPPER — PROXY AUD/CHINE\n" +
-            "- Iron Ore > +3% ou Copper > +2% (demande forte Chine) :\n" +
-            "  • 🇦🇺 AUDUSD : ACHAT CHOC 🟢 | Australie 1er exportateur fer mondial\n" +
-            "  • 🛢️ USOIL   : INCLINATION ACHAT MAIS NEUTRE | Demande industrielle\n" +
-            "  • Autres actifs : NEUTRE\n" +
-            "- Iron Ore < -3% ou Copper < -2% :\n" +
-            "  • 🇦🇺 AUDUSD : VENTE CHOC 🔴 | Corrélation directe iron ore/AUD\n" +
-            "  🏁 FLUX DOMINANT : AUD/CHINE CORRÉLATION MATIÈRES PREMIÈRES 🦘\n\n" +
-            
-            "RÈGLE 13 : SPR / BAKER HUGHES / API CRUDE\n" +
-            "- SPR Release > 1M barils :\n" +
-            "  • 🛢️ USOIL   : VENTE CHOC 🔴 | Offre supplémentaire immédiate\n" +
-            "  • 🇨🇦 USDCAD : ACHAT CHOC 🟢 | CAD s'affaiblit avec le pétrole\n" +
-            "- Baker Hughes Rig Count HAUSSE > +10 rigs :\n" +
-            "  • 🛢️ USOIL   : INCLINATION VENTE MAIS NEUTRE | Offre future en hausse\n" +
-            "- Baker Hughes Rig Count BAISSE < -10 rigs :\n" +
-            "  • 🛢️ USOIL   : INCLINATION ACHAT MAIS NEUTRE | Offre future en baisse\n" +
-            "- API Crude Stock HAUSSE surprise :\n" +
-            "  • 🛢️ USOIL   : VENTE CHOC 🔴 | Anticipation EIA surplus\n" +
-            "- API Crude Stock BAISSE surprise :\n" +
-            "  • 🛢️ USOIL   : ACHAT CHOC 🟢 | Anticipation EIA déficit\n\n" +
-            
-            "RÈGLE 14 : CORRÉLATIONS TEMPORELLES INTER-DRIVERS\n" +
-            "- NFP FORT (7j) + CPI FORT aujourd'hui = CONFIRMATION HAWKISH → Conviction +15%\n" +
-            "- NFP FAIBLE (7j) + CPI FAIBLE aujourd'hui = CONFIRMATION DOVISH → Conviction +15%\n" +
-            "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE → Conviction plafonnée 55%\n" +
-            "- GEO ESCALADE active (48h) + HAWKISH = Double choc → Or et Pétrole prioritaires\n" +
-            "- FOMC dans < 7 jours = tout CPI/NFP reçoit +20% conviction additionnelle\n" +
-            "- Carry Trade Unwinding + GEO = Double risk-off → USDJPY et GOLD prioritaires\n" +
-            "- Bank Failure + GEO = Risque systémique maximal → Conviction maximale autorisée\n"
+            "3. EXCLUSION ET CONCISION : Pas de politesse, pas de salutations, pas de résumés verbeux des actualités passées. Calculez les directions comme un algorithme purement déterministe. Les 11 actifs doivent figurer sur le rapport, sans omission."
         ;
                     
         // Traitement de l'enveloppe de prompt (Filtres géopolitiques complexes de votre script)
         String systemPromptFinal = construirePromptQuotidienSystem(dailyDrivers, DAILY_SYSTEM_PROMPT);
 
-        JSONObject payload = new JSONObject();
+                JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
         payload.put("temperature", 0.02);
-        
+
         JSONArray messages = new JSONArray();
         messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
-        // ✅ Construction du contexte mensuel
-        String monthlyContext = "";
-        if (monthlyRegistry != null && !monthlyRegistry.trim().isEmpty()) {
-            monthlyContext = "\n\n═══ REGISTRE MACRO DU MOIS (30 derniers jours — Rang Suprême) ═══\n" +
-                monthlyRegistry +
-                "\nINSTRUCTION MÉMOIRE : Interpréter les drivers actuels EN COHÉRENCE avec ce registre.\n" +
-                "- NFP FORT (7j) + CPI FORT aujourd'hui = CONFIRMATION HAWKISH → Conviction +15%\n" +
-                "- NFP FAIBLE (7j) + CPI FAIBLE aujourd'hui = CONFIRMATION DOVISH → Conviction +15%\n" +
-                "- NFP FORT + CPI FAIBLE = SIGNAL CONTRADICTOIRE → Conviction plafonnée 55%, signaler divergence\n" +
-                "- GEO ESCALADE active (48h) + HAWKISH = Double choc → Or et Pétrole prioritaires\n" +
-                "- FOMC dans < 7 jours = tout CPI/NFP reçoit +20% conviction additionnelle\n";
-        } else {
-            monthlyContext = "\n\n═══ REGISTRE MACRO DU MOIS : Aucun historique disponible ═══\n";
-        }
-        // ✅ Construction du contexte régime
-        String regimeContext = "\n\n═══ RÉGIME DE MARCHÉ ACTUEL (7 derniers jours) ═══\n" +
-            regimeMarche +
-            "\n⚠️ INSTRUCTION RÉGIME : Toute analyse doit être cohérente avec ce régime. " +
-            "Un signal contraire au régime dominant doit être signalé comme DIVERGENCE.\n";
-        
-        messages.put(new JSONObject().put("role", "user").put("content",
+        messages.put(new JSONObject().put("role", "user").put("content", 
             "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n" +
-            "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers +
-            monthlyContext +               // ✅ mémoire 30 jours
-            regimeContext +                // ✅ régime 7 jours
-            upcomingContext.toString() +   // ✅ calendrier 72h
-            "\n\nINSTRUCTION SPÉCIALE : Analyse les corrélations entre les drivers passés " +
-            "(NFP, géopolitique, banques centrales) et les événements à venir (CPI, FOMC, etc.). " +
-            "Identifie les risques d'escalade ou de confirmation de tendance. " +
-            "Si le régime est HAWKISH DOMINANT et que le CPI d'aujourd'hui bat les prévisions, " +
-            "c'est une CONFIRMATION — augmenter la conviction. " +
-            "Si le régime est DOVISH DOMINANT et que le NFP est fort, " +
-            "c'est une DIVERGENCE — signaler explicitement et plafonner la conviction à 55%."));
+            "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers));
         payload.put("messages", messages);
-                
-                URL url = new URL(GROQ_URL);
-                conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-                conn.setConnectTimeout(15000); 
-                conn.setReadTimeout(20000);
-                conn.setDoOutput(true);
-        
-                // ✅ Gestion sécurisée de l'OutputStream
-                try (OutputStream os = conn.getOutputStream()) {
-                    byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-                    os.write(input, 0, input.length);
-                    os.flush();
+
+        URL url = new URL(GROQ_URL);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+        conn.setConnectTimeout(15000); 
+        conn.setReadTimeout(20000);
+        conn.setDoOutput(true);
+
+        // ✅ Gestion sécurisée de l'OutputStream
+        try (OutputStream os = conn.getOutputStream()) {
+            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+            os.flush();
+        }
+
+        int responseCode = conn.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            StringBuilder r = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    r.append(line);
                 }
-        
-                int responseCode = conn.getResponseCode();
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    StringBuilder r = new StringBuilder();
-                    try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = br.readLine()) != null) {
-                            r.append(line);
-                        }
+            }
+            
+            JSONObject jsonResponse = new JSONObject(r.toString());
+            String aiResult = jsonResponse.getJSONArray("choices")
+                                         .getJSONObject(0)
+                                         .getJSONObject("message")
+                                         .getString("content");
+
+            if (aiResult != null && aiResult.trim().length() > 50) {
+                sendTelegramSecure(aiResult.trim(), this);
+                Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
+            }
+        } else {
+            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
+                StringBuilder errorResponse = new StringBuilder();
+                String line;
+                while ((line = errorReader.readLine()) != null) {
+                    errorResponse.append(line);
+                }
+                Log.e(TAG, "[DAILY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
                     }
-                    
-                    JSONObject jsonResponse = new JSONObject(r.toString());
-                    String aiResult = jsonResponse.getJSONArray("choices")
-                                                 .getJSONObject(0)
-                                                 .getJSONObject("message")
-                                                 .getString("content");
-        
-                    if (aiResult != null && aiResult.trim().length() > 50) {
-                        sendTelegramSecure(aiResult.trim(), this);
-                        Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
-                    }
-                } else {
-                    try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
-                        StringBuilder errorResponse = new StringBuilder();
-                        String line;
-                        while ((line = errorReader.readLine()) != null) {
-                            errorResponse.append(line);
-                        }
-                        Log.e(TAG, "[DAILY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
-                            }
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "[DAILY] Échec critique lors du traitement du briefing journalier", e);
-                    } finally {
-                        if (conn != null) conn.disconnect();
-                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "[DAILY] Échec critique lors du traitement du briefing journalier", e);
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
     }
 
 
@@ -3787,22 +2285,15 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private void registerNetworkCallback() {
-    ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-    if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
-            @Override
-            public void onAvailable(Network network) {
-    triggerQueueSynchronization();
-    // ✅ Guard : backfill réseau max 1 fois par 30 minutes
-    long now = System.currentTimeMillis();
-    if (now - lastBackfillTime > 30 * 60 * 1000L) {
-        lastBackfillTime = now;
-        scheduler.schedule(() -> runHistoricalBackfill(),
-                5, TimeUnit.SECONDS);
-    }
-            }
-        });
-    }
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) {
+                    triggerQueueSynchronization();
+                }
+            });
+        }
     }
 
     private boolean isDeviceOnline() {
@@ -3817,15 +2308,10 @@ public class NotificationService extends NotificationListenerService {
         return false;
     }
 
-
-    private static String generateSecureHash(String input) {
-        if (input == null) return "";
-        
+    private String generateSecureHash(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            // StandardCharsets.UTF_8 évite de passer une String "UTF-8" sujette aux fautes de frappe
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            
+            byte[] hash = digest.digest(input.getBytes("UTF-8"));
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
@@ -3833,11 +2319,8 @@ public class NotificationService extends NotificationListenerService {
                 hexString.append(hex);
             }
             return hexString.toString();
-            
         } catch (Exception e) {
-            // ✅ En cas d'erreur, on logue et on utilise le hashCode stable du texte
-            android.util.Log.e("HashUtil", "Erreur SHA-256, repli sur hashCode", e);
-            return String.valueOf(input.hashCode());
+            return String.valueOf(System.currentTimeMillis());
         }
     }
 
@@ -3950,144 +2433,9 @@ public class NotificationService extends NotificationListenerService {
                     "Appliquer immédiatement la CONTRAINTE 11.\n\n";
             }
             // ✅ Utilise basePrompt (contient le guidage mathématique si présent)
-            // ✅ Enrichissement contexte prix live pour calibrer la conviction Groq
-            // ✅ Contexte prix live enrichi — injection Groq
-            StringBuilder prixContext = new StringBuilder();
-            try {
-                String upFeed = (evenementActuel != null)
-                        ? evenementActuel.toUpperCase(Locale.ROOT) : "";
-            
-                // Déterminer la session de marché active
-                String session = getSessionActive();
-            
-                prixContext.append("\n\n📊 CONTEXTE PRIX LIVE — ")
-                           .append(session).append("\n");
-                prixContext.append("(Source : Twelve Data | Utiliser pour calibrer conviction)\n");
-                prixContext.append("──────────────────────────────────────────\n");
-            
-                boolean hasPrix = false;
-            
-                // Map actif → symbole Twelve Data
-                String[][] actifsSurveilles = {
-                    {"GOLD",    "XAU/USD",  "GOLD",    "XAU"},
-                    {"BITCOIN", "BTC/USD",  "BITCOIN", "BTC"},
-                    {"NASDAQ",  "QQQ",      "NASDAQ",  "QQQ"},
-                    {"SP500",   "SPY",      "SP500",   "SPY",  "S&P"},
-                    {"USOIL",   "WTI",      "OIL",     "CRUDE","WTI"},
-                    {"EURUSD",  "EUR/USD",  "EURUSD",  "EUR"},
-                    {"USDJPY",  "USD/JPY",  "USDJPY",  "YEN", "JPY"},
-                    {"GBPUSD",  "GBP/USD",  "GBPUSD",  "GBP", "STERLING"},
-                    {"USDCAD",  "USD/CAD",  "USDCAD",  "CAD"},
-                    {"AUDUSD",  "AUD/USD",  "AUDUSD",  "AUD"},
-                    {"US10Y",   "TLT",      "US10Y",   "TREASURY","YIELD","BOND"},
-                };
-            
-                for (String[] actif : actifsSurveilles) {
-                    String nomActif = actif[0];
-                    String symbol   = actif[1];
-            
-                    // Vérifier si l'actif est mentionné dans le flux
-                    boolean mentionné = false;
-                    for (int i = 2; i < actif.length; i++) {
-                        if (upFeed.contains(actif[i])) { mentionné = true; break; }
-                    }
-                    if (!mentionné) continue;
-            
-                    // Récupérer données complètes
-                    MarketDataFetcher.MarketData data =
-                            MarketDataFetcher.fetchMarketDataPublic(symbol);
-                    if (data == null || data.price <= 0) continue;
-            
-                    hasPrix = true;
-            
-                    // Déterminer régime directionnel 24h
-                    String tendance;
-                    double abs = Math.abs(data.changePercent);
-                    if (abs >= 1.5)       tendance = data.changePercent > 0 ? "🚀 FORTE HAUSSE" : "💥 FORTE BAISSE";
-                    else if (abs >= 0.5)  tendance = data.changePercent > 0 ? "📈 HAUSSE"       : "📉 BAISSE";
-                    else if (abs >= 0.15) tendance = data.changePercent > 0 ? "🔼 LÉGÈRE HAUSSE": "🔽 LÉGÈRE BAISSE";
-                    else                  tendance = "➡️ STABLE";
-            
-                    // Régime historique (simple calcul H/L du jour)
-                    double rangeDuJour = (data.high > 0 && data.low > 0)
-                            ? ((data.price - data.low) / (data.high - data.low)) * 100.0
-                            : -1;
-                    String positionRange = "";
-                    if (rangeDuJour >= 0) {
-                        if (rangeDuJour >= 80)      positionRange = " | 📍 Proche HIGH du jour";
-                        else if (rangeDuJour <= 20) positionRange = " | 📍 Proche LOW du jour";
-                        else                        positionRange = " | 📍 Mi-range du jour";
-                    }
-            
-                    // Ligne principale
-                   // ── Formatage précis selon le type d'actif ──
-                    String prixFormaté = formatPrixActif(nomActif, data.price);
-                    
-                    prixContext.append(String.format(Locale.US,
-                        "• %-8s : %s | %+.2f%% (%s)%s\n",
-                        nomActif, prixFormaté, data.changePercent,
-                        tendance, positionRange));
-                }
-            
-                if (!hasPrix) {
-                    prixContext.setLength(0); // aucun actif pertinent → pas d'injection
-                } else {
-                    prixContext.append("──────────────────────────────────────────\n");
-                    prixContext.append("⚠️ RÈGLE DE CALIBRATION CONVICTION (OBLIGATOIRE) :\n");
-                    prixContext.append("Appliquer AVANT de calculer la conviction finale :\n\n");
-                    prixContext.append("  Si actif en FORTE HAUSSE (>1.5%) ET signal bullish :\n");
-                    prixContext.append("  → Momentum déjà intégré → PLAFONNER conviction à 65%\n\n");
-                    prixContext.append("  Si actif en FORTE BAISSE (>1.5%) ET signal bearish :\n");
-                    prixContext.append("  → Momentum déjà intégré → PLAFONNER conviction à 65%\n\n");
-                    prixContext.append("  Si actif en FORTE HAUSSE (>1.5%) ET signal bearish :\n");
-                    prixContext.append("  → Retournement probable → BONUS +10% sur conviction\n\n");
-                    prixContext.append("  Si actif STABLE (<0.15%) ET signal surprise (>10% écart) :\n");
-                    prixContext.append("  → Pas encore pricé → BONUS +10% sur conviction\n\n");
-                    prixContext.append("  Si actif Proche HIGH du jour ET signal bullish :\n");
-                    prixContext.append("  → Résistance proche → PLAFONNER conviction à 60%\n\n");
-                    prixContext.append("  Si actif Proche LOW du jour ET signal bearish :\n");
-                    prixContext.append("  → Support proche → PLAFONNER conviction à 60%\n");
-                }
-            
-            } catch (Exception ignored) {
-                prixContext.setLength(0);
-            }
-            
-            return directiveDeCrise + basePrompt + prixContext.toString();
+            return directiveDeCrise + basePrompt;
     }
 
-     private String getSessionActive() {
-        TimeZone nyTz   = TimeZone.getTimeZone("America/New_York");
-        TimeZone lonTz  = TimeZone.getTimeZone("Europe/London");
-        TimeZone madaTz = TimeZone.getTimeZone("Indian/Antananarivo");
-    
-        Calendar ny  = Calendar.getInstance(nyTz);
-        Calendar lon = Calendar.getInstance(lonTz);
-    
-        int nyMin  = ny.get(Calendar.HOUR_OF_DAY)  * 60 + ny.get(Calendar.MINUTE);
-        int lonMin = lon.get(Calendar.HOUR_OF_DAY) * 60 + lon.get(Calendar.MINUTE);
-    
-        // NYSE ouvert : 9h30–16h00 NY
-        boolean nyOpen  = nyMin  >= (9*60+30) && nyMin  < (16*60);
-        // London ouvert : 8h00–16h30 London
-        boolean lonOpen = lonMin >= (8*60)    && lonMin < (16*60+30);
-    
-        // Session active
-        if (nyOpen && lonOpen)  return "🗽🇬🇧 SESSION NY + LONDON (chevauchement)";
-        if (nyOpen)             return "🗽 SESSION NEW YORK";
-        if (lonOpen)            return "🇬🇧 SESSION LONDON";
-    
-        // Pre-market NY : 6h30–9h29
-        if (nyMin >= (6*60+30) && nyMin < (9*60+30))
-            return "⏳ PRÉ-MARKET NEW YORK";
-    
-        // After-hours NY : 16h00–20h00
-        if (nyMin >= (16*60) && nyMin < (20*60))
-            return "🌙 AFTER-HOURS NEW YORK";
-    
-        // Session Asie/Tokyo : 9h00–15h30 Tokyo = 3h00–9h30 London
-        return "🌏 SESSION ASIE (liquidité réduite)";
-    }
      // Méthode de vérification géographique des mots-clés
      public String construirePromptQuotidienSystem(String registreDeLaJournee, String promptDeBase) {
         boolean alerteGéoMajeure = false;
@@ -4121,19 +2469,13 @@ public class NotificationService extends NotificationListenerService {
         // Sinon, on renvoie le prompt standard (la hiérarchie normale s'applique)
         return promptDeBase;
     }
+
     @Override
     public void onDestroy() {
-        if (this.scheduler != null && !this.scheduler.isShutdown()) {
-            try { this.scheduler.shutdownNow(); } catch (Exception ignored) {}
-        }
-        if (this.exec != null && !this.exec.isShutdown()) {
-            try { this.exec.shutdownNow(); } catch (Exception ignored) {}
-        }
-        // ✅ Arrêt propre du MarketDataFetcher executor
-        MarketDataFetcher.shutdownExecutor();
-    
-        serviceInstance = null;
-        Log.d(TAG, "[SERVICE] Service arrêté proprement et exécuteurs libérés");
         super.onDestroy();
+        serviceInstance = null;    // ✅ 
+        scheduler.shutdownNow();
+        exec.shutdownNow();
+        Log.d(TAG, "[SERVICE] Service arrêté");
     }
 }
