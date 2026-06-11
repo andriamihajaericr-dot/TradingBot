@@ -791,8 +791,8 @@ public class NotificationService extends NotificationListenerService {
             + "ACTIFS PRÉ-QUALIFIÉS : " + assetsString;
 
     Executors.newSingleThreadExecutor().execute(new Runnable() {
-    @Override
-    public void run() {
+        @Override
+        public void run() {
             java.net.HttpURLConnection conn = null;
             EventDatabase db = EventDatabase.getInstance(NotificationService.this);
             if (db == null || fingerprint == null) {
@@ -802,7 +802,6 @@ public class NotificationService extends NotificationListenerService {
     
             try {
                 List<String> historique = db.obtenirTexteEvenementsRecents();
-                //String promptFinal = construirePromptFinal(userContent, historique);
                 String promptFinal = construirePromptFinalAvecPrompt(body, historique, customSystemPrompt);
                 JSONObject jsonPayload = new JSONObject();
                 jsonPayload.put("model", GROQ_MODEL);
@@ -886,16 +885,26 @@ public class NotificationService extends NotificationListenerService {
     
                     // ✅ Application du filtre conviction
                     if (activeSignalsCount > 0) {
-                    int convictionPercent = extrairePourcentageConviction(aiReport);
+                        int convictionPercent = extrairePourcentageConviction(aiReport);
+                        
+                        // ✅ CORRECTION 1 : Déclaration et initialisation de isSupremeRank
+                        boolean isSupremeRank = aiReport != null && aiReport.contains("SUPREME_RANK");
+                        
+                        // ✅ Poids géo/macro selon conviction
+                        int geoWeight = (convictionPercent >= 80) ? 4 : (convictionPercent >= 60) ? 3 : 1;
+                        
+                        // ✅ CORRECTION 2 : Mise à jour directe inline si la fonction globale est manquante dans db
+                        try {
+                            android.database.sqlite.SQLiteDatabase wdb = db.getWritableDatabase();
+                            android.content.ContentValues cv = new android.content.ContentValues();
+                            cv.put("geo_weight", geoWeight);
+                            wdb.update("events", cv, "fingerprint = ?", new String[]{fingerprint});
+                        } catch (Exception e) {
+                            Log.e(TAG, "Échec de la mise à jour SQL native du poids", e);
+                        }
                     
-                    // ✅ Poids géo/macro selon conviction — cohérent avec processIncomingMacroFeed
-                    int geoWeight = (convictionPercent >= 80) ? 4 : (convictionPercent >= 60) ? 3 : 1;
-                    
-                    // Mettre à jour le poids de l'événement dans votre table SQLite si nécessaire
-                    db.mettreAJourPoidsEvenement(fingerprint, geoWeight); 
-                
-                    if (convictionPercent >= 40 || isSupremeRank) {
-                            String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
+                        if (convictionPercent >= 40 || isSupremeRank) {
+                            String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
                             sendTelegramSecure(finalPayload, NotificationService.this);
                             db.markEventAsSynced(fingerprint, "PROCESSED_OK");
                         } else {
