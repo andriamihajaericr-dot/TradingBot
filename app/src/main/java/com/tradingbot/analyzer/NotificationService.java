@@ -1493,133 +1493,178 @@ public class NotificationService extends NotificationListenerService {
 
     Executors.newSingleThreadExecutor().execute(new Runnable() {
     @Override
+   
     public void run() {
-            java.net.HttpURLConnection conn = null;
-            EventDatabase db = EventDatabase.getInstance(NotificationService.this);
-            if (db == null || fingerprint == null) {
-                Log.e(TAG, "Instance SQLite ou empreinte manquante. Avortement du pipeline.");
+        java.net.HttpURLConnection conn = null;
+        EventDatabase db = EventDatabase.getInstance(NotificationService.this);
+        if (db == null || fingerprint == null) {
+            Log.e(TAG, "Instance SQLite ou empreinte manquante. Avortement du pipeline.");
+            return;
+        }
+    
+        try {
+            List<String> historique = db.obtenirTexteEvenementsRecents();
+            String promptFinal = construirePromptFinalAvecPrompt(body, historique, customSystemPrompt);
+            
+            JSONObject jsonPayload = new JSONObject();
+            jsonPayload.put("model", GROQ_MODEL);
+            jsonPayload.put("temperature", 0.02);
+    
+            JSONArray messages = new JSONArray();
+            messages.put(new JSONObject().put("role", "system").put("content", promptFinal));
+            messages.put(new JSONObject().put("role", "user").put("content", userContent));
+            jsonPayload.put("messages", messages);
+    
+            String apiKey = getGroqApiKey();
+            if (apiKey.isEmpty()) {
+                Log.e(TAG, "[GROQ] Clé API absente. Analyse annulée.");
+                db.markEventAsSynced(fingerprint, "FAILED_MISSING_API_KEY");
                 return;
             }
     
-            try {
-                List<String> historique = db.obtenirTexteEvenementsRecents();
-                //String promptFinal = construirePromptFinal(userContent, historique);
-                String promptFinal = construirePromptFinalAvecPrompt(body, historique, customSystemPrompt);
-                JSONObject jsonPayload = new JSONObject();
-                jsonPayload.put("model", GROQ_MODEL);
-                jsonPayload.put("temperature", 0.02);
+            java.net.URL url = new java.net.URL(GROQ_URL);
+            conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
     
-                JSONArray messages = new JSONArray();
-                messages.put(new JSONObject().put("role", "system").put("content", promptFinal));
-                messages.put(new JSONObject().put("role", "user").put("content", userContent));
-                jsonPayload.put("messages", messages);
+            // ✅ Écriture sécurisée du payload
+            try (java.io.OutputStream os = conn.getOutputStream()) {
+                byte[] input = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+                os.flush();
+            }
     
-                String apiKey = getGroqApiKey();
-                if (apiKey.isEmpty()) {
-                    Log.e(TAG, "[GROQ] Clé API absente. Analyse annulée.");
-                    db.markEventAsSynced(fingerprint, "FAILED_MISSING_API_KEY");
+            int status = conn.getResponseCode();
+            if (status == java.net.HttpURLConnection.HTTP_OK) {
+                StringBuilder response = new StringBuilder();
+                try (java.io.BufferedReader br = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        response.append(line);
+                    }
+                }
+    
+                JSONObject jsonResponse = new JSONObject(response.toString());
+                String aiReport = jsonResponse.getJSONArray("choices")
+                        .getJSONObject(0)
+                        .getJSONObject("message")
+                        .getString("content");
+    
+                if (aiReport == null || aiReport.length() < 50) {
+                    Log.w(TAG, "[GROQ] Rapport reçu trop court ou vide.");
+                    db.markEventAsSynced(fingerprint, "FAILED_EMPTY_LLM_REPORT");
                     return;
                 }
     
-                java.net.URL url = new java.net.URL(GROQ_URL);
-                conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setDoOutput(true);
-                conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(15000);
+                // Filtrage intelligent des signaux d'impacts macroéconomiques
+                StringBuilder filteredMessage = new StringBuilder();
+                String[] lines = aiReport.split("\n");
+                int activeSignalsCount = 0;
+                boolean inImpactSection = false;
     
-                try (java.io.OutputStream os = conn.getOutputStream()) {
-                    byte[] input = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                    os.write(input, 0, input.length);
-                    os.flush();
-                }
+                for (String line : lines) {
+                    String trimmed = line.trim();
+                    if (trimmed.isEmpty()) continue;
     
-                int status = conn.getResponseCode();
-                if (status == java.net.HttpURLConnection.HTTP_OK) {
-                    StringBuilder response = new StringBuilder();
-                    try (java.io.BufferedReader br = new java.io.BufferedReader(
-                            new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = br.readLine()) != null) {
-                            response.append(line);
-                        }
+                    // Sortie de la section des impacts si un autre titre de section majeure commence
+                    if (inImpactSection && (trimmed.startsWith("---") || trimmed.startsWith("###") || trimmed.startsWith("🏁"))) {
+                        inImpactSection = false;
                     }
     
-                    JSONObject jsonResponse = new JSONObject(response.toString());
-                    String aiReport = jsonResponse.getJSONArray("choices")
-                            .getJSONObject(0)
-                            .getJSONObject("message")
-                            .getString("content");
-    
-                    if (aiReport == null || aiReport.length() < 50) {
-                        Log.w(TAG, "[GROQ] Rapport reçu trop court ou vide.");
-                        db.markEventAsSynced(fingerprint, "FAILED_EMPTY_LLM_REPORT");
-                        return;
+                    if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
+                        trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
+                        filteredMessage.append(line).append("\n");
+                        if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
+                        continue;
                     }
     
-                    // Filtrage intelligent des signaux d'impacts macroéconomiques
-                    StringBuilder filteredMessage = new StringBuilder();
-                    String[] lines = aiReport.split("\n");
-                    int activeSignalsCount = 0;
-                    boolean inImpactSection = false;
-    
-                    for (String line : lines) {
-                        String trimmed = line.trim();
-                        if (trimmed.isEmpty()) continue;
-                        if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
-                            trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
+                    if (inImpactSection && trimmed.startsWith("•")) {
+                        String upperLine = line.toUpperCase(Locale.ROOT);
+                        boolean isSignificant = upperLine.contains("ACHAT CHOC") || upperLine.contains("VENTE CHOC") ||
+                                                upperLine.contains("INCLINATION ACHAT") || upperLine.contains("INCLINATION VENTE");
+                        if (isSignificant) {
                             filteredMessage.append(line).append("\n");
-                            if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
-                            continue;
-                        }
-                        if (inImpactSection && trimmed.startsWith("•")) {
-                            String upperLine = line.toUpperCase(Locale.ROOT);
-                            boolean isSignificant = upperLine.contains("ACHAT CHOC") || upperLine.contains("VENTE CHOC") ||
-                                                    upperLine.contains("INCLINATION ACHAT") || upperLine.contains("INCLINATION VENTE");
-                            if (isSignificant) {
-                                filteredMessage.append(line).append("\n");
-                                activeSignalsCount++;
-                            }
+                            activeSignalsCount++;
                         }
                     }
+                }
     
-                    // ✅ Application du filtre conviction
-                   // ─── REMETTEZ CECI À LA LIGNE 1589 ───
-                    long timestampSec = System.currentTimeMillis() / 1000;
-                    boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, timestampSec, "pending", 1);
-                    if (convictionPercent >= 40 || isSupremeRank) {
-                            String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
-                            sendTelegramSecure(finalPayload, NotificationService.this);
-                            db.markEventAsSynced(fingerprint, "PROCESSED_OK");
-                        } else {
-                            Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
-                            db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
-                        }
+                long timestampSec = System.currentTimeMillis() / 1000;
+                
+                // ✅ Remplacement safe de String.join pour compatibilité totale Android < API 26
+                String assetsJoined = "";
+                if (assets != null) {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        assetsJoined = String.join(", ", assets);
                     } else {
-                        db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 0; i < assets.size(); i++) {
+                            sb.append(assets.get(i));
+                            if (i < assets.size() - 1) sb.append(", ");
+                        }
+                        assetsJoined = sb.toString();
                     }
+                }
+                
+                // Sauvegarde de l'état Macro-Choc traité par l'IA
+                db.saveEvent(
+                    fingerprint, 
+                    "com.tradingbot.calendar", 
+                    source, 
+                    "Macro-Choc", 
+                    title, 
+                    body, 
+                    assetsJoined, 
+                    "Analyse IA", 
+                    timestampSec, 
+                    "pending", 
+                    1
+                );
+    
+                // ✅ Vérification si des signaux actifs ont été retenus
+                if (activeSignalsCount > 0) {
+                    String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
+                    sendTelegramSecure(finalPayload, NotificationService.this);
+                    db.markEventAsSynced(fingerprint, "PROCESSED_OK");
                 } else {
-                    Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
-                    db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
+                    Log.d(TAG, "Aucun signal d'impact significatif retenu → message filtré.");
+                    db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
-                if (db != null) {
-                    try {
-                        db.markEventAsSynced(fingerprint, "FAILED_CRITICAL_EXCEPTION");
-                    } catch (Exception ex) {
-                        Log.e(TAG, "Impossible de forcer la mise à jour du verrou SQLite", ex);
+    
+            } else {
+                Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
+                
+                // ✅ VUIDAGE DU FLUX D'ERREUR pour libérer proprement la connexion HTTP réseau
+                try (java.io.InputStream es = conn.getErrorStream()) {
+                    if (es != null) {
+                        byte[] buffer = new byte[1024];
+                        while (es.read(buffer) != -1) { /* Consomme le flux d'erreur */ }
                     }
+                } catch (Exception ignored) {}
+    
+                db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
+            if (db != null) {
+                try {
+                    db.markEventAsSynced(fingerprint, "FAILED_CRITICAL_EXCEPTION");
+                } catch (Exception ex) {
+                    Log.e(TAG, "Impossible de forcer la mise à jour du verrou SQLite", ex);
                 }
-            } finally {
-                if (conn != null) conn.disconnect();
+            }
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
             }
         }
-        });    
     }
-    }
+    
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
