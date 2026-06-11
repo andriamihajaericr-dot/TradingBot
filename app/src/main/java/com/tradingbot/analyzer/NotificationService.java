@@ -3052,11 +3052,14 @@ public class NotificationService extends NotificationListenerService {
               }
                 // ====================== ENVOI TELEGRAM ======================
                 if (activeSignalsCount > 0) {
-                // Extraction précise du pourcentage de conviction depuis aiResult
-                int convictionPercent = extrairePourcentageConviction(aiResult);
-                boolean isSupremeRank = estEvenementSuprême(feed); // feed = le texte brut de l'événement
+                int convictionPercent = extrairePourcentageConviction(aiReport);
+                
+                // ✅ Poids géo/macro selon conviction — cohérent avec processIncomingMacroFeed
+                int geoWeight = (convictionPercent >= 80) ? 4 : (convictionPercent >= 60) ? 3 : 1;
+                
+                // Mettre à jour le poids de l'événement dans votre table SQLite si nécessaire
+                db.mettreAJourPoidsEvenement(fingerprint, geoWeight); 
             
-                // Seuil : conviction >= 40% OU événement de Rang Suprême (Fed, CPI, NFP, etc.)
                 if (convictionPercent >= 40 || isSupremeRank) {
                     String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUES Pipeline*\n"
                             + "🕒 " + timeString + " (Mada)\n"
