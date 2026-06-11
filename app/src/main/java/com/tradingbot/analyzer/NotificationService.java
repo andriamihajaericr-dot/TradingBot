@@ -2448,8 +2448,10 @@ public class NotificationService extends NotificationListenerService {
         }
     
         long timestampSec = System.currentTimeMillis() / 1000;
-        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed,
-                String.join(", ", targetAssets), initialImpact, timestampSec, "pending", weight);
+         // ✅ Poids géo selon conviction — cohérent avec processIncomingMacroFeed
+        int geoWeight = (vr.confidence >= 80) ? 4 : (vr.confidence >= 60) ? 3 : 1;
+        
+        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, timestampSec, "pending", geoWeight);
         if (saved && isDeviceOnline()) {
             triggerQueueSynchronization();
         }
