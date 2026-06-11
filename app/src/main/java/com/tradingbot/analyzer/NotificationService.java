@@ -3880,9 +3880,133 @@ public class NotificationService extends NotificationListenerService {
                     "Appliquer immédiatement la CONTRAINTE 11.\n\n";
             }
             // ✅ Utilise basePrompt (contient le guidage mathématique si présent)
-            return directiveDeCrise + basePrompt;
+            // ✅ Enrichissement contexte prix live pour calibrer la conviction Groq
+            // ✅ Contexte prix live enrichi — injection Groq
+            StringBuilder prixContext = new StringBuilder();
+            try {
+                String upFeed = (evenementActuel != null)
+                        ? evenementActuel.toUpperCase(Locale.ROOT) : "";
+            
+                // Déterminer la session de marché active
+                String session = getSessionActive();
+            
+                prixContext.append("\n\n📊 CONTEXTE PRIX LIVE — ")
+                           .append(session).append("\n");
+                prixContext.append("(Source : Twelve Data | Utiliser pour calibrer conviction)\n");
+                prixContext.append("──────────────────────────────────────────\n");
+            
+                boolean hasPrix = false;
+            
+                // Map actif → symbole Twelve Data
+                String[][] actifsSurveilles = {
+                    {"GOLD",    "XAU/USD",  "GOLD",    "XAU"},
+                    {"BITCOIN", "BTC/USD",  "BITCOIN", "BTC"},
+                    {"NASDAQ",  "QQQ",      "NASDAQ",  "QQQ"},
+                    {"SP500",   "SPY",      "SP500",   "SPY",  "S&P"},
+                    {"USOIL",   "WTI",      "OIL",     "CRUDE","WTI"},
+                    {"EURUSD",  "EUR/USD",  "EURUSD",  "EUR"},
+                    {"USDJPY",  "USD/JPY",  "USDJPY",  "YEN", "JPY"},
+                    {"GBPUSD",  "GBP/USD",  "GBPUSD",  "GBP", "STERLING"},
+                    {"USDCAD",  "USD/CAD",  "USDCAD",  "CAD"},
+                    {"AUDUSD",  "AUD/USD",  "AUDUSD",  "AUD"},
+                    {"US10Y",   "TLT",      "US10Y",   "TREASURY","YIELD","BOND"},
+                };
+            
+                for (String[] actif : actifsSurveilles) {
+                    String nomActif = actif[0];
+                    String symbol   = actif[1];
+            
+                    // Vérifier si l'actif est mentionné dans le flux
+                    boolean mentionné = false;
+                    for (int i = 2; i < actif.length; i++) {
+                        if (upFeed.contains(actif[i])) { mentionné = true; break; }
+                    }
+                    if (!mentionné) continue;
+            
+                    // Récupérer données complètes
+                    MarketDataFetcher.MarketData data =
+                            MarketDataFetcher.fetchMarketDataPublic(symbol);
+                    if (data == null || data.price <= 0) continue;
+            
+                    hasPrix = true;
+            
+                    // Déterminer régime directionnel 24h
+                    String tendance;
+                    double abs = Math.abs(data.changePercent);
+                    if (abs >= 1.5)       tendance = data.changePercent > 0 ? "🚀 FORTE HAUSSE" : "💥 FORTE BAISSE";
+                    else if (abs >= 0.5)  tendance = data.changePercent > 0 ? "📈 HAUSSE"       : "📉 BAISSE";
+                    else if (abs >= 0.15) tendance = data.changePercent > 0 ? "🔼 LÉGÈRE HAUSSE": "🔽 LÉGÈRE BAISSE";
+                    else                  tendance = "➡️ STABLE";
+            
+                    // Régime historique (simple calcul H/L du jour)
+                    double rangeDuJour = (data.high > 0 && data.low > 0)
+                            ? ((data.price - data.low) / (data.high - data.low)) * 100.0
+                            : -1;
+                    String positionRange = "";
+                    if (rangeDuJour >= 0) {
+                        if (rangeDuJour >= 80)      positionRange = " | 📍 Proche HIGH du jour";
+                        else if (rangeDuJour <= 20) positionRange = " | 📍 Proche LOW du jour";
+                        else                        positionRange = " | 📍 Mi-range du jour";
+                    }
+            
+                    // Ligne principale
+                    prixContext.append(String.format(Locale.US,
+                        "• %-8s : %,.4f | %+.2f%% (%s)%s\n",
+                        nomActif, data.price, data.changePercent, tendance, positionRange));
+                }
+            
+                if (!hasPrix) {
+                    prixContext.setLength(0); // aucun actif pertinent → pas d'injection
+                } else {
+                    prixContext.append("──────────────────────────────────────────\n");
+                    prixContext.append("⚠️ RÈGLE DE CALIBRATION CONVICTION :\n");
+                    prixContext.append("- Actif à FORTE HAUSSE pré-existante + news bullish → ");
+                    prixContext.append("conviction -10% (momentum déjà pricé)\n");
+                    prixContext.append("- Actif à FORTE BAISSE pré-existante + news bearish → ");
+                    prixContext.append("conviction -10% (momentum déjà pricé)\n");
+                    prixContext.append("- Actif STABLE + news surprise forte → ");
+                    prixContext.append("conviction +10% (pas encore pricé)\n");
+                }
+            
+            } catch (Exception ignored) {
+                prixContext.setLength(0);
+            }
+            
+            return directiveDeCrise + basePrompt + prixContext.toString();
     }
 
+     private String getSessionActive() {
+        TimeZone nyTz   = TimeZone.getTimeZone("America/New_York");
+        TimeZone lonTz  = TimeZone.getTimeZone("Europe/London");
+        TimeZone madaTz = TimeZone.getTimeZone("Indian/Antananarivo");
+    
+        Calendar ny  = Calendar.getInstance(nyTz);
+        Calendar lon = Calendar.getInstance(lonTz);
+    
+        int nyMin  = ny.get(Calendar.HOUR_OF_DAY)  * 60 + ny.get(Calendar.MINUTE);
+        int lonMin = lon.get(Calendar.HOUR_OF_DAY) * 60 + lon.get(Calendar.MINUTE);
+    
+        // NYSE ouvert : 9h30–16h00 NY
+        boolean nyOpen  = nyMin  >= (9*60+30) && nyMin  < (16*60);
+        // London ouvert : 8h00–16h30 London
+        boolean lonOpen = lonMin >= (8*60)    && lonMin < (16*60+30);
+    
+        // Session active
+        if (nyOpen && lonOpen)  return "🗽🇬🇧 SESSION NY + LONDON (chevauchement)";
+        if (nyOpen)             return "🗽 SESSION NEW YORK";
+        if (lonOpen)            return "🇬🇧 SESSION LONDON";
+    
+        // Pre-market NY : 6h30–9h29
+        if (nyMin >= (6*60+30) && nyMin < (9*60+30))
+            return "⏳ PRÉ-MARKET NEW YORK";
+    
+        // After-hours NY : 16h00–20h00
+        if (nyMin >= (16*60) && nyMin < (20*60))
+            return "🌙 AFTER-HOURS NEW YORK";
+    
+        // Session Asie/Tokyo : 9h00–15h30 Tokyo = 3h00–9h30 London
+        return "🌏 SESSION ASIE (liquidité réduite)";
+    }
      // Méthode de vérification géographique des mots-clés
      public String construirePromptQuotidienSystem(String registreDeLaJournee, String promptDeBase) {
         boolean alerteGéoMajeure = false;
