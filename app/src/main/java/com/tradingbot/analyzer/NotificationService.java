@@ -1664,7 +1664,10 @@ public class NotificationService extends NotificationListenerService {
             }
         }
     }
-    
+    }); // <-- Fin de l'exécuteur anonyme Executors...execute()
+    } // <-- Fin de la méthode sendToGroqAndTelegram()
+
+} // Fin de la classe globale NotificationService
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
