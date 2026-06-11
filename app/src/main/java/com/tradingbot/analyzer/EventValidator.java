@@ -281,7 +281,6 @@ if (normalizedInput.contains("ACTUAL:") && (normalizedInput.contains("FORECAST:"
         }
     
         // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
-        // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
         String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
         EventDatabase db = (context != null) ? EventDatabase.getInstance(context) : null;
         if (!detectedType.startsWith("GEO") && db != null) {
