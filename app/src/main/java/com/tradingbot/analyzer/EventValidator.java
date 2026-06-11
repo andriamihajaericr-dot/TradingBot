@@ -92,13 +92,12 @@ public class EventValidator {
         GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
         
         if (geo.confidence >= 65) {
-            // Si vos mots-clés internes (que vous avez déjà) indiquent une désescalade ou un apaisement
             if (combined.contains("ceasefire") || combined.contains("cessez-le-feu") || combined.contains("peace") || combined.contains("pourparlers")) { 
                 if (isWarRegimeActive) {
                     isWarRegimeActive = false; // 🕊️ Désactivation immédiate et pivot vers mode normal
                     logToMain("🕊️ [ARBITRAGE] Fin du Régime de Guerre détectée par assessGeopoliticalEvent.");
                 }
-                // Pas de 'return' ici : on laisse le flux continuer pour capter le rebond normal du marché
+                // Pas de return : on laisse couler pour capter le rebond macro économique lié à la paix
             } 
             else {
                 // 🚨 Escalade militaire confirmée : Activation ou maintien du Régime de Guerre
