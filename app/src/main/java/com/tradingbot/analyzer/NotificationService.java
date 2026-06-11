@@ -886,10 +886,15 @@ public class NotificationService extends NotificationListenerService {
     
                     // ✅ Application du filtre conviction
                     if (activeSignalsCount > 0) {
-                        int convictionPercent = extrairePourcentageConviction(aiReport);
-                        //boolean isSupremeRank = estEvenementSuprême(body);
-    
-                        if (convictionPercent >= 40 || isSupremeRank) {
+                    int convictionPercent = extrairePourcentageConviction(aiReport);
+                    
+                    // ✅ Poids géo/macro selon conviction — cohérent avec processIncomingMacroFeed
+                    int geoWeight = (convictionPercent >= 80) ? 4 : (convictionPercent >= 60) ? 3 : 1;
+                    
+                    // Mettre à jour le poids de l'événement dans votre table SQLite si nécessaire
+                    db.mettreAJourPoidsEvenement(fingerprint, geoWeight); 
+                
+                    if (convictionPercent >= 40 || isSupremeRank) {
                             String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
                             sendTelegramSecure(finalPayload, NotificationService.this);
                             db.markEventAsSynced(fingerprint, "PROCESSED_OK");
