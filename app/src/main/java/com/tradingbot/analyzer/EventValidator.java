@@ -25,8 +25,12 @@ public class EventValidator {
     // ✅ Hash du dernier rapport envoyé — évite les doublons
     private static String lastCalendarHash = "";
     private static final Map<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
-    // ✅ Ajouter en haut de la classe (après les autres champs statiques)
     private static Context appContext = null;
+
+    // ✅ AJOUT : État persistant pour le Régime de Guerre
+    private static boolean isWarRegimeActive = false;
+    private static long lastWarShockTimestamp = 0;
+    private static final long WAR_REGIME_DURATION_MS = 12 * 60 * 60 * 1000L; // Verrou de 12 heures
 
     
     public static void setAppContext(Context context) {
