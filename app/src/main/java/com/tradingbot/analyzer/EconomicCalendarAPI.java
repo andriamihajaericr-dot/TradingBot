@@ -203,9 +203,13 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
         int countThis = 0;
         long nowSec = System.currentTimeMillis() / 1000;
         for (CalendarEvent e : thisWeek) {
+            // ForexFactory peut retourner "" ou "N/A" ou null pour actual non publié
+            // Pour les événements passés (isPast=true), on accepte aussi les valeurs courtes
             boolean hasActual = e.actual != null
                     && !e.actual.equals("N/A")
-                    && !e.actual.isEmpty();
+                    && !e.actual.trim().isEmpty()
+                    && !e.actual.equals("0")
+                    && !e.actual.equals("null");
             boolean isPast = false;
             try {
                 long eventTs = Long.parseLong(e.timestamp);
