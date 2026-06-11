@@ -68,14 +68,15 @@ public class EventValidator {
 
     /**
      * Méthode principale de validation et d'enrichissement de la matrice d'actifs
-     */public static ValidationResult validate(Context context, String title, String content, long timestamp, List<String> detectedAssets) {
+     */
+    public static ValidationResult validate(Context context, String title, String content, long timestamp, List<String> detectedAssets) {
         ValidationResult result = new ValidationResult();
     
         if (title == null) title = "";
         if (content == null) content = "";
         if (detectedAssets == null) detectedAssets = new ArrayList<>();
     
-        // ✅ AJOUT SECURITY : Rejet immédiat si le flux contient du code source ou fichier local
+        // ✅ AJOUT ARBITRAGE : 0. Sécurité de Source (Anti-Bruit Fichiers / Chrome)
         String testUpper = (title + " " + content).toUpperCase(Locale.ROOT);
         if (testUpper.contains(".JAVA") || testUpper.contains("PUBLIC CLASS") || testUpper.contains("IMPORT ANDROID.") || title.endsWith(".db")) {
             result.isConfirmed = false;
@@ -86,87 +87,63 @@ public class EventValidator {
         String combined = (title + " " + content).toLowerCase(Locale.ROOT);
         String upperCombined = (title + " " + content).toUpperCase(Locale.ROOT);
         
-        // ── EXTRACTION PRIORITAIRE ET SYSTÉMATIQUE DES ACTIFS (Sécurité Rang Suprême) ──
-        // ── EXTRACTION PRIORITAIRE ET SYSTÉMATIQUE DES ACTIFS (Optimisé FinancialJuice & Interbancaire) ──
-try {
-    List<String> rawExtracted = new ArrayList<>();
-    String textToScan = upperCombined;
+        // Extraction de rawExtracted si elle est définie ou utilisée plus bas (optionnel selon votre structure)
+        String rawExtracted = upperCombined.replace(" :", ":").trim(); 
 
-    // 1. EURUSD
-    if (textToScan.contains("EURUSD") || textToScan.contains("EUR/") || textToScan.contains("EURO") || 
-        textToScan.contains("EUROZONE") || textToScan.contains("ECB") || textToScan.contains("BCE") || 
-        textToScan.contains("LAGARDE") || textToScan.contains(" EZ ")) {
-        rawExtracted.add("EURUSD");
-    }
-    // 2. USDJPY
-    if (textToScan.contains("USDJPY") || textToScan.contains("JPY") || textToScan.contains("YEN") || 
-        textToScan.contains("BOJ") || textToScan.contains("UEDA") || textToScan.contains("JGB")) {
-        rawExtracted.add("USDJPY");
-    }
-    // 3. GBPUSD
-    if (textToScan.contains("GBPUSD") || textToScan.contains("GBP/") || textToScan.contains("POUND") || 
-        textToScan.contains("CABLE") || textToScan.contains("BOE") || textToScan.contains("BAILEY") || textToScan.contains(" UK ")) {
-        rawExtracted.add("GBPUSD");
-    }
-    // 4. AUDUSD
-    if (textToScan.contains("AUDUSD") || textToScan.contains("AUD/") || textToScan.contains("AUSSIE") || 
-        textToScan.contains("RBA") || textToScan.contains("BULLOCK")) {
-        rawExtracted.add("AUDUSD");
-    }
-    // 5. USDCAD
-    if (textToScan.contains("USDCAD") || textToScan.contains("CAD/") || textToScan.contains("LOONIE") || 
-        textToScan.contains("BOC") || textToScan.contains("MACKLEM")) {
-        rawExtracted.add("USDCAD");
-    }
-    // 6. GOLD
-    if (textToScan.contains("GOLD") || textToScan.contains("XAU") || textToScan.contains(" OR ") || 
-        textToScan.contains("BULLION") || textToScan.contains("PRECIOUS METALS")) {
-        rawExtracted.add("GOLD");
-    }
-    // 7. USOIL
-    if (textToScan.contains("USOIL") || textToScan.contains("CRUDE") || textToScan.contains("WTI") || 
-        textToScan.contains("PETROLE") || textToScan.contains("BRENT") || textToScan.contains("OPEC") || 
-        textToScan.contains("OPEP") || textToScan.contains(" EIA ") || textToScan.contains(" API ")) {
-        rawExtracted.add("USOIL");
-    }
-    // 8. NASDAQ
-    if (textToScan.contains("NASDAQ") || textToScan.contains("NAS100") || textToScan.contains("USTECH") || 
-        textToScan.contains("TECH") || textToScan.contains("NVIDIA") || textToScan.contains(" SOX ")) {
-        rawExtracted.add("NASDAQ");
-    }
-    // 9. SP500
-    if (textToScan.contains("SP500") || textToScan.contains("S&P") || textToScan.contains("SPX") || 
-        textToScan.contains("WALL STREET") || textToScan.contains("US STOCKS") || textToScan.contains("MARKET CAP")) {
-        rawExtracted.add("SP500");
-    }
-    // 10. BITCOIN
-    if (textToScan.contains("BITCOIN") || textToScan.contains("BTC") || textToScan.contains("CRYPTO")) {
-        rawExtracted.add("BITCOIN");
-    }
-    // 11. US10Y
-    if (textToScan.contains("US10Y") || textToScan.contains("TREASURY") || textToScan.contains("YIELD") || 
-        textToScan.contains("10-YEAR") || textToScan.contains("BOND") || textToScan.contains("T-NOTE") || 
-        textToScan.contains("TREASURIES") || textToScan.contains("AUCTION") || textToScan.contains("POWELL") || 
-        textToScan.contains("FOMC") || textToScan.contains(" FED ")) {
-        rawExtracted.add("US10Y");
-    }
-
-    // Transfert sécurisé sans doublon
-    for (String asset : rawExtracted) {
-        if (asset != null && !detectedAssets.contains(asset)) {
-            detectedAssets.add(asset);
+        // ✅ AJOUT ARBITRAGE : 1. Gestion de crise et désescalade événementielle
+        GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
+        
+        if (geo.confidence >= 65) {
+            // Si vos mots-clés internes (que vous avez déjà) indiquent une désescalade ou un apaisement
+            if (combined.contains("ceasefire") || combined.contains("cessez-le-feu") || combined.contains("peace") || combined.contains("pourparlers")) { 
+                if (isWarRegimeActive) {
+                    isWarRegimeActive = false; // 🕊️ Désactivation immédiate et pivot vers mode normal
+                    logToMain("🕊️ [ARBITRAGE] Fin du Régime de Guerre détectée par assessGeopoliticalEvent.");
+                }
+                // Pas de 'return' ici : on laisse le flux continuer pour capter le rebond normal du marché
+            } 
+            else {
+                // 🚨 Escalade militaire confirmée : Activation ou maintien du Régime de Guerre
+                isWarRegimeActive = true;
+                
+                result.isConfirmed = true;
+                result.confidence  = geo.confidence;
+                result.reason      = "🚨 EXCEPTION ABSOLUE : RÉGIME DE GUERRE ACTIVÉ / RECONDUIT";
+                result.geoContext  = geo.contextLabel;
+        
+                for (String asset : geo.impactedAssets) {
+                    if (asset != null && !detectedAssets.contains(asset)) {
+                        detectedAssets.add(asset);
+                    }
+                }
+                result.assetsEnriched = !detectedAssets.isEmpty();
+                logToMain("🌍 Géo prioritaire [" + geo.contextLabel + "] — Verrouillage de la matrice.");
+                return result;
+            }
         }
-    }
-    
-} catch (Exception e) {
-    Log.e(TAG, "Erreur lors de l'extraction brute des actifs", e);
- }
-        // =========================================================================
-// ⚡ INTERCEPTION & DÉROGATION ABSOLUE : VERSION SOUVERAINE FINANCIALJUICE
-// =========================================================================
 
-// 1️⃣ Normalisation de sécurité contre les caprices de formatage des flux bruts
-String normalizedInput = upperCombined.replace(" :", ":").trim();
+        // ✅ AJOUT ARBITRAGE : 2. Filtrage du Calendrier Suprême / Banques si la guerre est en cours
+        if (isWarRegimeActive) {
+            String checkText = (upperCombined + " " + rawExtracted).toUpperCase(Locale.ROOT);
+            if (checkText.contains("DOVISH") || checkText.contains("HAWKISH") || 
+                checkText.contains("FED ") || checkText.contains("FOMC") || 
+                checkText.contains("BANQUE CENTRALE") || checkText.contains("CENTRAL BANK") ||
+                checkText.contains("CPI") || checkText.contains("PCE") || 
+                checkText.contains("PPI") || checkText.contains("INFLATION") ||
+                checkText.contains("RATE STATEMENT") || checkText.contains("INTEREST RATE")) {
+                
+                // Forçage de l'alignement USDJPY en VENTE CHOC (Force du Yen refuge) pour éviter la neutralité
+                if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
+                
+                result.isConfirmed = false; // Bloque l'envoi de la réévaluation à Groq
+                result.reason = "Régime de Guerre actif : Arbitrage prioritaire. Flux structurel (Banque/Inflation/Supreme) filtré.";
+                logToMain("🛡️ [ARBITRAGE] Flux Suprême (Inflation/Bancaire) intercepté sous Régime de Guerre.");
+                return result;
+            }
+        }
+
+        // ── ⚡ INTERCEPTION & DÉROGATION ABSOLUE : VERSION SOUVERAINE FINANCIALJUICE ──
+        String normalizedInput = upperCombined.replace(" :", ":").trim();
 
 // 2️⃣ Détection adaptative : Valide la présence d'ACTUAL et d'une métrique de comparaison
 if (normalizedInput.contains("ACTUAL:") && (normalizedInput.contains("FORECAST:") || normalizedInput.contains("PREVIOUS:"))) {
