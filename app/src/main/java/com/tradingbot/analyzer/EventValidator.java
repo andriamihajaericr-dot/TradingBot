@@ -124,14 +124,13 @@ public class EventValidator {
 
         // ✅ AJOUT ARBITRAGE : 2. Filtrage du Calendrier Suprême / Banques si la guerre est en cours
         if (isWarRegimeActive) {
-            String checkText = (upperCombined + " " + rawExtracted).toUpperCase(Locale.ROOT);
-            if (checkText.contains("DOVISH") || checkText.contains("HAWKISH") || 
-                checkText.contains("FED ") || checkText.contains("FOMC") || 
-                checkText.contains("BANQUE CENTRALE") || checkText.contains("CENTRAL BANK") ||
-                checkText.contains("CPI") || checkText.contains("PCE") || 
-                checkText.contains("PPI") || checkText.contains("INFLATION") ||
-                checkText.contains("RATE STATEMENT") || checkText.contains("INTEREST RATE")) {
-                
+    // upperCombined contient déjà tout le texte en majuscules, il suffit de le tester directement
+    if (upperCombined.contains("DOVISH") || upperCombined.contains("HAWKISH") || 
+        upperCombined.contains("FED ") || upperCombined.contains("FOMC") || 
+        upperCombined.contains("BANQUE CENTRALE") || upperCombined.contains("CENTRAL BANK") ||
+        upperCombined.contains("CPI") || upperCombined.contains("PCE") || 
+        upperCombined.contains("PPI") || upperCombined.contains("INFLATION") ||
+        upperCombined.contains("RATE STATEMENT") || upperCombined.contains("INTEREST RATE")) {
                 // Forçage de l'alignement USDJPY en VENTE CHOC (Force du Yen refuge) pour éviter la neutralité
                 if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
                 
