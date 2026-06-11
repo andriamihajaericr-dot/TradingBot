@@ -2255,6 +2255,36 @@ public class NotificationService extends NotificationListenerService {
                 }
             }
         }, fiveMinutesMillis, fiveMinutesMillis, TimeUnit.MILLISECONDS);
+
+        // ✅ Pre-Market Scanner — toutes les 15 min pendant la fenêtre pre-market
+        long fifteenMinMs = 15 * 60 * 1000L;
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                if (!MarketDataFetcher.PreMarketScanner.isPreMarketWindow()) return;
+                MarketDataFetcher.PreMarketScanner.scan((rapport, isChoc) -> {
+                    if (isChoc) {
+                        // Choc violent → Telegram immédiat + analyse Groq
+                        sendTelegramSecure(rapport, NotificationService.this);
+                        processAnalysisWithAI(
+                            "PreMarket-Scanner",
+                            "PRE-MARKET MOVEMENT DETECTED",
+                            rapport,
+                            Arrays.asList("SP500","NASDAQ","GOLD","BITCOIN",
+                                          "USOIL","EURUSD","USDJPY","GBPUSD",
+                                          "AUDUSD","USDCAD","US10Y"),
+                            generateSecureHash("premarket_" + System.currentTimeMillis()),
+                            SYSTEM_PROMPT,
+                            true  // isSupremeRank → bypass throttle
+                        );
+                    } else {
+                        // Alerte modérée → Telegram simple sans Groq
+                        sendTelegramSecure(rapport, NotificationService.this);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "[PRE-MARKET] Erreur scanner", e);
+            }
+        }, fifteenMinMs, fifteenMinMs, TimeUnit.MILLISECONDS);
     }
 
 
@@ -3888,17 +3918,16 @@ public class NotificationService extends NotificationListenerService {
     }
     @Override
     public void onDestroy() {
-        // ✅ 1. Interruption sécurisée des pools existants dans votre classe
         if (this.scheduler != null && !this.scheduler.isShutdown()) {
             try { this.scheduler.shutdownNow(); } catch (Exception ignored) {}
         }
         if (this.exec != null && !this.exec.isShutdown()) {
             try { this.exec.shutdownNow(); } catch (Exception ignored) {}
         }
+        // ✅ Arrêt propre du MarketDataFetcher executor
+        MarketDataFetcher.shutdownExecutor();
     
-        // ✅ 2. Libération du Singleton pour le Garbage Collector
-        serviceInstance = null; 
-        
+        serviceInstance = null;
         Log.d(TAG, "[SERVICE] Service arrêté proprement et exécuteurs libérés");
         super.onDestroy();
     }
