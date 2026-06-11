@@ -1619,6 +1619,7 @@ public class NotificationService extends NotificationListenerService {
         }
         });    
     }
+    }
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
