@@ -325,6 +325,7 @@ if (normalizedInput.contains("ACTUAL:") && (normalizedInput.contains("FORECAST:"
     
     
         // ── ÉTAPE 5 : Géopolitique ───────────────────────────────────────
+        /**
         GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
         if (geo.confidence >= 65) {
             result.isConfirmed = true;
@@ -356,7 +357,7 @@ if (normalizedInput.contains("ACTUAL:") && (normalizedInput.contains("FORECAST:"
             result.isConfirmed = true;
             String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
             logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
-        }
+        } */
     
         result.assetsEnriched = !detectedAssets.isEmpty();
         return result;
