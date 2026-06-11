@@ -1586,20 +1586,9 @@ public class NotificationService extends NotificationListenerService {
                     }
     
                     // ✅ Application du filtre conviction
-                    if (activeSignalsCount > 0) {
-                    int convictionPercent = extrairePourcentageConviction(aiReport);
-                    
-                    // ✅ Calcul dynamique du Poids géo/macro selon la conviction du rapport IA
-                    int geoWeight = (convictionPercent >= 80) ? 4 : (convictionPercent >= 60) ? 3 : 1;
-                    
-                    // ✅ Sauvegarde ou mise à jour du poids de l'événement en utilisant 'db'
-                    db.markEventAsSynced(fingerprint, "SYNCED_WEIGHT_" + geoWeight); 
-                    // Note : Si votre EventDatabase possède une méthode dédiée pour modifier uniquement le poids, 
-                    // vous pouvez utiliser : db.mettreAJourPoidsEvenement(fingerprint, geoWeight);
-                
-                    // ✅ Définition locale de isSupremeRank basée sur le rapport de l'IA
-                    boolean isSupremeRank = aiReport.contains("SUPREME_RANK") || convictionPercent >= 80;
-                
+                   // ─── REMETTEZ CECI À LA LIGNE 1589 ───
+                    long timestampSec = System.currentTimeMillis() / 1000;
+                    boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, timestampSec, "pending", 1);
                     if (convictionPercent >= 40 || isSupremeRank) {
                             String finalPayload = "⚡ *ANALYSE  MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
                             sendTelegramSecure(finalPayload, NotificationService.this);
