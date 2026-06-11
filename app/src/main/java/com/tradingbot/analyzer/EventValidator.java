@@ -62,10 +62,12 @@ public class EventValidator {
         public ValidationResult(boolean isConfirmed, int confidence, String reason) {
             this.isConfirmed = isConfirmed;
             this.confidence  = confidence;
-            this.reason      = reason;
-        }
+            this.reason      = reason;        }
     }
 
+    /**
+     * Méthode principale de validation et d'enrichissement de la matrice d'actifs
+     */
     /**
      * Méthode principale de validation et d'enrichissement de la matrice d'actifs
      */
@@ -75,6 +77,7 @@ public class EventValidator {
         if (title == null) title = "";
         if (content == null) content = "";
         if (detectedAssets == null) detectedAssets = new ArrayList<>();
+    
         // ✅ 0. Sécurité de Source (Anti-Bruit Fichiers / Chrome)
         String testUpper = (title + " " + content).toUpperCase(Locale.ROOT);
         if (testUpper.contains(".JAVA") || testUpper.contains("PUBLIC CLASS") || testUpper.contains("IMPORT ANDROID.") || title.endsWith(".db")) {
@@ -82,13 +85,14 @@ public class EventValidator {
             result.reason = "Bruit système : Code source ou fichier local détecté";
             return result;
         }
+
         String combined = (title + " " + content).toLowerCase(Locale.ROOT);
         String upperCombined = testUpper; // Réutilisation directe de la variable en majuscule
         
         // Nettoyage de la chaîne pour l'interception et le traitement des espacements de métriques
-        String rawExtracted = upperCombined.replace(" :", ":").trim();
+        String rawExtracted = upperCombined.replace(" :", ":").trim(); 
 
-        // ✅ AJOUT ARBITRAGE : 1. Gestion de crise et désescalade événementielle
+        // ✅ 1. Gestion de crise et désescalade événementielle (Premier filtre souverain)
         GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
         
         if (geo.confidence >= 65) {
@@ -119,7 +123,7 @@ public class EventValidator {
             }
         }
 
-        // ✅ AJOUT ARBITRAGE : 2. Filtrage du Calendrier Suprême / Banques si la guerre est en cours
+        // ✅ 2. Filtrage du Calendrier Suprême / Banques si la guerre est en cours
         if (isWarRegimeActive) {
             if (upperCombined.contains("DOVISH") || upperCombined.contains("HAWKISH") || 
                 upperCombined.contains("FED ") || upperCombined.contains("FOMC") || 
@@ -141,130 +145,125 @@ public class EventValidator {
         // ── ⚡ INTERCEPTION & DÉROGATION ABSOLUE : VERSION SOUVERAINE FINANCIALJUICE ──
         // Utilisation directe de la variable unifiée rawExtracted
         if (rawExtracted.contains("ACTUAL:") && (rawExtracted.contains("FORECAST:") || rawExtracted.contains("PREVIOUS:"))) {
-    // ── BLOC 1 : RANG SUPRÊME / MACRO US ──
-    // (Impact : GOLD, NASDAQ, USDJPY, US10Y, SP500, USOIL)
-    if (normalizedInput.contains("US ") || normalizedInput.contains("USA ") || normalizedInput.contains("UNITED STATES") || 
-        normalizedInput.contains("FOMC") || normalizedInput.contains("FED ") || normalizedInput.contains("POWELL") ||
-        normalizedInput.contains("NFP") || normalizedInput.contains("PAYROLL") || normalizedInput.contains("TREASURY")) {
-        
-        if (normalizedInput.contains("CPI") || normalizedInput.contains("PCE") || normalizedInput.contains("INFLATION") || 
-            normalizedInput.contains("PPI") || normalizedInput.contains("RATE DECISION") || normalizedInput.contains("INTEREST RATE") || 
-            normalizedInput.contains("TAUX") || normalizedInput.contains("PAYROLL") || normalizedInput.contains("NFP") || 
-            normalizedInput.contains("UNEMPLOYMENT") || normalizedInput.contains("CHÔMAGE") || normalizedInput.contains("JOBLESS") || 
-            normalizedInput.contains("CLAIMS") || normalizedInput.contains("GDP") || normalizedInput.contains("PIB") || 
-            normalizedInput.contains("ISM") || normalizedInput.contains("PMI") || normalizedInput.contains("ADP") || 
-            normalizedInput.contains("JOLTS") || normalizedInput.contains("RETAIL") || normalizedInput.contains("VENTES AU DÉTAIL") || 
-            normalizedInput.contains("MICHIGAN") || normalizedInput.contains("CONSUMER CONFIDENCE") || 
-            normalizedInput.contains("DURABLE GOODS") || normalizedInput.contains("INDUSTRIAL PRODUCTION") || 
-            normalizedInput.contains("HOUSING") || normalizedInput.contains("BEIGE BOOK") || normalizedInput.contains("MINUTES")) {
             
-            if (!detectedAssets.contains("GOLD")) detectedAssets.add("GOLD");
-            if (!detectedAssets.contains("NASDAQ")) detectedAssets.add("NASDAQ");
-            if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
-            if (!detectedAssets.contains("US10Y")) detectedAssets.add("US10Y");
-            if (!detectedAssets.contains("SP500")) detectedAssets.add("SP500");
-            if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL"); 
-        }
-    }
+            // ── BLOC 1 : RANG SUPRÊME / MACRO US ──
+            if (rawExtracted.contains("US ") || rawExtracted.contains("USA ") || rawExtracted.contains("UNITED STATES") || 
+                rawExtracted.contains("FOMC") || rawExtracted.contains("FED ") || rawExtracted.contains("POWELL") ||
+                rawExtracted.contains("NFP") || rawExtracted.contains("PAYROLL") || rawExtracted.contains("TREASURY")) {
+                
+                if (rawExtracted.contains("CPI") || rawExtracted.contains("PCE") || rawExtracted.contains("INFLATION") || 
+                    rawExtracted.contains("PPI") || rawExtracted.contains("RATE DECISION") || rawExtracted.contains("INTEREST RATE") || 
+                    rawExtracted.contains("TAUX") || rawExtracted.contains("PAYROLL") || rawExtracted.contains("NFP") || 
+                    rawExtracted.contains("UNEMPLOYMENT") || rawExtracted.contains("CHÔMAGE") || rawExtracted.contains("JOBLESS") || 
+                    rawExtracted.contains("CLAIMS") || rawExtracted.contains("GDP") || rawExtracted.contains("PIB") || 
+                    rawExtracted.contains("ISM") || rawExtracted.contains("PMI") || rawExtracted.contains("ADP") || 
+                    rawExtracted.contains("JOLTS") || rawExtracted.contains("RETAIL") || rawExtracted.contains("VENTES AU DÉTAIL") || 
+                    rawExtracted.contains("MICHIGAN") || rawExtracted.contains("CONSUMER CONFIDENCE") || 
+                    rawExtracted.contains("DURABLE GOODS") || rawExtracted.contains("INDUSTRIAL PRODUCTION") || 
+                    rawExtracted.contains("HOUSING") || rawExtracted.contains("BEIGE BOOK") || rawExtracted.contains("MINUTES")) {
+                    
+                    if (!detectedAssets.contains("GOLD")) detectedAssets.add("GOLD");
+                    if (!detectedAssets.contains("NASDAQ")) detectedAssets.add("NASDAQ");
+                    if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
+                    if (!detectedAssets.contains("US10Y")) detectedAssets.add("US10Y");
+                    if (!detectedAssets.contains("SP500")) detectedAssets.add("SP500");
+                    if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL"); 
+                }
+            }
 
-    // ── BLOC 2 : ZONE EURO 🇪🇺 ──
-    // (Impact : EURUSD)
-    if (normalizedInput.contains("EUROZONE") || normalizedInput.contains("GERMANY") || normalizedInput.contains("FRANCE") || 
-        normalizedInput.contains("ITALY") || normalizedInput.contains("ECB") || normalizedInput.contains("BCE") || normalizedInput.contains("LAGARDE")) {
-        
-        if (normalizedInput.contains("CPI") || normalizedInput.contains("HICP") || normalizedInput.contains("INFLATION") || 
-            normalizedInput.contains("PMI") || normalizedInput.contains("ZEW") || normalizedInput.contains("IFO") || 
-            normalizedInput.contains("GDP") || normalizedInput.contains("PIB") || normalizedInput.contains("RATE") || 
-            normalizedInput.contains("TAUX") || normalizedInput.contains("SPREAD") || normalizedInput.contains("BTP") || normalizedInput.contains("OAT")) {
-            if (!detectedAssets.contains("EURUSD")) detectedAssets.add("EURUSD");
-        }
-    }
-    
-    // ── BLOC 3 : ROYAUME-UNI 🇬🇧 ──
-    // (Impact : GBPUSD)
-    if (normalizedInput.contains("UK ") || normalizedInput.contains("UNITED KINGDOM") || normalizedInput.contains("BRITAIN") || 
-        normalizedInput.contains("BOE") || normalizedInput.contains("BAILEY") || normalizedInput.contains("MPC")) {
-        
-        if (normalizedInput.contains("CPI") || normalizedInput.contains("INFLATION") || normalizedInput.contains("GDP") || 
-            normalizedInput.contains("PIB") || normalizedInput.contains("PMI") || normalizedInput.contains("EARNINGS") || 
-            normalizedInput.contains("WAGES") || normalizedInput.contains("SALAIRES") || normalizedInput.contains("UNEMPLOYMENT") || 
-            normalizedInput.contains("CLAIMANT") || normalizedInput.contains("RATE") || normalizedInput.contains("BUDGET")) {
-            if (!detectedAssets.contains("GBPUSD")) detectedAssets.add("GBPUSD");
-        }
-    }
-    
-    // ── BLOC 4 : CANADA 🇨🇦 ──
-    // (Impact : USDCAD, USOIL)
-    if (normalizedInput.contains("CANADA") || normalizedInput.contains("CANADIAN") || normalizedInput.contains("BOC") || normalizedInput.contains("MACKLEM")) {
-        if (normalizedInput.contains("CPI") || normalizedInput.contains("INFLATION") || normalizedInput.contains("GDP") || 
-            normalizedInput.contains("RATE") || normalizedInput.contains("TAUX") || normalizedInput.contains("EMPLOYMENT") || normalizedInput.contains("UNEMPLOYMENT")) {
-            if (!detectedAssets.contains("USDCAD")) detectedAssets.add("USDCAD");
-            if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL");
-        }
-    }
-    
-    // ── BLOC 5 : AUSTRALIE & CHINE 🇦🇺 🇨🇳 ──
-    // (Impact : AUDUSD)
-    if (normalizedInput.contains("AUSTRALIA") || normalizedInput.contains("AUSTRALIAN") || normalizedInput.contains("RBA") || 
-        normalizedInput.contains("BULLOCK") || normalizedInput.contains("CHINA") || normalizedInput.contains("CHINESE") || 
-        normalizedInput.contains("PBOC") || normalizedInput.contains("CNY") || normalizedInput.contains("YUAN")) {
-        
-        if (normalizedInput.contains("CPI") || normalizedInput.contains("INFLATION") || normalizedInput.contains("GDP") || 
-            normalizedInput.contains("PMI") || normalizedInput.contains("RATE") || normalizedInput.contains("TAUX") || 
-            normalizedInput.contains("CAIXIN") || normalizedInput.contains("TRADE BALANCE") || normalizedInput.contains("BALANCE COMMERCIALE") || 
-            normalizedInput.contains("TARIFF") || normalizedInput.contains("TRADE WAR") || normalizedInput.contains("STIMULUS")) {
-            if (!detectedAssets.contains("AUDUSD")) detectedAssets.add("AUDUSD");
-        }
-    }
-    
-    // ── BLOC 6 : JAPON 🇯🇵 ──
-    // (Impact : USDJPY)
-    if (normalizedInput.contains("JAPAN") || normalizedInput.contains("JAPANESE") || normalizedInput.contains("TOKYO") || 
-        normalizedInput.contains("BOJ") || normalizedInput.contains("UEDA") || normalizedInput.contains("MOF")) {
-        
-        if (normalizedInput.contains("CPI") || normalizedInput.contains("INFLATION") || normalizedInput.contains("RATE") || 
-            normalizedInput.contains("TAUX") || normalizedInput.contains("YCC") || normalizedInput.contains("YIELD CURVE") || 
-            normalizedInput.contains("TANKAN") || normalizedInput.contains("INTERVENTION") || normalizedInput.contains("YEN")) {
-            if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
-        }
-    }
-    
-    // ── BLOC 7 : SÉCURITÉ MATIÈRES PREMIÈRES & CRYPTO (Indépendant du pays) ──
-    if (normalizedInput.contains("EIA") || normalizedInput.contains("API") || normalizedInput.contains("OPEC") || 
-        normalizedInput.contains("CRUDE") || normalizedInput.contains("OIL INVENTORIES") || normalizedInput.contains("NATURAL GAS") || 
-        normalizedInput.contains("PÉTROLE") || normalizedInput.contains("STOCKS")) {
-        if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL");
-    }
-    if (normalizedInput.contains("SEC ") || normalizedInput.contains("ETF") || normalizedInput.contains("BITCOIN") || 
-        normalizedInput.contains("CRYPTO") || normalizedInput.contains("BINANCE")) {
-        if (!detectedAssets.contains("BITCOIN")) detectedAssets.add("BITCOIN");
-    }
+            // ── BLOC 2 : ZONE EURO 🇪🇺 ──
+            if (rawExtracted.contains("EUROZONE") || rawExtracted.contains("GERMANY") || rawExtracted.contains("FRANCE") || 
+                rawExtracted.contains("ITALY") || rawExtracted.contains("ECB") || rawExtracted.contains("BCE") || rawExtracted.contains("LAGARDE")) {
+                
+                if (rawExtracted.contains("CPI") || rawExtracted.contains("HICP") || rawExtracted.contains("INFLATION") || 
+                    rawExtracted.contains("PMI") || rawExtracted.contains("ZEW") || rawExtracted.contains("IFO") || 
+                    rawExtracted.contains("GDP") || rawExtracted.contains("PIB") || rawExtracted.contains("RATE") || 
+                    rawExtracted.contains("TAUX") || rawExtracted.contains("SPREAD") || rawExtracted.contains("BTP") || rawExtracted.contains("OAT")) {
+                    if (!detectedAssets.contains("EURUSD")) detectedAssets.add("EURUSD");
+                }
+            }
+            
+            // ── BLOC 3 : ROYAUME-UNI 🇬🇧 ──
+            if (rawExtracted.contains("UK ") || rawExtracted.contains("UNITED KINGDOM") || rawExtracted.contains("BRITAIN") || 
+                rawExtracted.contains("BOE") || rawExtracted.contains("BAILEY") || rawExtracted.contains("MPC")) {
+                
+                if (rawExtracted.contains("CPI") || rawExtracted.contains("INFLATION") || rawExtracted.contains("GDP") || 
+                    rawExtracted.contains("PIB") || rawExtracted.contains("PMI") || rawExtracted.contains("EARNINGS") || 
+                    rawExtracted.contains("WAGES") || rawExtracted.contains("SALAIRES") || rawExtracted.contains("UNEMPLOYMENT") || 
+                    rawExtracted.contains("CLAIMANT") || rawExtracted.contains("RATE") || rawExtracted.contains("BUDGET")) {
+                    if (!detectedAssets.contains("GBPUSD")) detectedAssets.add("GBPUSD");
+                }
+            }
+            
+            // ── BLOC 4 : CANADA 🇨🇦 ──
+            if (rawExtracted.contains("CANADA") || rawExtracted.contains("CANADIAN") || rawExtracted.contains("BOC") || rawExtracted.contains("MACKLEM")) {
+                if (rawExtracted.contains("CPI") || rawExtracted.contains("INFLATION") || rawExtracted.contains("GDP") || 
+                    rawExtracted.contains("RATE") || rawExtracted.contains("TAUX") || rawExtracted.contains("EMPLOYMENT") || rawExtracted.contains("UNEMPLOYMENT")) {
+                    if (!detectedAssets.contains("USDCAD")) detectedAssets.add("USDCAD");
+                    if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL");
+                }
+            }
+            
+            // ── BLOC 5 : AUSTRALIE & CHINE 🇦🇺 🇨🇳 ──
+            if (rawExtracted.contains("AUSTRALIA") || rawExtracted.contains("AUSTRALIAN") || rawExtracted.contains("RBA") || 
+                rawExtracted.contains("BULLOCK") || rawExtracted.contains("CHINA") || rawExtracted.contains("CHINESE") || 
+                rawExtracted.contains("PBOC") || rawExtracted.contains("CNY") || rawExtracted.contains("YUAN")) {
+                
+                if (rawExtracted.contains("CPI") || rawExtracted.contains("INFLATION") || rawExtracted.contains("GDP") || 
+                    rawExtracted.contains("PMI") || rawExtracted.contains("RATE") || rawExtracted.contains("TAUX") || 
+                    rawExtracted.contains("CAIXIN") || rawExtracted.contains("TRADE BALANCE") || rawExtracted.contains("BALANCE COMMERCIALE") || 
+                    rawExtracted.contains("TARIFF") || rawExtracted.contains("TRADE WAR") || rawExtracted.contains("STIMULUS")) {
+                    if (!detectedAssets.contains("AUDUSD")) detectedAssets.add("AUDUSD");
+                }
+            }
+            
+            // ── BLOC 6 : JAPON 🇯🇵 ──
+            if (rawExtracted.contains("JAPAN") || rawExtracted.contains("JAPANESE") || rawExtracted.contains("TOKYO") || 
+                rawExtracted.contains("BOJ") || rawExtracted.contains("UEDA") || rawExtracted.contains("MOF")) {
+                
+                if (rawExtracted.contains("CPI") || rawExtracted.contains("INFLATION") || rawExtracted.contains("RATE") || 
+                    rawExtracted.contains("TAUX") || rawExtracted.contains("YCC") || rawExtracted.contains("YIELD CURVE") || 
+                    rawExtracted.contains("TANKAN") || rawExtracted.contains("INTERVENTION") || rawExtracted.contains("YEN")) {
+                    if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
+                }
+            }
+            
+            // ── BLOC 7 : SÉCURITÉ MATIÈRES PREMIÈRES & CRYPTO ──
+            if (rawExtracted.contains("EIA") || rawExtracted.contains("API") || rawExtracted.contains("OPEC") || 
+                rawExtracted.contains("CRUDE") || rawExtracted.contains("OIL INVENTORIES") || rawExtracted.contains("NATURAL GAS") || 
+                rawExtracted.contains("PÉTROLE") || rawExtracted.contains("STOCKS")) {
+                if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL");
+            }
+            if (rawExtracted.contains("SEC ") || rawExtracted.contains("ETF") || rawExtracted.contains("BITCOIN") || 
+                rawExtracted.contains("CRYPTO") || rawExtracted.contains("BINANCE")) {
+                if (!detectedAssets.contains("BITCOIN")) detectedAssets.add("BITCOIN");
+            }
 
-    // ── BLOC 8 : SÉCURITÉ RENDEMENTS & EARNINGS CORPORATE ──
-    if (normalizedInput.contains("REAL YIELDS") || normalizedInput.contains("REAL RATES") || 
-        normalizedInput.contains("GOLD RESERVES") || normalizedInput.contains("TIPS")) {
-        if (!detectedAssets.contains("GOLD")) detectedAssets.add("GOLD");
-        if (!detectedAssets.contains("US10Y")) detectedAssets.add("US10Y");
-    }
-    if (normalizedInput.contains("EARNINGS") || normalizedInput.contains("PROFIT WARNING") || normalizedInput.contains("GUIDANCE") || 
-        normalizedInput.contains("EPS ") || normalizedInput.contains("REVENUE") || normalizedInput.contains("NVDA") || 
-        normalizedInput.contains("AAPL") || normalizedInput.contains("MSFT") || normalizedInput.contains("AMZN")) {
-        if (!detectedAssets.contains("NASDAQ")) detectedAssets.add("NASDAQ");
-        if (!detectedAssets.contains("SP500")) detectedAssets.add("SP500");
-    }
+            // ── BLOC 8 : SÉCURITÉ RENDEMENTS & EARNINGS CORPORATE ──
+            if (rawExtracted.contains("REAL YIELDS") || rawExtracted.contains("REAL RATES") || 
+                rawExtracted.contains("GOLD RESERVES") || rawExtracted.contains("TIPS")) {
+                if (!detectedAssets.contains("GOLD")) detectedAssets.add("GOLD");
+                if (!detectedAssets.contains("US10Y")) detectedAssets.add("US10Y");
+            }
+            if (rawExtracted.contains("EARNINGS") || rawExtracted.contains("PROFIT WARNING") || rawExtracted.contains("GUIDANCE") || 
+                rawExtracted.contains("EPS ") || rawExtracted.contains("REVENUE") || rawExtracted.contains("NVDA") || 
+                rawExtracted.contains("AAPL") || rawExtracted.contains("MSFT") || rawExtracted.contains("AMZN")) {
+                if (!detectedAssets.contains("NASDAQ")) detectedAssets.add("NASDAQ");
+                if (!detectedAssets.contains("SP500")) detectedAssets.add("SP500");
+            }
 
-    // Validation et sortie souveraine de la dérogation
-    if (!detectedAssets.isEmpty()) {
-        result.confidence = 100;
-        result.isConfirmed = true;
-        result.reason = "Interception Complète Calendrier FinancialJuice (" + detectedAssets.toString() + ")";
-        result.assetsEnriched = true;
-        logToMain("🟢 [FJ PRODUCTION INTERCEPT] Intégrité 100% validée pour : " + detectedAssets);
-        return result;
-    }
-}
+            // Validation finale et retour de l'interception souveraine FinancialJuice
+            if (!detectedAssets.isEmpty()) {
+                result.confidence = 100;
+                result.isConfirmed = true;
+                result.reason = "Interception Complète Calendrier FinancialJuice (" + detectedAssets.toString() + ")";
+                result.assetsEnriched = true;
+                logToMain("🟢 [FJ PRODUCTION INTERCEPT] Intégrité 100% validée pour : " + detectedAssets);
+                return result;
+            }
+        }
 
-        // ── ÉTAPE 1 : Anti-Doublons (très haut dans le flux) ─────────────
+        // ── ÉTAPE 3 : Anti-Doublons (Positionné très haut) ─────────────
         if (isRecentDuplicate(title, content)) {
             result.confidence  = 0;
             result.isConfirmed = false;
@@ -274,10 +273,12 @@ public class EventValidator {
             return result;
         }
     
-        // ── INERTIE MACRO (éviter plusieurs analyses sur le même driver majeur) ─────
-        String detectedType = EconomicEventDetector.detectEvent(title, content).eventType;
+        // ── ÉTAPE 4 : Inertie Macro (Sécurisée contre les NPE) ─────
+        var economyDetector = EconomicEventDetector.detectEvent(title, content);
+        String detectedType = (economyDetector != null) ? economyDetector.eventType : "UNKNOWN";
+        
         EventDatabase db = (context != null) ? EventDatabase.getInstance(context) : null;
-        if (!detectedType.startsWith("GEO") && db != null) {
+        if (!detectedType.equals("UNKNOWN") && !detectedType.startsWith("GEO") && db != null) {
             try {
                 long currentSeconds = timestamp / 1000;
                 if (db.isDriverActiveRecently(detectedType, currentSeconds)) {
@@ -285,7 +286,6 @@ public class EventValidator {
                     result.isInertiaBlock = true;
                     result.reason = "Driver déjà actif récemment (Inertie Macro)";
                     result.assetsEnriched = !detectedAssets.isEmpty();
-                    // Récupérer le dernier événement de ce type pour le rappel
                     result.lastEventSummary = db.getLastEventByType(detectedType);
                     logToMain("⏳ Driver " + detectedType + " déjà actif — envoi d'un rappel");
                     return result;
@@ -295,7 +295,7 @@ public class EventValidator {
             }
         }
     
-        // ── ÉTAPE 2 : Filtre anti-rumeur absolu ───────────────────────────
+        // ── ÉTAPE 5 : Filtre anti-rumeur absolu ───────────────────────────
         if (containsRumorMarkers(combined)) {
             result.confidence  = 0;
             result.isConfirmed = false;
@@ -305,7 +305,7 @@ public class EventValidator {
             return result;
         }
     
-        // ── ÉTAPE 3 : Filtre éditorial ───────────────────────────────────
+        // ── ÉTAPE 6 : Filtre éditorial ───────────────────────────────────
         if (containsEditorialContent(combined)) {
             result.confidence  = 0;
             result.isConfirmed = false;
@@ -315,14 +315,12 @@ public class EventValidator {
             return result;
         }
     
-    
-        // ── ÉTAPE 5 : Géopolitique ───────────────────────────────────────
-        /**
-        GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
+        // ── ✅ ÉTAPE 7 : Sécurité Géopolitique Fallback (Décommenté et Unifié) ──
+        // On réutilise directement l'objet 'geo' calculé en Étape 1 pour éviter la double exécution
         if (geo.confidence >= 65) {
             result.isConfirmed = true;
             result.confidence  = geo.confidence;
-            result.reason      = "Événement géopolitique confirmé";
+            result.reason      = "Événement géopolitique confirmé (Fallback)";
             result.geoContext  = geo.contextLabel;
     
             for (String asset : geo.impactedAssets) {
@@ -336,7 +334,7 @@ public class EventValidator {
             return result;
         }
     
-        // ── ÉTAPE 6 : Breaking News générique ───────────────────────────
+        // ── ✅ ÉTAPE 8 : Breaking News générique Fallback (Décommenté) ──
         result.confidence = calculateBreakingNewsConfidence(title, content);
         result.reason      = "Breaking News (Flux Interbancaire)";
     
@@ -349,7 +347,7 @@ public class EventValidator {
             result.isConfirmed = true;
             String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
             logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
-        } */
+        }
     
         result.assetsEnriched = !detectedAssets.isEmpty();
         return result;
