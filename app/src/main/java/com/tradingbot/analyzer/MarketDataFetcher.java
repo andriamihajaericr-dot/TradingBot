@@ -13,6 +13,9 @@ import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class MarketDataFetcher {
     private static final String TAG = "MarketDataFetcher";
@@ -295,5 +298,30 @@ public class MarketDataFetcher {
             Log.e(TAG, "Interruption lors de l'arrêt de l'executor", e);
             Thread.currentThread().interrupt();
         }
+    }
+    /**
+     * Récupère les prix pour une liste d'actifs.
+     * Utilisée par le Pipeline de Décision dans NotificationService.
+     */
+    public static java.util.Map<String, Double> getPrices(java.util.List<String> symbols) {
+        java.util.Map<String, Double> prices = new java.util.HashMap<>();
+        
+        if (symbols == null || symbols.isEmpty()) return prices;
+
+        for (String symbol : symbols) {
+            // Utilise votre méthode de conversion existante pour être sûr d'avoir le bon format Twelve Data
+            String apiSymbol = getTwelveDataSymbol(symbol);
+            
+            // Appel à votre méthode fetchMarketData existante
+            MarketData data = fetchMarketData(apiSymbol);
+            
+            if (data != null) {
+                // On stocke le prix avec le nom original de l'actif (ex: "GOLD")
+                prices.put(symbol, data.price);
+            } else {
+                Log.w(TAG, "Impossible de récupérer le prix pour: " + symbol);
+            }
+        }
+        return prices;
     }
 }
