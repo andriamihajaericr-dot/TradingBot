@@ -167,12 +167,19 @@ public class EventValidator {
                     rawExtracted.contains("DURABLE GOODS") || rawExtracted.contains("INDUSTRIAL PRODUCTION") || 
                     rawExtracted.contains("HOUSING") || rawExtracted.contains("BEIGE BOOK") || rawExtracted.contains("MINUTES")) {
                     
-                    if (!detectedAssets.contains("GOLD")) detectedAssets.add("GOLD");
-                    if (!detectedAssets.contains("NASDAQ")) detectedAssets.add("NASDAQ");
-                    if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
-                    if (!detectedAssets.contains("US10Y")) detectedAssets.add("US10Y");
-                    if (!detectedAssets.contains("SP500")) detectedAssets.add("SP500");
-                    if (!detectedAssets.contains("USOIL")) detectedAssets.add("USOIL"); 
+                   // ✅ Tableau suprême incluant le Forex, les Indices, l'Or, le Pétrole ET Bitcoin
+                    String[] usAssets = {
+                        "GOLD", "NASDAQ", "SP500", "USOIL", "US10Y", // Actifs traditionnels
+                        "USDJPY", "EURUSD", "GBPUSD", "USDCAD", "AUDUSD", // Bloc Forex majeur
+                        "BITCOIN" // 🪙 Ajouté pour réagir instantanément aux chocs de liquidité US (CPI, NFP, FED)
+                    };
+                    
+                    for(String a : usAssets) {
+                        if (!detectedAssets.contains(a)) { 
+                            detectedAssets.add(a); 
+                            assetsEnrichedInThisBlock = true; 
+                        }
+                    }
                 }
             }
 
