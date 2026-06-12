@@ -552,8 +552,7 @@ public class EventValidator {
         
         // ✅ Blindage final : assure que la confiance reste strictement entre 0 et 100
         geo.confidence = Math.max(0, Math.min(100, score));
-        return geo;
-
+       
         // ── D. Entité précise ────────────────────────────────────────
         if (lowerText.matches(".*\\d+\\s*(drone|missile|rocket|soldier|ship|bomb).*") ||
             lowerText.matches(".*\\d+\\s*(km|miles|kilometers).*")                    ||
