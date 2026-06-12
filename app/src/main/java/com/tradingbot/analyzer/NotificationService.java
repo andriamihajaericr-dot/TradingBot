@@ -374,6 +374,41 @@ public class NotificationService extends NotificationListenerService {
         return 0;
     }
 
+    /**
+ * Intercepte le rapport de Groq et injecte les prix live de MarketDataFetcher
+ * sans altérer la structure attendue par le reste de l'application.
+ */
+   private static String injectLivePrices(String groqReport, List<String> assets) {
+    if (groqReport == null || groqReport.isEmpty()) return groqReport;
+
+    // 1. Récupération des prix via Twelve Data (Appel synchrone sécurisé car déjà dans le thread de tâche)
+    java.util.Map<String, Double> livePrices = MarketDataFetcher.getPrices(assets);
+    if (livePrices == null || livePrices.isEmpty()) return groqReport;
+
+    String enrichedReport = groqReport;
+
+    // 2. Remplacement chirurgical ligne par ligne
+    for (java.util.Map.Entry<String, Double> entry : livePrices.entrySet()) {
+        String assetName = entry.getKey();
+        Double price = entry.getValue();
+
+        if (price != null) {
+            // Formatage propre du prix selon sa valeur (ex: pips Forex vs indices)
+            String formattedPrice = (price > 1000) ? String.format(Locale.US, "%,.2f", price) : String.format(Locale.US, "%.5f", price);
+            String priceTag = " [Live: " + formattedPrice + "]";
+
+            // Regex qui cible le nom de l'actif suivi des espaces et des deux-points (ex: "• 🏆 GOLD    :")
+            // et injecte le prix juste après les deux-points tout en préservant le reste de la ligne.
+            String regex = "(•\\s*[^:\\n]*\\b" + Pattern.quote(assetName) + "\\b\\s*:)";
+            
+            // Remplacement direct dans le bloc de texte
+            enrichedReport = enrichedReport.replaceAll(regex, "$1" + priceTag);
+        }
+    }
+
+    return enrichedReport;
+    }
+
     private void processAnalysisWithAI(final String sourceName, final String title, final String body, final List<String> enrichedAssets, final String fingerprint, final String customSystemPrompt, final boolean isSupremeRank){
         // 1. Intégration de votre SYSTEM_PROMPT (Le moule et les contraintes strictes)
         final String systemPrompt = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
