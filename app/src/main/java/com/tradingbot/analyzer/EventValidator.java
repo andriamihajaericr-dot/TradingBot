@@ -77,94 +77,87 @@ public class EventValidator {
      * Méthode principale de validation et d'enrichissement de la matrice d'actifs
      */
     public static ValidationResult validate(Context context, String title, String content, long timestamp, List<String> detectedAssets) {
-        ValidationResult result = new ValidationResult();
-    
-        if (title == null) title = "";
-        if (content == null) content = "";
-        if (detectedAssets == null) detectedAssets = new ArrayList<>();
-    
-        // ✅ 0. Sécurité de Source (Anti-Bruit Fichiers / Chrome)
-        String testUpper = (title + " " + content).toUpperCase(Locale.ROOT);
-        if (testUpper.contains(".JAVA") || testUpper.contains("PUBLIC CLASS") || testUpper.contains("IMPORT ANDROID.") || title.endsWith(".db")) {
-            result.isConfirmed = false;
-            result.reason = "Bruit système : Code source ou fichier local détecté";
-            return result;
-        }
+    ValidationResult result = new ValidationResult();
 
-        String combined = (title + " " + content).toLowerCase(Locale.ROOT);
-        String upperCombined = testUpper; // Réutilisation directe de la variable en majuscule
-        
-        // Nettoyage de la chaîne pour l'interception et le traitement des espacements de métriques
-        String rawExtracted = upperCombined.replace(" :", ":").trim(); 
+    if (title == null) title = "";
+    if (content == null) content = "";
+    if (detectedAssets == null) detectedAssets = new ArrayList<>();
 
-        // ✅ 1. Gestion de crise et désescalade événementielle (Premier filtre souverain)
-        GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
-        
-        if (geo.confidence >= 65) {
-            if (combined.contains("ceasefire") || combined.contains("cessez-le-feu") || combined.contains("peace") || combined.contains("pourparlers")) { 
-                if (isWarRegimeActive) {
-                    isWarRegimeActive = false; // 🕊️ Désactivation immédiate et pivot vers mode normal
-                    logToMain("🕊️ [ARBITRAGE] Fin du Régime de Guerre détectée par assessGeopoliticalEvent.");
-                }
-                // Pas de return : on laisse couler pour capter le rebond macro économique lié à la paix
-            } 
-            else {
-                // 🚨 Escalade militaire confirmée : Activation ou maintien du Régime de Guerre
-                isWarRegimeActive = true;
-                
-                result.isConfirmed = true;
-                result.confidence  = geo.confidence;
-                result.reason      = "🚨 EXCEPTION ABSOLUE : RÉGIME DE GUERRE ACTIVÉ / RECONDUIT";
-                result.geoContext  = geo.contextLabel;
-        
+    // ✅ 0. Sécurité de Source (Anti-Bruit Fichiers / Chrome)
+    String testUpper = (title + " " + content).toUpperCase(Locale.ROOT);
+    if (testUpper.contains(".JAVA") || testUpper.contains("PUBLIC CLASS") || testUpper.contains("IMPORT ANDROID.") || title.endsWith(".db")) {
+        result.isConfirmed = false;
+        result.reason = "Bruit système : Code source ou fichier local détecté";
+        return result;
+    }
+
+    String combined = (title + " " + content).toLowerCase(Locale.ROOT);
+    String upperCombined = testUpper; 
+    String rawExtracted = upperCombined.replace(" :", ":").trim(); 
+
+    // ✅ 1. Gestion de crise et désescalade événementielle
+    GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
+    
+    if (geo.confidence >= 65) {
+        if (combined.contains("ceasefire") || combined.contains("cessez-le-feu") || combined.contains("peace") || combined.contains("pourparlers")) { 
+            if (isWarRegimeActive) {
+                isWarRegimeActive = false; // 🕊️ Désactivation immédiate
+                logToMain("🕊️ [ARBITRAGE] Fin du Régime de Guerre détectée par assessGeopoliticalEvent.");
+            }
+            // Pas de return : on laisse couler pour capter le rebond macro économique
+        } 
+        else {
+            isWarRegimeActive = true;
+            result.isConfirmed = true;
+            result.confidence  = geo.confidence;
+            result.reason      = "🚨 EXCEPTION ABSOLUE : RÉGIME DE GUERRE ACTIVÉ / RECONDUIT";
+            result.geoContext  = geo.contextLabel;
+    
+            // 🛡️ Correction NPE : Vérification de non-nullité de la liste
+            if (geo.impactedAssets != null) {
                 for (String asset : geo.impactedAssets) {
                     if (asset != null && !detectedAssets.contains(asset)) {
                         detectedAssets.add(asset);
                     }
                 }
-                result.assetsEnriched = !detectedAssets.isEmpty();
-                logToMain("🌍 Géo prioritaire [" + geo.contextLabel + "] — Verrouillage de la matrice.");
-                return result;
             }
+            result.assetsEnriched = !detectedAssets.isEmpty();
+            logToMain("🌍 Géo prioritaire [" + geo.contextLabel + "] — Verrouillage de la matrice.");
+            return result;
         }
+    }
 
-        // ✅ 2. Filtrage du Calendrier Suprême / Banques si la guerre est en cours
-        if (isWarRegimeActive) {
-            if (upperCombined.contains("DOVISH") || upperCombined.contains("HAWKISH") || 
-                upperCombined.contains("FED") || upperCombined.contains("FOMC") || 
-                upperCombined.contains("BANQUE CENTRALE") || upperCombined.contains("CENTRAL BANK") ||
-                upperCombined.contains("CPI") || upperCombined.contains("PCE") || 
-                upperCombined.contains("PPI") || upperCombined.contains("INFLATION") ||
-                upperCombined.contains("RATE STATEMENT") || upperCombined.contains("INTEREST RATE")) {
-                
-                // Forçage de l'alignement USDJPY (Yen refuge en régime de guerre)
-                if (!detectedAssets.contains("USDJPY")) {
-                    detectedAssets.add("USDJPY");
-                }
-                
-                // 🟢 Au lieu d'écraser 'result.reason' qui sera détruit plus bas,
-                // on utilise un log persistant et on prépare une note de contexte
-                result.geoContext = "[⚠️ ARBITRAGE MACRO EN GUERRE]"; 
-                
-                logToMain("⚠️ [ARBITRAGE] Flux macro (Inflation/Bancaire) autorisé à circuler malgré le Régime de Guerre.");
-                // On ne return pas, la validation normale (FinancialJuice / Fallback) prend le relais
-            }
-        }
-
-        // ── ⚡ INTERCEPTION & DÉROGATION ABSOLUE : VERSION SOUVERAINE FINANCIALJUICE ──
-        // Utilisation directe de la variable unifiée rawExtracted
-        if (rawExtracted.contains("ACTUAL:") && (rawExtracted.contains("FORECAST:") || rawExtracted.contains("PREVIOUS:"))) {
+    // ✅ 2. Filtrage du Calendrier Suprême / Banques si la guerre est en cours
+    if (isWarRegimeActive) {
+        if (upperCombined.contains("DOVISH") || upperCombined.contains("HAWKISH") || 
+            upperCombined.contains("FED") || upperCombined.contains("FOMC") || 
+            upperCombined.contains("BANQUE CENTRALE") || upperCombined.contains("CENTRAL BANK") ||
+            upperCombined.contains("CPI") || upperCombined.contains("PCE") || 
+            upperCombined.contains("PPI") || upperCombined.contains("INFLATION") ||
+            upperCombined.contains("RATE STATEMENT") || upperCombined.contains("INTEREST RATE")) {
             
-            // ── BLOC 1 : RANG SUPRÊME / MACRO US ──
-           String lowerForCurrency = rawExtracted.toLowerCase(Locale.ROOT);
-           if (rawExtracted.contains("US ") || rawExtracted.contains("USA ") || rawExtracted.contains("UNITED STATES") || 
-                rawExtracted.contains("FOMC") || rawExtracted.contains("FED ") || rawExtracted.contains("POWELL") ||
-                rawExtracted.contains("NFP") || rawExtracted.contains("PAYROLL") || rawExtracted.contains("TREASURY") ||
-                rawExtracted.contains("USD") || rawExtracted.contains("DOLLAR")) { // 🌟 Filet de sécurité ajouté ici (en MAJUSCULES)
-                
-                // On vérifie ensuite STRICTEMENT s'il s'agit d'une métrique à fort impact
-                if (rawExtracted.contains("CPI") || rawExtracted.contains("PCE") || rawExtracted.contains("INFLATION") || 
-                    rawExtracted.contains("PPI") || rawExtracted.contains("RATE DECISION") || rawExtracted.contains("INTEREST RATE") || 
+            if (!detectedAssets.contains("USDJPY")) {
+                detectedAssets.add("USDJPY");
+            }
+            result.geoContext = "[⚠️ ARBITRAGE MACRO EN GUERRE]"; 
+            logToMain("⚠️ [ARBITRAGE] Flux macro (Inflation/Bancaire) autorisé à circuler malgré le Régime de Guerre.");
+        }
+    }
+
+    // ── ⚡ INTERCEPTION & DÉROGATION ABSOLUE : VERSION SOUVERAINE FINANCIALJUICE ──
+    if (rawExtracted.contains("ACTUAL:") && (rawExtracted.contains("FORECAST:") || rawExtracted.contains("PREVIOUS:"))) {
+        
+        // 🌟 Indicateur local pour éviter la contamination par des actifs pré-détectés en amont
+        boolean assetsEnrichedInThisBlock = false;
+
+        // ── BLOC 1 : RANG SUPRÊME / MACRO US ──
+        if (rawExtracted.contains("US ") || rawExtracted.contains("USA ") || rawExtracted.contains("UNITED STATES") || 
+            rawExtracted.contains("FOMC") || rawExtracted.contains("FED ") || rawExtracted.contains("POWELL") ||
+            rawExtracted.contains("NFP") || rawExtracted.contains("PAYROLL") || rawExtracted.contains("TREASURY") ||
+            rawExtracted.contains("USD") || rawExtracted.contains("DOLLAR")) { // Amélioration validée au tour précédent
+            
+                    if (rawExtracted.contains("CPI") || rawExtracted.contains("PCE") || rawExtracted.contains("INFLATION") || 
+                    rawExtracted.contains("PPI") || rawExtracted.contains("RATE DECISION") || rawExtracted.contains("INTEREST RATE") ||
                     rawExtracted.contains("TAUX") || rawExtracted.contains("PAYROLL") || rawExtracted.contains("NFP") || 
                     rawExtracted.contains("UNEMPLOYMENT") || rawExtracted.contains("CHÔMAGE") || rawExtracted.contains("JOBLESS") || 
                     rawExtracted.contains("CLAIMS") || rawExtracted.contains("GDP") || rawExtracted.contains("PIB") || 
@@ -328,42 +321,129 @@ public class EventValidator {
         }
     
         // ── ✅ ÉTAPE 7 : Sécurité Géopolitique Fallback (Décommenté et Unifié) ──
-        // On réutilise directement l'objet 'geo' calculé en Étape 1 pour éviter la double exécution
-        if (geo.confidence >= 65) {
+        // ── BLOC 7 : SÉCURITÉ MATIÈRES PREMIÈRES & CRYPTO ──
+        if (rawExtracted.contains("EIA") || rawExtracted.contains("API") || rawExtracted.contains("OPEC") || 
+            rawExtracted.contains("CRUDE") || rawExtracted.contains("OIL INVENTORIES") || rawExtracted.contains("PÉTROLE") || rawExtracted.contains("STOCKS")) {
+            if (!detectedAssets.contains("USOIL")) { detectedAssets.add("USOIL"); assetsEnrichedInThisBlock = true; }
+        }
+        if (rawExtracted.contains("SEC ") || rawExtracted.contains("ETF") || rawExtracted.contains("BITCOIN") || rawExtracted.contains("CRYPTO")) {
+            if (!detectedAssets.contains("BITCOIN")) { detectedAssets.add("BITCOIN"); assetsEnrichedInThisBlock = true; }
+        }
+
+        // ── BLOC 8 : SÉCURITÉ RENDEMENTS & EARNINGS ──
+        if (rawExtracted.contains("REAL YIELDS") || rawExtracted.contains("REAL RATES") || rawExtracted.contains("GOLD RESERVES")) {
+            if (!detectedAssets.contains("GOLD")) { detectedAssets.add("GOLD"); assetsEnrichedInThisBlock = true; }
+            if (!detectedAssets.contains("US10Y")) { detectedAssets.add("US10Y"); assetsEnrichedInThisBlock = true; }
+        }
+        if (rawExtracted.contains("EARNINGS") || rawExtracted.contains("PROFIT WARNING") || rawExtracted.contains("NVDA") || rawExtracted.contains("AAPL")) {
+            if (!detectedAssets.contains("NASDAQ")) { detectedAssets.add("NASDAQ"); assetsEnrichedInThisBlock = true; }
+            if (!detectedAssets.contains("SP500")) { detectedAssets.add("SP500"); assetsEnrichedInThisBlock = true; }
+        }
+
+        // ✅ Validation finale corrigée : On ne valide à 100% que si CE bloc a intercepté un actif maître
+        if (assetsEnrichedInThisBlock) {
+            result.confidence = 100;
             result.isConfirmed = true;
-            result.confidence  = geo.confidence;
-            result.reason      = "Événement géopolitique confirmé (Fallback)";
-            result.geoContext  = geo.contextLabel;
+            result.reason = "Interception Complète Calendrier FinancialJuice (" + detectedAssets.toString() + ")";
+            result.assetsEnriched = true;
+            logToMain("🟢 [FJ PRODUCTION INTERCEPT] Intégrité 100% validée pour : " + detectedAssets);
+            return result;
+        }
+    }
+
+    // ── ÉTAPE 3 : Anti-Doublons ─────────────
+    if (isRecentDuplicate(title, content)) {
+        result.confidence  = 0;
+        result.isConfirmed = false;
+        result.reason      = "Doublon récent détecté (30min)";
+        result.assetsEnriched = !detectedAssets.isEmpty();
+        logToMain("🔄 Doublon identifié (Enrichissement préservé)");
+        return result;
+    }
+
+    // ── ÉTAPE 4 : Inertie Macro (Sécurisée contre l'unité des Timestamps) ─────
+    var economyDetector = EconomicEventDetector.detectEvent(title, content);
+    String detectedType = (economyDetector != null) ? economyDetector.eventType : "UNKNOWN";
     
+    EventDatabase db = (context != null) ? EventDatabase.getInstance(context) : null;
+    if (!detectedType.equals("UNKNOWN") && !detectedType.startsWith("GEO") && db != null) {
+        try {
+            // 🛡️ Correction : Alignement adaptatif ms / secondes
+            long currentSeconds = (timestamp > 9999999999L) ? (timestamp / 1000L) : timestamp;
+            if (db.isDriverActiveRecently(detectedType, currentSeconds)) {
+                result.isConfirmed = false;
+                result.isInertiaBlock = true;
+                result.reason = "Driver déjà actif récemment (Inertie Macro)";
+                result.assetsEnriched = !detectedAssets.isEmpty();
+                result.lastEventSummary = db.getLastEventByType(detectedType);
+                logToMain("⏳ Driver " + detectedType + " déjà actif — envoi d'un rappel");
+                return result;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur inertie macro", e);
+        }
+    }
+
+    // ── ÉTAPE 5 : Filtre anti-rumeur absolu ───────────────────────────
+    if (containsRumorMarkers(combined)) {
+        result.confidence  = 0;
+        result.isConfirmed = false;
+        result.reason      = "Rejeté — Marqueur de rumeur ou non-confirmé détecté";
+        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
+        logToMain("❌ Rumeur/Non-confirmé rejeté – " + shortTitle + "…");
+        return result;
+    }
+
+    // ── ÉTAPE 6 : Filtre éditorial ───────────────────────────────────
+    if (containsEditorialContent(combined)) {
+        result.confidence  = 0;
+        result.isConfirmed = false;
+        result.reason      = "Bruit macroéconomique (Opinion/Éditorial pur)";
+        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
+        logToMain("❌ Rejeté – Contenu éditorial – " + shortTitle + "…");
+        return result;
+    }
+
+    // ── ✅ ÉTAPE 7 : Sécurité Géopolitique Fallback ──
+    if (geo.confidence >= 65) {
+        result.isConfirmed = true;
+        result.confidence  = geo.confidence;
+        result.reason      = "Événement géopolitique confirmé (Fallback)";
+        result.geoContext  = geo.contextLabel;
+
+        // 🛡️ Correction NPE : Idem étape 1
+        if (geo.impactedAssets != null) {
             for (String asset : geo.impactedAssets) {
                 if (asset != null && !detectedAssets.contains(asset)) {
                     detectedAssets.add(asset);
                 }
             }
-            result.assetsEnriched = !detectedAssets.isEmpty();
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
-            logToMain("🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
-            return result;
         }
-    
-        // ── ✅ ÉTAPE 8 : Breaking News générique Fallback (Décommenté) ──
-        result.confidence = calculateBreakingNewsConfidence(title, content);
-        result.reason      = "Breaking News (Flux Interbancaire)";
-    
-        if (result.confidence < 70) {   
-            result.confidence  = 0;
-            result.isConfirmed = false;
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
-            logToMain("❌ Rejeté – " + shortTitle + "… (confiance " + result.confidence + "%)");
-        } else {
-            result.isConfirmed = true;
-            String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
-            logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
-        }
-    
         result.assetsEnriched = !detectedAssets.isEmpty();
+        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
+        logToMain("🌍 Géo confirmé [" + geo.contextLabel + "] " + geo.confidence + "% – " + shortTitle + "…");
         return result;
     }
+
+    // ── ✅ ÉTAPE 8 : Breaking News générique Fallback ──
+    int calculatedConfidence = calculateBreakingNewsConfidence(title, content); // 🌟 Correction Log : sauvegarde de la valeur brute
+    result.reason = "Breaking News (Flux Interbancaire)";
+
+    if (calculatedConfidence < 70) {   
+        result.confidence  = 0;
+        result.isConfirmed = false;
+        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(40, title.length())) : "?";
+        logToMain("❌ Rejeté – " + shortTitle + "… (confiance initiale " + calculatedConfidence + "%)"); // Log précis !
+    } else {
+        result.confidence  = calculatedConfidence;
+        result.isConfirmed = true;
+        String shortTitle = !title.isEmpty() ? title.substring(0, Math.min(50, title.length())) : "?";
+        logToMain("⚡ Breaking News retenu – " + shortTitle + "… (confiance " + result.confidence + "%)");
+    }
+
+    result.assetsEnriched = !detectedAssets.isEmpty();
+    return result;
+}
 
     private static boolean containsRumorMarkers(String text) {
         if (text == null) return false;
