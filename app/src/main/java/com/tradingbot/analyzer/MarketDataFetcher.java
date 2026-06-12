@@ -324,4 +324,79 @@ public class MarketDataFetcher {
         }
         return prices;
     }
+
+    /**
+ * Récupère les cotations de manière groupée (Batch) en une seule requête HTTP.
+ * Solution optimale contre le Rate Limiting et pour la synchronisation des prix.
+ */
+ public static java.util.Map<String, MarketData> getMarketDataBatch(java.util.List<String> symbols) {
+    java.util.Map<String, MarketData> targetMap = new java.util.HashMap<>();
+    if (symbols == null || symbols.isEmpty()) return targetMap;
+
+    // 1. Convertir et associer vos symboles internes aux symboles stricts de l'API
+    java.util.Map<String, String> internalToApiMapping = new java.util.HashMap<>();
+    java.util.List<String> apiSymbolsList = new java.util.ArrayList<>();
+    
+    for (String symbol : symbols) {
+        String apiSymbol = getTwelveDataSymbol(symbol);
+        internalToApiMapping.put(apiSymbol, symbol); // Permet de faire le chemin inverse après réception
+        apiSymbolsList.add(apiSymbol);
+    }
+
+    // 2. Joindre les symboles par des virgules pour l'URL Twelve Data
+    String joinedSymbols = android.text.TextUtils.join(",", apiSymbolsList);
+    String urlString = "https://api.twelvedata.com/quote?symbol=" + joinedSymbols + "&apikey=" + TWELVE_DATA_KEY;
+
+    HttpURLConnection urlConnection = null;
+    try {
+        URL url = new URL(urlString);
+        urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        urlConnection.setConnectTimeout(3000);
+        urlConnection.setReadTimeout(3000);
+
+        int responseCode = urlConnection.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            BufferedReader r = new BufferedReader(new InputStreamReader(urlConnection.getInputStream(), java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = r.readLine()) != null) {
+                sb.append(line);
+            }
+            r.close();
+
+            // 3. Parsing de l'objet JSON groupé
+            org.json.JSONObject rootJson = new org.json.JSONObject(sb.toString());
+
+            for (String apiSymbol : apiSymbolsList) {
+                if (rootJson.has(apiSymbol)) {
+                    org.json.JSONObject assetJson = rootJson.getJSONObject(apiSymbol);
+                    
+                    // Sécurité : Vérifier que l'API ne renvoie pas une erreur interne pour cet actif
+                    if (!assetJson.has("status") || !"error".equals(assetJson.optString("status"))) {
+                        MarketData data = new MarketData();
+                        data.price = assetJson.optDouble("price", 0.0);
+                        data.changePercent = assetJson.optDouble("change_percent", 0.0);
+                        
+                        // Récupération du nom d'origine de l'actif (ex: "GOLD")
+                        String originalName = internalToApiMapping.get(apiSymbol);
+                        if (originalName != null) {
+                            targetMap.put(originalName, data);
+                        }
+                    }
+                }
+            }
+        } else {
+            Log.e(TAG, "Erreur serveur HTTP lors du fetch Batch: " + responseCode);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur critique dans getMarketDataBatch", e);
+    } finally {
+        if (urlConnection != null) {
+            urlConnection.disconnect();
+        }
+    }
+
+    return targetMap;
+  }
 }
