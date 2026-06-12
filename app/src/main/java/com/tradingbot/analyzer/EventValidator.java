@@ -156,10 +156,13 @@ public class EventValidator {
         if (rawExtracted.contains("ACTUAL:") && (rawExtracted.contains("FORECAST:") || rawExtracted.contains("PREVIOUS:"))) {
             
             // ── BLOC 1 : RANG SUPRÊME / MACRO US ──
-            if (rawExtracted.contains("US ") || rawExtracted.contains("USA ") || rawExtracted.contains("UNITED STATES") || 
+           String lowerForCurrency = rawExtracted.toLowerCase(Locale.ROOT);
+           if (rawExtracted.contains("US ") || rawExtracted.contains("USA ") || rawExtracted.contains("UNITED STATES") || 
                 rawExtracted.contains("FOMC") || rawExtracted.contains("FED ") || rawExtracted.contains("POWELL") ||
-                rawExtracted.contains("NFP") || rawExtracted.contains("PAYROLL") || rawExtracted.contains("TREASURY")) {
+                rawExtracted.contains("NFP") || rawExtracted.contains("PAYROLL") || rawExtracted.contains("TREASURY") ||
+                rawExtracted.contains("USD") || rawExtracted.contains("DOLLAR")) { // 🌟 Filet de sécurité ajouté ici (en MAJUSCULES)
                 
+                // On vérifie ensuite STRICTEMENT s'il s'agit d'une métrique à fort impact
                 if (rawExtracted.contains("CPI") || rawExtracted.contains("PCE") || rawExtracted.contains("INFLATION") || 
                     rawExtracted.contains("PPI") || rawExtracted.contains("RATE DECISION") || rawExtracted.contains("INTEREST RATE") || 
                     rawExtracted.contains("TAUX") || rawExtracted.contains("PAYROLL") || rawExtracted.contains("NFP") || 
