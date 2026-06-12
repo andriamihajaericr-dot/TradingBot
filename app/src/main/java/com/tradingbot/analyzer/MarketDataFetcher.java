@@ -193,10 +193,34 @@ public class MarketDataFetcher {
     // ══════════════════════════════════════════════════════════════
     // REQUÊTE UNIFIÉE TWELVE DATA AVEC GESTION D'ERREUR AMÉLIORÉE
     // ══════════════════════════════════════════════════════════════
-    // ✅ Public pour injection dans NotificationService
+    
+    /**
+     * Traduit dynamiquement un nom d'actif (ex: "GOLD", "WTI", "EURUSD") en symbole Twelve Data strict.
+     * Parcourt l'ASSET_MAP pour assurer une corrélation sans faille et une maintenance centralisée.
+     */
+    public static String getTwelveDataSymbol(String assetName) {
+        if (assetName == null) return null;
+        // Normalisation stricte de l'entrée (ex: "EUR/USD" ou "eurusd" -> "EURUSD")
+        String normalizedInput = assetName.toUpperCase(Locale.ROOT).trim().replace("/", "");
+        
+        for (Object[] asset : ASSET_MAP) {
+            String nomConfig = ((String) asset[0]).toUpperCase(Locale.ROOT).replace("/", "");
+            String symConfig = ((String) asset[1]).toUpperCase(Locale.ROOT).replace("/", "");
+            
+            // Si l'entrée correspond au nom générique ou au symbole configuré
+            if (nomConfig.equals(normalizedInput) || symConfig.equals(normalizedInput)) {
+                return (String) asset[1]; // Renvoie le symbole officiel (ex: "XAU/USD", "USD/JPY")
+            }
+        }
+        return assetName; // Protection fallback : si non trouvé, renvoie la chaîne d'origine
+    }
+
+    // ✅ Passerelle publique pour injection sécurisée dans NotificationService
     public static MarketData fetchMarketDataPublic(String symbol) {
         return fetchMarketData(symbol);
     }
+
+    // 🔒 Logique d'infrastructure réseau d'origine (CONSERVÉE À 100% À L'IDENTIQUE)
     private static MarketData fetchMarketData(String symbol) {
         String urlStr = "https://api.twelvedata.com/quote?symbol=" + symbol + "&apikey=" + TWELVE_DATA_KEY;
         HttpURLConnection conn = null;
@@ -249,7 +273,6 @@ public class MarketDataFetcher {
             if (conn != null) conn.disconnect();
         }
     }
-
     /**
      * Récupération synchrone d'un prix (pour usage ponctuel).
      */
