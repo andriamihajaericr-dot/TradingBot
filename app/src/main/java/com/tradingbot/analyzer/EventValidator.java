@@ -533,11 +533,17 @@ public class EventValidator {
             geoZoneFound = true;
         }
 
-        if (!geoZoneFound && hasFactualAction) {
-            geo.contextLabel = "Événement Géo Non Régionalisé";
-            geo.impactedAssets.addAll(Arrays.asList("GOLD", "USDJPY", "USOIL"));
-            score += 12;
+        // 🔹 Exigence renforcée : une action militaire sans source crédible ni zone géographique précise ne dépasse pas 60
+        if (!geoZoneFound && !hasCredibleSource && hasFactualAction) {
+            score = Math.min(score, 55);
         }
+        if (!geoZoneFound && !hasFactualAction) {
+            score = Math.max(0, score - 25);
+        }
+        
+        // ✅ Blindage final : assure que la confiance reste strictement entre 0 et 100
+        geo.confidence = Math.max(0, Math.min(100, score));
+        return geo;
 
         // ── D. Entité précise ────────────────────────────────────────
         if (lowerText.matches(".*\\d+\\s*(drone|missile|rocket|soldier|ship|bomb).*") ||
