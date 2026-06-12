@@ -131,18 +131,23 @@ public class EventValidator {
         // ✅ 2. Filtrage du Calendrier Suprême / Banques si la guerre est en cours
         if (isWarRegimeActive) {
             if (upperCombined.contains("DOVISH") || upperCombined.contains("HAWKISH") || 
-                upperCombined.contains("FED ") || upperCombined.contains("FOMC") || 
+                upperCombined.contains("FED") || upperCombined.contains("FOMC") || 
                 upperCombined.contains("BANQUE CENTRALE") || upperCombined.contains("CENTRAL BANK") ||
                 upperCombined.contains("CPI") || upperCombined.contains("PCE") || 
                 upperCombined.contains("PPI") || upperCombined.contains("INFLATION") ||
                 upperCombined.contains("RATE STATEMENT") || upperCombined.contains("INTEREST RATE")) {
                 
-                if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
+                // Forçage de l'alignement USDJPY (Yen refuge en régime de guerre)
+                if (!detectedAssets.contains("USDJPY")) {
+                    detectedAssets.add("USDJPY");
+                }
                 
-                // 🟢 On ne bloque plus l'événement, on le laisse passer avec un avertissement
-                result.reason = "Régime de Guerre actif – Donnée macro analysée avec prudence.";
-                logToMain("⚠️ [ARBITRAGE] Flux macro (Inflation/Bancaire) traité malgré Régime de Guerre actif.");
-                // On ne return pas, on continue la validation normale
+                // 🟢 Au lieu d'écraser 'result.reason' qui sera détruit plus bas,
+                // on utilise un log persistant et on prépare une note de contexte
+                result.geoContext = "[⚠️ ARBITRAGE MACRO EN GUERRE]"; 
+                
+                logToMain("⚠️ [ARBITRAGE] Flux macro (Inflation/Bancaire) autorisé à circuler malgré le Régime de Guerre.");
+                // On ne return pas, la validation normale (FinancialJuice / Fallback) prend le relais
             }
         }
 
