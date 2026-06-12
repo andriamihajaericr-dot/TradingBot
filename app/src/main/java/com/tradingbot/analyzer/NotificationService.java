@@ -485,7 +485,7 @@ public class NotificationService extends NotificationListenerService {
         "C. NEWS BANQUES CENTRALES ÉTRANGÈRES (BoJ, BCE/ECB, BoE, RBA, BoC)\n" +
         "────────────────────────────────────────────────────────────────\n" +
         "   VERROU MONÉTAIRE ABSOLU : La devise locale réagit exclusivement à sa propre banque centrale.\n" +
-        "   Sauf mention explicite d'un choc global, les actifs américains (📈 US10Y, 💻 NASDAQ, 📊 SP500) and le ₿ BITCOIN DOIVENT IMPÉRATIVEMENT RESTER [NEUTRE].\n" +
+        "   Sauf mention explicite d'un choc global, les actifs américains (📈 US10Y, 💻 NASDAQ, 📊 SP500) et le ₿ BITCOIN DOIVENT IMPÉRATIVEMENT RESTER [NEUTRE].\n" +
         "   Interdiction formelle d'attribuer une faiblesse ou force de l'économie américaine sur une news provenant de l'étranger.\n\n" +
         "   DOVISH étranger → La devise locale s'effondre, provoquant une hausse mécanique du Dollar américain par effet de flux (Dollar Fort par différentiel) :\n" +
         "   • 🇪🇺 BCE/ECB DOVISH  → 🇪🇺 EURUSD: BEARISH 🔴 | 🇬🇧 GBPUSD: BEARISH 🔴 | 🇦🇺 AUDUSD: BEARISH 🔴 | 🇨🇦 USDCAD: BULLISH 🟢 | 🇯🇵 USDJPY: BULLISH 🟢 | 🛢️ USOIL: BEARISH 🔴 | 🏆 GOLD: NEUTRE\n" +
@@ -544,7 +544,7 @@ public class NotificationService extends NotificationListenerService {
         "   • 🇨🇦 USDCAD : BULLISH 🟢  | Pétrole baisse = le CAD s'affaiblit mécaniquement face au USD\n" +
         "   • 🇦🇺 AUDUSD : BULLISH 🟢  | Retour de l'appétit pour le risque sur les devises cycliques\n" +
         "   • ₿ BITCOIN  : BULLISH 🟢  | Retour des flux spéculatifs (amplitude x2 à x3 par rapport aux actions)\n" +
-        "   • 📈 US10Y, 🇪🇺 EURUSD, 🇬🇧 GBPUSD : NEUTRE | Retrait ordonné sans panique\n" +
+        "   • 📈 US10Y, 🇪🇺 EURUSD, 🇬🇧 GBPUSD : NEUTRE | Retrait ordonné des capitaux sans panique\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : RISK-ON RETOUR (MKT APPAISÉ) 🐂\n\n" +
         "F. STOCKS PÉTROLE EIA / OPEC\n" +
         "─────────────────────────────\n" +
@@ -603,8 +603,8 @@ public class NotificationService extends NotificationListenerService {
         "   - Si le texte du flux (le contenu) mentionne une banque centrale étrangère (BCE, ECB, BOJ, BOE, RBA, BOC), tu as l'INTERDICTION ABSOLUE de mettre BULLISH, BEARISH ou toute INCLINATION sur NASDAQ, SP500, US10Y et BITCOIN. Ils doivent obligatoirement être marqués [NEUTRE] avec la raison exacte suivante : \"Pas d'impact direct – actif américain / crypto\".\n" +
         "   - Quelle que soit la source ou l'émetteur de la notification (Twitter, FinancialJuice, etc.), c'est la nature du contenu textuel qui déclenche cette règle.\n" +
         "   - RÈGLE DE DIRECTIONNALITÉ DE LA DEVISE LOCALE :\n" +
-        "     * Banque centrale étrangère DOVISH (baisse des taux, ton accommodant) -> sa devise locale baisse face au USD. Exemple strict : BCE DOVISH = EURUSD BEARISH 🔴. (Mettre BULLISH est une erreur éliminatoire).\n" +
-        "     * Banque centrale étrangère HAWKISH (hausse des taux, ton restrictif) -> sa devise locale monte face au USD. Exemple strict : BCE HAWKISH = EURUSD BULLISH 🟢.\n" +
+        "      * Banque centrale étrangère DOVISH (baisse des taux, ton accommodant) -> sa devise locale baisse face au USD. Exemple strict : BCE DOVISH = EURUSD BEARISH 🔴. (Mettre BULLISH est une erreur éliminatoire).\n" +
+        "      * Banque centrale étrangère HAWKISH (hausse des taux, ton restrictif) -> sa devise locale monte face au USD. Exemple strict : BCE HAWKISH = EURUSD BULLISH 🟢.\n" +
         "   - Les autres paires de devises (GBPUSD, AUDUSD, USDJPY, USDCAD) et actifs (GOLD, USOIL) se conforment strictement aux directives de flux et de corrélation de la RÈGLE C (Différentiel de taux / effet dollar), ou restent [NEUTRE] s'ils ne sont pas mentionnés.\n" +
         "   - ⚠️ TOUTE INFRACTION À CETTE RÈGLE (ex: BCE HAWKISH → EURUSD BEARISH) ENTRAÎNE LE REJET AUTOMATIQUE DE LA RÉPONSE. CETTE RÈGLE PRÉVAUT SUR TOUTE AUTRE CONSIDÉRATION.\n\n" +
         "CONTRAINTE 8 — COMPLÉTUDE ABSOLUE DE LA MATRICE :\n" +
@@ -616,32 +616,32 @@ public class NotificationService extends NotificationListenerService {
         "   Aucune ligne ne peut être omise, supprimée ou ajoutée. Le non-respect de cette règle entraîne le rejet automatique de la réponse.\n\n" +
         "CONTRAINTE 10 — VALEUR EXACTE DU VECTEUR CIBLE :\n" +
         "   Le champ 🎯 VECTEUR CIBLE doit être choisi UNIQUEMENT parmi : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS.\n" +
-        "   Toute autre valeur is interdite et invalide la réponse.\n" +
+        "   Toute autre valeur est est interdite et invalide la réponse.\n" +
         "   La réponse doit utiliser exactement un de ces six termes, sans ajout ni modification.\n\n" +
         "CONTRAINTE 11 — HIÉRARCHIE ABSOLUE ET EXCEPTION DE CRISE :\n" +
         "   - En règle générale, le RANG SUPRÊME (Politique Monétaire, CPI, PCE) l'emporte sur le RANG TACTIQUE (GÉO).\n" +
         "   - ⚠️ EXCEPTION ABSOLUE (RÉGIME DE GUERRE) : Si le flux fait état d'une ESCALADE MILITAIRE DIRECTE ou MENACE SUR L'OFFRE (ex: Hormuz, frappes US-Iran), le driver GÉO devient PRIORITAIRE sur l'Inflation pour l'Or et le Pétrole.\n" +
         "   - Alignement obligatoire de la matrice des 11 actifs dans ce cas précis :\n" +
-        "     * 🏆 GOLD    : BULLISH 🟢 [Flux refuge dominant]\n" +
-        "     * 🛢️ USOIL   : BULLISH 🟢 [Prime de risque sur l'offre]\n" +
-        "     * 📈 US10Y   : BULLISH 🟢 [PCE Hawkish / Taux sous pression]\n" +
-        "     * 💻 NASDAQ  : BEARISH 🔴 [Double flux négatif : Taux hauts + Risk-Off]\n" +
-        "     * 📊 SP500   : BEARISH 🔴 [Strictement identique au NASDAQ]\n" +
-        "     * ₿ BITCOIN  : BEARISH 🔴 [Capitulation des actifs spéculatifs]\n" +
-        "     * 🇪🇺 EURUSD  : BEARISH 🔴 [Dollar fort + Proximité du choc géo]\n" +
-        "     * 🇬🇧 GBPUSD  : BEARISH 🔴 [Dollar fort par arbitrage]\n" +
-        "     * 🇦🇺 AUDUSD  : BEARISH 🔴 [Liquidation de la devise cyclique/commodity non-pétrole]\n" +
-        "     * 🇯🇵 USDJPY  : BEARISH 🔴 [Régime de dominance géopolitique – Yen refuge prioritaire]\n" +
-        "     * 🇨🇦 USDCAD  : NEUTRE ou BEARISH 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
+        "      * 🏆 GOLD    : BULLISH 🟢 [Flux refuge dominant]\n" +
+        "      * 🛢️ USOIL   : BULLISH 🟢 [Prime de risque sur l'offre]\n" +
+        "      * 📈 US10Y   : BULLISH 🟢 [PCE Hawkish / Taux sous pression]\n" +
+        "      * 💻 NASDAQ  : BEARISH 🔴 [Double flux négatif : Taux hauts + Risk-Off]\n" +
+        "      * 📊 SP500   : BEARISH 🔴 [Strictement identique au NASDAQ]\n" +
+        "      * ₿ BITCOIN  : BEARISH 🔴 [Capitulation des actifs spéculatifs]\n" +
+        "      * 🇪🇺 EURUSD  : BEARISH 🔴 [Dollar fort + Proximité du choc géo]\n" +
+        "      * 🇬🇧 GBPUSD  : BEARISH 🔴 [Dollar fort par arbitrage]\n" +
+        "      * 🇦🇺 AUDUSD  : BEARISH 🔴 [Liquidation de la devise cyclique/commodity non-pétrole]\n" +
+        "      * 🇯🇵 USDJPY  : BEARISH 🔴 [Régime de dominance géopolitique – Yen refuge prioritaire]\n" +
+        "      * 🇨🇦 USDCAD  : NEUTRE ou BEARISH 🔴 [Le choc USOIL haussier compense et annule la force du Dollar. Préciser l'arbitrage].\n" +
         "   - Le modèle doit mentionner l'expression exacte : \"Régime de dominance géopolitique (Safe-Haven) sur l'inflation\" dans le FAIT MARQUANT.\n\n" +
         "</HARD_CONSTRAINTS>\n\n" +
         "EXEMPLE D'APPLICATION (INDÉPENDANT DE LA SOURCE) :\n" +
         "   Si l'actualité dit : \"BCE dovish, Schnabel s'inquiète de la croissance européenne\", la réponse DOIT copier l'intégralité des 11 lignes ainsi :\n" +
-        "   • 📈 US10Y   : NEUTRE | Pas d'impact direct de ce driver.\n" +
+        "   • 📈 US10Y    : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
         "   • 💻 NASDAQ  : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
         "   • 📊 SP500   : NEUTRE | Pas d'impact direct – actif américain / crypto.\n" +
         "   • 🏆 GOLD    : NEUTRE | Pas d'impact direct de ce driver.\n" +
-        "   • 🛢️ USOIL   : NEUTRE | Pas d'impact direct de ce driver.\n" +
+        "   • 🛢️ USOIL   : BEARISH 🔴 | BCE dovish -> baisse de l'activité économique de la zone euro pénalisant le brut.\n" +
         "   • 🇪🇺 EURUSD : BEARISH 🔴 | BCE dovish -> baisse et affaiblissement de l'euro.\n" +
         "   • 🇯🇵 USDJPY : BULLISH 🟢 | Hausse mécanique par différentiel (Dollar Fort face au Yen).\n" +
         "   • 🇨🇦 USDCAD : BULLISH 🟢 | Hausse mécanique par différentiel (Dollar Fort face au CAD).\n" +
@@ -656,7 +656,7 @@ public class NotificationService extends NotificationListenerService {
         "📢 FAIT MARQUANT : [Analyse pro de la situation en français. Mentionner l'arbitrage si écrasement d'un driver récent ou divergence.]\n\n" +
         "--- IMPACTS ACQUISITION ---\n" +
         "⚠️ EXIGENCE DE DYNAMISME ANALYTIQUE : Interdiction absolue d'utiliser des raisons théoriques standardisées ou de répéter la même justification d'une ligne à l'autre. Chaque raison DOIT lier explicitement l'actif concerné aux données CONCRÈTES, FACTUELLES ou CHIFFRÉES contenues dans le texte du flux.\n\n" +
-        "• 📈 US10Y   : [BULLISH 🟢 / BEARISH 🔴 / NEUTRE / INCLINATION BULLISH MAIS NEUTRE / INCLINATION BEARISH MAIS NEUTRE] | [Lien macro dynamique et contextuel basé sur les faits précis du flux]\n" +
+        "• 📈 US10Y    : [BULLISH 🟢 / BEARISH 🔴 / NEUTRE / INCLINATION BULLISH MAIS NEUTRE / INCLINATION BEARISH MAIS NEUTRE] | [Lien macro dynamique et contextuel basé sur les faits précis du flux]\n" +
         "• 💻 NASDAQ  : [BULLISH 🟢 / BEARISH 🔴 / NEUTRE / INCLINATION BULLISH MAIS NEUTRE / INCLINATION BEARISH MAIS NEUTRE] | [Lien macro dynamique et contextuel basé sur les faits précis du flux]\n" +
         "• 📊 SP500   : [BULLISH 🟢 / BEARISH 🔴 / NEUTRE / INCLINATION BULLISH MAIS NEUTRE / INCLINATION BEARISH MAIS NEUTRE] | [Lien macro dynamique et contextuel basé sur les faits précis du flux]\n" +
         "• 🏆 GOLD    : [BULLISH 🟢 / BEARISH 🔴 / NEUTRE / INCLINATION BULLISH MAIS NEUTRE / INCLINATION BEARISH MAIS NEUTRE] | [Lien macro dynamique et contextuel basé sur les faits précis du flux]\n" +
@@ -667,8 +667,7 @@ public class NotificationService extends NotificationListenerService {
         "• 🇬🇧 GBPUSD : [BULLISH 🟢 / BEARISH 🔴 / NEUTRE / INCLINATION BULLISH MAIS NEUTRE / INCLINATION BEARISH MAIS NEUTRE] | [Lien macro dynamique et contextuel basé sur les faits précis du flux]\n" +
         "• 🇦🇺 AUDUSD : [BULLISH 🟢 / BEARISH 🔴 / NEUTRE / INCLINATION BULLISH MAIS NEUTRE / INCLINATION BEARISH MAIS NEUTRE] | [Lien macro dynamique et contextuel basé sur les faits précis du flux]\n" +
         "• ₿ BITCOIN  : [BULLISH 🟢 / BEARISH 🔴 / NEUTRE / INCLINATION BULLISH MAIS NEUTRE / INCLINATION BEARISH MAIS NEUTRE] | [Lien macro dynamique et contextuel basé sur les faits précis du flux]\n\n" +
-        "🏁 FLUX DOMINANT : [Chaîne de caractères exacte issue des règles de directionnalité]"
-    ;
+        "🏁 FLUX DOMINANT : [Chaîne de caractères exacte issue des règles de directionnalité]";
 
     // 2. Génération dynamique de l'horodatage actuel au format de Madagascar (EAT)
     java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
