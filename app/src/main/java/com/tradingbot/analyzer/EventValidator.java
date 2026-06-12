@@ -137,13 +137,12 @@ public class EventValidator {
                 upperCombined.contains("PPI") || upperCombined.contains("INFLATION") ||
                 upperCombined.contains("RATE STATEMENT") || upperCombined.contains("INTEREST RATE")) {
                 
-                // Forçage de l'alignement USDJPY en VENTE CHOC (Yen refuge) pour éviter la neutralité spéculative
                 if (!detectedAssets.contains("USDJPY")) detectedAssets.add("USDJPY");
                 
-                result.isConfirmed = false; // Bloque l'envoi de la réévaluation standard à Groq
-                result.reason = "Régime de Guerre actif : Arbitrage prioritaire. Flux structurel (Banque/Inflation/Supreme) filtré.";
-                logToMain("🛡️ [ARBITRAGE] Flux Suprême (Inflation/Bancaire) intercepté sous Régime de Guerre.");
-                return result;
+                // 🟢 On ne bloque plus l'événement, on le laisse passer avec un avertissement
+                result.reason = "Régime de Guerre actif – Donnée macro analysée avec prudence.";
+                logToMain("⚠️ [ARBITRAGE] Flux macro (Inflation/Bancaire) traité malgré Régime de Guerre actif.");
+                // On ne return pas, on continue la validation normale
             }
         }
 
