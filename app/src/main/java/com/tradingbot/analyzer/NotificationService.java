@@ -1358,7 +1358,7 @@ public class NotificationService extends NotificationListenerService {
                                 upFeed.contains("BOC")  || upFeed.contains("PIB")  || 
                                 upFeed.contains("GDP")  || upFeed.contains("OPEC") ||
                                 upFeed.contains("INFLATION") || upFeed.contains("INTEREST RATE") ||
-                                upFeed.contains("POWELL") || upFeed.contains("LAGARDE") ||
+                                upFeed.contains("POWELL") || upFeed.contains("LAGARDE") || upFeed.contains("WARSH") ||
                                 upFeed.contains("PMI") || upFeed.contains("ISM");
     
         int weight = assignDriverWeight(feed);
