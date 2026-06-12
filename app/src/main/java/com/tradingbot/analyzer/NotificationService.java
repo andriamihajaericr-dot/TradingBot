@@ -314,7 +314,6 @@ public class NotificationService extends NotificationListenerService {
         "• ₿ BITCOIN  : [BULLISH 🟢 / BEARISH 🔴 / NEUTRE / INCLINATION BULLISH MAIS NEUTRE / INCLINATION BEARISH MAIS NEUTRE] | [Lien macro dynamique et contextuel basé sur les faits précis du flux]\n\n" +
         "🏁 FLUX DOMINANT : [Chaîne de caractères exacte issue des règles de directionnalité]";
 
-    
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
