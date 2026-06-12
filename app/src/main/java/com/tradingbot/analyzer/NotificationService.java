@@ -1149,82 +1149,55 @@ public class NotificationService extends NotificationListenerService {
             3 // Ajusté à 3 selon votre révision de pipeline pour les drivers confirmés
         );
     }
+   // 🚀 INJECTION : Déportation réseau simplifiée et ultra-rapide via Batch API
+new Thread(new Runnable() {
+    @Override
+    public void run() {
+        try {
+            StringBuilder blocPrix = new StringBuilder();
 
-    // 🚀 INJECTION : Déportation réseau avec requêtes HTTP parallèles simultanées
-    new Thread(new Runnable() {
-        @Override
-        public void run() {
-            try {
-                StringBuilder blocPrix = new StringBuilder();
+            if (assets != null && !assets.isEmpty()) {
+                blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
+                
+                // Un seul appel réseau unifié pour TOUS les actifs qualifiés simultanément
+                java.util.Map<String, MarketDataFetcher.MarketData> batchPrices = 
+                        MarketDataFetcher.getMarketDataBatch(assets);
 
-                if (assets != null && !assets.isEmpty()) {
-                    blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
+                for (String asset : assets) {
+                    MarketDataFetcher.MarketData data = batchPrices.get(asset);
                     
-                    // Conteneur thread-safe pour collecter les résultats asynchrones
-                    final Map<String, MarketDataFetcher.MarketData> mapResultats = new java.util.concurrent.ConcurrentHashMap<>();
-                    List<CompletableFuture<Void>> futures = new ArrayList<>();
-
-                    // Déclenchement simultané de toutes les requêtes réseau
-                    for (final String asset : assets) {
-                        futures.add(CompletableFuture.runAsync(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    String symboleStrict = MarketDataFetcher.getTwelveDataSymbol(asset);
-                                    MarketDataFetcher.MarketData data = MarketDataFetcher.fetchMarketDataPublic(symboleStrict);
-                                    if (data != null) {
-                                        mapResultats.put(asset, data);
-                                    }
-                                } catch (Exception e) {
-                                    Log.e(TAG, "Échec de récupération parallèle pour : " + asset, e);
-                                }
-                            }
-                        }));
+                    if (data != null && data.price > 0) {
+                        String tendance = data.changePercent >= 0 ? "📈" : "📉";
+                        // ✅ Correction Markdown : Remplacement des ** par * pour le parse_mode standard de Telegram
+                        String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
+                        blocPrix.append(String.format(Locale.US, formatPrix, tendance, asset, data.price, data.changePercent));
+                    } else {
+                        blocPrix.append("\n🔸 ").append(asset).append(" : (Cours indisponible)");
                     }
-
-                    // ⚡ BARRIÈRE DE SÉCURITÉ TIERS : On attend toutes les requêtes pendant un maximum de 2.5 secondes
-                    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                            .get(2500, TimeUnit.MILLISECONDS);
-
-                    // Reconstruction propre et ordonnée du bloc de texte
-                    for (String asset : assets) {
-                        MarketDataFetcher.MarketData data = mapResultats.get(asset);
-                        
-                        if (data != null && data.price > 0) {
-                            String tendance = data.changePercent >= 0 ? "📈" : "📉";
-                            // Gestion dynamique de l'affichage de précision numérique (Indices/Crypto vs Forex)
-                            String formatPrix = (data.price > 1000) ? "\n%s %s : **%,.2f** (%+.2f%%)" : "\n%s %s : **%.5f** (%+.2f%%)";
-                            blocPrix.append(String.format(Locale.US, formatPrix, tendance, asset, data.price, data.changePercent));
-                        } else {
-                            blocPrix.append("\n🔸 ").append(asset).append(" : (Cours indisponible)");
-                        }
-                    }
-                }
-
-                // Construction du corps de message enrichi
-                String bodyEnrichi = body + blocPrix.toString();
-
-                // Routage final vers l'analyse cognitive ou l'alerte directe
-                if (instance != null) {
-                    instance.processAnalysisWithAI(
-                        source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true);
-                } else {
-                    String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
-                    sendTelegramSecure(msg, context);
-                }
-
-            } catch (Exception e) {
-                Log.e(TAG, "Erreur critique lors de la capture concurrente des prix réels", e);
-                // Secours absolu : si l'infrastructure réseau flanche, aucun blocage du flux principal
-                if (instance != null) {
-                    instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true);
-                } else {
-                    String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
-                    sendTelegramSecure(msg, context);
                 }
             }
+
+            String bodyEnrichi = body + blocPrix.toString();
+
+            if (instance != null) {
+                instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true);
+            } else {
+                String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
+                sendTelegramSecure(msg, context);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur critique lors de l'enrichissement par Batch API", e);
+            // Mode dégradé sécurisé (Fallback) : transmission du corps initial sans bloc de prix
+            if (instance != null) {
+                instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true);
+            } else {
+                String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
+                sendTelegramSecure(msg, context);
+            }
         }
-    }).start();
+    }
+}).start();
    }
 
     @Override
