@@ -326,77 +326,100 @@ public class MarketDataFetcher {
     }
 
     /**
- * Récupère les cotations de manière groupée (Batch) en une seule requête HTTP.
- * Solution optimale contre le Rate Limiting et pour la synchronisation des prix.
+ * Récupère en un seul appel réseau (Batch) les données de marché complètes pour une liste d'actifs.
+ * Gère l'asymétrie structurelle de l'API Twelve Data (1 seul symbole vs plusieurs).
  */
- public static java.util.Map<String, MarketData> getMarketDataBatch(java.util.List<String> symbols) {
-    java.util.Map<String, MarketData> targetMap = new java.util.HashMap<>();
-    if (symbols == null || symbols.isEmpty()) return targetMap;
+public static java.util.Map<String, MarketData> getMarketDataBatch(java.util.List<String> assets) {
+    java.util.Map<String, MarketData> results = new java.util.HashMap<>();
+    if (assets == null || assets.isEmpty()) return results;
 
-    // 1. Convertir et associer vos symboles internes aux symboles stricts de l'API
-    java.util.Map<String, String> internalToApiMapping = new java.util.HashMap<>();
-    java.util.List<String> apiSymbolsList = new java.util.ArrayList<>();
-    
-    for (String symbol : symbols) {
-        String apiSymbol = getTwelveDataSymbol(symbol);
-        internalToApiMapping.put(apiSymbol, symbol); // Permet de faire le chemin inverse après réception
-        apiSymbolsList.add(apiSymbol);
+    // 1. Traduction des actifs internes en symboles Twelve Data officiels et création d'un dictionnaire inverse
+    java.util.List<String> apiSymbols = new java.util.ArrayList<>();
+    java.util.Map<String, String> symbolToAssetMap = new java.util.HashMap<>();
+    for (String asset : assets) {
+        String sym = getTwelveDataSymbol(asset);
+        if (sym != null && !apiSymbols.contains(sym)) {
+            apiSymbols.add(sym);
+            symbolToAssetMap.put(sym, asset);
+        }
     }
 
-    // 2. Joindre les symboles par des virgules pour l'URL Twelve Data
-    String joinedSymbols = android.text.TextUtils.join(",", apiSymbolsList);
-    String urlString = "https://api.twelvedata.com/quote?symbol=" + joinedSymbols + "&apikey=" + TWELVE_DATA_KEY;
+    if (apiSymbols.isEmpty()) return results;
 
-    HttpURLConnection urlConnection = null;
+    // 2. Construction de la chaîne de symboles séparés par des virgules
+    StringBuilder sbSymbols = new StringBuilder();
+    for (int i = 0; i < apiSymbols.size(); i++) {
+        sbSymbols.append(apiSymbols.get(i));
+        if (i < apiSymbols.size() - 1) sbSymbols.append(",");
+    }
+
+    String urlStr = "https://api.twelvedata.com/quote?symbol=" + sbSymbols.toString() + "&apikey=" + TWELVE_DATA_KEY;
+    HttpURLConnection conn = null;
     try {
-        URL url = new URL(urlString);
-        urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setRequestMethod("GET");
-        urlConnection.setConnectTimeout(3000);
-        urlConnection.setReadTimeout(3000);
+        URL url = new URL(urlStr);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(6000);
+        conn.setReadTimeout(6000);
 
-        int responseCode = urlConnection.getResponseCode();
-        if (responseCode == HttpURLConnection.HTTP_OK) {
-            BufferedReader r = new BufferedReader(new InputStreamReader(urlConnection.getInputStream(), java.nio.charset.StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = r.readLine()) != null) {
-                sb.append(line);
+        if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+            Log.e(TAG, "HTTP " + conn.getResponseCode() + " pour le traitement Batch");
+            return results;
+        }
+
+        BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
+        StringBuilder sbResponse = new StringBuilder();
+        String line;
+        while ((line = br.readLine()) != null) sbResponse.append(line);
+        br.close();
+
+        JSONObject json = new JSONObject(sbResponse.toString());
+
+        // Vérification globale des erreurs de clés ou de limites d'API
+        if (json.has("status") && "error".equals(json.optString("status"))) {
+            Log.e(TAG, "API Error au cours du Batch : " + json.optString("message"));
+            return results;
+        }
+
+        // ⚠️ GESTION DU PIÈGE STRUCTUREL TWELVE DATA
+        if (apiSymbols.size() == 1) {
+            // Un seul symbole demandé -> L'objet est directement à la racine du JSON
+            String singleSym = apiSymbols.get(0);
+            MarketData data = parseSingleQuoteJson(json);
+            if (data != null) {
+                results.put(symbolToAssetMap.get(singleSym), data);
             }
-            r.close();
-
-            // 3. Parsing de l'objet JSON groupé
-            org.json.JSONObject rootJson = new org.json.JSONObject(sb.toString());
-
-            for (String apiSymbol : apiSymbolsList) {
-                if (rootJson.has(apiSymbol)) {
-                    org.json.JSONObject assetJson = rootJson.getJSONObject(apiSymbol);
-                    
-                    // Sécurité : Vérifier que l'API ne renvoie pas une erreur interne pour cet actif
-                    if (!assetJson.has("status") || !"error".equals(assetJson.optString("status"))) {
-                        MarketData data = new MarketData();
-                        data.price = assetJson.optDouble("price", 0.0);
-                        data.changePercent = assetJson.optDouble("change_percent", 0.0);
-                        
-                        // Récupération du nom d'origine de l'actif (ex: "GOLD")
-                        String originalName = internalToApiMapping.get(apiSymbol);
-                        if (originalName != null) {
-                            targetMap.put(originalName, data);
-                        }
+        } else {
+            // Plusieurs symboles -> Le JSON est un dictionnaire d'objets indexé par les symboles
+            for (String sym : apiSymbols) {
+                if (json.has(sym)) {
+                    MarketData data = parseSingleQuoteJson(json.getJSONObject(sym));
+                    if (data != null) {
+                        results.put(symbolToAssetMap.get(sym), data);
                     }
                 }
             }
-        } else {
-            Log.e(TAG, "Erreur serveur HTTP lors du fetch Batch: " + responseCode);
         }
     } catch (Exception e) {
-        Log.e(TAG, "Erreur critique dans getMarketDataBatch", e);
+        Log.e(TAG, "Exception lors de l'exécution du Batch Twelve Data", e);
     } finally {
-        if (urlConnection != null) {
-            urlConnection.disconnect();
-        }
+        if (conn != null) conn.disconnect();
     }
+    return results;
+}
 
-    return targetMap;
-  }
+/**
+ * Extraction sécurisée d'un bloc de cotation JSON unitaire
+ */
+private static MarketData parseSingleQuoteJson(JSONObject json) {
+    if (json.has("status") && "error".equals(json.optString("status"))) return null;
+    
+    double price = json.optDouble("close", 0.0);
+    double changePercent = json.optDouble("percent_change", 0.0);
+    double high = json.optDouble("high", price);
+    double low = json.optDouble("low", price);
+
+    if (price <= 0.0) return null;
+    return new MarketData(price, changePercent, high, low);
+}
 }
