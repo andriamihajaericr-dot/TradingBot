@@ -1218,7 +1218,7 @@ public class NotificationService extends NotificationListenerService {
         String fingerprint = String.valueOf((source + title + body).hashCode());
         NotificationService instance = serviceInstance;
     
-        // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report
+        // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report (INCHANGÉ)
         if (instance != null && instance.eventDb != null) {
             String assetsStr = assets != null ? android.text.TextUtils.join(",", assets) : "";
             instance.eventDb.saveEvent(
@@ -1236,13 +1236,54 @@ public class NotificationService extends NotificationListenerService {
             );
         }
     
-        if (instance != null) {
-            instance.processAnalysisWithAI(
-                source, title, body, assets, fingerprint, SYSTEM_PROMPT, true);
-        } else {
-            String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
-            sendTelegramSecure(msg, context);
+        // 🚀 INJECTION : Déportation réseau pour capturer les prix Twelve Data en arrière-plan
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    StringBuilder blocPrix = new StringBuilder();
+    
+                    if (assets != null && !assets.isEmpty()) {
+                        blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
+                        for (String asset : assets) {
+                            // Liaison et conversion dynamique avec la matrice de MarketDataFetcher
+                            String symboleStrict = MarketDataFetcher.getTwelveDataSymbol(asset);
+                            MarketDataFetcher.MarketData data = MarketDataFetcher.fetchMarketDataPublic(symboleStrict);
+                            
+                            if (data != null && data.price > 0) {
+                                String tendance = data.changePercent >= 0 ? "📈" : "📉";
+                                blocPrix.append(String.format(Locale.US, "\n%s %s : **%.4f** (%+.2f%%)", 
+                                        tendance, asset, data.price, data.changePercent));
+                            } else {
+                                blocPrix.append("\n🔸 ").append(asset).append(" : (Cours indisponible)");
+                            }
                         }
+                    }
+    
+                    // Construction du corps enrichi contenant la news originale + les prix réels
+                    String bodyEnrichi = body + blocPrix.toString();
+    
+                    // ✅ Routage d'origine conservé à l'identique (seul 'body' est remplacé par 'bodyEnrichi')
+                    if (instance != null) {
+                        instance.processAnalysisWithAI(
+                            source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true);
+                    } else {
+                        String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
+                        sendTelegramSecure(msg, context);
+                    }
+    
+                } catch (Exception e) {
+                    Log.e(TAG, "Erreur critique dans le thread d'enrichissement des prix", e);
+                    // Secours absolu : si l'appel réseau crash, on envoie le flux d'origine sans bloquer le robot
+                    if (instance != null) {
+                        instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true);
+                    } else {
+                        String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
+                        sendTelegramSecure(msg, context);
+                    }
+                }
+            }
+        }).start();
     }
 
     @Override
@@ -1250,12 +1291,12 @@ public class NotificationService extends NotificationListenerService {
         super.onCreate();
         eventDb = EventDatabase.getInstance(this);
         
-        // ── MISE À JOUR : Liaison du contexte pour l'extraction de la clé macro_api_key ──
+        // ── Liaison du contexte pour l'extraction de la clé macro_api_key ──
         EconomicCalendarAPI.init(this);
         EventValidator.setAppContext(this); 
-        serviceInstance = this;                 // ✅
-        //EventValidator.init(eventDb); 
-        // ── MISE À JOUR : Déportation du préchargement réseau dans un thread d'arrière-plan ──
+        serviceInstance = this;                 // ✅ Assure la survie de l'instance pour l'IA
+        
+        // ── Déportation du préchargement réseau dans un thread d'arrière-plan ──
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -1269,57 +1310,54 @@ public class NotificationService extends NotificationListenerService {
                 }
             }
         }).start();
-
+    
         createNotificationChannel();
         startDailyBriefScheduler();
         startMonthlyReportScheduler();
         registerNetworkCallback();
         
-        // Planification unifiée : purge SQLite + nettoyage RAM + préchargement toutes les 12 heures
-        // Calcul du délai initial requis pour atteindre le tout prochain minuit à Madagascar
-    long initialDelayMillis = calculateMillisUntilNextMadaMidnight();
-    // Périodicité stricte de 24 heures pour s'exécuter à chaque minuit
-    long period24HoursMillis = 24 * 60 * 60 * 1000L; 
-
-    scheduler.scheduleAtFixedRate(new Runnable() {
-        @Override
-        public void run() {
-            if (isSyncing) return;
-            isSyncing = true;
-            try {
-                Log.d(TAG, "🕒 [MAINTENANCE] Déclenchement automatique de minuit (Heure de Madagascar)...");
-                
-                // 1. Purge SQLite des événements ayant dépassé la fenêtre de validité de 48 heures
-                long thresholdSeconds = (System.currentTimeMillis() - (48 * 60 * 60 * 1000L)) / 1000;
-                eventDb.purgeOldEvents(thresholdSeconds); 
-                Log.d(TAG, "[MAINTENANCE] Base de données SQLite purgée des données > 48h.");
-
-                // 2. Nettoyage de la table des empreintes pour éviter les fuites RAM
-                EventValidator.cleanupOldFingerprints();
-                Log.d(TAG, "[MAINTENANCE] Table des empreintes mémoires RAM nettoyée.");
-
-                // 3. Re-synchronisation du calendrier pour la nouvelle journée
-                EventValidator.preloadCalendar();
-                Log.d(TAG, "[MAINTENANCE] Calendrier économique mis à jour.");
-                
-            } catch (Exception e) {
-                Log.e(TAG, "[MAINTENANCE] Erreur lors de la maintenance à minuit", e);
-            } finally {
-                isSyncing = false;
+        // Planification unifiée : purge SQLite + nettoyage RAM + préchargement toutes les 24h à Minuit (Madagascar)
+        long initialDelayMillis = calculateMillisUntilNextMadaMidnight();
+        long period24HoursMillis = 24 * 60 * 60 * 1000L; 
+    
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                if (isSyncing) return;
+                isSyncing = true;
+                try {
+                    Log.d(TAG, "🕒 [MAINTENANCE] Déclenchement automatique de minuit (Heure de Madagascar)...");
+                    
+                    // 1. Purge SQLite des événements ayant dépassé la fenêtre de validité de 48 heures
+                    long thresholdSeconds = (System.currentTimeMillis() - (48 * 60 * 60 * 1000L)) / 1000;
+                    eventDb.purgeOldEvents(thresholdSeconds); 
+                    Log.d(TAG, "[MAINTENANCE] Base de données SQLite purgée des données > 48h.");
+    
+                    // 2. Nettoyage de la table des empreintes pour éviter les fuites RAM
+                    EventValidator.cleanupOldFingerprints();
+                    Log.d(TAG, "[MAINTENANCE] Table des empreintes mémoires RAM nettoyée.");
+    
+                    // 3. Re-synchronisation du calendrier pour la nouvelle journée
+                    EventValidator.preloadCalendar();
+                    Log.d(TAG, "[MAINTENANCE] Calendrier économique mis à jour.");
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "[MAINTENANCE] Erreur lors de la maintenance à minuit", e);
+                } finally {
+                    isSyncing = false;
+                }
             }
-        }
-    }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
-    // Dans NotificationService.onCreate(), après la planification de minuit, ajouter :
-
-// Rafraîchissement du calendrier toutes les 6 heures (21600000 ms)
-    long sixHoursMillis = 6 * 60 * 60 * 1000L;
-    scheduler.scheduleAtFixedRate(new Runnable() {
-        @Override
-        public void run() {
-            Log.d(TAG, "[CALENDAR] Rafraîchissement périodique du calendrier économique...");
-            EventValidator.preloadCalendar();
-        }
-    }, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
+        }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
+    
+        // Rafraîchissement du calendrier toutes les 6 heures (21600000 ms)
+        long sixHoursMillis = 6 * 60 * 60 * 1000L;
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "[CALENDAR] Rafraîchissement périodique du calendrier économique...");
+                EventValidator.preloadCalendar();
+            }
+        }, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
     }
 
 
