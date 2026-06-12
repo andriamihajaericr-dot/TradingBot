@@ -6,6 +6,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import android.util.Log;
 import android.content.Context;
 import java.util.Collections; // ✅ ajouter si absent
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 public class EventValidator {
 
@@ -31,7 +33,10 @@ public class EventValidator {
     private static boolean isWarRegimeActive = false;
     private static long lastWarShockTimestamp = 0;
     //private static final long WAR_REGIME_DURATION_MS = 12 * 60 * 60 * 1000L; // Verrou de 12 heures
-
+    // 🔹 PRÉCOMPILATION REGEX (Pour les performances du flux d'actualités)
+    private static final Pattern PERCENT_PATTERN = Pattern.compile("\\d+(\\.\\d+)?%");
+    private static final Pattern BREAKING_PATTERN = Pattern.compile("\\b(breaking)\\b");
+    private static final Pattern URGENT_ALERT_PATTERN = Pattern.compile("\\b(urgent|alert)\\b");
     
     public static void setAppContext(Context context) {
     if (context != null) appContext = context.getApplicationContext();
@@ -1079,17 +1084,47 @@ public class EventValidator {
     // ─────────────────────────────────────────────────────────────
     //  BREAKING NEWS GÉNÉRIQUE
     // ─────────────────────────────────────────────────────────────
+     // ─────────────────────────────────────────────────────────────
+    //  BREAKING NEWS GÉNÉRIQUE (Optimisé)
+    // ─────────────────────────────────────────────────────────────
     private static int calculateBreakingNewsConfidence(String title, String content) {
         int score = 40;
-        String lower = ((title != null ? title : "") + " " + (content != null ? content : "")).toLowerCase(Locale.ROOT);
+        
+        // Sécurisation contre les NullPointerExceptions
+        String safeTitle = title != null ? title : "";
+        String safeContent = content != null ? content : "";
+        
+        // Tout en minuscules pour la vérification de la casse
+        String lower = (safeTitle + " " + safeContent).toLowerCase(Locale.ROOT);
 
-        if (lower.contains("breaking"))                  score += 25;
-        if (lower.contains("urgent") || lower.contains("alert"))    score += 20;
-        if (lower.contains("fxhedgers") || lower.contains("deltaone")) score += 25;
+        // 🔹 Sources interbancaires et financières de confiance (prime unifiée)
+        if (lower.contains("fxhedgers") || lower.contains("deltaone") || 
+            lower.contains("reuters") || lower.contains("bloomberg") ||
+            lower.contains("financial times") || lower.contains("wsj") ||
+            lower.contains("wall street journal") || lower.contains("cnbc") ||
+            lower.contains("financialjuice") || lower.contains("zerohedge")) {
+            score += 30;
+        }
+
+        // 🔹 Mots déclencheurs d'alerte (Utilisation des regex sécurisées anti-faux-positifs)
+        if (BREAKING_PATTERN.matcher(lower).find())     score += 25;
+        if (URGENT_ALERT_PATTERN.matcher(lower).find()) score += 20;
+
+        // 🔹 Mots-clés institutionnels
         if (lower.contains("federal reserve") || lower.contains("fomc")) score += 20;
-        if (content != null && content.matches(".*\\d+\\.\\d+%.*")) score += 15;
 
-        return Math.min(100, score);
+        // 🔹 Chiffre avec pourcentage → donnée économique concrète
+        if (PERCENT_PATTERN.matcher(lower).find()) {
+            score += 20;
+        }
+
+        // 🔹 Format calendaire (Interception FinancialJuice)
+        if (lower.contains("actual:") && lower.contains("forecast:")) {
+            score += 25;
+        }
+
+        // Borner le résultat de façon sécurisée entre 0 et 100
+        return Math.max(0, Math.min(100, score));
     }
         /**
      * Enrichit le contenu d'une notification avec les données du calendrier économique
