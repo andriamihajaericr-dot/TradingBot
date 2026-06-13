@@ -22,6 +22,9 @@ public class EventDatabase extends SQLiteOpenHelper {
     
     private static volatile EventDatabase instance;
 
+    // Implémentation du Singleton pour la sécurité d'accès concurrentiel (WAL)
+    private static volatile EventDatabase instance;
+
     public static EventDatabase getInstance(Context context) {
         if (instance == null) {
             synchronized (EventDatabase.class) {
@@ -34,6 +37,21 @@ public class EventDatabase extends SQLiteOpenHelper {
             }
         }
         return instance;
+    }
+
+    // =========================================================================
+    // ✅ CORRECTIF : Ajout de la méthode manquante appelée par MainActivity
+    // =========================================================================
+    public static void resetInstance() {
+        synchronized (EventDatabase.class) {
+            if (instance != null) {
+                try {
+                    instance.close(); // Ferme proprement la connexion existante si ouverte
+                } catch (Exception ignored) {}
+                instance = null; // Libère l'instance pour forcer une recréation au prochain getInstance()
+                Log.d(TAG, "Instance de la base de données réinitialisée avec succès.");
+            }
+        }
     }
 
     private EventDatabase(Context context) {
