@@ -247,49 +247,68 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
     return fetchHistoricalEvents(globalAppContext, daysBack);
 }
 
-   public static List<CalendarEvent> fetchHistoricalEvents(Context context, int daysBack) {
-    List<CalendarEvent> allEvents = new ArrayList<>();
-    logToMain("🔄 [BACKFILL] Récupération via ForexFactory (thisweek + lastweek)...");
-
-    try {
-        // ── 1. Semaine courante — actuals déjà publiés cette semaine ──
-        // ── Semaine courante — uniquement événements passés avec actual publié ──
-        // ✅ Délai 3s pour éviter le rate limit ForexFactory
-        // Le calendrier principal vient de l'appeler au démarrage
-       Thread.sleep(3000);
-       List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
-        int countThis = 0;
+    public static List<CalendarEvent> fetchHistoricalEvents(Context context, int daysBack) {
+        List<CalendarEvent> allEvents = new ArrayList<>();
         long nowSec = System.currentTimeMillis() / 1000;
-        for (CalendarEvent e : thisWeek) {
-            // ForexFactory peut retourner "" ou "N/A" ou null pour actual non publié
-            // Pour les événements passés (isPast=true), on accepte aussi les valeurs courtes
-            boolean hasActual = e.actual != null
-                    && !e.actual.equals("N/A")
-                    && !e.actual.trim().isEmpty()
-                    && !e.actual.equals("0")
-                    && !e.actual.equals("null");
-            boolean isPast = false;
-            try {
-                long eventTs = Long.parseLong(e.timestamp);
-                isPast = eventTs < nowSec;
-            } catch (Exception ignored) {
-                isPast = hasActual;
+
+        // ── Étape 1 : Récupération et filtrage de LAST_WEEK ──
+        try {
+            logToMain("🔄 [BACKFILL] Étape 1 : Récupération de LAST_WEEK...");
+            List<CalendarEvent> lastWeek = fetchFromForexFactoryUrl(FF_URL_LAST_WEEK, 168);
+            int countLast = 0;
+            if (lastWeek != null) {
+                for (CalendarEvent e : lastWeek) {
+                    if (isValidPastEvent(e, nowSec)) {
+                        allEvents.add(e);
+                        countLast++;
+                    }
+                }
             }
-            if (hasActual && isPast) {
-                allEvents.add(e);
-                countThis++;
-            }
+            logToMain("✅ [BACKFILL] LastWeek traités : " + countLast + " événements passés trouvés.");
+        } catch (Exception e) {
+            logToMain("❌ [BACKFILL] Erreur sur LAST_WEEK : " + e.getMessage());
         }
-        logToMain("✅ [BACKFILL] thisweek passés avec actual : " + countThis + " événements");
-    } catch (Exception e) {
-        logToMain("❌ [BACKFILL] Erreur ForexFactory : " + e.getMessage());
-        Log.e(TAG, "Erreur fetchHistoricalEvents", e);
+
+        // ✅ Sécurité Anti-Rate-Limit (Pause de 1,5 seconde entre les deux requêtes HTTP lourdes)
+        try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
+
+        // ── Étape 2 : Récupération et filtrage de THIS_WEEK ──
+        try {
+            logToMain("🔄 [BACKFILL] Étape 2 : Récupération de THIS_WEEK...");
+            List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
+            int countThis = 0;
+            if (thisWeek != null) {
+                for (CalendarEvent e : thisWeek) {
+                    if (isValidPastEvent(e, nowSec)) {
+                        allEvents.add(e);
+                        countThis++;
+                    }
+                }
+            }
+            logToMain("✅ [BACKFILL] ThisWeek traités : " + countThis + " événements passés trouvés.");
+        } catch (Exception e) {
+            logToMain("❌ [BACKFILL] Erreur sur THIS_WEEK : " + e.getMessage());
+        }
+
+        logToMain("📊 [BACKFILL] Total validé et prêt à l'insertion SQLite : " + allEvents.size() + " événements.");
+        return allEvents;
     }
 
-    logToMain("📊 [BACKFILL] Total récupéré : " + allEvents.size()
-            + " événements (thisweek + lastweek)");
-    return allEvents;
-} 
+    /**
+     * ✅ MÉTHODE UTILITAIRE DE SÉCURITÉ : Valide si un événement est bien dans le passé et possède un résultat réel complet
+     */
+    private static boolean isValidPastEvent(CalendarEvent e, long nowSec) {
+        boolean hasActual = e.actual != null && !e.actual.equalsIgnoreCase("N/A") 
+                            && !e.actual.trim().isEmpty() && !e.actual.equalsIgnoreCase("null");
+        boolean isPast = false;
+        try {
+            long eventTs = Long.parseLong(e.timestamp);
+            isPast = eventTs < nowSec;
+        } catch (Exception ignored) {
+            isPast = hasActual; // Fallback si le timestamp est corrompu mais qu'un résultat est écrit
+        }
+        return hasActual && isPast;
+    }
 
     private static List<CalendarEvent> fetchFromFMP(Context context, int hoursAhead) {
           logToMain("❌ [FMP] Appel réseau bloqué (méthode dépréciée).");
