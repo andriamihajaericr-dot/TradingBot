@@ -10,9 +10,9 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class EconomicCalendarAPI {
-    private static final String TAG = "EconomicCalendarAPI";
+    private static final String TAG            = "EconomicCalendarAPI";
 
-    // ✅ Flux exclusifs Forex Factory
+    // ✅ Clean & Strict : Uniquement Forex Factory stable
     private static final String FF_URL_LAST_WEEK = "https://nfs.faireconomy.media/ff_calendar_lastweek.json";
     private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
     private static final String FF_URL_NEXT_WEEK = "https://nfs.faireconomy.media/ff_calendar_nextweek.json";
@@ -34,9 +34,9 @@ public class EconomicCalendarAPI {
             globalAppContext = context.getApplicationContext();
         }
     }
-
+    
     private static final int MAX_RETRIES = 3;
-    private static final long INITIAL_BACKOFF_MS = 1000;
+    private static final long INITIAL_BACKOFF_MS = 3000; // Augmenté à 3s pour éviter d'enchaîner trop vite
 
     private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hoursAhead) {
         long backoff = INITIAL_BACKOFF_MS;
@@ -56,7 +56,7 @@ public class EconomicCalendarAPI {
             if (attempt < MAX_RETRIES) {
                 try {
                     Thread.sleep(backoff);
-                    backoff *= 2;
+                    backoff *= 2; // Backoff exponentiel (3s, 6s, 12s)
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     break;
@@ -74,10 +74,6 @@ public class EconomicCalendarAPI {
         return fetchUpcomingEvents(globalAppContext, hoursAhead);
     }
 
-    // =========================================================================
-    // 🌍 MOTEUR DE PARSING FOREXFACTORY
-    // =========================================================================
-
     private static List<CalendarEvent> fetchFromForexFactoryUrl(String urlString, int hoursAhead) throws Exception {
         List<CalendarEvent> events = new ArrayList<>();
         HttpURLConnection conn = null;
@@ -89,9 +85,20 @@ public class EconomicCalendarAPI {
             conn.setRequestMethod("GET");
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+            
+            // ✅ CRITIQUE : User-Agent complet de navigateur pour contourner les protections anti-bot 429
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            conn.setRequestProperty("Accept", "application/json");
 
             int responseCode = conn.getResponseCode();
+            if (responseCode == 429) {
+                logToMain("⚠️ [CALENDRIER] Limite de requêtes atteinte (HTTP 429) sur " + urlString + ". Pause forcée...");
+                throw new IOException("HTTP error code: 429 (Too Many Requests)");
+            }
+            if (responseCode == 404) {
+                logToMain("❌ [CALENDRIER] Ressource introuvable (HTTP 404) pour : " + urlString);
+                return events; // Retourne une liste vide proprement au lieu de crash
+            }
             if (responseCode != 200) {
                 throw new IOException("HTTP error code: " + responseCode);
             }
@@ -120,9 +127,11 @@ public class EconomicCalendarAPI {
 
                 if (!isTrackedCurrency(country)) continue;
 
-                // ✅ CORRECTIF CRITIQUE : Signature et paramètres corrigés pour la compilation
+                // ✅ CORRECTION ICI : Suppression du paramètre 'timeStr' inexistant
                 long eventMs = convertForexFactoryDateToMs(dateStr);
                 long maxFutureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000);
+                
+                // Tolérance de 45 min dans le passé pour capturer les publications à la minute près
                 long minPastMs = nowMs - (45 * 60 * 1000L); 
 
                 if (hoursAhead == 168 || (eventMs <= maxFutureMs && eventMs >= minPastMs)) {
@@ -150,7 +159,6 @@ public class EconomicCalendarAPI {
     }
 
     public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
-        // ✅ Nettoyé : Plus de variable morte targetContext inutile ici
         logToMain("🔄 [CALENDRIER] Chargement ForexFactory (This Week)...");
         List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, h), hoursAhead);
         if (events == null) events = new ArrayList<>();
@@ -162,7 +170,7 @@ public class EconomicCalendarAPI {
                 events.addAll(nextWeekEvents);
             }
         } catch (Exception e) {
-            Log.w(TAG, "Impossible de charger la semaine suivante: " + e.getMessage());
+            Log.w(TAG, "Semaine suivante indisponible: " + e.getMessage());
         }
 
         if (!events.isEmpty()) {
@@ -174,7 +182,7 @@ public class EconomicCalendarAPI {
             uniqueEvents.addAll(events);
             List<CalendarEvent> cleanedList = new ArrayList<>(uniqueEvents);
 
-            logToMain("✅ [CALENDRIER] ForexFactory : " + cleanedList.size() + " événements chargés (Total combiné)");
+            logToMain("✅ [CALENDRIER] ForexFactory : " + cleanedList.size() + " événements chargés.");
             return cleanedList;
         }
 
@@ -207,7 +215,7 @@ public class EconomicCalendarAPI {
             logToMain("❌ [BACKFILL] Erreur sur LAST_WEEK : " + e.getMessage());
         }
 
-        try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
+        try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
 
         try {
             logToMain("🔄 [BACKFILL] Étape 2 : Récupération de THIS_WEEK...");
@@ -226,7 +234,7 @@ public class EconomicCalendarAPI {
             logToMain("❌ [BACKFILL] Erreur sur THIS_WEEK : " + e.getMessage());
         }
 
-        logToMain("📊 [BACKFILL] Total validé et prêt à l'insertion SQLite : " + allEvents.size() + " événements.");
+        logToMain("📊 [BACKFILL] Total validé pour insertion SQLite : " + allEvents.size() + " événements.");
         return allEvents;
     }
 
@@ -238,7 +246,7 @@ public class EconomicCalendarAPI {
             long eventTs = Long.parseLong(e.timestamp);
             isPast = eventTs < nowSec;
         } catch (Exception ignored) {
-            isPast = hasActual; 
+            isPast = hasActual;
         }
         return hasActual && isPast;
     }
@@ -264,106 +272,58 @@ public class EconomicCalendarAPI {
                 assets.addAll(Arrays.asList("GOLD", "USDJPY", "EURUSD", "SP500"));
             } else if (ind.contains("non-farm") || ind.contains("nfp") || ind.contains("payroll")) {
                 assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "BITCOIN", "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"));
-            } else if (ind.contains("adp") || ind.contains("jolts") || ind.contains("job openings") || ind.contains("jobless") || ind.contains("initial claims") || ind.contains("continuing claims")) {
-                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"));
             } else if (ind.contains("gdp") || ind.contains("gross domestic")) {
                 assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY", "GOLD", "USOIL"));
-            } else if (ind.contains("ism") || ind.contains("pmi") || ind.contains("purchasing managers")) {
-                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY", "USOIL"));
-            } else if (ind.contains("chicago pmi") || ind.contains("empire state") || ind.contains("philly fed") || ind.contains("philadelphia") || ind.contains("durable goods") || ind.contains("capital goods") || ind.contains("housing starts") || ind.contains("building permits") || ind.contains("home sales") || ind.contains("existing home") || ind.contains("new home") || ind.contains("pending home")) {
-                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY"));
-            } else if (ind.contains("retail") || ind.contains("consumer spending") || ind.contains("michigan") || ind.contains("consumer sentiment") || ind.contains("consumer confidence")) {
-                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USOIL", "BITCOIN"));
-            } else if (ind.contains("industrial production") || ind.contains("capacity utilization")) {
-                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USOIL", "USDJPY"));
-            } else if (ind.contains("personal income") || ind.contains("personal spending") || ind.contains("trade balance") || ind.contains("current account")) {
-                assets.addAll(Arrays.asList("USDJPY", "EURUSD", "GBPUSD", "GOLD"));
-            } else if (ind.contains("crude oil") || ind.contains("eia") || ind.contains("oil inventories") || ind.contains("distillate") || ind.contains("gasoline") || ind.contains("petroleum") || ind.contains("opec")) {
+            } else if (ind.contains("crude oil") || ind.contains("eia") || ind.contains("oil inventories")) {
                 assets.addAll(Arrays.asList("USOIL", "USDCAD", "GOLD", "SP500"));
             }
         } else if (cty.contains("united kingdom") || cty.contains("uk")) {
             assets.add("GBPUSD");
-            if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("gdp") || ind.contains("growth") || ind.contains("average earnings") || ind.contains("wage")) {
-                assets.addAll(Arrays.asList("EURUSD", "GOLD"));
-            } else if (ind.contains("boe") || ind.contains("interest rate") || ind.contains("monetary policy")) {
-                assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
-            } else if (ind.contains("claimant count") || ind.contains("unemployment")) {
-                assets.add("EURUSD");
-            } else if (ind.contains("pmi") || ind.contains("retail")) {
-                assets.addAll(Arrays.asList("EURUSD", "SP500"));
+            if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("boe")) {
+                assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500"));
             }
         } else if (cty.contains("japan")) {
             assets.add("USDJPY");
-            if (ind.contains("boj") || ind.contains("interest rate") || ind.contains("yield curve") || ind.contains("monetary policy")) {
-                assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "EURUSD", "AUDUSD"));
-            } else if (ind.contains("cpi") || ind.contains("inflation")) {
-                assets.add("GOLD");
-            } else if (ind.contains("tankan") || ind.contains("gdp")) {
-                assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
+            if (ind.contains("boj") || ind.contains("interest rate")) {
+                assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "EURUSD"));
             }
-        } else if (cty.contains("canada")) {
-            assets.addAll(Arrays.asList("USDCAD", "USOIL"));
-            if (ind.contains("boc") || ind.contains("interest rate") || ind.contains("rate decision")) {
-                assets.addAll(Arrays.asList("GOLD", "SP500", "EURUSD"));
-            } else if (ind.contains("cpi") || ind.contains("inflation")) {
-                assets.addAll(Arrays.asList("GOLD", "EURUSD"));
-            } else if (ind.contains("gdp") || ind.contains("employment")) {
-                assets.add("GOLD");
-            }
-        } else if (cty.contains("australia")) {
-            assets.add("AUDUSD");
-            if (ind.contains("rba") || ind.contains("interest rate") || ind.contains("rate decision")) {
-                assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "USDJPY"));
-            } else if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("gdp") || ind.contains("employment")) {
-                assets.addAll(Arrays.asList("GOLD", "USDJPY"));
-            }
-        } else if (cty.contains("eurozone") || cty.contains("euro area") || ind.contains("ecb") || ind.contains("lagarde")) {
+        } else if (cty.contains("eurozone") || cty.contains("euro area") || ind.contains("ecb")) {
             assets.add("EURUSD");
-            if (ind.contains("ecb") || ind.contains("interest rate") || ind.contains("rate decision") || ind.contains("lagarde")) {
-                assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
-            } else if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("hicp") || ind.contains("retail") || ind.contains("consumer")) {
-                assets.addAll(Arrays.asList("GBPUSD", "SP500"));
-            } else if (ind.contains("gdp") || ind.contains("growth") || ind.contains("pmi") || ind.contains("ifo") || ind.contains("zew")) {
-                assets.addAll(Arrays.asList("GBPUSD", "USOIL"));
-            } else if (ind.contains("unemployment") || ind.contains("jobless")) {
-                assets.add("GBPUSD");
-            }
-        } else if (cty.contains("china") || cty.contains("chinese")) {
-            assets.addAll(Arrays.asList("AUDUSD", "USDJPY", "USOIL"));
-            if (ind.contains("caixin") || ind.contains("pmi") || ind.contains("trade balance") || ind.contains("exports")) {
-                assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD"));
-            } else if (ind.contains("gdp") || ind.contains("growth")) {
-                assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD", "USOIL"));
+            if (ind.contains("ecb") || ind.contains("cpi") || ind.contains("inflation")) {
+                assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500", "USDJPY"));
             }
         }
         return new ArrayList<>(new LinkedHashSet<>(assets));
     }
-    
+
     private static boolean isMediumHighImpact(String eventName) {
         if (eventName == null || eventName.isEmpty()) return false;
         String ind = eventName.toLowerCase(Locale.US);
-        return ind.contains("initial jobless claims") || ind.contains("jobless claims") || ind.contains("continuing claims") || ind.contains("unemployment claims") ||
-               ind.contains("adp employment") || ind.contains("jolts") || ind.contains("job openings") || ind.contains("ppi") || ind.contains("producer price") ||
-               ind.contains("gdp") || ind.contains("gross domestic product") || ind.contains("industrial production") || ind.contains("durable goods") ||
-               ind.contains("chicago pmi") || ind.contains("philly fed") || ind.contains("empire state") || ind.contains("michigan") ||
-               ind.contains("consumer confidence") || ind.contains("consumer sentiment") || ind.contains("retail sales") || ind.contains("building permits") ||
-               ind.contains("housing starts") || ind.contains("eia") || ind.contains("crude oil inventories") || ind.contains("opec") ||
-               ind.contains("minutes") || ind.contains("powell") || ind.contains("warsh") || ind.contains("beige book") ||
-               ind.contains("trade balance") || ind.contains("current account") || ind.contains("personal spending") || ind.contains("personal income");
+        return ind.contains("initial jobless claims") || ind.contains("jobless claims") ||
+               ind.contains("adp employment") || ind.contains("percent") ||
+               ind.contains("ppi") || ind.contains("producer price") ||
+               ind.contains("gdp") || ind.contains("gross domestic product") ||
+               ind.contains("crude oil inventories") || ind.contains("eia") ||
+               ind.contains("powell") || ind.contains("minutes");
     }
-    
+
+    // ✅ METHODE DE CONVERSION TEMPORELLE STRICTE ET CORRIGÉE
     private static long convertForexFactoryDateToMs(String dateStr) {
-        if (dateStr == null || dateStr.isEmpty()) return System.currentTimeMillis();
+        if (dateStr == null || dateStr.isEmpty())
+            return System.currentTimeMillis();
         try {
+            // Format standard avec Timezone ISO8601 (ex: 2026-06-05T08:30:00-04:00)
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US);
             return sdf.parse(dateStr).getTime();
         } catch (Exception e) {
             try {
+                // Fallback sans timezone -> Défaut New York
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
                 sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
                 return sdf.parse(dateStr).getTime();
             } catch (Exception e2) {
                 try {
+                    // Date brute sans heure -> Minuit New York
                     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
                     sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
                     return sdf.parse(dateStr).getTime();
@@ -378,7 +338,7 @@ public class EconomicCalendarAPI {
         if (value == null || value.isEmpty() || value.equalsIgnoreCase("null")) return "N/A";
         String trimmed = value.trim();
         if (trimmed.startsWith(".")) {
-            trimmed = "0" + trimmed;
+            trimmed = "0" + trimmed; // (.3% -> 0.3%)
         }
         return trimmed;
     }
@@ -417,6 +377,7 @@ public class EconomicCalendarAPI {
                     }
                 }
             }
+            
             if (updatedCount > 0) {
                 logToMain("📊 [FOREXFACTORY] Synchronisation terminée : " + updatedCount + " valeurs 'actual' mises à jour.");
             } else {
@@ -433,7 +394,7 @@ public class EconomicCalendarAPI {
             try {
                 MainActivity.instance.addLog(message);
             } catch (Exception e) {
-                Log.w(TAG, "Impossible d'ajouter le log à l'UI : " + e.getMessage());
+                Log.w(TAG, "Impossible de pousser le log sur l'UI: " + e.getMessage());
             }
         }
     }
