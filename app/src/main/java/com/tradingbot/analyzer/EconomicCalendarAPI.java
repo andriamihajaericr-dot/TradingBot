@@ -115,7 +115,7 @@ public class EconomicCalendarAPI {
 
             JSONArray jsonArray = new JSONArray(sb.toString());
             long nowMs = System.currentTimeMillis();
-            long maxFutureMs = nowMs + ((long) hoursAhead * 3600 * 1000);
+            //long maxFutureMs = nowMs + ((long) hoursAhead * 3600 * 1000);
 
             for (int i = 0; i < jsonArray.length(); i++) {
                 JSONObject obj = jsonArray.getJSONObject(i);
@@ -132,11 +132,19 @@ public class EconomicCalendarAPI {
                 if (!isTrackedCurrency(country)) continue;
 
                 // Conversion sécurisée de la date ForexFactory
-                long eventMs = convertForexFactoryDateToMs(dateStr);
+                // À l'intérieur de la boucle de parsing de fetchFromForexFactoryUrl
+            long eventMs = convertForexFactoryDateToMs(dateStr, timeStr);
+            long maxFutureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000);
+            
+            // ✅ Sécurité : Tolérer jusqu'à 45 min dans le passé pour les annonces récentes, mais ignorer les vieux jours
+            long minPastMs = nowMs - (45 * 60 * 1000L); 
+
+            if (hoursAhead == 168 || (eventMs <= maxFutureMs && eventMs >= minPastMs)) {
+                // ... suite de votre traitement (parsing de l'événement) ...
 
                 // Ne capture que les événements pertinents selon la fenêtre horaire (hoursAhead)
                 // Si hoursAhead est négatif ou très grand (Backfill/History), on adapte la logique
-                if (hoursAhead == 168 || eventMs <= maxFutureMs) { 
+                //if (hoursAhead == 168 || eventMs <= maxFutureMs) { 
                     CalendarEvent event = new CalendarEvent();
                     event.timestamp  = String.valueOf(eventMs / 1000);
                     event.country    = currencyToCountry(country);
