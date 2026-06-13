@@ -570,6 +570,46 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
             default:    return "Global";
         }
     }
+
+    /**
+ * Rafraîchit les valeurs 'actual' des événements récents stockés localement en interrogeant Forex Factory
+ */
+public static void refreshMissingActuals(Context context) {
+    logToMain("🔄 [FOREXFACTORY] Vérification des résultats publiés (Actuals)...");
+    try {
+        // 1. Récupérer les événements publiés cette semaine sur Forex Factory
+        List<CalendarEvent> currentWeekEvents = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
+        EventDatabase db = EventDatabase.getInstance(context);
+        int updatedCount = 0;
+
+        for (CalendarEvent webEvent : currentWeekEvents) {
+            // Si Forex Factory a publié un résultat concret (différent de N/A)
+            if (webEvent.actual != null && !webEvent.actual.equalsIgnoreCase("N/A") && !webEvent.actual.isEmpty()) {
+                
+                long timestampSec = Long.parseLong(webEvent.timestamp);
+                
+                // Mettre à jour SQLite uniquement si la valeur locale actuelle est encore à "N/A"
+                boolean updated = db.updateActualIfMissing(webEvent.indicator, timestampSec, webEvent.actual);
+                if (updated) {
+                    updatedCount++;
+                    logToMain("✅ [MAJ ACTUAL] " + webEvent.indicator + " -> " + webEvent.actual);
+                    
+                    // Optionnel : Déclencher ici une analyse post-publication (via Groq / Telegram)
+                    // si vous souhaitez notifier le groupe du résultat chiffré !
+                }
+            }
+        }
+        
+        if (updatedCount > 0) {
+            logToMain("📊 [FOREXFACTORY] Synchronisation terminée : " + updatedCount + " valeurs 'actual' mises à jour.");
+        } else {
+            logToMain("ℹ️ [FOREXFACTORY] Aucun nouveau résultat à mettre à jour.");
+        }
+
+    } catch (Exception e) {
+        logToMain("❌ [FOREXFACTORY] Erreur lors du refresh des actuals : " + e.getMessage());
+    }
+    }
     // ── Log vers MainActivity + Logcat ──
     private static void logToMain(String message) {
         Log.d(TAG, message);
