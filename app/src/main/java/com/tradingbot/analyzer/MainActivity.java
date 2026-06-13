@@ -84,6 +84,7 @@ public class MainActivity extends AppCompatActivity {
 
         eventDb = EventDatabase.getInstance(this);
         EventValidator.setAppContext(this);
+        EconomicCalendarAPI.init(getApplicationContext()); // ◄ ✅ AJOUTER CECI
         // Liaison des composants
         mainScrollView      = findViewById(R.id.mainScrollView);
         statusText          = findViewById(R.id.statusText);
