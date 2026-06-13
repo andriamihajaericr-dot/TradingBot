@@ -301,34 +301,72 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/octet-stream", "application/x-sqlite3"});
         importDbLauncher.launch(intent);
      }
+
     private void importDatabaseFromUri(Uri uri) {
-        try {
-            // Demander un accès permanent à l'Uri (l'utilisateur devra confirmer)
-            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-    
-            File currentDb = getDatabasePath("trading_bot.db");
-            if (eventDb != null) {
-                eventDb.close();
-                eventDb = null;
+    try {
+        addLog("⏳ [IMPORT] Début de la restauration de la base de données macro...");
+
+        // 1. Fermer proprement la connexion locale active pour libérer les verrous SQLite
+        if (eventDb != null) {
+            eventDb.close();
+            eventDb = null;
+        }
+
+        // 2. ✅ CORRECTION CRITIQUE 1 : Libérer le Singleton pour forcer une reconnexion saine
+        EventDatabase.resetInstance();
+
+        // 3. ✅ CORRECTION CRITIQUE 2 : Nettoyer l'ancienne base ainsi que ses fichiers WAL et SHM
+        // deleteDatabase() d'Android supprime proprement le .db, le .db-wal et le .db-shm
+        boolean deleted = deleteDatabase("trading_bot.db");
+        if (deleted) {
+            addLog("🗑️ Ancienne base et résidus WAL/SHM purgés avec succès.");
+        }
+
+        File currentDb = getDatabasePath("trading_bot.db");
+        
+        // Sécurité : s'assurer que le dossier parent des bases existe (au cas où deleteDatabase l'aurait supprimé)
+        File dbDir = currentDb.getParentFile();
+        if (dbDir != null && !dbDir.exists()) {
+            dbDir.mkdirs();
+        }
+
+        // 4. ✅ CORRECTION CRITIQUE 3 & 4 : Suppression de takePersistableUriPermission 
+        // et utilisation du Try-with-resources pour fermer automatiquement les flux en toutes circonstances
+        try (InputStream is = getContentResolver().openInputStream(uri);
+             FileOutputStream fos = new FileOutputStream(currentDb)) {
+            
+            if (is == null) {
+                throw new IOException("Impossible d'ouvrir le flux de lecture de l'URI.");
             }
-            EventDatabase.resetInstance();
-            InputStream is = getContentResolver().openInputStream(uri);
-            FileOutputStream fos = new FileOutputStream(currentDb);
-            byte[] buffer = new byte[1024];
+
+            byte[] buffer = new byte[4096]; // Augmentation à 4Ko pour accélérer le transfert du fichier
             int length;
             while ((length = is.read(buffer)) > 0) {
                 fos.write(buffer, 0, length);
             }
             fos.flush();
-            fos.close();
-            is.close();
-            eventDb = EventDatabase.getInstance(this);
-            Toast.makeText(this, "Base macro restaurée avec succès", Toast.LENGTH_LONG).show();
-            addLog("✅ Base de données importée avec succès.");
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur lors de l'importation", e);
-            Toast.makeText(this, "Échec de l'importation : " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+
+        // 5. ✅ Réinstanciation sécurisée sur le nouveau fichier fraîchement copié
+        eventDb = EventDatabase.getInstance(this);
+        
+        // 6. ✅ Diagnostic de contrôle immédiat de la structure importée
+        eventDb.diagnostiquerTableEvents();
+        
+        Toast.makeText(this, "Base macro restaurée avec succès", Toast.LENGTH_LONG).show();
+        addLog("✅ Base de données importée et moteur SQL réinitialisé avec succès.");
+
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur critique lors de l'importation", e);
+        Toast.makeText(this, "Échec de l'importation : " + e.getMessage(), Toast.LENGTH_LONG).show();
+        addLog("❌ [ERREUR IMPORT] : " + e.getMessage());
+        
+        // Mesure de secours : réinitialiser l'instance pour ne pas laisser le bot ou l'UI plantés
+        try {
+            EventDatabase.resetInstance();
+            eventDb = EventDatabase.getInstance(this);
+        } catch (Exception ignored) {}
+    }
     }
     private void exportDatabaseToStorage() {
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
