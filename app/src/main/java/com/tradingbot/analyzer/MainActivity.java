@@ -311,7 +311,7 @@ public class MainActivity extends AppCompatActivity {
                 eventDb.close();
                 eventDb = null;
             }
-    
+            EventDatabase.resetInstance();
             InputStream is = getContentResolver().openInputStream(uri);
             FileOutputStream fos = new FileOutputStream(currentDb);
             byte[] buffer = new byte[1024];
