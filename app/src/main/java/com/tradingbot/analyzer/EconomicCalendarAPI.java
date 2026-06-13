@@ -1,7 +1,6 @@
 package com.tradingbot.analyzer;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -11,11 +10,9 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class EconomicCalendarAPI {
-    private static final String TAG            = "EconomicCalendarAPI";
-    private static final String PREFS_NAME     = "TradingBot";
-    private static final String PREF_MACRO_KEY = "macro_api_key";
+    private static final String TAG = "EconomicCalendarAPI";
 
-    // ✅ Clean & Strict : Uniquement Forex Factory
+    // ✅ Flux exclusifs Forex Factory
     private static final String FF_URL_LAST_WEEK = "https://nfs.faireconomy.media/ff_calendar_lastweek.json";
     private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
     private static final String FF_URL_NEXT_WEEK = "https://nfs.faireconomy.media/ff_calendar_nextweek.json";
@@ -37,6 +34,7 @@ public class EconomicCalendarAPI {
             globalAppContext = context.getApplicationContext();
         }
     }
+
     private static final int MAX_RETRIES = 3;
     private static final long INITIAL_BACKOFF_MS = 1000;
 
@@ -48,7 +46,6 @@ public class EconomicCalendarAPI {
                 if (events != null && !events.isEmpty()) {
                     return events;
                 }
-                // ✅ Log si résultat vide sans exception
                 if (attempt < MAX_RETRIES) {
                     logToMain("⚠️ [CALENDRIER] Tentative " + attempt + "/" + MAX_RETRIES + " — réponse vide, retry dans " + (backoff/1000) + "s");
                 }
@@ -72,20 +69,14 @@ public class EconomicCalendarAPI {
     interface FetchFunction {
         List<CalendarEvent> fetch(int hoursAhead) throws Exception;
     }
-    /**
-     * Surcharge essentielle pour préserver la compatibilité ascendante avec EventValidator.preloadCalendar()
-     */
+
     public static List<CalendarEvent> fetchUpcomingEvents(int hoursAhead) {
         return fetchUpcomingEvents(globalAppContext, hoursAhead);
     }
-    // =========================================================================
-    // 🌍 MOTEUR DE PARSING FOREXFACTORY (RÉSOLUTIONS DES ERREURS DE COMPILATION)
-    // =========================================================================
 
-    private static List<CalendarEvent> fetchFromForexFactory(int hoursAhead) throws Exception {
-        // Charge par défaut la semaine en cours
-        return fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, hoursAhead);
-    }
+    // =========================================================================
+    // 🌍 MOTEUR DE PARSING FOREXFACTORY
+    // =========================================================================
 
     private static List<CalendarEvent> fetchFromForexFactoryUrl(String urlString, int hoursAhead) throws Exception {
         List<CalendarEvent> events = new ArrayList<>();
@@ -115,36 +106,26 @@ public class EconomicCalendarAPI {
 
             JSONArray jsonArray = new JSONArray(sb.toString());
             long nowMs = System.currentTimeMillis();
-            //long maxFutureMs = nowMs + ((long) hoursAhead * 3600 * 1000);
 
             for (int i = 0; i < jsonArray.length(); i++) {
                 JSONObject obj = jsonArray.getJSONObject(i);
 
                 String title    = obj.optString("title", "");
                 String country  = obj.optString("country", "");
-                String dateStr  = obj.optString("date", ""); // ISO8601 string
+                String dateStr  = obj.optString("date", ""); 
                 String impact   = obj.optString("impact", "Medium");
                 String forecast = obj.optString("forecast", "N/A");
                 String previous = obj.optString("previous", "N/A");
                 String actual   = obj.optString("actual", "N/A");
 
-                // Filtrage strict sur vos devises clés pour ne pas surcharger la mémoire
                 if (!isTrackedCurrency(country)) continue;
 
-                // Conversion sécurisée de la date ForexFactory
-                // À l'intérieur de la boucle de parsing de fetchFromForexFactoryUrl
-            long eventMs = convertForexFactoryDateToMs(dateStr, timeStr);
-            long maxFutureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000);
-            
-            // ✅ Sécurité : Tolérer jusqu'à 45 min dans le passé pour les annonces récentes, mais ignorer les vieux jours
-            long minPastMs = nowMs - (45 * 60 * 1000L); 
+                // ✅ CORRECTIF CRITIQUE : Signature et paramètres corrigés pour la compilation
+                long eventMs = convertForexFactoryDateToMs(dateStr);
+                long maxFutureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000);
+                long minPastMs = nowMs - (45 * 60 * 1000L); 
 
-            if (hoursAhead == 168 || (eventMs <= maxFutureMs && eventMs >= minPastMs)) {
-                // ... suite de votre traitement (parsing de l'événement) ...
-
-                // Ne capture que les événements pertinents selon la fenêtre horaire (hoursAhead)
-                // Si hoursAhead est négatif ou très grand (Backfill/History), on adapte la logique
-                //if (hoursAhead == 168 || eventMs <= maxFutureMs) { 
+                if (hoursAhead == 168 || (eventMs <= maxFutureMs && eventMs >= minPastMs)) {
                     CalendarEvent event = new CalendarEvent();
                     event.timestamp  = String.valueOf(eventMs / 1000);
                     event.country    = currencyToCountry(country);
@@ -154,10 +135,8 @@ public class EconomicCalendarAPI {
                     event.previous   = formatValue(previous);
                     event.actual     = formatValue(actual);
                     
-                    // Injection automatique de la matrice d'intermarché des 11 actifs
                     event.affectedAssets = mapIndicatorToAssetsIntermarket(event.indicator, event.country);
 
-                    // Filtrage optionnel : Conserver uniquement les impacts Medium/High pour vos actifs
                     if (isMediumHighImpact(event.indicator) || event.importance.equals("HIGH")) {
                         events.add(event);
                     }
@@ -168,19 +147,14 @@ public class EconomicCalendarAPI {
             if (conn != null) conn.disconnect();
         }
         return events;
-     }
+    }
 
-    /**
-     * Point d'entrée principal (Pipeline de données à 3 niveaux)
-     */
     public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
-        Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
-
+        // ✅ Nettoyé : Plus de variable morte targetContext inutile ici
         logToMain("🔄 [CALENDRIER] Chargement ForexFactory (This Week)...");
         List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, h), hoursAhead);
         if (events == null) events = new ArrayList<>();
 
-        // ✅ CORRECTIF CRITIQUE : Charger la semaine prochaine pour éviter l'aveuglement du week-end
         try {
             logToMain("🔄 [CALENDRIER] Chargement ForexFactory (Next Week) pour complétion...");
             List<CalendarEvent> nextWeekEvents = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_NEXT_WEEK, h), hoursAhead);
@@ -192,7 +166,6 @@ public class EconomicCalendarAPI {
         }
 
         if (!events.isEmpty()) {
-            // ✅ Nettoyage strict des doublons (Clé unique = timestamp + indicateur)
             Set<CalendarEvent> uniqueEvents = new TreeSet<>((e1, e2) -> {
                 String k1 = e1.timestamp + "_" + e1.indicator;
                 String k2 = e2.timestamp + "_" + e2.indicator;
@@ -209,17 +182,14 @@ public class EconomicCalendarAPI {
         return new ArrayList<>();
     }
 
-    // ✅ Récupération des événements historiques (jusqu'à 30 jours en arrière)
-// Utilisé pour le backfill automatique des données manquantes
-public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
-    return fetchHistoricalEvents(globalAppContext, daysBack);
-}
+    public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
+        return fetchHistoricalEvents(globalAppContext, daysBack);
+    }
 
     public static List<CalendarEvent> fetchHistoricalEvents(Context context, int daysBack) {
         List<CalendarEvent> allEvents = new ArrayList<>();
         long nowSec = System.currentTimeMillis() / 1000;
 
-        // ── Étape 1 : Récupération et filtrage de LAST_WEEK ──
         try {
             logToMain("🔄 [BACKFILL] Étape 1 : Récupération de LAST_WEEK...");
             List<CalendarEvent> lastWeek = fetchFromForexFactoryUrl(FF_URL_LAST_WEEK, 168);
@@ -237,10 +207,8 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
             logToMain("❌ [BACKFILL] Erreur sur LAST_WEEK : " + e.getMessage());
         }
 
-        // ✅ Sécurité Anti-Rate-Limit (Pause de 1,5 seconde entre les deux requêtes HTTP lourdes)
         try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
 
-        // ── Étape 2 : Récupération et filtrage de THIS_WEEK ──
         try {
             logToMain("🔄 [BACKFILL] Étape 2 : Récupération de THIS_WEEK...");
             List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
@@ -262,9 +230,6 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
         return allEvents;
     }
 
-    /**
-     * ✅ MÉTHODE UTILITAIRE DE SÉCURITÉ : Valide si un événement est bien dans le passé et possède un résultat réel complet
-     */
     private static boolean isValidPastEvent(CalendarEvent e, long nowSec) {
         boolean hasActual = e.actual != null && !e.actual.equalsIgnoreCase("N/A") 
                             && !e.actual.trim().isEmpty() && !e.actual.equalsIgnoreCase("null");
@@ -273,15 +238,9 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
             long eventTs = Long.parseLong(e.timestamp);
             isPast = eventTs < nowSec;
         } catch (Exception ignored) {
-            isPast = hasActual; // Fallback si le timestamp est corrompu mais qu'un résultat est écrit
+            isPast = hasActual; 
         }
         return hasActual && isPast;
-    }
-
-    private static List<CalendarEvent> fetchFromFMP(Context context, int hoursAhead) {
-          logToMain("❌ [FMP] Appel réseau bloqué (méthode dépréciée).");
-        return new ArrayList<>();
-
     }
     
     public static List<String> mapIndicatorToAssetsIntermarket(String indicator, String country) {
@@ -289,313 +248,137 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
         String ind = indicator.toLowerCase(Locale.US);
         String cty = country.toLowerCase(Locale.US);
     
-        assets.add("US10Y"); // Pivot obligatoire d'analyse macro intermarché
+        assets.add("US10Y"); 
     
         if (cty.contains("united states") || cty.equals("us") || cty.startsWith("us ")) {
-    
             if (ind.contains("fomc") || ind.contains("federal reserve") ||
                 ind.contains("interest rate") || ind.contains("rate decision") ||
                 ind.contains("powell") || ind.contains("warsh") ||
                 ind.contains("beige book") || ind.contains("minutes")) {
-                assets.addAll(Arrays.asList(
-                    "GOLD", "SP500", "NASDAQ", "BITCOIN",
-                    "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"
-                ));
-            } else if (ind.contains("cpi") || ind.contains("inflation") ||
-                       ind.contains("consumer price")) {
-                assets.addAll(Arrays.asList(
-                    "GOLD", "SP500", "NASDAQ", "BITCOIN",
-                    "USDJPY", "EURUSD", "GBPUSD", "USDCAD"
-                ));
+                assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "BITCOIN", "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"));
+            } else if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("consumer price")) {
+                assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "BITCOIN", "USDJPY", "EURUSD", "GBPUSD", "USDCAD"));
             } else if (ind.contains("pce") || ind.contains("personal consumption expenditure")) {
-                assets.addAll(Arrays.asList(
-                    "GOLD", "SP500", "NASDAQ", "BITCOIN",
-                    "USDJPY", "EURUSD", "GBPUSD"
-                ));
+                assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "BITCOIN", "USDJPY", "EURUSD", "GBPUSD"));
             } else if (ind.contains("ppi") || ind.contains("producer price")) {
-                assets.addAll(Arrays.asList(
-                    "GOLD", "USDJPY", "EURUSD", "SP500"
-                ));
-            } else if (ind.contains("non-farm") || ind.contains("nfp") ||
-                       ind.contains("payroll")) {
-                assets.addAll(Arrays.asList(
-                    "GOLD", "SP500", "NASDAQ", "BITCOIN",
-                    "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"
-                ));
-            } else if (ind.contains("adp")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
-                ));
-            } else if (ind.contains("jolts") || ind.contains("job openings")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
-                ));
-            } else if (ind.contains("jobless") || ind.contains("initial claims") ||
-                       ind.contains("continuing claims")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"
-                ));
+                assets.addAll(Arrays.asList("GOLD", "USDJPY", "EURUSD", "SP500"));
+            } else if (ind.contains("non-farm") || ind.contains("nfp") || ind.contains("payroll")) {
+                assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "BITCOIN", "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"));
+            } else if (ind.contains("adp") || ind.contains("jolts") || ind.contains("job openings") || ind.contains("jobless") || ind.contains("initial claims") || ind.contains("continuing claims")) {
+                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY", "EURUSD", "GOLD"));
             } else if (ind.contains("gdp") || ind.contains("gross domestic")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY", "GOLD", "USOIL"
-                ));
-            } else if (ind.contains("ism") || ind.contains("pmi") ||
-                       ind.contains("purchasing managers")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY", "USOIL"
-                ));
-            } else if (ind.contains("chicago pmi") || ind.contains("empire state") ||
-                       ind.contains("philly fed") || ind.contains("philadelphia")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY"
-                ));
-            } else if (ind.contains("retail") || ind.contains("consumer spending")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY", "BITCOIN"
-                ));
-            } else if (ind.contains("personal income") || ind.contains("personal spending")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY", "GOLD"
-                ));
-            } else if (ind.contains("michigan") || ind.contains("consumer sentiment") ||
-                       ind.contains("consumer confidence")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USOIL", "BITCOIN"
-                ));
-            } else if (ind.contains("durable goods") || ind.contains("capital goods")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY"
-                ));
+                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY", "GOLD", "USOIL"));
+            } else if (ind.contains("ism") || ind.contains("pmi") || ind.contains("purchasing managers")) {
+                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY", "USOIL"));
+            } else if (ind.contains("chicago pmi") || ind.contains("empire state") || ind.contains("philly fed") || ind.contains("philadelphia") || ind.contains("durable goods") || ind.contains("capital goods") || ind.contains("housing starts") || ind.contains("building permits") || ind.contains("home sales") || ind.contains("existing home") || ind.contains("new home") || ind.contains("pending home")) {
+                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY"));
+            } else if (ind.contains("retail") || ind.contains("consumer spending") || ind.contains("michigan") || ind.contains("consumer sentiment") || ind.contains("consumer confidence")) {
+                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USOIL", "BITCOIN"));
             } else if (ind.contains("industrial production") || ind.contains("capacity utilization")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USOIL", "USDJPY"
-                ));
-            } else if (ind.contains("housing starts") || ind.contains("building permits")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY"
-                ));
-            } else if (ind.contains("home sales") || ind.contains("existing home") ||
-                       ind.contains("new home") || ind.contains("pending home")) {
-                assets.addAll(Arrays.asList(
-                    "SP500", "NASDAQ", "USDJPY"
-                ));
-            } else if (ind.contains("trade balance") || ind.contains("current account")) {
-                assets.addAll(Arrays.asList(
-                    "USDJPY", "EURUSD", "GBPUSD", "GOLD"
-                ));
-            } else if (ind.contains("crude oil") || ind.contains("eia") ||
-                       ind.contains("oil inventories") || ind.contains("distillate") ||
-                       ind.contains("gasoline") || ind.contains("petroleum")) {
-                assets.addAll(Arrays.asList(
-                    "USOIL", "USDCAD", "GOLD", "SP500"
-                ));
-            } else if (ind.contains("opec")) {
-                assets.addAll(Arrays.asList(
-                    "USOIL", "USDCAD", "GOLD", "SP500", "NASDAQ"
-                ));
+                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USOIL", "USDJPY"));
+            } else if (ind.contains("personal income") || ind.contains("personal spending") || ind.contains("trade balance") || ind.contains("current account")) {
+                assets.addAll(Arrays.asList("USDJPY", "EURUSD", "GBPUSD", "GOLD"));
+            } else if (ind.contains("crude oil") || ind.contains("eia") || ind.contains("oil inventories") || ind.contains("distillate") || ind.contains("gasoline") || ind.contains("petroleum") || ind.contains("opec")) {
+                assets.addAll(Arrays.asList("USOIL", "USDCAD", "GOLD", "SP500"));
             }
-    
         } else if (cty.contains("united kingdom") || cty.contains("uk")) {
-                assets.add("GBPUSD");
-                if (ind.contains("cpi") || ind.contains("inflation")) {
-                    assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500"));
-                } else if (ind.contains("boe") || ind.contains("interest rate") ||
-                           ind.contains("monetary policy")) {
-                    assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
-                } else if (ind.contains("gdp") || ind.contains("growth")) {
-                    assets.addAll(Arrays.asList("EURUSD", "GOLD"));
-                } else if (ind.contains("average earnings") || ind.contains("wage")) {
-                    assets.addAll(Arrays.asList("EURUSD", "GOLD"));
-                } else if (ind.contains("claimant count") || ind.contains("unemployment")) {
-                    assets.addAll(Arrays.asList("EURUSD"));
-                } else if (ind.contains("pmi") || ind.contains("retail")) {
-                    assets.addAll(Arrays.asList("EURUSD", "SP500"));
-                }
-    
-        } else if (cty.contains("japan")) {
-                    assets.add("USDJPY");
-                    if (ind.contains("boj") || ind.contains("interest rate") ||
-                        ind.contains("yield curve") || ind.contains("monetary policy")) {
-                        assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "EURUSD", "AUDUSD"));
-                    } else if (ind.contains("cpi") || ind.contains("inflation")) {
-                        assets.addAll(Arrays.asList("GOLD"));
-                    } else if (ind.contains("tankan")) {
-                        assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
-                    } else if (ind.contains("gdp")) {
-                        assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
-                    }
-    
-        } else if (cty.contains("canada")) {
-                assets.addAll(Arrays.asList("USDCAD", "USOIL"));
-                if (ind.contains("boc") || ind.contains("interest rate") ||
-                    ind.contains("rate decision")) {
-                    assets.addAll(Arrays.asList("GOLD", "SP500", "EURUSD"));
-                } else if (ind.contains("cpi") || ind.contains("inflation")) {
-                    assets.addAll(Arrays.asList("GOLD", "EURUSD"));
-                } else if (ind.contains("gdp") || ind.contains("employment")) {
-                    assets.addAll(Arrays.asList("GOLD"));
-                }
-        
-        } else if (cty.contains("australia")) {
-                assets.add("AUDUSD");
-                if (ind.contains("rba") || ind.contains("interest rate") ||
-                    ind.contains("rate decision")) {
-                    assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "USDJPY"));
-                } else if (ind.contains("cpi") || ind.contains("inflation")) {
-                    assets.addAll(Arrays.asList("GOLD", "USDJPY"));
-                } else if (ind.contains("gdp") || ind.contains("employment")) {
-                    assets.addAll(Arrays.asList("GOLD", "USDJPY"));
-                }
-        
-        } else if (cty.contains("eurozone") || cty.contains("euro area") ||
-                       ind.contains("ecb") || ind.contains("lagarde")) {
+            assets.add("GBPUSD");
+            if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("gdp") || ind.contains("growth") || ind.contains("average earnings") || ind.contains("wage")) {
+                assets.addAll(Arrays.asList("EURUSD", "GOLD"));
+            } else if (ind.contains("boe") || ind.contains("interest rate") || ind.contains("monetary policy")) {
+                assets.addAll(Arrays.asList("EURUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
+            } else if (ind.contains("claimant count") || ind.contains("unemployment")) {
                 assets.add("EURUSD");
-                if (ind.contains("ecb") || ind.contains("interest rate") ||
-                    ind.contains("rate decision") || ind.contains("lagarde")) {
-                    assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
-                } else if (ind.contains("cpi") || ind.contains("inflation") ||
-                           ind.contains("hicp")) {
-                    assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500"));
-                } else if (ind.contains("gdp") || ind.contains("growth")) {
-                    assets.addAll(Arrays.asList("GBPUSD", "GOLD", "USOIL"));
-                } else if (ind.contains("pmi") || ind.contains("ifo") || ind.contains("zew")) {
-                    assets.addAll(Arrays.asList("GBPUSD", "SP500", "USOIL"));
-                } else if (ind.contains("retail") || ind.contains("consumer")) {
-                    assets.addAll(Arrays.asList("GBPUSD", "SP500"));
-                } else if (ind.contains("unemployment") || ind.contains("jobless")) {
-                    assets.addAll(Arrays.asList("GBPUSD"));
-                }
-        
-        } else if (cty.contains("china") || cty.contains("chinese")) {
-                assets.addAll(Arrays.asList("AUDUSD", "USDJPY", "USOIL"));
-                if (ind.contains("caixin") || ind.contains("pmi")) {
-                    assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD"));
-                } else if (ind.contains("gdp") || ind.contains("growth")) {
-                    assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD", "USOIL"));
-                } else if (ind.contains("trade balance") || ind.contains("exports")) {
-                    assets.addAll(Arrays.asList("GOLD", "SP500"));
-                }
+            } else if (ind.contains("pmi") || ind.contains("retail")) {
+                assets.addAll(Arrays.asList("EURUSD", "SP500"));
             }
-    
-            return new ArrayList<>(new LinkedHashSet<>(assets));
-    }
-    
-    private static List<CalendarEvent> generateInstitutionalExhaustiveFallback() {
-        List<CalendarEvent> list = new ArrayList<>();
-        long nowSeconds = System.currentTimeMillis() / 1000;
-
-        String[][] drivers = {
-            {"United States", "FOMC INTEREST RATE DECISION",      "HIGH",   "4.75%",  "5.00%"},
-            {"United States", "CORE CPI INFLATION MOM",           "HIGH",   "0.2%",   "0.3%"},
-            {"United States", "NON-FARM PAYROLLS EMPLOYMENT",     "HIGH",   "160K",   "185K"},
-            {"United States", "CORE PCE PRICE INDEX YOY",         "HIGH",   "2.6%",   "2.7%"},
-            {"United States", "ISM MANUFACTURING PMI",            "HIGH",   "49.1",   "48.2"},
-            {"United States", "GROSS DOMESTIC PRODUCT (GDP) QOQ", "HIGH",   "2.1%",   "2.5%"}
-        };
-
-        for (int i = 0; i < drivers.length; i++) {
-            CalendarEvent e  = new CalendarEvent();
-            e.timestamp      = String.valueOf(nowSeconds + ((long) i * 1800));
-            e.country        = drivers[i][0];
-            e.indicator      = drivers[i][1];
-            e.importance     = drivers[i][2];
-            e.forecast       = drivers[i][3];
-            e.previous       = drivers[i][4];
-            e.actual         = "N/A";
-            e.affectedAssets = mapIndicatorToAssetsIntermarket(e.indicator, e.country);
-            list.add(e);
+        } else if (cty.contains("japan")) {
+            assets.add("USDJPY");
+            if (ind.contains("boj") || ind.contains("interest rate") || ind.contains("yield curve") || ind.contains("monetary policy")) {
+                assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "EURUSD", "AUDUSD"));
+            } else if (ind.contains("cpi") || ind.contains("inflation")) {
+                assets.add("GOLD");
+            } else if (ind.contains("tankan") || ind.contains("gdp")) {
+                assets.addAll(Arrays.asList("GOLD", "AUDUSD"));
+            }
+        } else if (cty.contains("canada")) {
+            assets.addAll(Arrays.asList("USDCAD", "USOIL"));
+            if (ind.contains("boc") || ind.contains("interest rate") || ind.contains("rate decision")) {
+                assets.addAll(Arrays.asList("GOLD", "SP500", "EURUSD"));
+            } else if (ind.contains("cpi") || ind.contains("inflation")) {
+                assets.addAll(Arrays.asList("GOLD", "EURUSD"));
+            } else if (ind.contains("gdp") || ind.contains("employment")) {
+                assets.add("GOLD");
+            }
+        } else if (cty.contains("australia")) {
+            assets.add("AUDUSD");
+            if (ind.contains("rba") || ind.contains("interest rate") || ind.contains("rate decision")) {
+                assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "USDJPY"));
+            } else if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("gdp") || ind.contains("employment")) {
+                assets.addAll(Arrays.asList("GOLD", "USDJPY"));
+            }
+        } else if (cty.contains("eurozone") || cty.contains("euro area") || ind.contains("ecb") || ind.contains("lagarde")) {
+            assets.add("EURUSD");
+            if (ind.contains("ecb") || ind.contains("interest rate") || ind.contains("rate decision") || ind.contains("lagarde")) {
+                assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500", "NASDAQ", "USDJPY"));
+            } else if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("hicp") || ind.contains("retail") || ind.contains("consumer")) {
+                assets.addAll(Arrays.asList("GBPUSD", "SP500"));
+            } else if (ind.contains("gdp") || ind.contains("growth") || ind.contains("pmi") || ind.contains("ifo") || ind.contains("zew")) {
+                assets.addAll(Arrays.asList("GBPUSD", "USOIL"));
+            } else if (ind.contains("unemployment") || ind.contains("jobless")) {
+                assets.add("GBPUSD");
+            }
+        } else if (cty.contains("china") || cty.contains("chinese")) {
+            assets.addAll(Arrays.asList("AUDUSD", "USDJPY", "USOIL"));
+            if (ind.contains("caixin") || ind.contains("pmi") || ind.contains("trade balance") || ind.contains("exports")) {
+                assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD"));
+            } else if (ind.contains("gdp") || ind.contains("growth")) {
+                assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD", "USOIL"));
+            }
         }
-        return list;
+        return new ArrayList<>(new LinkedHashSet<>(assets));
     }
+    
     private static boolean isMediumHighImpact(String eventName) {
         if (eventName == null || eventName.isEmpty()) return false;
         String ind = eventName.toLowerCase(Locale.US);
-        return ind.contains("initial jobless claims") ||
-               ind.contains("jobless claims") ||
-               ind.contains("continuing claims") ||
-               ind.contains("unemployment claims") ||
-               ind.contains("adp employment")              ||
-               ind.contains("jolts")                       ||
-               ind.contains("job openings")                ||
-               ind.contains("ppi")                         ||
-               ind.contains("producer price")              ||
-               ind.contains("gdp")                         ||
-               ind.contains("gross domestic product")      ||
-               ind.contains("industrial production")       ||
-               ind.contains("durable goods")               ||
-               ind.contains("chicago pmi")                 ||
-               ind.contains("philly fed")                  ||
-               ind.contains("empire state")                ||
-               ind.contains("michigan")                    ||
-               ind.contains("consumer confidence")         ||
-               ind.contains("consumer sentiment")          ||
-               ind.contains("retail sales")                ||
-               ind.contains("building permits")            ||  // ajouté
-               ind.contains("housing starts")              ||  // ajouté
-               ind.contains("eia")                         ||
-               ind.contains("crude oil inventories")       ||
-               ind.contains("opec")                        ||
-               ind.contains("minutes")                     ||
-               ind.contains("powell")                      ||
-               ind.contains("warsh")                       ||
-               ind.contains("beige book")                  ||
-               ind.contains("trade balance")               ||  // ajouté
-               ind.contains("current account")             ||  // ajouté
-               ind.contains("personal spending")           ||  // ajouté
-               ind.contains("personal income");                // ajouté
-    }
-    private static String convertFMPDateToUnixSeconds(String dateStr) {
-    if (dateStr == null || dateStr.isEmpty())
-        return String.valueOf(System.currentTimeMillis() / 1000);
-    try {
-        // ✅ FMP retourne les heures en heure de New York (EST/EDT)
-        // America/New_York gère automatiquement le DST (EDT UTC-4 été, EST UTC-5 hiver)
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
-        sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
-        return String.valueOf(sdf.parse(dateStr).getTime() / 1000);
-    } catch (Exception e) {
-        try {
-            // ✅ Date sans heure → assigner 00:00 New York
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-            sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
-            return String.valueOf(sdf.parse(dateStr).getTime() / 1000);
-        } catch (Exception e2) {
-            return String.valueOf(System.currentTimeMillis() / 1000);
-        }
-    }
+        return ind.contains("initial jobless claims") || ind.contains("jobless claims") || ind.contains("continuing claims") || ind.contains("unemployment claims") ||
+               ind.contains("adp employment") || ind.contains("jolts") || ind.contains("job openings") || ind.contains("ppi") || ind.contains("producer price") ||
+               ind.contains("gdp") || ind.contains("gross domestic product") || ind.contains("industrial production") || ind.contains("durable goods") ||
+               ind.contains("chicago pmi") || ind.contains("philly fed") || ind.contains("empire state") || ind.contains("michigan") ||
+               ind.contains("consumer confidence") || ind.contains("consumer sentiment") || ind.contains("retail sales") || ind.contains("building permits") ||
+               ind.contains("housing starts") || ind.contains("eia") || ind.contains("crude oil inventories") || ind.contains("opec") ||
+               ind.contains("minutes") || ind.contains("powell") || ind.contains("warsh") || ind.contains("beige book") ||
+               ind.contains("trade balance") || ind.contains("current account") || ind.contains("personal spending") || ind.contains("personal income");
     }
     
     private static long convertForexFactoryDateToMs(String dateStr) {
-    if (dateStr == null || dateStr.isEmpty())
-        return System.currentTimeMillis();
-    try {
-        // ✅ Format avec timezone explicite (ex: 2026-06-05T08:30:00-04:00)
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US);
-        return sdf.parse(dateStr).getTime();
-    } catch (Exception e) {
+        if (dateStr == null || dateStr.isEmpty()) return System.currentTimeMillis();
         try {
-            // ✅ Format sans timezone → New York par défaut (DST automatique)
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
-            sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US);
             return sdf.parse(dateStr).getTime();
-        } catch (Exception e2) {
+        } catch (Exception e) {
             try {
-                // ✅ Date seule → New York minuit
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
                 sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
                 return sdf.parse(dateStr).getTime();
-            } catch (Exception e3) {
-                return System.currentTimeMillis();
+            } catch (Exception e2) {
+                try {
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                    sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
+                    return sdf.parse(dateStr).getTime();
+                } catch (Exception e3) {
+                    return System.currentTimeMillis();
+                }
             }
         }
     }
-        }
 
     private static String formatValue(String value) {
         if (value == null || value.isEmpty() || value.equalsIgnoreCase("null")) return "N/A";
         String trimmed = value.trim();
         if (trimmed.startsWith(".")) {
-            trimmed = "0" + trimmed; // Standardisation pour alignement numérique (.3% -> 0.3%)
+            trimmed = "0" + trimmed;
         }
         return trimmed;
     }
@@ -617,46 +400,33 @@ public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
         }
     }
 
-    /**
- * Rafraîchit les valeurs 'actual' des événements récents stockés localement en interrogeant Forex Factory
- */
-public static void refreshMissingActuals(Context context) {
-    logToMain("🔄 [FOREXFACTORY] Vérification des résultats publiés (Actuals)...");
-    try {
-        // 1. Récupérer les événements publiés cette semaine sur Forex Factory
-        List<CalendarEvent> currentWeekEvents = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
-        EventDatabase db = EventDatabase.getInstance(context);
-        int updatedCount = 0;
+    public static void refreshMissingActuals(Context context) {
+        logToMain("🔄 [FOREXFACTORY] Vérification des résultats publiés (Actuals)...");
+        try {
+            List<CalendarEvent> currentWeekEvents = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
+            EventDatabase db = EventDatabase.getInstance(context);
+            int updatedCount = 0;
 
-        for (CalendarEvent webEvent : currentWeekEvents) {
-            // Si Forex Factory a publié un résultat concret (différent de N/A)
-            if (webEvent.actual != null && !webEvent.actual.equalsIgnoreCase("N/A") && !webEvent.actual.isEmpty()) {
-                
-                long timestampSec = Long.parseLong(webEvent.timestamp);
-                
-                // Mettre à jour SQLite uniquement si la valeur locale actuelle est encore à "N/A"
-                boolean updated = db.updateActualIfMissing(webEvent.indicator, timestampSec, webEvent.actual);
-                if (updated) {
-                    updatedCount++;
-                    logToMain("✅ [MAJ ACTUAL] " + webEvent.indicator + " -> " + webEvent.actual);
-                    
-                    // Optionnel : Déclencher ici une analyse post-publication (via Groq / Telegram)
-                    // si vous souhaitez notifier le groupe du résultat chiffré !
+            for (CalendarEvent webEvent : currentWeekEvents) {
+                if (webEvent.actual != null && !webEvent.actual.equalsIgnoreCase("N/A") && !webEvent.actual.isEmpty()) {
+                    long timestampSec = Long.parseLong(webEvent.timestamp);
+                    boolean updated = db.updateActualIfMissing(webEvent.indicator, timestampSec, webEvent.actual);
+                    if (updated) {
+                        updatedCount++;
+                        logToMain("✅ [MAJ ACTUAL] " + webEvent.indicator + " -> " + webEvent.actual);
+                    }
                 }
             }
+            if (updatedCount > 0) {
+                logToMain("📊 [FOREXFACTORY] Synchronisation terminée : " + updatedCount + " valeurs 'actual' mises à jour.");
+            } else {
+                logToMain("ℹ️ [FOREXFACTORY] Aucun nouveau résultat à mettre à jour.");
+            }
+        } catch (Exception e) {
+            logToMain("❌ [FOREXFACTORY] Erreur lors du refresh des actuals : " + e.getMessage());
         }
-        
-        if (updatedCount > 0) {
-            logToMain("📊 [FOREXFACTORY] Synchronisation terminée : " + updatedCount + " valeurs 'actual' mises à jour.");
-        } else {
-            logToMain("ℹ️ [FOREXFACTORY] Aucun nouveau résultat à mettre à jour.");
-        }
+    }
 
-    } catch (Exception e) {
-        logToMain("❌ [FOREXFACTORY] Erreur lors du refresh des actuals : " + e.getMessage());
-    }
-    }
-    // ── Log vers MainActivity + Logcat ──
     private static void logToMain(String message) {
         Log.d(TAG, message);
         if (MainActivity.instance != null) {
