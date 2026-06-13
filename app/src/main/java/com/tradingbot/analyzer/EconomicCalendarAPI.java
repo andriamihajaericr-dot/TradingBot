@@ -182,22 +182,6 @@ public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hours
         List<CalendarEvent> allEvents = new ArrayList<>();
         long nowSec = System.currentTimeMillis() / 1000;
 
-        try {
-            logToMain("🔄 [BACKFILL] Étape 1 : Récupération de LAST_WEEK...");
-            List<CalendarEvent> lastWeek = fetchFromForexFactoryUrl(FF_URL_LAST_WEEK, 168);
-            int countLast = 0;
-            if (lastWeek != null) {
-                for (CalendarEvent e : lastWeek) {
-                    if (isValidPastEvent(e, nowSec)) {
-                        allEvents.add(e);
-                        countLast++;
-                    }
-                }
-            }
-            logToMain("✅ [BACKFILL] LastWeek traités : " + countLast + " événements passés trouvés.");
-        } catch (Exception e) {
-            logToMain("❌ [BACKFILL] Erreur sur LAST_WEEK : " + e.getMessage());
-        }
 
         try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
 
