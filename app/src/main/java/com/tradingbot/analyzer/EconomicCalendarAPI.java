@@ -158,6 +158,7 @@ public class EconomicCalendarAPI {
         return events;
     }
 
+    
     public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
         logToMain("🔄 [CALENDRIER] Chargement ForexFactory (This Week)...");
         List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, h), hoursAhead);
@@ -185,10 +186,6 @@ public class EconomicCalendarAPI {
             logToMain("✅ [CALENDRIER] ForexFactory : " + cleanedList.size() + " événements chargés.");
             return cleanedList;
         }
-
-        logToMain("⚠️ [CALENDRIER] ForexFactory indisponible — Aucun événement chargé.");
-        return new ArrayList<>();
-    }
 
     public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
         return fetchHistoricalEvents(globalAppContext, daysBack);
