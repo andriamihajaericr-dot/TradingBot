@@ -75,40 +75,8 @@ public class EconomicCalendarAPI {
     /**
      * Surcharge essentielle pour préserver la compatibilité ascendante avec EventValidator.preloadCalendar()
      */
-    public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
-        Context targetContext = (context != null) ? context.getApplicationContext() : globalAppContext;
-
-        logToMain("🔄 [CALENDRIER] Chargement ForexFactory (This Week)...");
-        List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, h), hoursAhead);
-        if (events == null) events = new ArrayList<>();
-
-        // ✅ CORRECTIF CRITIQUE : Charger la semaine prochaine pour éviter l'aveuglement du week-end
-        try {
-            logToMain("🔄 [CALENDRIER] Chargement ForexFactory (Next Week) pour complétion...");
-            List<CalendarEvent> nextWeekEvents = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_NEXT_WEEK, h), hoursAhead);
-            if (nextWeekEvents != null && !nextWeekEvents.isEmpty()) {
-                events.addAll(nextWeekEvents);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Impossible de charger la semaine suivante: " + e.getMessage());
-        }
-
-        if (!events.isEmpty()) {
-            // ✅ Nettoyage strict des doublons (Clé unique = timestamp + indicateur)
-            Set<CalendarEvent> uniqueEvents = new TreeSet<>((e1, e2) -> {
-                String k1 = e1.timestamp + "_" + e1.indicator;
-                String k2 = e2.timestamp + "_" + e2.indicator;
-                return k1.compareTo(k2);
-            });
-            uniqueEvents.addAll(events);
-            List<CalendarEvent> cleanedList = new ArrayList<>(uniqueEvents);
-
-            logToMain("✅ [CALENDRIER] ForexFactory : " + cleanedList.size() + " événements chargés (Total combiné)");
-            return cleanedList;
-        }
-
-        logToMain("⚠️ [CALENDRIER] ForexFactory indisponible — Aucun événement chargé.");
-        return new ArrayList<>();
+    public static List<CalendarEvent> fetchUpcomingEvents(int hoursAhead) {
+        return fetchUpcomingEvents(globalAppContext, hoursAhead);
     }
     // =========================================================================
     // 🌍 MOTEUR DE PARSING FOREXFACTORY (RÉSOLUTIONS DES ERREURS DE COMPILATION)
