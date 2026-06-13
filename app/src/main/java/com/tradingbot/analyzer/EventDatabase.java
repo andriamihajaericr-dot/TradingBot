@@ -20,11 +20,8 @@ public class EventDatabase extends SQLiteOpenHelper {
     private static final int DATABASE_VERSION = 3;
     public static final String TABLE_EVENTS = "events";
     
-    private static volatile EventDatabase instance;
-
     // Implémentation du Singleton pour la sécurité d'accès concurrentiel (WAL)
     private static volatile EventDatabase instance;
-
     public static EventDatabase getInstance(Context context) {
         if (instance == null) {
             synchronized (EventDatabase.class) {
