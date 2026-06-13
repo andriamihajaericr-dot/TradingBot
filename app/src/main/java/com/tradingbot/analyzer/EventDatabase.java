@@ -8,19 +8,18 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.TimeZone;  // ✅ ajouter
-import java.util.Date;      // ✅ ajouter si absent
-import java.text.SimpleDateFormat;
+import java.util.TimeZone;  
+import java.util.Date;      
 import java.util.List;
 import java.util.Locale;
 import java.util.ArrayList;
 
 public class EventDatabase extends SQLiteOpenHelper {
-    private static final String TAG = "EventDatabase";   // <-- À AJOUTER
+    private static final String TAG = "EventDatabase";   
     private static final String DATABASE_NAME = "trading_bot.db";
     private static final int DATABASE_VERSION = 3;
     public static final String TABLE_EVENTS = "events";
-    // Implémentation du Singleton pour la sécurité d'accès concurrentiel (WAL)
+    
     private static volatile EventDatabase instance;
 
     public static EventDatabase getInstance(Context context) {
@@ -40,19 +39,13 @@ public class EventDatabase extends SQLiteOpenHelper {
     private EventDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
-    
-    public static void resetInstance() {
-        synchronized (EventDatabase.class) {
-           instance = null;
-        }
-    }
 
     @Override
     public void onConfigure(SQLiteDatabase db) {
         super.onConfigure(db);
-        // Activation du mode WAL (Write-Ahead Logging) pour éviter les accès bloquants
         db.enableWriteAheadLogging();
     }
+
     @Override
     public void onCreate(SQLiteDatabase db) {
         String createTable = "CREATE TABLE " + TABLE_EVENTS + " (" +
@@ -70,7 +63,6 @@ public class EventDatabase extends SQLiteOpenHelper {
                 "driver_weight INTEGER DEFAULT 1)";
         db.execSQL(createTable);
 
-        // Index principal (le plus important)
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_time_weight ON " + 
                    TABLE_EVENTS + "(unix_timestamp, driver_weight);");
     }
@@ -83,13 +75,11 @@ public class EventDatabase extends SQLiteOpenHelper {
             } catch (Exception e) {
                 Log.d("EventDatabase", "driver_weight déjà présent");
             }
-            // FIX #7 : index créé directement dans le bloc de migration v3 (garantie)
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_time_weight ON " +
                        TABLE_EVENTS + "(unix_timestamp, driver_weight);");
         }
     }
 
-    // FIX #1 : timestamp en long (évite la troncature Y2K38 avec un int)
     public synchronized boolean saveEvent(String fingerprint, String pkg, String src, String type,
                                           String title, String content, String assets, String impact,
                                           long timestamp, String status, int weight) {
@@ -113,9 +103,7 @@ public class EventDatabase extends SQLiteOpenHelper {
 
     public Cursor getUnsyncedEvents(long currentUnixTime) {
         SQLiteDatabase db = this.getReadableDatabase();
-        // CORRECTION : Fenêtre élargie à 6h (21600s) pour couvrir les périodes offline prolongées
         long threshold = currentUnixTime - 21600;
-        // FIX #2 : valeur unifiée "pending" (cohérence avec NotificationService)
         return db.query(TABLE_EVENTS, null,
                 "sync_status = ? AND unix_timestamp >= ? AND driver_weight >= 2",
                 new String[]{"pending", String.valueOf(threshold)},
@@ -131,18 +119,14 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
     
     public synchronized void updateEventWeight(String hash, int weight) {
-    SQLiteDatabase db = this.getWritableDatabase();
-    ContentValues values = new ContentValues();
-    
-    // 🟢 CORRECTION : On utilise le vrai nom de la colonne défini dans le onCreate
-    values.put("driver_weight", weight); 
-    
-    try {
-        // On conserve votre logique parfaite par fingerprint (hash)
-        db.update(TABLE_EVENTS, values, "fingerprint = ?", new String[]{hash});
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur lors de la mise à jour du poids pour le hash : " + hash, e);
-    }
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("driver_weight", weight); 
+        try {
+            db.update(TABLE_EVENTS, values, "fingerprint = ?", new String[]{hash});
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur lors de la mise à jour du poids pour le hash : " + hash, e);
+        }
     }
     
     public String getRecentEventsForAssets(List<String> assets, int limit) {
@@ -188,80 +172,74 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
 
     public String getDailyMacroSummary(long currentUnixTime) {
-    long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
-    long sevenDaysAgo       = currentUnixTime - (7L * 24 * 60 * 60);
+        long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
+        long sevenDaysAgo       = currentUnixTime - (7L * 24 * 60 * 60);
 
-    // ✅ 3 fenêtres combinées :
-    // 1. 24h — tous drivers >= 3 (news + macro normaux)
-    // 2. 7j — Rang Suprême weight=5 (NFP/CPI de la semaine)
-    // 3. 7j — GEO event_type ou impact (Iran/Israël même si > 24h)
-    String selection =
-        "(unix_timestamp >= ? AND driver_weight >= 3) OR " +
-        "(unix_timestamp >= ? AND driver_weight = 5) OR " +
-        "(unix_timestamp >= ? AND (" +
-            "event_type = 'GEOPOLITICAL' OR " +
-            "event_type LIKE '%GEO%' OR " +
-            "impact LIKE '%Choc Géopolitique%' OR " +
-            "impact LIKE '%GÉOPOLITIQUE%'" +
-        ") AND driver_weight >= 2)";
+        String selection =
+            "(unix_timestamp >= ? AND driver_weight >= 3) OR " +
+            "(unix_timestamp >= ? AND driver_weight = 5) OR " +
+            "(unix_timestamp >= ? AND (" +
+                "event_type = 'GEOPOLITICAL' OR " +
+                "event_type LIKE '%GEO%' OR " +
+                "impact LIKE '%Choc Géopolitique%' OR " +
+                "impact LIKE '%GÉOPOLITIQUE%'" +
+            ") AND driver_weight >= 2)";
 
-    String[] whereArgs = new String[]{
-        String.valueOf(twentyFourHoursAgo),  // fenêtre 1
-        String.valueOf(sevenDaysAgo),         // fenêtre 2
-        String.valueOf(sevenDaysAgo)          // fenêtre 3
-    };
+        String[] whereArgs = new String[]{
+            String.valueOf(twentyFourHoursAgo),  
+            String.valueOf(sevenDaysAgo),         
+            String.valueOf(sevenDaysAgo)          
+        };
 
-    SQLiteDatabase db = this.getReadableDatabase();
-    StringBuilder sb = new StringBuilder();
-    Cursor cursor = null;
-    try {
-        cursor = db.query(TABLE_EVENTS,
-                new String[]{"source", "title", "feed_content", "impact", "event_type"},
-                selection, whereArgs, null, null, "unix_timestamp ASC");
+        SQLiteDatabase db = this.getReadableDatabase();
+        StringBuilder sb = new StringBuilder();
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_EVENTS,
+                    new String[]{"source", "title", "feed_content", "impact", "event_type"},
+                    selection, whereArgs, null, null, "unix_timestamp ASC");
 
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-                String src     = cursor.getString(0);
-                String title   = cursor.getString(1);
-                String content = cursor.getString(2);
-                String impact  = cursor.getString(3);
-                String type    = cursor.getString(4);
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String src     = cursor.getString(0);
+                    String title   = cursor.getString(1);
+                    String content = cursor.getString(2);
+                    String impact  = cursor.getString(3);
+                    String type    = cursor.getString(4);
 
-                // ✅ Nettoyage de l'en-tête temporel pour économiser les tokens
-                if (content != null && content.contains("\n\n")) {
-                    String[] parts = content.split("\n\n", 2);
-                    if (parts.length > 1) content = parts[1];
-                }
+                    if (content != null && content.contains("\n\n")) {
+                        String[] parts = content.split("\n\n", 2);
+                        if (parts.length > 1) content = parts[1];
+                    }
 
-                // ✅ Différenciation calendaire / GEO / news
-                boolean isCalendarResult = "CALENDAR-RESULT".equals(type) ||
-                    (impact != null && impact.startsWith("CALENDRIER ÉCONOMIQUE"));
-                boolean isGeoEvent = "GEOPOLITICAL".equals(type) ||
-                    (type != null && type.contains("GEO")) ||
-                    (impact != null && impact.contains("Choc Géopolitique"));
+                    boolean isCalendarResult = "CALENDAR-RESULT".equals(type) ||
+                        (impact != null && impact.startsWith("CALENDRIER ÉCONOMIQUE"));
+                    boolean isGeoEvent = "GEOPOLITICAL".equals(type) ||
+                        (type != null && type.contains("GEO")) ||
+                        (impact != null && impact.contains("Choc Géopolitique"));
 
-                if (isCalendarResult) {
-                    sb.append("--- 📅 RÉSULTAT CALENDAIRE OFFICIEL ---\n");
-                } else if (isGeoEvent) {
-                    sb.append("--- 🌍 ÉVÉNEMENT GÉOPOLITIQUE ---\n"); // ✅ ajout
-                } else {
-                    sb.append("--- ⚡ ALERTE MACRO / NEWS ---\n");
-                }
+                    if (isCalendarResult) {
+                        sb.append("--- 📅 RÉSULTAT CALENDAIRE OFFICIEL ---\n");
+                    } else if (isGeoEvent) {
+                        sb.append("--- 🌍 ÉVÉNEMENT GÉOPOLITIQUE ---\n"); 
+                    } else {
+                        sb.append("--- ⚡ ALERTE MACRO / NEWS ---\n");
+                    }
 
-                sb.append("Source: ").append(src).append("\n");
-                sb.append("Titre: ").append(title).append("\n");
-                sb.append("Contenu: ").append(content).append("\n");
-                sb.append("Impact calculé: ").append(impact).append("\n\n");
+                    sb.append("Source: ").append(src).append("\n");
+                    sb.append("Titre: ").append(title).append("\n");
+                    sb.append("Contenu: ").append(content).append("\n");
+                    sb.append("Impact calculé: ").append(impact).append("\n\n");
 
-            } while (cursor.moveToNext());
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e("EventDatabase", "Erreur construction Daily Macro Summary", e);
+        } finally {
+            if (cursor != null) cursor.close();
         }
-    } catch (Exception e) {
-        Log.e("EventDatabase", "Erreur construction Daily Macro Summary", e);
-    } finally {
-        if (cursor != null) cursor.close();
+        return sb.toString();
     }
-    return sb.toString();
-}
     
     public String getMonthlyMacroRegistry(long currentUnixTime) {
         SQLiteDatabase db = this.getReadableDatabase();
@@ -286,7 +264,6 @@ public class EventDatabase extends SQLiteOpenHelper {
         return sb.toString();
     }
 
-    // FIX #3 : double DELETE encapsulé dans une transaction atomique
     public void purgeOldEvents(long currentUnixTime) {
         SQLiteDatabase db = this.getWritableDatabase();
         db.beginTransaction();
@@ -310,7 +287,7 @@ public class EventDatabase extends SQLiteOpenHelper {
         
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
-        long twoHoursAgo = currentUnixTime - (2 * 60 * 60); // 2 heures
+        long twoHoursAgo = currentUnixTime - (2 * 60 * 60); 
         
         try {
             cursor = db.rawQuery(
@@ -327,11 +304,6 @@ public class EventDatabase extends SQLiteOpenHelper {
         }
     }
 
-    /**
- * Récupère le dernier événement d'un type donné (ex: "FED-MONETARY-POLICY")
- * pour l'envoyer dans un rappel Telegram.
- * @return une chaîne formatée avec l'heure, le titre, le contenu tronqué et l'impact.
- */
     public String getLastEventByType(String eventType) {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
@@ -348,7 +320,6 @@ public class EventDatabase extends SQLiteOpenHelper {
                 java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM HH:mm:ss", java.util.Locale.FRANCE);
                 sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
                 String timeStr = sdf.format(new java.util.Date(ts * 1000));
-                // Troncature du contenu à 200 caractères pour éviter les messages trop longs
                 String shortContent = content.length() > 200 ? content.substring(0, 200) + "…" : content;
                 return "🕒 " + timeStr + "\n📌 " + title + "\n📝 " + shortContent + "\n⚡ Impact: " + impact;
             }
@@ -359,19 +330,12 @@ public class EventDatabase extends SQLiteOpenHelper {
         }
         return "Aucun historique trouvé pour ce driver.";
     }
-    /**
-     * Récupère l'intégralité du contenu textuel des notifications des 30 dernières minutes
-     */
-    /**
-     * Récupère l'intégralité du contenu textuel des notifications des 30 dernières minutes
-     * CORRECTION : Remplacement de la colonne fictive 'description' par 'feed_content'
-     */
+
     public List<String> obtenirTexteEvenementsRecents() {
         List<String> historique = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
         
-        // 30 minutes converties en secondes
         long trenteMinutesEnSec = (System.currentTimeMillis() / 1000L) - (30 * 60);
         
         try {
@@ -391,16 +355,12 @@ public class EventDatabase extends SQLiteOpenHelper {
         }
         return historique;
     }
-    /**
- * Extrait l'unique dernier driver macroéconomique de la base de données
- * pour servir de rappel brut.
- */
+
     public String obtenirLeToutDernierDriver() {
         StringBuilder sb = new StringBuilder();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
         try {
-            // ✅ SÉCURITÉ : On cherche le dernier événement validé et synchronisé par le bot
             cursor = db.rawQuery(
                 "SELECT unix_timestamp, title, feed_content FROM " + TABLE_EVENTS + 
                 " WHERE sync_status = 'synced' ORDER BY unix_timestamp DESC LIMIT 1", 
@@ -426,7 +386,7 @@ public class EventDatabase extends SQLiteOpenHelper {
         }
         return sb.toString();
     }
-    //LISTER LES DONNÉES DE LA BASE DE DONNÉES 
+
     public void diagnostiquerTableEvents() {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
@@ -437,7 +397,6 @@ public class EventDatabase extends SQLiteOpenHelper {
                 null
             );
     
-            // Utilisé à la place de Log.d pour forcer l'apparition dans la console GitHub Actions
             System.out.println("=== GITHUB RUNNER DIAGNOSTIC: TABLE EVENTS ===");
             if (cursor != null && cursor.moveToFirst()) {
                 int count = 0;
@@ -467,360 +426,385 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
 
     public String getDerniersDriversGeo(long currentUnixTime) {
-    SQLiteDatabase db = this.getReadableDatabase();
-    StringBuilder sb = new StringBuilder();
-    long fortyEightHoursAgo = currentUnixTime - (48 * 60 * 60);
-    Cursor cursor = null;
-    try {
-        cursor = db.query(TABLE_EVENTS,
-    new String[]{"title", "impact", "unix_timestamp"},
-    "unix_timestamp >= ? AND (" +
-    // ✅ Détection via event_type — le plus fiable
-    "event_type = 'GEOPOLITICAL' OR " +
-    "event_type LIKE '%GEO%' OR " +
-    // ✅ Détection via impact descriptif
-    "impact LIKE '%Choc Géopolitique%' OR " +
-    "impact LIKE '%GÉOPOLITIQUE%' OR " +
-    "impact LIKE '%GEO%' OR " +
-    // ✅ Détection via titre — élargi avec nouveaux mots-clés
-    "title LIKE '%IRAN%' OR title LIKE '%iran%' OR " +
-    "title LIKE '%ISRAEL%' OR title LIKE '%israel%' OR " +
-    "title LIKE '%TEHRAN%' OR title LIKE '%tehran%' OR " +
-    "title LIKE '%AIRSTRIKE%' OR title LIKE '%airstrike%' OR " +
-    "title LIKE '%STRIKE%' OR title LIKE '%strike%' OR " +
-    "title LIKE '%ATTACK%' OR title LIKE '%attack%' OR " +
-    "title LIKE '%MISSILE%' OR title LIKE '%missile%' OR " +
-    "title LIKE '%DRONE%' OR title LIKE '%drone%' OR " +
-    "title LIKE '%UKRAINE%' OR title LIKE '%ukraine%' OR " +
-    "title LIKE '%RUSSIA%' OR title LIKE '%russia%' OR " +
-    "title LIKE '%HORMUZ%' OR title LIKE '%hormuz%' OR " +
-    "title LIKE '%RED SEA%' OR title LIKE '%red sea%' OR " +
-    "title LIKE '%HEZBOLLAH%' OR title LIKE '%hezbollah%' OR " +
-    "title LIKE '%HOUTHI%' OR title LIKE '%houthi%' OR " +
-    "title LIKE '%GAZA%' OR title LIKE '%gaza%' OR " +
-    "title LIKE '%TAIWAN%' OR title LIKE '%taiwan%' OR " +
-    "title LIKE '%PUTIN%' OR title LIKE '%putin%' OR " +
-    "title LIKE '%WAR%' OR title LIKE '%war%' OR " +
-    "title LIKE '%CONFLICT%' OR title LIKE '%conflict%' OR " +
-    // ✅ Détection via feed_content aussi
-    "feed_content LIKE '%airstrike%' OR " +
-    "feed_content LIKE '%missile%' OR " +
-    "feed_content LIKE '%GEOPOLIT%')",
-    new String[]{String.valueOf(fortyEightHoursAgo)},
-    null, null, "unix_timestamp DESC", "5");
-
-        if (cursor != null && cursor.moveToFirst()) {
-            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
-            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
-            do {
-                long ts = cursor.getLong(2);
-                String dateStr = sdf.format(new Date(ts * 1000));
-                sb.append("⚠️ [").append(dateStr).append("] ")
-                  .append(cursor.getString(0))
-                  .append(" | ").append(cursor.getString(1))
-                  .append("\n");
-            } while (cursor.moveToNext());
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur getDerniersDriversGeo", e);
-    } finally {
-        if (cursor != null) cursor.close();
-    }
-    return sb.toString();
-    }
-
-   public String diagnostiquerDriverSpecifique(String keyword) {
-    SQLiteDatabase db = this.getReadableDatabase();
-    StringBuilder sb = new StringBuilder();
-    long fortyEightHoursAgo = (System.currentTimeMillis() / 1000) - (48 * 60 * 60);
-    Cursor cursor = null;
-    try {
-        cursor = db.query(TABLE_EVENTS,
-            new String[]{"title", "source", "impact", "driver_weight",
-                         "sync_status", "unix_timestamp", "event_type"},
-            "unix_timestamp >= ? AND (title LIKE ? OR feed_content LIKE ?)",
-            new String[]{
-                String.valueOf(fortyEightHoursAgo),
-                "%" + keyword + "%",
-                "%" + keyword + "%"
-            },
-            null, null, "unix_timestamp DESC");
-
-        if (cursor != null && cursor.getCount() > 0) {
-            sb.append("✅ [DB] ").append(cursor.getCount())
-              .append(" entrée(s) trouvée(s) pour : ").append(keyword).append("\n");
-            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
-            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
-            cursor.moveToFirst(); // ✅ positionner avant la boucle
-            do {
-                long ts = cursor.getLong(5);
-                String dateStr = sdf.format(new Date(ts * 1000));
-                sb.append("  → [").append(dateStr).append("] ")
-                  .append(cursor.getString(0))
-                  .append(" | Source: ").append(cursor.getString(1))
-                  .append(" | Poids: ").append(cursor.getInt(3))
-                  .append(" | Status: ").append(cursor.getString(4))
-                  .append(" | Type: ").append(cursor.getString(6))
-                  .append("\n");
-            } while (cursor.moveToNext());
-        } else {
-            sb.append("❌ [DB] Aucune entrée pour : ").append(keyword)
-              .append(" (dernières 48h)\n");
-        }
-    } catch (Exception e) {
-        sb.append("⚠️ Erreur diagnostic : ").append(e.getMessage());
-    } finally {
-        if (cursor != null) cursor.close();
-    }
-    return sb.toString();
-   }
-
-    // ✅ Détecte le régime de marché actuel basé sur les 7 derniers jours
-public String detecterRegimeMarche(long currentUnixTime) {
-    SQLiteDatabase db = this.getReadableDatabase();
-    long sevenDaysAgo = currentUnixTime - (7 * 24 * 60 * 60);
-    Cursor cursor = null;
-
-    int scoreHawkish  = 0;
-    int scoreDovish   = 0;
-    int scoreGeo      = 0;
-    int scoreRiskOn   = 0;
-    int scoreRiskOff  = 0;
-    int totalEvents   = 0;
-
-    try {
-        cursor = db.query(TABLE_EVENTS,
-            new String[]{"impact", "event_type", "driver_weight", "title"},
-            "unix_timestamp >= ? AND driver_weight >= 3",
-            new String[]{String.valueOf(sevenDaysAgo)},
-            null, null, "unix_timestamp DESC");
-
-        if (cursor == null || cursor.getCount() == 0) {
-            return "RÉGIME INDÉTERMINÉ | Aucun driver macro significatif sur 7 jours.";
-        }
-
-        cursor.moveToFirst();
-        do {
-            String impact    = cursor.getString(0) != null ? cursor.getString(0).toUpperCase() : "";
-            String eventType = cursor.getString(1) != null ? cursor.getString(1).toUpperCase() : "";
-            int weight       = cursor.getInt(2);
-            String title     = cursor.getString(3) != null ? cursor.getString(3).toUpperCase() : "";
-
-            totalEvents++;
-
-            // ── Score pondéré par le poids du driver ──
-            int multiplier = (weight >= 5) ? 3 : (weight == 4) ? 2 : 1;
-
-            // ── Détection HAWKISH ──
-            if (impact.contains("BIAIS HAUSSIER") || impact.contains("HAWKISH") ||
-                impact.contains("HIGHER THAN EXPECTED") || impact.contains("ABOVE FORECAST") ||
-                impact.contains("BEATS ESTIMATES") || impact.contains("BETTER THAN EXPECTED") ||
-                title.contains("HAWKISH") || title.contains("RATE HIKE") ||
-                title.contains("BEATS") || title.contains("ABOVE FORECAST")) {
-                scoreHawkish += multiplier;
-                scoreRiskOff += multiplier; // HAWKISH = taux hauts = risk-off actions
-            }
-
-            // ── Détection DOVISH ──
-            else if (impact.contains("BIAIS BAISSIER") || impact.contains("DOVISH") ||
-                     impact.contains("LOWER THAN EXPECTED") || impact.contains("BELOW FORECAST") ||
-                     impact.contains("MISSES ESTIMATES") || impact.contains("WORSE THAN EXPECTED") ||
-                     title.contains("DOVISH") || title.contains("RATE CUT") ||
-                     title.contains("MISSES") || title.contains("BELOW FORECAST")) {
-                scoreDovish += multiplier;
-                scoreRiskOn += multiplier; // DOVISH = baisses taux attendues = risk-on
-            }
-
-            // ── Détection GEO / RISK-OFF ──
-            if (eventType.contains("GEO") ||
-                impact.contains("CHOC GÉOPOLITIQUE") ||
-                impact.contains("GEO") ||
-                title.contains("IRAN") || title.contains("ISRAEL") ||
-                title.contains("UKRAINE") || title.contains("RUSSIA") ||
-                title.contains("MISSILE") || title.contains("STRIKE") ||
-                title.contains("HORMUZ") || title.contains("RED SEA") ||
-                title.contains("TAIWAN") || title.contains("HOUTHI")) {
-                scoreGeo     += multiplier;
-                scoreRiskOff += multiplier;
-            }
-
-        } while (cursor.moveToNext());
-
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur detecterRegimeMarche", e);
-        return "RÉGIME INDÉTERMINÉ | Erreur de calcul.";
-    } finally {
-        if (cursor != null) cursor.close();
-    }
-
-    // ── Calcul du régime dominant ──
-    int scoreTotal = scoreHawkish + scoreDovish + scoreGeo;
-    if (scoreTotal == 0) {
-        return "RÉGIME NEUTRE | Aucun signal directionnel dominant sur 7 jours.";
-    }
-
-    // ── Détermination du régime principal ──
-    String regimePrincipal;
-    String regimeDetail;
-
-    // Cas 1 — GEO dominant (score GEO > 60% du total)
-    if (scoreGeo > 0 && (scoreGeo * 100 / scoreTotal) >= 60) {
-        regimePrincipal = "RÉGIME RISK-OFF GÉOPOLITIQUE DOMINANT 🔴";
-        regimeDetail    = "Les chocs géopolitiques dominent le flux macro. " +
-                          "Or et Yen sont les refuges prioritaires. " +
-                          "Pétrole sous pression haussière structurelle.";
-    }
-    // Cas 2 — HAWKISH dominant (score HAWKISH > 50% du total)
-    else if (scoreHawkish > scoreDovish && scoreHawkish > scoreGeo &&
-             (scoreHawkish * 100 / scoreTotal) >= 50) {
-        regimePrincipal = "RÉGIME HAWKISH DOMINANT 🦅";
-        regimeDetail    = "Les données macro US confirment un contexte de resserrement monétaire. " +
-                          "Dollar structurellement fort. " +
-                          "Actions et actifs risk-on sous pression.";
-    }
-    // Cas 3 — DOVISH dominant (score DOVISH > 50% du total)
-    else if (scoreDovish > scoreHawkish && scoreDovish > scoreGeo &&
-             (scoreDovish * 100 / scoreTotal) >= 50) {
-        regimePrincipal = "RÉGIME DOVISH DOMINANT 🕊️";
-        regimeDetail    = "Les données macro US confirment un contexte accommodant. " +
-                          "Dollar structurellement faible. " +
-                          "Actions et actifs risk-on favorisés.";
-    }
-    // Cas 4 — STAGFLATION (HAWKISH + RISK-OFF simultanés équilibrés)
-    else if (scoreHawkish > 0 && scoreGeo > 0 &&
-             Math.abs(scoreHawkish - scoreGeo) <= 2) {
-        regimePrincipal = "RÉGIME STAGFLATIONNISTE / DOUBLE CHOC ⚠️";
-        regimeDetail    = "Coexistence d'un choc HAWKISH (inflation) et d'un choc GÉOPOLITIQUE. " +
-                          "Or est le seul actif avec double bénéfice. " +
-                          "Pétrole haussier. Toutes les devises sous pression.";
-    }
-    // Cas 5 — HAWKISH + DOVISH contradictoires (mixte)
-    else if (scoreHawkish > 0 && scoreDovish > 0 &&
-             Math.abs(scoreHawkish - scoreDovish) <= 2) {
-        regimePrincipal = "RÉGIME MIXTE / INCERTAIN 🔄";
-        regimeDetail    = "Les signaux macro sont contradictoires sur 7 jours. " +
-                          "Conviction réduite sur tous les actifs. " +
-                          "Attendre une confirmation directionnelle.";
-    }
-    // Cas 6 — Défaut
-    else {
-        regimePrincipal = "RÉGIME NEUTRE FAIBLE SIGNAL 〰️";
-        regimeDetail    = "Aucun signal macro dominant détecté. Marché en attente de catalyseur.";
-    }
-
-    // ── Construction du rapport de régime ──
-    StringBuilder sb = new StringBuilder();
-    sb.append(regimePrincipal).append("\n");
-    sb.append("─────────────────────────────────\n");
-    sb.append("📊 Score HAWKISH  : ").append(scoreHawkish).append("\n");
-    sb.append("📊 Score DOVISH   : ").append(scoreDovish).append("\n");
-    sb.append("📊 Score GEO      : ").append(scoreGeo).append("\n");
-    sb.append("📊 Score RISK-ON  : ").append(scoreRiskOn).append("\n");
-    sb.append("📊 Score RISK-OFF : ").append(scoreRiskOff).append("\n");
-    sb.append("📊 Total événements analysés : ").append(totalEvents).append("\n");
-    sb.append("─────────────────────────────────\n");
-    sb.append("📝 ").append(regimeDetail);
-
-    return sb.toString();
-}
-
-  // ✅ Détecte les indicateurs Rang Suprême manquants dans les 30 derniers jours
-// Retourne une liste de (indicateur, date_attendue) manquants
-public List<String> getMissingSupremeRankIndicators(long currentUnixTime) {
-    SQLiteDatabase db = this.getReadableDatabase();
-    List<String> missing = new ArrayList<>();
-    long thirtyDaysAgo = currentUnixTime - (30L * 24 * 60 * 60);
-
-    // ✅ Liste des événements Rang 5 attendus mensuellement
-    String[][] supremeEvents = {
-        {"NFP", "NON-FARM", "PAYROLL", "EMPLOYMENT CHANGE"},          // 1er vendredi du mois
-        {"CPI", "CORE CPI", "CONSUMER PRICE"},                         // ~10-15 du mois
-        {"FOMC", "FEDERAL RESERVE", "RATE DECISION"},                  // 8 fois/an
-        {"PCE", "CORE PCE", "PERSONAL CONSUMPTION"},                   // fin du mois
-        {"PPI", "PRODUCER PRICE"},                                      // ~10-15 du mois
-        {"JOBLESS CLAIMS", "INITIAL CLAIMS"},                           // chaque jeudi
-        {"GDP", "GROSS DOMESTIC"},                                      // trimestriel
-        {"ADP", "ADP EMPLOYMENT"},                                      // 1er mercredi
-        {"JOLTS", "JOB OPENINGS"}                                       // 1er mardi
-    };
-
-    for (String[] keywords : supremeEvents) {
-        String mainKeyword = keywords[0];
-        StringBuilder whereClause = new StringBuilder();
-        whereClause.append("unix_timestamp >= ? AND driver_weight >= 4 AND (");
-        for (int i = 0; i < keywords.length; i++) {
-            if (i > 0) whereClause.append(" OR ");
-            whereClause.append("title LIKE ? OR feed_content LIKE ?");
-        }
-        whereClause.append(")");
-
-        List<String> args = new ArrayList<>();
-        args.add(String.valueOf(thirtyDaysAgo));
-        for (String kw : keywords) {
-            args.add("%" + kw + "%");
-            args.add("%" + kw + "%");
-        }
-
+        SQLiteDatabase db = this.getReadableDatabase();
+        StringBuilder sb = new StringBuilder();
+        long fortyEightHoursAgo = currentUnixTime - (48 * 60 * 60);
         Cursor cursor = null;
         try {
-            cursor = db.query(TABLE_EVENTS, new String[]{"COUNT(*)"} ,
-                    whereClause.toString(),
-                    args.toArray(new String[0]),
-                    null, null, null);
+            cursor = db.query(TABLE_EVENTS,
+        new String[]{"title", "impact", "unix_timestamp"},
+        "unix_timestamp >= ? AND (" +
+        "event_type = 'GEOPOLITICAL' OR " +
+        "event_type LIKE '%GEO%' OR " +
+        "impact LIKE '%Choc Géopolitique%' OR " +
+        "impact LIKE '%GÉOPOLITIQUE%' OR " +
+        "impact LIKE '%GEO%' OR " +
+        "title LIKE '%IRAN%' OR title LIKE '%iran%' OR " +
+        "title LIKE '%ISRAEL%' OR title LIKE '%israel%' OR " +
+        "title LIKE '%TEHRAN%' OR title LIKE '%tehran%' OR " +
+        "title LIKE '%AIRSTRIKE%' OR title LIKE '%airstrike%' OR " +
+        "title LIKE '%STRIKE%' OR title LIKE '%strike%' OR " +
+        "title LIKE '%ATTACK%' OR title LIKE '%attack%' OR " +
+        "title LIKE '%MISSILE%' OR title LIKE '%missile%' OR " +
+        "title LIKE '%DRONE%' OR title LIKE '%drone%' OR " +
+        "title LIKE '%UKRAINE%' OR title LIKE '%ukraine%' OR " +
+        "title LIKE '%RUSSIA%' OR title LIKE '%russia%' OR " +
+        "title LIKE '%HORMUZ%' OR title LIKE '%hormuz%' OR " +
+        "title LIKE '%RED SEA%' OR title LIKE '%red sea%' OR " +
+        "title LIKE '%HEZBOLLAH%' OR title LIKE '%hezbollah%' OR " +
+        "title LIKE '%HOUTHI%' OR title LIKE '%houthi%' OR " +
+        "title LIKE '%GAZA%' OR title LIKE '%gaza%' OR " +
+        "title LIKE '%TAIWAN%' OR title LIKE '%taiwan%' OR " +
+        "title LIKE '%PUTIN%' OR title LIKE '%putin%' OR " +
+        "title LIKE '%WAR%' OR title LIKE '%war%' OR " +
+        "title LIKE '%CONFLICT%' OR title LIKE '%conflict%' OR " +
+        "feed_content LIKE '%airstrike%' OR " +
+        "feed_content LIKE '%missile%' OR " +
+        "feed_content LIKE '%GEOPOLIT%')",
+        new String[]{String.valueOf(fortyEightHoursAgo)},
+        null, null, "unix_timestamp DESC", "5");
 
             if (cursor != null && cursor.moveToFirst()) {
-                int count = cursor.getInt(0);
-                if (count == 0) {
-                    missing.add(mainKeyword);
-                    Log.d(TAG, "[BACKFILL] Manquant dans DB : " + mainKeyword);
-                }
+                SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
+                sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+                do {
+                    long ts = cursor.getLong(2);
+                    String dateStr = sdf.format(new Date(ts * 1000));
+                    sb.append("⚠️ [").append(dateStr).append("] ")
+                      .append(cursor.getString(0))
+                      .append(" | ").append(cursor.getString(1))
+                      .append("\n");
+                } while (cursor.moveToNext());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Erreur getMissingSupremeRankIndicators", e);
+            Log.e(TAG, "Erreur getDerniersDriversGeo", e);
         } finally {
             if (cursor != null) cursor.close();
         }
+        return sb.toString();
     }
-    return missing;
-}
-    
- public boolean isEventAlreadySaved(String indicator, long unixTimestamp) {
-    if (indicator == null || indicator.trim().isEmpty()) return false;
-    
-    SQLiteDatabase db = this.getReadableDatabase();
-    if (db == null || !db.isOpen()) return false;
-    
-    // ✅ Sécurité : conversion automatique si le timestamp envoyé est par erreur en millisecondes
-    long secondsTimestamp = (unixTimestamp > 9999999999L) ? (unixTimestamp / 1000L) : unixTimestamp;
-    
-    long windowStart = secondsTimestamp - (2 * 60 * 60); // ±2h réelles
-    long windowEnd   = secondsTimestamp + (2 * 60 * 60);
-    
-    // Nettoyage de la chaîne de recherche pour le moteur SQLite
-    String searchPattern = "%" + indicator.trim() + "%";
-    
-    // ✅ Utilisation du try-with-resources : Garantit la fermeture automatique du Cursor et évite les Memory Leaks
-    try (Cursor cursor = db.query(
-            TABLE_EVENTS,
-            new String[]{"COUNT(*)"},
-            "unix_timestamp >= ? AND unix_timestamp <= ? AND (title LIKE ? OR feed_content LIKE ?)",
-            new String[]{
-                String.valueOf(windowStart),
-                String.valueOf(windowEnd),
-                searchPattern,
-                searchPattern
-            },
-            null, null, null)) {
+
+    public String diagnostiquerDriverSpecifique(String keyword) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        StringBuilder sb = new StringBuilder();
+        long fortyEightHoursAgo = (System.currentTimeMillis() / 1000) - (48 * 60 * 60);
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_EVENTS,
+                new String[]{"title", "source", "impact", "driver_weight",
+                             "sync_status", "unix_timestamp", "event_type"},
+                "unix_timestamp >= ? AND (title LIKE ? OR feed_content LIKE ?)",
+                new String[]{
+                    String.valueOf(fortyEightHoursAgo),
+                    "%" + keyword + "%",
+                    "%" + keyword + "%"
+                },
+                null, null, "unix_timestamp DESC");
+
+            if (cursor != null && cursor.getCount() > 0) {
+                sb.append("✅ [DB] ").append(cursor.getCount())
+                  .append(" entrée(s) trouvée(s) pour : ").append(keyword).append("\n");
+                SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
+                sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+                cursor.moveToFirst(); 
+                do {
+                    long ts = cursor.getLong(5);
+                    String dateStr = sdf.format(new Date(ts * 1000));
+                    sb.append("  → [").append(dateStr).append("] ")
+                      .append(cursor.getString(0))
+                      .append(" | Source: ").append(cursor.getString(1))
+                      .append(" | Poids: ").append(cursor.getInt(3))
+                      .append(" | Status: ").append(cursor.getString(4))
+                      .append(" | Type: ").append(cursor.getString(6))
+                      .append("\n");
+                } while (cursor.moveToNext());
+            } else {
+                sb.append("❌ [DB] Aucune entrée pour : ").append(keyword)
+                  .append(" (dernières 48h)\n");
+            }
+        } catch (Exception e) {
+            sb.append("⚠️ Erreur diagnostic : ").append(e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return sb.toString();
+    }
+
+    public String detecterRegimeMarche(long currentUnixTime) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        long sevenDaysAgo = currentUnixTime - (7 * 24 * 60 * 60);
+        Cursor cursor = null;
+
+        int scoreHawkish  = 0;
+        int scoreDovish   = 0;
+        int scoreGeo      = 0;
+        int scoreRiskOn   = 0;
+        int scoreRiskOff  = 0;
+        int totalEvents   = 0;
+
+        try {
+            cursor = db.query(TABLE_EVENTS,
+                new String[]{"impact", "event_type", "driver_weight", "title"},
+                "unix_timestamp >= ? AND driver_weight >= 3",
+                new String[]{String.valueOf(sevenDaysAgo)},
+                null, null, "unix_timestamp DESC");
+
+            if (cursor == null || cursor.getCount() == 0) {
+                return "RÉGIME INDÉTERMINÉ | Aucun driver macro significatif sur 7 jours.";
+            }
+
+            cursor.moveToFirst();
+            do {
+                String impact    = cursor.getString(0) != null ? cursor.getString(0).toUpperCase() : "";
+                String eventType = cursor.getString(1) != null ? cursor.getString(1).toUpperCase() : "";
+                int weight       = cursor.getInt(2);
+                String title     = cursor.getString(3) != null ? cursor.getString(3).toUpperCase() : "";
+
+                totalEvents++;
+
+                int multiplier = (weight >= 5) ? 3 : (weight == 4) ? 2 : 1;
+
+                if (impact.contains("BIAIS HAUSSIER") || impact.contains("HAWKISH") ||
+                    impact.contains("HIGHER THAN EXPECTED") || impact.contains("ABOVE FORECAST") ||
+                    impact.contains("BEATS ESTIMATES") || impact.contains("BETTER THAN EXPECTED") ||
+                    title.contains("HAWKISH") || title.contains("RATE HIKE") ||
+                    title.contains("BEATS") || title.contains("ABOVE FORECAST")) {
+                    scoreHawkish += multiplier;
+                    scoreRiskOff += multiplier; 
+                }
+
+                else if (impact.contains("BIAIS BAISSIER") || impact.contains("DOVISH") ||
+                         impact.contains("LOWER THAN EXPECTED") || impact.contains("BELOW FORECAST") ||
+                         impact.contains("MISSES ESTIMATES") || impact.contains("WORSE THAN EXPECTED") ||
+                         title.contains("DOVISH") || title.contains("RATE CUT") ||
+                         title.contains("MISSES") || title.contains("BELOW FORECAST")) {
+                    scoreDovish += multiplier;
+                    scoreRiskOn += multiplier; 
+                }
+
+                if (eventType.contains("GEO") ||
+                    impact.contains("CHOC GÉOPOLITIQUE") ||
+                    impact.contains("GEO") ||
+                    title.contains("IRAN") || title.contains("ISRAEL") ||
+                    title.contains("UKRAINE") || title.contains("RUSSIA") ||
+                    title.contains("MISSILE") || title.contains("STRIKE") ||
+                    title.contains("HORMUZ") || title.contains("RED SEA") ||
+                    title.contains("TAIWAN") || title.contains("HOUTHI")) {
+                    scoreGeo     += multiplier;
+                    scoreRiskOff += multiplier;
+                }
+
+            } while (cursor.moveToNext());
+
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur detecterRegimeMarche", e);
+            return "RÉGIME INDÉTERMINÉ | Erreur de calcul.";
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+
+        int scoreTotal = scoreHawkish + scoreDovish + scoreGeo;
+        if (scoreTotal == 0) {
+            return "RÉGIME NEUTRE | Aucun signal directionnel dominant sur 7 jours.";
+        }
+
+        String regimePrincipal;
+        String regimeDetail;
+
+        if (scoreGeo > 0 && (scoreGeo * 100 / scoreTotal) >= 60) {
+            regimePrincipal = "RÉGIME RISK-OFF GÉOPOLITIQUE DOMINANT 🔴";
+            regimeDetail    = "Les chocs géopolitiques dominent le flux macro. " +
+                              "Or et Yen sont les refuges prioritaires. " +
+                              "Pétrole sous pression haussière structurelle.";
+        }
+        else if (scoreHawkish > scoreDovish && scoreHawkish > scoreGeo &&
+                 (scoreHawkish * 100 / scoreTotal) >= 50) {
+            regimePrincipal = "RÉGIME HAWKISH DOMINANT 🦅";
+            regimeDetail    = "Les données macro US confirment un contexte de resserrement monétaire. " +
+                              "Dollar structurellement fort. " +
+                              "Actions et actifs risk-on sous pression.";
+        }
+        else if (scoreDovish > scoreHawkish && scoreDovish > scoreGeo &&
+                 (scoreDovish * 100 / scoreTotal) >= 50) {
+            regimePrincipal = "RÉGIME DOVISH DOMINANT 🕊️";
+            regimeDetail    = "Les données macro US confirment un contexte accommodant. " +
+                              "Dollar structurellement faible. " +
+                              "Actions et actifs risk-on favorisés.";
+        }
+        else if (scoreHawkish > 0 && scoreGeo > 0 &&
+                 Math.abs(scoreHawkish - scoreGeo) <= 2) {
+            regimePrincipal = "RÉGIME STAGFLATIONNISTE / DOUBLE CHOC ⚠️";
+            regimeDetail    = "Coexistence d'un choc HAWKISH (inflation) et d'un choc GÉOPOLITIQUE. " +
+                              "Or est le seul actif avec double bénéfice. " +
+                              "Pétrole haussier. Toutes les devises sous pression.";
+        }
+        else if (scoreHawkish > 0 && scoreDovish > 0 &&
+                 Math.abs(scoreHawkish - scoreDovish) <= 2) {
+            regimePrincipal = "RÉGIME MIXTE / INCERTAIN 🔄";
+            regimeDetail    = "Les signaux macro sont contradictoires sur 7 jours. " +
+                              "Conviction réduite sur tous les actifs. " +
+                              "Attendre une confirmation directionnelle.";
+        }
+        else {
+            regimePrincipal = "RÉGIME NEUTRE FAIBLE SIGNAL 〰️";
+            regimeDetail    = "Aucun signal macro dominant détecté. Marché en attente de catalyseur.";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(regimePrincipal).append("\n");
+        sb.append("─────────────────────────────────\n");
+        sb.append("📊 Score HAWKISH  : ").append(scoreHawkish).append("\n");
+        sb.append("📊 Score DOVISH   : ").append(scoreDovish).append("\n");
+        sb.append("📊 Score GEO      : ").append(scoreGeo).append("\n");
+        sb.append("📊 Score RISK-ON  : ").append(scoreRiskOn).append("\n");
+        sb.append("📊 Score RISK-OFF : ").append(scoreRiskOff).append("\n");
+        sb.append("📊 Total événements analysés : ").append(totalEvents).append("\n");
+        sb.append("─────────────────────────────────\n");
+        sb.append("📝 ").append(regimeDetail);
+
+        return sb.toString();
+    }
+
+    public List<String> getMissingSupremeRankIndicators(long currentUnixTime) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        List<String> missing = new ArrayList<>();
+        long thirtyDaysAgo = currentUnixTime - (30L * 24 * 60 * 60);
+
+        String[][] supremeEvents = {
+            {"NFP", "NON-FARM", "PAYROLL", "EMPLOYMENT CHANGE"},          
+            {"CPI", "CORE CPI", "CONSUMER PRICE"},                         
+            {"FOMC", "FEDERAL RESERVE", "RATE DECISION"},                  
+            {"PCE", "CORE PCE", "PERSONAL CONSUMPTION"},                   
+            {"PPI", "PRODUCER PRICE"},                                      
+            {"JOBLESS CLAIMS", "INITIAL CLAIMS"},                           
+            {"GDP", "GROSS DOMESTIC"},                                      
+            {"ADP", "ADP EMPLOYMENT"},                                      
+            {"JOLTS", "JOB OPENINGS"}                                       
+        };
+
+        for (String[] keywords : supremeEvents) {
+            String mainKeyword = keywords[0];
+            StringBuilder whereClause = new StringBuilder();
+            whereClause.append("unix_timestamp >= ? AND driver_weight >= 4 AND (");
+            for (int i = 0; i < keywords.length; i++) {
+                if (i > 0) whereClause.append(" OR ");
+                whereClause.append("title LIKE ? OR feed_content LIKE ?");
+            }
+            whereClause.append(")");
+
+            List<String> args = new ArrayList<>();
+            args.add(String.valueOf(thirtyDaysAgo));
+            for (String kw : keywords) {
+                args.add("%" + kw + "%");
+                args.add("%" + kw + "%");
+            }
+
+            Cursor cursor = null;
+            try {
+                cursor = db.query(TABLE_EVENTS, new String[]{"COUNT(*)"} ,
+                        whereClause.toString(),
+                        args.toArray(new String[0]),
+                        null, null, null);
+
+                if (cursor != null && cursor.moveToFirst()) {
+                    int count = cursor.getInt(0);
+                    if (count == 0) {
+                        missing.add(mainKeyword);
+                        Log.d(TAG, "[BACKFILL] Manquant dans DB : " + mainKeyword);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur getMissingSupremeRankIndicators", e);
+            } finally {
+                if (cursor != null) cursor.close();
+            }
+        }
+        return missing;
+    }
         
-        // ✅ Lecture du résultat du COUNT(*)
-        if (cursor != null && cursor.moveToFirst()) {
-            return cursor.getInt(0) > 0; // Retourne true si l'événement existe déjà dans la fenêtre de 4h
+    public boolean isEventAlreadySaved(String indicator, long unixTimestamp) {
+        if (indicator == null || indicator.trim().isEmpty()) return false;
+        
+        SQLiteDatabase db = this.getReadableDatabase();
+        if (db == null || !db.isOpen()) return false;
+        
+        long secondsTimestamp = (unixTimestamp > 9999999999L) ? (unixTimestamp / 1000L) : unixTimestamp;
+        
+        long windowStart = secondsTimestamp - (2 * 60 * 60); 
+        long windowEnd   = secondsTimestamp + (2 * 60 * 60);
+        
+        String searchPattern = "%" + indicator.trim() + "%";
+        
+        try (Cursor cursor = db.query(
+                TABLE_EVENTS,
+                new String[]{"COUNT(*)"},
+                "unix_timestamp >= ? AND unix_timestamp <= ? AND (title LIKE ? OR feed_content LIKE ?)",
+                new String[]{
+                    String.valueOf(windowStart),
+                    String.valueOf(windowEnd),
+                    searchPattern,
+                    searchPattern
+                },
+                null, null, null)) {
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursor.getInt(0) > 0; 
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur lors de la vérification du doublon pour l'indicateur : " + indicator, e);
         }
         
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur lors de la vérification du doublon pour l'indicateur : " + indicator, e);
+        return false; 
+    } 
+
+    // =========================================================================
+    // ✅ METHODE CORRECTIVE AJOUTÉE POUR SYNCHRONISER LES "ACTUALS" DU CALENDRIER
+    // =========================================================================
+    public synchronized boolean updateActualIfMissing(String indicator, long unixTimestamp, String actualValue) {
+        if (indicator == null || indicator.trim().isEmpty() || actualValue == null || actualValue.equalsIgnoreCase("N/A")) {
+            return false;
+        }
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        
+        // Sécurité : conversion automatique si le timestamp envoyé est par erreur en millisecondes
+        long secondsTimestamp = (unixTimestamp > 9999999999L) ? (unixTimestamp / 1000L) : unixTimestamp;
+        
+        long windowStart = secondsTimestamp - (2 * 60 * 60); // ±2h autour du release
+        long windowEnd   = secondsTimestamp + (2 * 60 * 60);
+        String searchPattern = "%" + indicator.trim() + "%";
+
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_EVENTS,
+                    new String[]{"id", "feed_content"},
+                    "unix_timestamp >= ? AND unix_timestamp <= ? AND (title LIKE ? OR feed_content LIKE ?)",
+                    new String[]{String.valueOf(windowStart), String.valueOf(windowEnd), searchPattern, searchPattern},
+                    null, null, null);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    int id = cursor.getInt(0);
+                    String content = cursor.getString(1);
+
+                    // Si l'événement possède encore le tag initial "Actual: N/A", on l'écrase
+                    if (content != null && content.contains("Actual: N/A")) {
+                        String updatedContent = content.replace("Actual: N/A", "Actual: " + actualValue);
+                        
+                        ContentValues cv = new ContentValues();
+                        cv.put("feed_content", updatedContent);
+                        
+                        db.update(TABLE_EVENTS, cv, "id = ?", new String[]{String.valueOf(id)});
+                        return true; // Modification validée
+                    }
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur dans updateActualIfMissing pour " + indicator, e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return false;
     }
-    
-    return false; // Par défaut, si erreur ou non trouvé, on considère qu'il n'est pas sauvé
-} 
 }
