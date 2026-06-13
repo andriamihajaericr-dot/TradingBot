@@ -40,6 +40,12 @@ public class EventDatabase extends SQLiteOpenHelper {
     private EventDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
+    
+    public static void resetInstance() {
+        synchronized (EventDatabase.class) {
+           instance = null;
+        }
+    }
 
     @Override
     public void onConfigure(SQLiteDatabase db) {
