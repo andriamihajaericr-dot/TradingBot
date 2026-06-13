@@ -32,35 +32,25 @@ public class EconomicCalendarAPI {
     }
     
     private static final int MAX_RETRIES = 3;
-    private static final long INITIAL_BACKOFF_MS = 3000; // Augmenté à 3s pour éviter d'enchaîner trop vite
+    // Dans ta classe EconomicCalendarAPI
+private static final long INITIAL_BACKOFF_MS = 30000; // Commence à 10 secondes au lieu de 3
 
-    private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hoursAhead) {
-        long backoff = INITIAL_BACKOFF_MS;
-        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                List<CalendarEvent> events = fetcher.fetch(hoursAhead);
-                if (events != null && !events.isEmpty()) {
-                    return events;
-                }
-                if (attempt < MAX_RETRIES) {
-                    logToMain("⚠️ [CALENDRIER] Tentative " + attempt + "/" + MAX_RETRIES + " — réponse vide, retry dans " + (backoff/1000) + "s");
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Tentative " + attempt + " échouée : " + e.getMessage());
-                logToMain("❌ [CALENDRIER] Tentative " + attempt + "/" + MAX_RETRIES + " échouée : " + e.getMessage());
+private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hoursAhead) {
+    long backoff = INITIAL_BACKOFF_MS;
+    for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            return fetcher.fetch(hoursAhead); // Tente la requête
+        } catch (Exception e) {
+            if (e.getMessage().contains("429")) {
+                logToMain("🛑 [BAN] IP limitée. Pause longue de " + (backoff / 1000) + "s...");
             }
-            if (attempt < MAX_RETRIES) {
-                try {
-                    Thread.sleep(backoff);
-                    backoff *= 2; // Backoff exponentiel (3s, 6s, 12s)
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
+            // Attente de sécurité
+            try { Thread.sleep(backoff); } catch (InterruptedException ie) { break; }
+            backoff *= 3; // Augmentation plus agressive (10s, 30s, 90s)
         }
-        return new ArrayList<>();
     }
+    return new ArrayList<>();
+}
 
     interface FetchFunction {
         List<CalendarEvent> fetch(int hoursAhead) throws Exception;
