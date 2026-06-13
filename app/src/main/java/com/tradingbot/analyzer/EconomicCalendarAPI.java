@@ -12,10 +12,6 @@ import java.util.*;
 public class EconomicCalendarAPI {
     private static final String TAG            = "EconomicCalendarAPI";
 
-    // ✅ Clean & Strict : Uniquement Forex Factory stable
-    private static final String FF_URL_LAST_WEEK = "https://nfs.faireconomy.media/ff_calendar_lastweek.json";
-    private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
-    private static final String FF_URL_NEXT_WEEK = "https://nfs.faireconomy.media/ff_calendar_nextweek.json";
     private static Context globalAppContext = null;
 
     public static class CalendarEvent {
@@ -158,34 +154,25 @@ public class EconomicCalendarAPI {
         return events;
     }
 
+    // 1. Purge les URLs mortes en haut du fichier
+private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+// Supprime LAST_WEEK et NEXT_WEEK ici.
+
+// 2. Simplifie ta méthode de fetch
+public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
+    logToMain("🔄 [CALENDRIER] Chargement ForexFactory (This Week)...");
     
-    public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
-        logToMain("🔄 [CALENDRIER] Chargement ForexFactory (This Week)...");
-        List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, h), hoursAhead);
-        if (events == null) events = new ArrayList<>();
+    // On ne tente plus NextWeek, on évite les 404 inutiles
+    List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, h), hoursAhead);
+    
+    if (events != null && !events.isEmpty()) {
+        logToMain("✅ [CALENDRIER] Succès : " + events.size() + " événements chargés.");
+        return events;
+    }
 
-        try {
-            logToMain("🔄 [CALENDRIER] Chargement ForexFactory (Next Week) pour complétion...");
-            List<CalendarEvent> nextWeekEvents = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_NEXT_WEEK, h), hoursAhead);
-            if (nextWeekEvents != null && !nextWeekEvents.isEmpty()) {
-                events.addAll(nextWeekEvents);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Semaine suivante indisponible: " + e.getMessage());
-        }
-
-        if (!events.isEmpty()) {
-            Set<CalendarEvent> uniqueEvents = new TreeSet<>((e1, e2) -> {
-                String k1 = e1.timestamp + "_" + e1.indicator;
-                String k2 = e2.timestamp + "_" + e2.indicator;
-                return k1.compareTo(k2);
-            });
-            uniqueEvents.addAll(events);
-            List<CalendarEvent> cleanedList = new ArrayList<>(uniqueEvents);
-
-            logToMain("✅ [CALENDRIER] ForexFactory : " + cleanedList.size() + " événements chargés.");
-            return cleanedList;
-        }
+    logToMain("⚠️ [CALENDRIER] Aucune donnée disponible pour le moment.");
+    return new ArrayList<>();
+}
 
     public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
         return fetchHistoricalEvents(globalAppContext, daysBack);
