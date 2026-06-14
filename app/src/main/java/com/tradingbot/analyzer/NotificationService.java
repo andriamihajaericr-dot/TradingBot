@@ -778,25 +778,8 @@ public class NotificationService extends NotificationListenerService {
     
                     // ✅ Application du filtre conviction
                     if (activeSignalsCount > 0) {
-                        int convictionPercent = extrairePourcentageConviction(aiReport);
-                        
-                        // ✅ CORRECTION 1 : Déclaration et initialisation de isSupremeRank
-                        // boolean isSupremeRank = aiReport != null && aiReport.contains("SUPREME_RANK");
-                        
-                        // ✅ Poids géo/macro selon conviction
-                        int geoWeight = (convictionPercent >= 80) ? 4 : (convictionPercent >= 60) ? 3 : 1;
-                        
-                        // ✅ CORRECTION 2 : Mise à jour directe inline si la fonction globale est manquante dans db
-                        try {
-                            android.database.sqlite.SQLiteDatabase wdb = db.getWritableDatabase();
-                            android.content.ContentValues cv = new android.content.ContentValues();
-                            cv.put("geo_weight", geoWeight);
-                            wdb.update("events", cv, "fingerprint = ?", new String[]{fingerprint});
-                        } catch (Exception e) {
-                            Log.e(TAG, "Échec de la mise à jour SQL native du poids", e);
-                        }
-                    
-                        if (convictionPercent >= 40 || isSupremeRank) {
+                    int convictionPercent = extrairePourcentageConviction(aiReport);
+                      if (convictionPercent >= 40 || isSupremeRank) {
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
                             sendTelegramSecure(finalPayload, NotificationService.this);
                             db.markEventAsSynced(fingerprint, "PROCESSED_OK");
