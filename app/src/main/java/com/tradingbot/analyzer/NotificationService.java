@@ -1834,7 +1834,7 @@ new Thread(new Runnable() {
     "      • 🇨🇦 USDCAD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
     "      • 🇬🇧 GBPUSD -> NEUTRE ⚪   [Légère corrélation positive EUR/GBP mais insuffisante sans driver BoE]\n" +
     "      • 🇦🇺 AUDUSD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
-    "      • 🏆 GOLD    -> BEARISH 🔴  [Euro fort = Dollar relatif plus faible mais taux réels européens hausse pèsent]\n" +
+    "      • 🏆 GOLD    -> NEUTRE ⚪   [Effets contradictoires — taux EU hausse pèse, Dollar relatif faible soutient. Résultante nulle.]\n" +
     "      • 🛢️ USOIL   -> NEUTRE ⚪   [Pas d'impact direct]\n" +
     "      • 🏁 FLUX DOMINANT -> EURO FORT\n\n" +
     "   B) BCE DOVISH : Inverser strictement 🇪🇺 EURUSD -> BEARISH 🔴. Les 10 autres actifs restent NEUTRE ⚪.\n\n" +
