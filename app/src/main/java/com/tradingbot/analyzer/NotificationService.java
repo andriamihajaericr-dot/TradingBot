@@ -1945,7 +1945,7 @@ new Thread(new Runnable() {
 
     "RÈGLE 7 : DRIVER GÉOPOLITIQUE EUROPE DE L'EST (RUSSIE / UKRAINE / OTAN)\n" +
     "- En cas d'escalade confirmée (frappes, franchissement ligne rouge, implication OTAN) :\n" +
-    "      • 📈 US10Y   -> BULLISH 🟢  [Fuite vers obligations US — safe haven taux]\n" +
+    "      • 📈 US10Y   -> BEARISH 🔴  [Fuite massive vers les obligations US — Safe Haven Taux]\n" +
     "      • 💻 NASDAQ  -> BEARISH 🔴  [Risk-Off global — impact croissance européenne]\n" +
     "      • 📊 SP500   -> BEARISH 🔴  [Symétrie stricte NASDAQ]\n" +
     "      • 🏆 GOLD    -> BULLISH 🟢  [Refuge Safe-Haven — priorité absolue en guerre Europe]\n" +
