@@ -252,6 +252,8 @@ public class NotificationService extends NotificationListenerService {
         "      * Banque centrale étrangère HAWKISH (hausse des taux, ton restrictif) -> sa devise locale monte face au USD. Exemple strict : BCE HAWKISH = EURUSD BULLISH 🟢.\n" +
         "   - Les autres paires de devises (GBPUSD, AUDUSD, USDJPY, USDCAD) et actifs (GOLD, USOIL) se conforment strictement aux directives de flux et de corrélation de la RÈGLE C (Différentiel de taux / effet dollar), ou restent [NEUTRE] s'ils ne sont pas mentionnés.\n" +
         "   - ⚠️ TOUTE INFRACTION À CETTE RÈGLE (ex: BCE HAWKISH → EURUSD BEARISH) ENTRAÎNE LE REJET AUTOMATIQUE DE LA RÉPONSE. CETTE RÈGLE PRÉVAUT SUR TOUTE AUTRE CONSIDÉRATION.\n\n" +
+        "CONTRAINTE 7B — SÉCURITÉ FORMATAGE TELEGRAM :\n" +
+        "   - Il est STRICTEMENT INTERDIT d'utiliser des doubles astérisques (**) pour mettre du texte en gras. Seul l'astérisque simple (*) ou les crochets sont autorisés pour éviter de corrompre le formatage Telegram.\n\n" +
         "CONTRAINTE 8 — COMPLÉTUDE ABSOLUE DE LA MATRICE :\n" +
         "   - Tu dois obligatoirement copier-coller la liste complète des 11 actifs dans l'ordre exact du format de sortie. Aucune ligne ne peut être omise ou supprimée, sous aucun prétexte.\n" +
         "   - Si un actif n'est pas directement touché ou doit rester neutre par application de la CONTRAINTE 7, sa mention réglementaire stricte doit être : `NEUTRE | Pas d'impact direct de ce driver.` (ou la raison spécifique exigée par la contrainte 7).\n" +
