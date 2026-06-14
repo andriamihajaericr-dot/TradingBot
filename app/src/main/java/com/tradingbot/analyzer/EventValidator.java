@@ -1541,17 +1541,13 @@ EconomicAnalyzer.EvaluationResult eval = EconomicAnalyzer.analyserEvenement(
 
 // ✅ Alignement strict avec les retours de votre classe EconomicAnalyzer
 if (eval != null && eval.isParsed) {
-    if ("HAUSSIER".equals(eval.marketImpact)) {
-        content += " | Status: HIGHER THAN EXPECTED 🟢";
-    } else if ("BAISSIER".equals(eval.marketImpact)) {
-        content += " | Status: LOWER THAN EXPECTED 🔴";
-    } else {
-        content += " | Status: AS EXPECTED ⚪"; // Cas où actual == forecast
-    }
-} else {
-    // Si l'analyseur n'a pas pu extraire de chiffres (ex: données textuelles, révisions sans consensus)
-    content += " | Status: UNCHANGED/TEXTUAL ⚪"; 
-}
+   if (eval.deviation > 0) {
+    content += " | Status: HIGHER THAN EXPECTED 🟢";
+   } else if (eval.deviation < 0) {
+    content += " | Status: LOWER THAN EXPECTED 🔴";
+   } else {
+    content += " | Status: AS EXPECTED ⚪";
+   } 
 
 // ✅ Récupération des actifs liés
 List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
