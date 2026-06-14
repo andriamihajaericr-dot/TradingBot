@@ -1853,7 +1853,7 @@ new Thread(new Runnable() {
     "      • 🇪🇺 EURUSD -> NEUTRE ⚪   [Légère corrélation GBP/EUR insuffisante sans driver BCE]\n" +
     "      • 🏆 GOLD    -> NEUTRE ⚪   [Pas d'impact direct — driver UK insuffisant pour mouvoir l'Or]\n" +
     "      • Les 8 autres actifs (US10Y, NASDAQ, SP500, USOIL, USDJPY, USDCAD, AUDUSD, BITCOIN) -> NEUTRE ⚪\n" +
-    "      • 🏁 FLUX DOMINANT -> EURO FORT (GBP)\n\n" +
+    "      • 🏁 FLUX DOMINANT -> GBP FORT \n\n" +
     "   F) BoE DOVISH : 🇬🇧 GBPUSD -> BEARISH 🔴. Les 10 autres actifs -> NEUTRE ⚪.\n\n" +
     "   G) RBA HAWKISH (Bullock restrictif, taux hausse Australie) :\n" +
     "      • 🇦🇺 AUDUSD -> BULLISH 🟢  [Aussie Dollar monte — différentiel de taux AUD/USD s'élargit]\n" +
