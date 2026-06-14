@@ -1941,7 +1941,7 @@ new Thread(new Runnable() {
     "      • 🇪🇺 EURUSD -> BEARISH 🔴  [Euro en première ligne du choc géographique — fuite vers Dollar]\n" +
     "      • 🇯🇵 USDJPY -> BEARISH 🔴  [Yen refuge — mais divergence possible si BoJ actif]\n" +
     "      • 🇨🇦 USDCAD -> BEARISH 🔴  [Pétrole haut renforce le CAD]\n" +
-    "      • 🇬🇧 GBPUSD -> BEARISH 🔴  [Proximité géographique UK — aversion risque GBP]\n" +
+    "      • 🇬🇧 GBPUSD : BEARISH 🔴 [UK membre OTAN exposé — coûts défense et énergie pèsent sur la Livre]\n" +
     "      • 🇦🇺 AUDUSD -> BEARISH 🔴  [Devise cyclique — Risk-Off global]\n" +
     "      • ₿ BITCOIN  -> BEARISH 🔴  [Liquidation actifs spéculatifs]\n" +
     "  • 🏁 FLUX DOMINANT : RISK-OFF / OR FORT\n\n" +
