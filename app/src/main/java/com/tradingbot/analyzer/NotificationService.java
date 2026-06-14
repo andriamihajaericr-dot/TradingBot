@@ -1883,8 +1883,20 @@ new Thread(new Runnable() {
     "   • 🇦🇺 AUDUSD -> NEUTRE ⚪   [Corrélation pétrole/AUD faible — AUD suit davantage les métaux]\n" +
     "   • ₿ BITCOIN  -> NEUTRE ⚪   [Pas d'impact direct]\n" +
     "   • 🏁 FLUX DOMINANT -> RISK-ON (ÉNERGIE)\n\n" +
-    "B) Hausse surprise des stocks (Surplus offre) : Inverser exactement — 🛢️ USOIL BEARISH 🔴, 🇨🇦 USDCAD BULLISH 🟢, 🏆 GOLD BEARISH 🔴, 📈 US10Y BEARISH 🔴. Les 7 autres NEUTRE ⚪.\n\n" +
-
+    "B) Hausse surprise des stocks de brut ou augmentation quotas OPEC (Surplus offre) :\n" +
+    "   • 🛢️ USOIL   -> BEARISH 🔴  [Pression baissière directe sur les prix du brut]\n" +
+    "   • 🇨🇦 USDCAD -> BULLISH 🟢  [CAD pétrolier s'affaiblit — Dollar reprend l'avantage]\n" +
+    "   • 🏆 GOLD    -> BEARISH 🔴  [Pétrole bas réduit anticipations inflationnistes — pression Or]\n" +
+    "   • 📈 US10Y   -> BEARISH 🔴  [Moins d'inflation anticipée = taux réels baissent légèrement]\n" +
+    "   • 💻 NASDAQ  -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 📊 SP500   -> NEUTRE ⚪   [Symétrie NASDAQ]\n" +
+    "   • 🇪🇺 EURUSD -> NEUTRE ⚪   [Effet ambivalent — Europe importatrice bénéficie mais dollar relatif stable]\n" +
+    "   • 🇯🇵 USDJPY -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🇬🇧 GBPUSD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🇦🇺 AUDUSD -> NEUTRE ⚪   [Corrélation pétrole/AUD faible]\n" +
+    "   • ₿ BITCOIN  -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🏁 FLUX DOMINANT -> RISK-OFF (ÉNERGIE)\n\n" +
+        
     "RÈGLE 5 : DRIVER BIG TECH EARNINGS (NASDAQ/SP500)\n" +
     "A) Beat massif (EPS > prévisions, Revenue beat, Guidance relevée — NVDA, AAPL, MSFT, AMZN, META, TSLA, GOOGL) :\n" +
     "   • 💻 NASDAQ  -> BULLISH 🟢  [Valorisations technologiques tirées par les résultats]\n" +
