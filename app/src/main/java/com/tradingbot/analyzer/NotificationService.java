@@ -1899,7 +1899,19 @@ new Thread(new Runnable() {
     "   • 🇬🇧 GBPUSD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
     "   • 🇦🇺 AUDUSD -> BULLISH 🟢  [Devise Risk-On profite du sentiment technologique positif]\n" +
     "   • 🏁 FLUX DOMINANT -> RISK-ON\n\n" +
-    "B) Miss massif (EPS < prévisions, Guidance abaissée, Profit Warning) : Inverser exactement toutes les directions ci-dessus.\n\n" +
+    "B) Miss massif (EPS < prévisions, Guidance abaissée, Profit Warning) :\n" +
+    "   • 💻 NASDAQ  -> BEARISH 🔴  [Valorisations comprimées par les résultats décevants]\n" +
+    "   • 📊 SP500   -> BEARISH 🔴  [Symétrie obligatoire NASDAQ]\n" +
+    "   • ₿ BITCOIN  -> BEARISH 🔴  [Sentiment Risk-Off technologique — corrélation crypto/tech]\n" +
+    "   • 🏆 GOLD    -> BULLISH 🟢  [Risk-Off restaure la demande de refuge]\n" +
+    "   • 🇦🇺 AUDUSD -> BEARISH 🔴  [Devise cyclique Risk-Off — double pression]\n" +
+    "   • 📈 US10Y   -> NEUTRE ⚪   [Pas d'impact direct sauf si Guidance récessive]\n" +
+    "   • 🛢️ USOIL   -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🇪🇺 EURUSD -> NEUTRE ⚪   [Impact limité aux actions US]\n" +
+    "   • 🇯🇵 USDJPY -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🇨🇦 USDCAD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🇬🇧 GBPUSD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🏁 FLUX DOMINANT -> RISK-OFF\n\n" +
 
     "RÈGLE 6 : DRIVER GÉOPOLITIQUE MOYEN-ORIENT (HORMUZ / IRAN / ISRAEL / HOUTHI)\n" +
     "- En cas d'escalade militaire directe, frappes, blocus Hormuz, ripostes confirmées :\n" +
