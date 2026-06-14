@@ -781,7 +781,7 @@ public class NotificationService extends NotificationListenerService {
                         int convictionPercent = extrairePourcentageConviction(aiReport);
                         
                         // ✅ CORRECTION 1 : Déclaration et initialisation de isSupremeRank
-                        boolean isSupremeRank = aiReport != null && aiReport.contains("SUPREME_RANK");
+                        // boolean isSupremeRank = aiReport != null && aiReport.contains("SUPREME_RANK");
                         
                         // ✅ Poids géo/macro selon conviction
                         int geoWeight = (convictionPercent >= 80) ? 4 : (convictionPercent >= 60) ? 3 : 1;
