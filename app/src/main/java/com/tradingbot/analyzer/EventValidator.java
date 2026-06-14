@@ -1548,6 +1548,7 @@ if (eval != null && eval.isParsed) {
    } else {
     content += " | Status: AS EXPECTED ⚪";
    } 
+}
 
 // ✅ Récupération des actifs liés
 List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
