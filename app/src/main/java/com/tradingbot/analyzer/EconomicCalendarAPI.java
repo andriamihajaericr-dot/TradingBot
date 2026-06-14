@@ -326,33 +326,36 @@ public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hours
         }
     }
 
-    public static void refreshMissingActuals(Context context) {
-        logToMain("🔄 [FOREXFACTORY] Vérification des résultats publiés (Actuals)...");
-        try {
-            List<CalendarEvent> currentWeekEvents = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
-            EventDatabase db = EventDatabase.getInstance(context);
-            int updatedCount = 0;
+ public static void refreshMissingActuals(Context context) {
+    logToMain("🔄 [FOREXFACTORY] Vérification des résultats publiés (Actuals)...");
+    try {
+        List<CalendarEvent> currentWeekEvents = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
+        EventDatabase db = EventDatabase.getInstance(context);
+        int updatedCount = 0;
 
-            for (CalendarEvent webEvent : currentWeekEvents) {
-                if (webEvent.actual != null && !webEvent.actual.equalsIgnoreCase("N/A") && !webEvent.actual.isEmpty()) {
-                    long timestampSec = Long.parseLong(webEvent.timestamp);
-                    boolean updated = db.updateActualIfMissing(webEvent.indicator, timestampSec, webEvent.actual);
-                    if (updated) {
-                        updatedCount++;
-                        logToMain("✅ [MAJ ACTUAL] " + webEvent.indicator + " -> " + webEvent.actual);
-                    }
+        for (CalendarEvent webEvent : currentWeekEvents) {
+            if (webEvent.actual != null && !webEvent.actual.equalsIgnoreCase("N/A") && !webEvent.actual.isEmpty()) {
+                long timestampSec = Long.parseLong(webEvent.timestamp);
+                boolean updated = db.updateActualIfMissing(webEvent.indicator, timestampSec, webEvent.actual);
+                if (updated) {
+                    updatedCount++;
+                    logToMain("✅ [MAJ ACTUAL] " + webEvent.indicator + " -> " + webEvent.actual);
                 }
             }
-            
-            if (updatedCount > 0) {
-                logToMain("📊 [FOREXFACTORY] Synchronisation terminée : " + updatedCount + " valeurs 'actual' mises à jour.");
-            } else {
-                logToMain("ℹ️ [FOREXFACTORY] Aucun nouveau résultat à mettre à jour.");
-            }
-        } catch (Exception e) {
-            logToMain("❌ [FOREXFACTORY] Erreur lors du refresh des actuals : " + e.getMessage());
         }
+
+        // ✅ Persistance des événements non encore en base (futurs + sans actual)
+        persistCalendarEventsToDB(context, currentWeekEvents);
+
+        if (updatedCount > 0) {
+            logToMain("📊 [FOREXFACTORY] Synchronisation terminée : " + updatedCount + " valeurs 'actual' mises à jour.");
+        } else {
+            logToMain("ℹ️ [FOREXFACTORY] Aucun nouveau résultat à mettre à jour.");
+        }
+    } catch (Exception e) {
+        logToMain("❌ [FOREXFACTORY] Erreur lors du refresh des actuals : " + e.getMessage());
     }
+}
 
     private static void logToMain(String message) {
         Log.d(TAG, message);
