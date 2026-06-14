@@ -177,7 +177,7 @@ public class NotificationService extends NotificationListenerService {
         "   • 💻 NASDAQ  : BEARISH 🔴  | Les marchés actions capitulent face à l'incertitude\n" +
         "   • 📊 SP500   : BEARISH 🔴  | Même direction que NASDAQ — obligatoire\n" +
         "   • ₿ BITCOIN  : BEARISH 🔴  | Retrait immédiat des capitaux des actifs spéculatifs\n" +
-        "   • 📈 US10Y    : BULLISH 🟢  | Ruée vers la sécurité des bons du Trésor américains\n" +
+        "   • 📈 US10Y   : BEARISH 🔴  | Fuite vers la qualité (les investisseurs achètent des obligations, les taux baissent)\n" +
         "   🏁 FLUX DOMINANT OBLIGATOIRE : YEN FORT / OR FORT (MKT RISK-OFF) 🐻\n\n" +
         "   DÉSESCALADE MOYEN-ORIENT (Discussions, Accords, Trêve) :\n" +
         "   Impact modéré, conviction plafonnée à 45%.\n" +
