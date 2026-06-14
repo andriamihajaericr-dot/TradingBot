@@ -357,6 +357,113 @@ public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hours
     }
 }
 
+    // ✅ Persistance centralisée des événements calendaires en DB
+public static void persistCalendarEventsToDB(Context context, List<CalendarEvent> events) {
+    if (context == null || events == null || events.isEmpty()) return;
+
+    EventDatabase db = EventDatabase.getInstance(context);
+    int saved = 0;
+    int skipped = 0;
+
+    for (CalendarEvent event : events) {
+        if (event == null || event.indicator == null || event.timestamp == null) continue;
+
+        // Filtrer jours fériés
+        String indUpper = event.indicator.toUpperCase(Locale.US);
+        if (indUpper.contains("BANK HOLIDAY") || indUpper.contains("PUBLIC HOLIDAY") ||
+            indUpper.contains("MARKET HOLIDAY") || indUpper.contains("NATIONAL HOLIDAY")) continue;
+
+        try {
+            long eventTs = Long.parseLong(event.timestamp);
+
+            // Anti-doublon via méthode existante EventDatabase
+            if (db.isEventAlreadySaved(event.indicator, eventTs)) {
+                skipped++;
+                continue;
+            }
+
+            // Fingerprint unique et stable
+            String fingerprint = "CAL_"
+                    + event.indicator.toLowerCase(Locale.US).replaceAll("[^a-z0-9]", "_")
+                    + "_" + eventTs;
+
+            // Contenu structuré lisible par l'IA et getDailyMacroSummary
+            String content = event.indicator
+                    + (event.country != null ? " | " + event.country : "")
+                    + " | Forecast: " + (event.forecast != null ? event.forecast : "N/A")
+                    + " | Previous: " + (event.previous != null ? event.previous : "N/A")
+                    + " | Actual: "   + (event.actual   != null ? event.actual   : "N/A");
+
+            // Poids selon importance et type d'indicateur
+            int weight;
+            if ("HIGH".equalsIgnoreCase(event.importance)) {
+                weight = isSupremeCalendarIndicator(event.indicator) ? 5 : 4;
+            } else if ("MEDIUM".equalsIgnoreCase(event.importance)) {
+                weight = 2;
+            } else {
+                weight = 1;
+            }
+
+            String assetsStr = (event.affectedAssets != null && !event.affectedAssets.isEmpty())
+                    ? String.join(",", event.affectedAssets)
+                    : "";
+
+            // Impact initial basé sur actual vs forecast
+            String impact = buildCalendarImpact(event);
+
+            db.saveEvent(
+                fingerprint,
+                "CALENDAR",
+                event.country  != null ? event.country  : "Global",
+                "CALENDAR-RESULT",
+                event.indicator,
+                content,
+                assetsStr,
+                impact,
+                eventTs,
+                "synced",
+                weight
+            );
+            saved++;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur persistCalendarEventsToDB : " + event.indicator, e);
+        }
+    }
+    logToMain("📥 [CALENDRIER DB] " + saved + " persistés, " + skipped + " doublons ignorés.");
+}
+
+private static boolean isSupremeCalendarIndicator(String indicator) {
+    if (indicator == null) return false;
+    String ind = indicator.toUpperCase(Locale.US);
+    return ind.contains("CPI")             ||
+           ind.contains("PCE")             ||
+           ind.contains("NFP")             ||
+           ind.contains("NON-FARM")        ||
+           ind.contains("PAYROLL")         ||
+           ind.contains("FOMC")            ||
+           ind.contains("FEDERAL RESERVE") ||
+           ind.contains("GDP")             ||
+           ind.contains("INTEREST RATE");
+}
+
+private static String buildCalendarImpact(CalendarEvent event) {
+    boolean hasActual   = event.actual   != null && !event.actual.equalsIgnoreCase("N/A")   && !event.actual.isEmpty();
+    boolean hasForecast = event.forecast != null && !event.forecast.equalsIgnoreCase("N/A") && !event.forecast.isEmpty();
+
+    if (hasActual && hasForecast) {
+        try {
+            double a = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
+            double f = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
+            if (a > f) return "CALENDRIER ÉCONOMIQUE | Haute Volatilité (Biais Haussier)";
+            if (a < f) return "CALENDRIER ÉCONOMIQUE | Haute Volatilité (Biais Baissier)";
+            return "CALENDRIER ÉCONOMIQUE | Conforme aux prévisions";
+        } catch (Exception ignored) {}
+    }
+    if (hasForecast) return "CALENDRIER ÉCONOMIQUE | En attente de publication";
+    return "CALENDRIER ÉCONOMIQUE | Données insuffisantes";
+    }
+
     private static void logToMain(String message) {
         Log.d(TAG, message);
         if (MainActivity.instance != null) {
