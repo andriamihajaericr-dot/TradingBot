@@ -768,8 +768,7 @@ public class NotificationService extends NotificationListenerService {
                         }
                         if (inImpactSection && trimmed.startsWith("•")) {
                             String upperLine = line.toUpperCase(Locale.ROOT);
-                            boolean isSignificant = upperLine.contains("ACHAT CHOC") || upperLine.contains("VENTE CHOC") ||
-                                                    upperLine.contains("INCLINATION ACHAT") || upperLine.contains("INCLINATION VENTE");
+                            boolean isSignificant = upperLine.contains("BULLISH") || upperLine.contains("BEARISH") || upperLine.contains("INCLINATION BULLISH") || upperLine.contains("INCLINATION BEARISH");
                             if (isSignificant) {
                                 filteredMessage.append(line).append("\n");
                                 activeSignalsCount++;
