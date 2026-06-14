@@ -1985,9 +1985,14 @@ new Thread(new Runnable() {
     "   • 💻 NASDAQ  -> BEARISH 🔴  [Sentiment Risk-Off technologique]\n" +
     "   • 📊 SP500   -> BEARISH 🔴  [Symétrie NASDAQ]\n" +
     "   • 🏆 GOLD    -> BULLISH 🟢  [Fuite vers refuge — Or bénéficie de la panique crypto]\n" +
-    "   • 🇦🇺 AUDUSD -> BEARISH 🔴  [Devise Risk-Off]\n" +
-    "   • Les 6 autres actifs -> NEUTRE ⚪\n" +
-    "   • 🏁 FLUX DOMINANT -> RISK-OFF\n\n" +
+    "   • 🇦🇺 AUDUSD -> BEARISH 🔴  [Devise Risk-Off cyclique]\n" +
+    "   • 📈 US10Y   -> NEUTRE ⚪   [Fuite obligataire possible mais effet trop dilué sans driver macro]\n" +
+    "   • 🛢️ USOIL   -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🇪🇺 EURUSD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🇯🇵 USDJPY -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🇨🇦 USDCAD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🇬🇧 GBPUSD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "   • 🏁 FLUX DOMINANT -> RISK-OFF\n" +
 
     "═══════════════════════════════════════════════════════════════\n" +
     "                    CONTRAINTES DE SÉCURITÉ DE COMPILATION\n" +
