@@ -1284,11 +1284,18 @@ public static void preloadCalendar() {
         });
 
         // ── Stockage dans la map interne ──
-        for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
-            if (event == null) continue;
-            String key = createEventKey(event.indicator, event.timestamp);
-            upcomingEvents.put(key, event);
-        }
+        // ── Stockage dans la map interne ──
+for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
+    if (event == null) continue;
+    String key = createEventKey(event.indicator, event.timestamp);
+    upcomingEvents.put(key, event);
+}
+
+// ✅ Persistance en DB pour cohérence inter-sessions et analyse IA enrichie
+if (appContext != null) {
+    EconomicCalendarAPI.persistCalendarEventsToDB(appContext, sortedEvents);
+}
+
 
         // ── Construction du rapport Telegram ──
         // ✅ Envoyer uniquement si le contenu a changé
