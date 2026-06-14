@@ -187,74 +187,113 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
 
     public String getDailyMacroSummary(long currentUnixTime) {
-        long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
-        long sevenDaysAgo       = currentUnixTime - (7L * 24 * 60 * 60);
+    long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
+    long sevenDaysAgo       = currentUnixTime - (7L * 24 * 60 * 60);
 
-        String selection =
-            "(unix_timestamp >= ? AND driver_weight >= 3) OR " +
-            "(unix_timestamp >= ? AND driver_weight = 5) OR " +
-            "(unix_timestamp >= ? AND (" +
-                "event_type = 'GEOPOLITICAL' OR " +
-                "event_type LIKE '%GEO%' OR " +
-                "impact LIKE '%Choc Géopolitique%' OR " +
-                "impact LIKE '%GÉOPOLITIQUE%'" +
-            ") AND driver_weight >= 2)";
+    // Clause 1 : tous événements >= poids 2 des dernières 24h
+    // Clause 2 : piliers macro suprêmes (poids 5) sur 7 jours — mémoire inter-sessions
+    // Clause 3 : géopolitique et calendaire même à poids 1, sur 7 jours
+    String selection =
+        "(unix_timestamp >= ? AND driver_weight >= 2) OR " +
+        "(unix_timestamp >= ? AND driver_weight = 5) OR " +
+        "(unix_timestamp >= ? AND (" +
+            "event_type LIKE '%GEO%' OR " +
+            "event_type = 'GEOPOLITICAL' OR " +
+            "event_type = 'CALENDAR-RESULT' OR " +
+            "impact LIKE '%Choc Géopolitique%'" +
+        ") AND driver_weight >= 1)";
 
-        String[] whereArgs = new String[]{
-            String.valueOf(twentyFourHoursAgo),  
-            String.valueOf(sevenDaysAgo),         
-            String.valueOf(sevenDaysAgo)          
-        };
+    String[] whereArgs = new String[]{
+        String.valueOf(twentyFourHoursAgo),
+        String.valueOf(sevenDaysAgo),
+        String.valueOf(sevenDaysAgo)
+    };
 
-        SQLiteDatabase db = this.getReadableDatabase();
-        StringBuilder sb = new StringBuilder();
-        Cursor cursor = null;
-        try {
-            cursor = db.query(TABLE_EVENTS,
-                    new String[]{"source", "title", "feed_content", "impact", "event_type"},
-                    selection, whereArgs, null, null, "unix_timestamp ASC");
+    SQLiteDatabase db = this.getReadableDatabase();
+    StringBuilder sb = new StringBuilder();
+    Cursor cursor = null;
 
-            if (cursor != null && cursor.moveToFirst()) {
-                do {
-                    String src     = cursor.getString(0);
-                    String title   = cursor.getString(1);
-                    String content = cursor.getString(2);
-                    String impact  = cursor.getString(3);
-                    String type    = cursor.getString(4);
+    try {
+        // ✅ target_assets et unix_timestamp ajoutés — essentiels pour l'IA
+        cursor = db.query(TABLE_EVENTS,
+                new String[]{"source", "title", "feed_content", "impact",
+                             "event_type", "driver_weight", "target_assets", "unix_timestamp"},
+                selection, whereArgs, null, null,
+                "driver_weight DESC, unix_timestamp ASC"); // Suprêmes en premier
 
-                    if (content != null && content.contains("\n\n")) {
-                        String[] parts = content.split("\n\n", 2);
-                        if (parts.length > 1) content = parts[1];
+        if (cursor != null && cursor.moveToFirst()) {
+
+            // Formatter les timestamps en heure Madagascar
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
+            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+
+            do {
+                String src      = cursor.getString(0);
+                String title    = cursor.getString(1);
+                String content  = cursor.getString(2);
+                String impact   = cursor.getString(3);
+                String type     = cursor.getString(4);
+                int    weight   = cursor.getInt(5);
+                String assets   = cursor.getString(6);
+                long   tsEpoch  = cursor.getLong(7);
+
+                // ✅ Nettoyage header sécurisé — ne supprime que si header reconnu
+                if (content != null && content.contains("\n\n")) {
+                    String[] parts = content.split("\n\n", 2);
+                    // Ne splitter que si la première partie ressemble à un header court
+                    if (parts.length > 1 && parts[0].length() < 120) {
+                        content = parts[1];
                     }
+                }
 
-                    boolean isCalendarResult = "CALENDAR-RESULT".equals(type) ||
-                        (impact != null && impact.startsWith("CALENDRIER ÉCONOMIQUE"));
-                    boolean isGeoEvent = "GEOPOLITICAL".equals(type) ||
-                        (type != null && type.contains("GEO")) ||
-                        (impact != null && impact.contains("Choc Géopolitique"));
+                // ✅ Classification des sections avec rang explicite
+                boolean isCalendar = "CALENDAR-RESULT".equals(type) ||
+                    (impact != null && impact.startsWith("CALENDRIER ÉCONOMIQUE"));
+                boolean isGeo = type != null && (
+                    type.contains("GEO") || type.equals("GEOPOLITICAL"));
+                boolean isSupreme = weight >= 4;
 
-                    if (isCalendarResult) {
-                        sb.append("--- 📅 RÉSULTAT CALENDAIRE OFFICIEL ---\n");
-                    } else if (isGeoEvent) {
-                        sb.append("--- 🌍 ÉVÉNEMENT GÉOPOLITIQUE ---\n"); 
-                    } else {
-                        sb.append("--- ⚡ ALERTE MACRO / NEWS ---\n");
-                    }
+                if (isCalendar) {
+                    sb.append("--- 📅 RÉSULTAT CALENDAIRE OFFICIEL")
+                      .append(isSupreme ? " [RANG SUPRÊME — PRIORITÉ ABSOLUE]" : "")
+                      .append(" ---\n");
+                } else if (isGeo) {
+                    sb.append("--- 🌍 ÉVÉNEMENT GÉOPOLITIQUE")
+                      .append(isSupreme ? " [ESCALADE CONFIRMÉE]" : "")
+                      .append(" ---\n");
+                } else if (isSupreme) {
+                    sb.append("--- 🔴 DRIVER MACROÉCONOMIQUE SUPRÊME [PRIORITÉ ABSOLUE] ---\n");
+                } else {
+                    sb.append("--- ⚡ ALERTE MACRO / NEWS ---\n");
+                }
 
-                    sb.append("Source: ").append(src).append("\n");
-                    sb.append("Titre: ").append(title).append("\n");
-                    sb.append("Contenu: ").append(content).append("\n");
-                    sb.append("Impact calculé: ").append(impact).append("\n\n");
+                // ✅ Heure Madagascar pour chaque événement
+                String heureEvent = sdf.format(new java.util.Date(tsEpoch * 1000L));
 
-                } while (cursor.moveToNext());
-            }
-        } catch (Exception e) {
-            Log.e("EventDatabase", "Erreur construction Daily Macro Summary", e);
-        } finally {
-            if (cursor != null) cursor.close();
+                sb.append("Heure (Mada): ").append(heureEvent).append("\n");
+                sb.append("Source: ").append(src   != null ? src   : "N/A").append("\n");
+                sb.append("Titre: ").append(title   != null ? title : "N/A").append("\n");
+                sb.append("Contenu: ").append(content != null ? content : "N/A").append("\n");
+                sb.append("Impact: ").append(impact  != null ? impact : "NEUTRE").append("\n");
+
+                // ✅ Actifs ciblés — guide l'IA sur la matrice directionnelle
+                if (assets != null && !assets.trim().isEmpty()) {
+                    sb.append("Actifs ciblés: ").append(assets).append("\n");
+                }
+
+                sb.append("Poids macro: ").append(weight).append("/5\n\n");
+
+            } while (cursor.moveToNext());
         }
-        return sb.toString();
+
+    } catch (Exception e) {
+        Log.e("EventDatabase", "Erreur construction Daily Macro Summary", e);
+    } finally {
+        if (cursor != null) cursor.close();
     }
+
+    return sb.toString();
+}
     
     public String getMonthlyMacroRegistry(long currentUnixTime) {
         SQLiteDatabase db = this.getReadableDatabase();
