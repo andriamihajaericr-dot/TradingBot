@@ -125,7 +125,7 @@ if (containsAny(unified, "WARSH", "KEVIN WARSH")) {
         // Macro secondaire (Poids 2)
         // ── ISM Services / Manufacturing — Leading Indicator US (Poids 4) ──
 // ── GDP Advance — Rang Suprême Trimestriel (Poids 4) ──
-} else if (containsAny(unified, "GDP ADVANCE", "ADVANCE GDP",
+} else if (containsAny(unified, "ADVANCE GDP",
            "GDP GROWTH", "GROSS DOMESTIC PRODUCT", "GDP QOQ",
            "GDP YOY", "GDP ANNUALIZED", "GDP FLASH")) {
     eventType   = "GDP-ADVANCE";
