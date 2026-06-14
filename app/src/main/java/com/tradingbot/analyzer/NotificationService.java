@@ -1864,7 +1864,8 @@ new Thread(new Runnable() {
     "   I) BoC HAWKISH (Macklem restrictif, taux hausse Canada) :\n" +
     "      • 🇨🇦 USDCAD -> BEARISH 🔴  [Dollar Canadien s'apprécie face au Dollar US]\n" +
     "      • 🛢️ USOIL   -> NEUTRE ⚪   [Corrélation CAD/pétrole présente mais insuffisante sans driver EIA/OPEC]\n" +
-    "      • Les 10 autres actifs -> NEUTRE ⚪\n" +
+    "      • 🏆 GOLD    -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "      • Les 8 autres actifs (US10Y, NASDAQ, SP500, EURUSD, USDJPY, GBPUSD, AUDUSD, BITCOIN) -> NEUTRE ⚪\n" +
     "      • 🏁 FLUX DOMINANT -> DOLLAR FAIBLE (CAD)\n\n" +
     "   J) BoC DOVISH : 🇨🇦 USDCAD -> BULLISH 🟢. Les 10 autres actifs -> NEUTRE ⚪.\n\n" +
 
