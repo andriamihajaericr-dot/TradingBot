@@ -1857,7 +1857,8 @@ new Thread(new Runnable() {
     "   F) BoE DOVISH : 🇬🇧 GBPUSD -> BEARISH 🔴. Les 10 autres actifs -> NEUTRE ⚪.\n\n" +
     "   G) RBA HAWKISH (Bullock restrictif, taux hausse Australie) :\n" +
     "      • 🇦🇺 AUDUSD -> BULLISH 🟢  [Aussie Dollar monte — différentiel de taux AUD/USD s'élargit]\n" +
-    "      • Les 10 autres actifs -> NEUTRE ⚪\n" +
+    "      • 🏆 GOLD    -> NEUTRE ⚪   [Pas d'impact direct]\n" +
+    "      • Les 9 autres actifs (US10Y, NASDAQ, SP500, USOIL, EURUSD, USDJPY, USDCAD, GBPUSD, BITCOIN) -> NEUTRE ⚪\n" +
     "      • 🏁 FLUX DOMINANT -> RISK-ON (AUD)\n\n" +
     "   H) RBA DOVISH : 🇦🇺 AUDUSD -> BEARISH 🔴. Les 10 autres actifs -> NEUTRE ⚪.\n\n" +
     "   I) BoC HAWKISH (Macklem restrictif, taux hausse Canada) :\n" +
