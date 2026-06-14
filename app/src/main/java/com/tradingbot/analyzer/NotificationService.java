@@ -1850,8 +1850,9 @@ new Thread(new Runnable() {
     "   D) BoJ DOVISH : 🇯🇵 USDJPY -> BULLISH 🟢, 🇦🇺 AUDUSD -> BULLISH 🟢, 🏆 GOLD -> BEARISH 🔴. Reste NEUTRE ⚪.\n\n" +
     "   E) BoE HAWKISH (Bailey restrictif, taux hausse UK) :\n" +
     "      • 🇬🇧 GBPUSD -> BULLISH 🟢  [Livre Sterling monte face au Dollar]\n" +
-    "      • 🇪🇺 EURUSD -> NEUTRE ⚪   [Légère corrélation GBP/EUR mais insuffisante sans driver BCE]\n" +
-    "      • Les 9 autres actifs -> NEUTRE ⚪\n" +
+    "      • 🇪🇺 EURUSD -> NEUTRE ⚪   [Légère corrélation GBP/EUR insuffisante sans driver BCE]\n" +
+    "      • 🏆 GOLD    -> NEUTRE ⚪   [Pas d'impact direct — driver UK insuffisant pour mouvoir l'Or]\n" +
+    "      • Les 8 autres actifs (US10Y, NASDAQ, SP500, USOIL, USDJPY, USDCAD, AUDUSD, BITCOIN) -> NEUTRE ⚪\n" +
     "      • 🏁 FLUX DOMINANT -> EURO FORT (GBP)\n\n" +
     "   F) BoE DOVISH : 🇬🇧 GBPUSD -> BEARISH 🔴. Les 10 autres actifs -> NEUTRE ⚪.\n\n" +
     "   G) RBA HAWKISH (Bullock restrictif, taux hausse Australie) :\n" +
