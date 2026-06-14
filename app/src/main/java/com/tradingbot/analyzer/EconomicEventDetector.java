@@ -67,8 +67,10 @@ if (containsAny(unified, "WARSH", "KEVIN WARSH")) {
     description = "Kevin Warsh (Futur Chair Fed) — Signal Politique Monétaire Majeur";
     impact      = "Haute Volatilité";
 
-} else if (containsAny(unified, "FEDERAL RESERVE", "FED CHAIR", "FOMC MINUTES",
-               "FOMC", "FED ", "POWELL", "BARKIN", "GOOLSBEE",
+} else if (containsAny(unified, "FEDERAL RESERVE", "FED CHAIR",
+               "FOMC", "FED RATE", "FED POLICY", "FED DECISION",
+               "FED STATEMENT", "FED MEETING", "FED SPEAKER",
+               "POWELL", "BARKIN", "GOOLSBEE",
                "HAMMACK", "WALLER", "WILLIAMS", "KUGLER", "RATE STANDS")) {
     eventType   = "FED-MONETARY-POLICY";
     description = "Décision / Discours Réserve Fédérale (USA)";
