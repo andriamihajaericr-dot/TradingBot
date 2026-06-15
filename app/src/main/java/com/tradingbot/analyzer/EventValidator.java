@@ -216,18 +216,19 @@ public class EventValidator {
     String rawExtracted = upperCombined.replace(" :", ":").trim(); 
 
     // ✅ ÉTAPE 1 : Gestion de crise et désescalade événementielle
+    // ✅ ÉTAPE 1 : Gestion de crise et désescalade événementielle
     GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
     
     if (geo != null && geo.confidence >= 65) {
         if (combined.contains("ceasefire") || combined.contains("cessez-le-feu") || combined.contains("peace") || combined.contains("pourparlers")) { 
-            if (isWarRegimeActive) {
-                isWarRegimeActive = false; // 🕊️ Désactivation immédiate
+            if (isWarRegimeActive(context)) { // ✅ Lecture sécurisée avec vérification du TTL
+                setWarRegime(context, false); // 🕊️ Désactivation immédiate persistante
                 logToMain("🕊️ [ARBITRAGE] Fin du Régime de Guerre détectée par assessGeopoliticalEvent.");
             }
             // Pas de return : on laisse couler pour capter le rebond macro économique
         } 
         else {
-            isWarRegimeActive = true;
+            setWarRegime(context, true); // 🚨 Activation / Reconduction persistante (remet à zéro le compteur des 36h)
             result.isConfirmed = true;
             result.confidence  = geo.confidence;
             result.reason      = "🚨 EXCEPTION ABSOLUE : RÉGIME DE GUERRE ACTIVÉ / RECONDUIT";
@@ -247,8 +248,8 @@ public class EventValidator {
     }
 
     // ✅ ÉTAPE 2 : Filtrage / Dérogation Macro sous Régime de Guerre
-    if (isWarRegimeActive) {
-        if (upperCombined.contains("DOVISH") || upperCombined.contains("HAWKISH") || 
+    if (isWarRegimeActive(context)) { // ✅ Lecture sécurisée avec vérification du TTL
+        if (upperCombined.contains("DOVISH") || upperCombined.contains("HAWKISH") ||
             upperCombined.contains("FED") || upperCombined.contains("FOMC") || 
             upperCombined.contains("BANQUE CENTRALE") || upperCombined.contains("CENTRAL BANK") ||
             upperCombined.contains("CPI") || upperCombined.contains("PCE") || 
