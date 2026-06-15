@@ -171,7 +171,7 @@ public class EventValidator {
     // ─────────────────────────────────────────────────────────────
     public static class ValidationResult {
         public boolean isConfirmed    = false;
-        public int     confidence     =;
+        public int     confidence     =0;
         public String  forecast       = "N/A";
         public String  previous       = "N/A";
         public String  actual         = "N/A";
