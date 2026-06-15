@@ -63,9 +63,90 @@ public class EventValidator {
     private static final Map<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
     private static Context appContext = null;
 
-    // ✅ AJOUT ARBITRAGE : État persistant du Régime de Guerre
-    private static boolean isWarRegimeActive = false;
-    private static long lastWarShockTimestamp = 0;
+    // ✅ AJOUT ARBITRAGE : Configuration Persistante du Régime de Guerre avec Sécurité TTL & Multi-Thread
+    private static final String PREFS_NAME = "BotWarRegimePrefs";
+    private static final String KEY_WAR_ACTIVE = "war_regime_active";
+    private static final String KEY_WAR_TIMESTAMP = "war_activation_timestamp";
+
+    private static volatile boolean isWarRegimeActive = false;
+    private static volatile long lastWarShockTimestamp = 0;
+    private static final long WAR_REGIME_TTL_MS = 36 * 60 * 60 * 1000L; // 36 Heures de validité automatique avant extinction
+
+    /**
+     * 🔄 Hydrate le régime de guerre depuis le stockage local (SharedPreferences) au réveil du bot
+     */
+    public static void hydrateWarRegime(Context context) {
+        if (context == null) return;
+        try {
+            android.content.SharedPreferences prefs = context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            synchronized (EventValidator.class) {
+                isWarRegimeActive = prefs.getBoolean(KEY_WAR_ACTIVE, false);
+                lastWarShockTimestamp = prefs.getLong(KEY_WAR_TIMESTAMP, 0);
+            }
+            Log.d(TAG, "📦 [HYDRATATION GÉOPOLITIQUE] Régime de guerre restauré depuis le disque : " + isWarRegimeActive);
+        } catch (Exception e) {
+            Log.e(TAG, "⚠️ Échec du rechargement du régime de guerre", e);
+        }
+    }
+
+    /**
+     * Modifie l'état du régime de guerre (Sauvegarde persistante instantanée et Thread-Safe)
+     */
+    public static synchronized void setWarRegime(Context context, boolean active) {
+        isWarRegimeActive = active;
+        lastWarShockTimestamp = active ? System.currentTimeMillis() : 0;
+
+        Context targetContext = (context != null) ? context : appContext;
+        if (targetContext != null) {
+            try {
+                targetContext.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                       .edit()
+                       .putBoolean(KEY_WAR_ACTIVE, isWarRegimeActive)
+                       .putLong(KEY_WAR_TIMESTAMP, lastWarShockTimestamp)
+                       .apply(); // Écriture asynchrone non-bloquante sur le disque
+            } catch (Exception e) {
+                Log.e(TAG, "⚠️ Échec de sauvegarde persistante du régime de guerre", e);
+            }
+        }
+    }
+
+    /**
+     * ✅ Récupère l'état du régime de guerre avec évaluation et extinction automatique (TTL 36h)
+     */
+    public static synchronized boolean isWarRegimeActive(Context context) {
+        if (isWarRegimeActive) {
+            long tempsEcoule = System.currentTimeMillis() - lastWarShockTimestamp;
+            if (tempsEcoule > WAR_REGIME_TTL_MS) {
+                Log.w(TAG, "⏱️ [TTL EXPIRED] Aucune mise à jour géopolitique majeure depuis 36h. Désactivation automatique du régime de guerre.");
+                
+                isWarRegimeActive = false;
+                lastWarShockTimestamp = 0;
+
+                Context targetContext = (context != null) ? context : appContext;
+                if (targetContext != null) {
+                    try {
+                        targetContext.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                               .edit()
+                               .putBoolean(KEY_WAR_ACTIVE, false)
+                               .putLong(KEY_WAR_TIMESTAMP, 0)
+                               .apply();
+                    } catch (Exception e) {
+                        Log.e(TAG, "⚠️ Échec du nettoyage de l'expiration TTL sur le stockage", e);
+                    }
+                }
+            }
+        }
+        return isWarRegimeActive;
+    }
+
+    /**
+     * Surcharge du Getter pour les appels externes ne disposant pas d'un objet Context immédiat
+     */
+    public static boolean isWarRegimeActive() {
+        return isWarRegimeActive(appContext);
+    }
+
+    // 🔹 PRÉCOMPILATION REGEX (Pour les performances du flux d'actualités)
     //private static final long WAR_REGIME_DURATION_MS = 12 * 60 * 60 * 1000L; // Verrou de 12 heures
     // 🔹 PRÉCOMPILATION REGEX (Pour les performances du flux d'actualités)
     private static final Pattern PERCENT_PATTERN = Pattern.compile("\\d+(\\.\\d+)?%");
@@ -85,7 +166,7 @@ public class EventValidator {
     // ─────────────────────────────────────────────────────────────
     public static class ValidationResult {
         public boolean isConfirmed    = false;
-        public int     confidence     = 0;
+        public int     confidence     =;
         public String  forecast       = "N/A";
         public String  previous       = "N/A";
         public String  actual         = "N/A";
