@@ -1108,6 +1108,17 @@ new Thread(new Runnable() {
                 EventValidator.preloadCalendar();
             }
         }, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
+        // --- NOUVEAU : Moniteur de divergence (toutes les 15 minutes) ---
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    checkForecastDivergence();
+                } catch (Exception e) {
+                    Log.e(TAG, "[DIVERGENCE] Erreur critique dans le moniteur", e);
+                }
+            }
+        }, 15, 15, TimeUnit.MINUTES);
     }
 
 
