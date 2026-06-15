@@ -816,28 +816,38 @@ public void close() {
         
         return false; 
     } 
-
-    // =========================================================================
-    // ✅ METHODE CORRECTIVE AJOUTÉE POUR SYNCHRONISER LES "ACTUALS" DU CALENDRIER
-    // =========================================================================
+    /**
+     * Met à jour la valeur "Actual" manquante pour un indicateur donné, recalcule son impact
+     * via le moteur quantitatif et déclenche le pipeline de notification Telegram.
+     *
+     * @param indicator     Nom ou mot-clé de l'indicateur économique.
+     * @param unixTimestamp Timestamp de la publication (gère secondes et millisecondes).
+     * @param actualValue   La nouvelle valeur réelle publiée.
+     * @return true si au moins un événement correspondant a été mis à jour et synchronisé.
+     */
     public synchronized boolean updateActualIfMissing(String indicator, long unixTimestamp, String actualValue) {
+        // Validation stricte des entrées pour éviter des écritures aberrantes
         if (indicator == null || indicator.trim().isEmpty() || actualValue == null || actualValue.equalsIgnoreCase("N/A")) {
             return false;
         }
 
         SQLiteDatabase db = this.getWritableDatabase();
         
-        // Sécurité : conversion automatique si le timestamp envoyé est par erreur en millisecondes
+        // 🛡️ SÉCURITÉ TIMESTAMP : conversion automatique si le timestamp envoyé est par erreur en millisecondes
         long secondsTimestamp = (unixTimestamp > 9999999999L) ? (unixTimestamp / 1000L) : unixTimestamp;
         
-        long windowStart = secondsTimestamp - (2 * 60 * 60); // ±2h autour du release
+        // Fenêtre de tolérance de ±2h autour de la release officielle
+        long windowStart = secondsTimestamp - (2 * 60 * 60); 
         long windowEnd   = secondsTimestamp + (2 * 60 * 60);
         String searchPattern = "%" + indicator.trim() + "%";
 
         Cursor cursor = null;
+        boolean updatedAtLeastOne = false; // 🔄 OPTIMISATION : Évite le court-circuit prématuré de la boucle
+
         try {
+            // ✅ PROJECTION SÉCURISÉE : Récupération explicite des 3 colonnes requises pour éviter tout crash
             cursor = db.query(TABLE_EVENTS,
-                    new String[]{"id", "feed_content"},
+                    new String[]{"id", "feed_content", "title"},
                     "unix_timestamp >= ? AND unix_timestamp <= ? AND (title LIKE ? OR feed_content LIKE ?)",
                     new String[]{String.valueOf(windowStart), String.valueOf(windowEnd), searchPattern, searchPattern},
                     null, null, null);
@@ -846,24 +856,61 @@ public void close() {
                 do {
                     int id = cursor.getInt(0);
                     String content = cursor.getString(1);
+                    String title = cursor.getString(2); // Extraction sécurisée du titre original
 
-                    // Si l'événement possède encore le tag initial "Actual: N/A", on l'écrase
+                    // On n'applique le rattrapage que si l'événement possède encore le tag initial "Actual: N/A"
                     if (content != null && content.contains("Actual: N/A")) {
                         String updatedContent = content.replace("Actual: N/A", "Actual: " + actualValue);
                         
+                        // 🧠 MOTEUR QUANTITATIF : Recalcul immédiat du biais, de l'impact macro et de la déviation
+                        EconomicAnalyzer.EvaluationResult evalResult = EconomicAnalyzer.analyserEvenement(title, updatedContent);
+                        
                         ContentValues cv = new ContentValues();
                         cv.put("feed_content", updatedContent);
+                        cv.put("impact", evalResult.marketImpact + " | " + evalResult.directionText);
+                        cv.put("driver_weight", evalResult.weight);
+                        cv.put("sync_status", "synced"); // On verrouille l'état comme traité/synchronisé
                         
                         db.update(TABLE_EVENTS, cv, "id = ?", new String[]{String.valueOf(id)});
-                        return true; // Modification validée
+                        
+                        // 🚀 PIPELINE TELEGRAM : Recherche résiliente du contexte Android actif pour l'expédition
+                        android.content.Context context = (MainActivity.instance != null) ? MainActivity.instance : NotificationService.getInstance();
+                        if (context != null) {
+                            // Collecte dynamique des liaisons intermarchés (Forex, Indices, Gold)
+                            List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(title, "United States");
+                            
+                            // 🛡️ SÉCURITÉ NPE : Si la liste revient nulle, on l'initialise à vide pour éviter un crash interne
+                            if (assets == null) {
+                                assets = new ArrayList<>();
+                            }
+                            
+                            String source = "CalendarSync";
+                            String body = updatedContent;
+                            
+                            // Injection de la direction mathématique exacte (déviation par rapport aux prévisions)
+                            if (evalResult.isParsed && !Double.isNaN(evalResult.deviation)) {
+                                String deviationText = evalResult.deviation > 0 ? "HIGHER" : (evalResult.deviation < 0 ? "LOWER" : "AS EXPECTED");
+                                body += " | Deviation: " + deviationText;
+                            }
+                            
+                            // Envoi instantané vers le traitement LLM et Telegram
+                            NotificationService.sendToGroqAndTelegram(source, title, body, assets, context.getApplicationContext());
+                        } else {
+                            // 🛡️ LOG D'ALERTE CONTEXTE : Permet de diagnostiquer une absence de contexte dans Logcat sans crasher
+                            Log.w(TAG, "🤖 [WARNING] updateActualIfMissing pour '" + title + "' mis à jour en DB mais aucun Context actif pour notifier Telegram.");
+                        }
+                        
+                        updatedAtLeastOne = true; // Une ligne a été traitée avec succès, on continue la boucle pour les suivantes
                     }
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Erreur dans updateActualIfMissing pour " + indicator, e);
+            Log.e(TAG, "Erreur critique dans updateActualIfMissing pour " + indicator, e);
         } finally {
+            // 🛡️ NETTOYAGE DES RESSOURCES : On ferme toujours le curseur pour éviter les fuites de mémoire (Cursor Leaks)
             if (cursor != null) cursor.close();
         }
-        return false;
+        
+        return updatedAtLeastOne; // Retourne true si au moins une mise à jour/notification a eu lieu
     }
 }
