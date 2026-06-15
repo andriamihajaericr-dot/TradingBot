@@ -39,6 +39,40 @@ public class MarketDataFetcher {
             twelveDataKey = key;
         }
     }
+    
+    public static Map<String, Double> getPrices(List<String> symbols) {
+        Map<String, Double> priceMap = new HashMap<>();
+        
+        for (String symbol : symbols) {
+            try {
+                // Construction de l'URL pour l'endpoint /quote
+                URL url = new URL("https://api.twelvedata.com/quote?symbol=" + symbol + "&apikey=" + twelveDataKey);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+    
+                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+    
+                // Utilisation de votre parseur existant
+                JSONObject json = new JSONObject(response.toString());
+                MarketData data = parseSingleQuoteJson(json);
+                
+                if (data != null) {
+                    priceMap.put(symbol, data.price);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur lors de la récupération du prix pour " + symbol, e);
+            }
+        }
+        return priceMap;
+    }
 
     public static class AssetConfig {
         public final String name;
