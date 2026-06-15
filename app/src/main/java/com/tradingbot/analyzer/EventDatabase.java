@@ -35,6 +35,12 @@ public class EventDatabase extends SQLiteOpenHelper {
         }
         return instance;
     }
+    // À ajouter dans EventDatabase.java si absent
+public void close() {
+    if (dbHelper != null) { // Remplacez dbHelper par le nom de votre SQLiteOpenHelper ou instance Room
+        dbHelper.close();
+    }
+}
 
     // =========================================================================
     // ✅ CORRECTIF : Ajout de la méthode manquante appelée par MainActivity
