@@ -29,8 +29,13 @@ public class EventValidator {
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
 
     // 🔄 ANTI-AMNÉSIE : Rechargement de la RAM depuis SQLite au démarrage du service
+    // 🔄 ANTI-AMNÉSIE : Rechargement de la RAM depuis SQLite au démarrage du service
     public static void hydrateFromDatabase(Context context) {
         if (context == null) return;
+        
+        // 🌍 Étape A : Restaurer le régime géopolitique de guerre
+        hydrateWarRegime(context);
+        
         try {
             android.database.sqlite.SQLiteDatabase db = EventDatabase.getInstance(context).getReadableDatabase();
             long clearWindow = System.currentTimeMillis() - 6 * 60 * 60 * 1000L; // Fenêtre de rétention de 6 heures
