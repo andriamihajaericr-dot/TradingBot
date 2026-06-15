@@ -6,13 +6,35 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.*;
 import java.net.*;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
+// ⚡ Nouveaux objets temporels modernes, thread-safe et immutables
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+
 public class EconomicCalendarAPI {
-    private static final String TAG            = "EconomicCalendarAPI";
+    private static final String TAG = "EconomicCalendarAPI";
 
     private static Context globalAppContext = null;
+
+    // 🗺️ Cartographie immuable des fuseaux horaires réels selon la devise d'impact
+    private static final Map<String, ZoneId> CURRENCY_ZONES = new HashMap<>();
+    static {
+        CURRENCY_ZONES.put("USD", ZoneId.of("America/New_York"));
+        CURRENCY_ZONES.put("CAD", ZoneId.of("America/New_York")); 
+        CURRENCY_ZONES.put("GBP", ZoneId.of("Europe/London"));
+        CURRENCY_ZONES.put("EUR", ZoneId.of("Europe/Paris")); 
+        CURRENCY_ZONES.put("JPY", ZoneId.of("Asia/Tokyo"));
+        CURRENCY_ZONES.put("AUD", ZoneId.of("Australia/Sydney"));
+    }
+
+    // 🕒 Formateurs réutilisables partagés (Évite de saturer la mémoire dans les boucles de traitement)
+    private static final DateTimeFormatter FORMATTER_ISO_T = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+    private static final DateTimeFormatter FORMATTER_CUSTOM = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US);
+    private static final DateTimeFormatter FORMATTER_DATE_ONLY = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US);
 
     public static class CalendarEvent {
         public String       timestamp      = "";
@@ -32,25 +54,23 @@ public class EconomicCalendarAPI {
     }
     
     private static final int MAX_RETRIES = 3;
-    // Dans ta classe EconomicCalendarAPI
-private static final long INITIAL_BACKOFF_MS = 30000; // Commence à 10 secondes au lieu de 3
+    private static final long INITIAL_BACKOFF_MS = 30000; 
 
-private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hoursAhead) {
-    long backoff = INITIAL_BACKOFF_MS;
-    for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            return fetcher.fetch(hoursAhead); // Tente la requête
-        } catch (Exception e) {
-            if (e.getMessage().contains("429")) {
-                logToMain("🛑 [BAN] IP limitée. Pause longue de " + (backoff / 1000) + "s...");
+    private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hoursAhead) {
+        long backoff = INITIAL_BACKOFF_MS;
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                return fetcher.fetch(hoursAhead); 
+            } catch (Exception e) {
+                if (e.getMessage() != null && e.getMessage().contains("429")) {
+                    logToMain("🛑 [BAN] IP limitée. Pause longue de " + (backoff / 1000) + "s...");
+                }
+                try { Thread.sleep(backoff); } catch (InterruptedException ie) { break; }
+                backoff *= 3; 
             }
-            // Attente de sécurité
-            try { Thread.sleep(backoff); } catch (InterruptedException ie) { break; }
-            backoff *= 3; // Augmentation plus agressive (10s, 30s, 90s)
         }
+        return new ArrayList<>();
     }
-    return new ArrayList<>();
-}
 
     interface FetchFunction {
         List<CalendarEvent> fetch(int hoursAhead) throws Exception;
@@ -72,7 +92,6 @@ private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hou
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
             
-            // ✅ CRITIQUE : User-Agent complet de navigateur pour contourner les protections anti-bot 429
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             conn.setRequestProperty("Accept", "application/json");
 
@@ -83,7 +102,7 @@ private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hou
             }
             if (responseCode == 404) {
                 logToMain("❌ [CALENDRIER] Ressource introuvable (HTTP 404) pour : " + urlString);
-                return events; // Retourne une liste vide proprement au lieu de crash
+                return events; 
             }
             if (responseCode != 200) {
                 throw new IOException("HTTP error code: " + responseCode);
@@ -104,7 +123,7 @@ private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hou
                 JSONObject obj = jsonArray.getJSONObject(i);
 
                 String title    = obj.optString("title", "");
-                String country  = obj.optString("country", "");
+                String country  = obj.optString("country", ""); 
                 String dateStr  = obj.optString("date", ""); 
                 String impact   = obj.optString("impact", "Medium");
                 String forecast = obj.optString("forecast", "N/A");
@@ -113,11 +132,9 @@ private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hou
 
                 if (!isTrackedCurrency(country)) continue;
 
-                // ✅ CORRECTION ICI : Suppression du paramètre 'timeStr' inexistant
-                long eventMs = convertForexFactoryDateToMs(dateStr);
+                // ✅ INTÉGRATION VALIDÉE : Appel du nouveau module strict gérant le fuseau de la devise
+                long eventMs = parseTimestampStrict(dateStr, country);
                 long maxFutureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000);
-                
-                // Tolérance de 45 min dans le passé pour capturer les publications à la minute près
                 long minPastMs = nowMs - (45 * 60 * 1000L); 
 
                 if (hoursAhead == 168 || (eventMs <= maxFutureMs && eventMs >= minPastMs)) {
@@ -144,65 +161,60 @@ private static List<CalendarEvent> fetchWithRetry(FetchFunction fetcher, int hou
         return events;
     }
 
-    // 1. Purge les URLs mortes en haut du fichier
-private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
-// Supprime LAST_WEEK et NEXT_WEEK ici.
+    private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
 
-// 2. Simplifie ta méthode de fetch
-public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
-    logToMain("🔄 [CALENDRIER] Chargement ForexFactory (This Week)...");
-    
-    // On ne tente plus NextWeek, on évite les 404 inutiles
-    List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, h), hoursAhead);
-    
-    if (events != null && !events.isEmpty()) {
-        logToMain("✅ [CALENDRIER] Succès : " + events.size() + " événements chargés.");
-        return events;
+    public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
+        logToMain("🔄 [CALENDRIER] Chargement ForexFactory (This Week)...");
+        
+        List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, h), hoursAhead);
+        
+        if (events != null && !events.isEmpty()) {
+            logToMain("✅ [CALENDRIER] Succès : " + events.size() + " événements chargés.");
+            return events;
+        }
+
+        logToMain("⚠️ [CALENDRIER] Aucune donnée disponible pour le moment.");
+        return new ArrayList<>();
     }
-
-    logToMain("⚠️ [CALENDRIER] Aucune donnée disponible pour le moment.");
-    return new ArrayList<>();
-}
 
     public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
         return fetchHistoricalEvents(globalAppContext, daysBack);
     }
 
- public static List<CalendarEvent> fetchHistoricalEvents(Context context, int daysBack) {
-    List<CalendarEvent> allEvents = new ArrayList<>();
-    long nowSec = System.currentTimeMillis() / 1000;
+    public static List<CalendarEvent> fetchHistoricalEvents(Context context, int daysBack) {
+        List<CalendarEvent> allEvents = new ArrayList<>();
+        long nowSec = System.currentTimeMillis() / 1000;
 
-    if (daysBack > 7) {
-        logToMain("⚠️ [BACKFILL] ForexFactory couvre uniquement la semaine en cours. daysBack=" + daysBack + " ignoré.");
-    }
+        if (daysBack > 7) {
+            logToMain("⚠️ [BACKFILL] ForexFactory couvre uniquement la semaine en cours. daysBack=" + daysBack + " ignoré.");
+        }
 
-    try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+        try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
 
-    try {
-        logToMain("🔄 [BACKFILL] Étape 2 : Récupération de THIS_WEEK...");
-        List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
-        int countThis = 0;
-        if (thisWeek != null) {
-            for (CalendarEvent e : thisWeek) {
-                if (isValidPastEvent(e, nowSec)) {
-                    allEvents.add(e);
-                    countThis++;
+        try {
+            logToMain("🔄 [BACKFILL] Étape 2 : Récupération de THIS_WEEK...");
+            List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
+            int countThis = 0;
+            if (thisWeek != null) {
+                for (CalendarEvent e : thisWeek) {
+                    if (isValidPastEvent(e, nowSec)) {
+                        allEvents.add(e);
+                        countThis++;
+                    }
                 }
             }
+            logToMain("✅ [BACKFILL] ThisWeek traités : " + countThis + " événements passés trouvés.");
+        } catch (Exception e) {
+            logToMain("❌ [BACKFILL] Erreur sur THIS_WEEK : " + e.getMessage());
         }
-        logToMain("✅ [BACKFILL] ThisWeek traités : " + countThis + " événements passés trouvés.");
-    } catch (Exception e) {
-        logToMain("❌ [BACKFILL] Erreur sur THIS_WEEK : " + e.getMessage());
-    }
 
-    // ✅ Persistance en DB de tous les événements passés validés
-    if (context != null && !allEvents.isEmpty()) {
-        persistCalendarEventsToDB(context, allEvents);
-    }
+        if (context != null && !allEvents.isEmpty()) {
+            persistCalendarEventsToDB(context, allEvents);
+        }
 
-    logToMain("📊 [BACKFILL] Total validé pour insertion SQLite : " + allEvents.size() + " événements.");
-    return allEvents;
- }
+        logToMain("📊 [BACKFILL] Total validé pour insertion SQLite : " + allEvents.size() + " événements.");
+        return allEvents;
+    }
 
     private static boolean isValidPastEvent(CalendarEvent e, long nowSec) {
         boolean hasActual = e.actual != null && !e.actual.equalsIgnoreCase("N/A") 
@@ -273,28 +285,38 @@ public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hours
                ind.contains("powell") || ind.contains("minutes");
     }
 
-    // ✅ METHODE DE CONVERSION TEMPORELLE STRICTE ET CORRIGÉE
-    private static long convertForexFactoryDateToMs(String dateStr) {
-        if (dateStr == null || dateStr.isEmpty())
+    // ✅ NOUVELLE LOGIQUE GÉOLOCALISÉE STRICTE ET TOLÉRANTE AUX ERREURS (JSR-310)
+    public static long parseTimestampStrict(String dateStr, String currency) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
             return System.currentTimeMillis();
+        }
+
+        String cleanCurrency = currency != null ? currency.toUpperCase(Locale.ROOT) : "";
+        ZoneId targetZone = CURRENCY_ZONES.getOrDefault(cleanCurrency, ZoneId.of("UTC"));
+
         try {
-            // Format standard avec Timezone ISO8601 (ex: 2026-06-05T08:30:00-04:00)
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US);
-            return sdf.parse(dateStr).getTime();
-        } catch (Exception e) {
+            // Tentative 1 : Format standard ISO-8601 complet (ex: 2026-06-05T08:30:00-04:00)
+            return ZonedDateTime.parse(dateStr).toInstant().toEpochMilli();
+        } catch (DateTimeParseException e1) {
             try {
-                // Fallback sans timezone -> Défaut New York
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
-                sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
-                return sdf.parse(dateStr).getTime();
-            } catch (Exception e2) {
+                // Tentative 2 : Date brute avec 'T' mais sans zone (ex: 2026-06-05T08:30:00)
+                LocalDateTime localDateTime = LocalDateTime.parse(dateStr, FORMATTER_ISO_T);
+                return localDateTime.atZone(targetZone).toInstant().toEpochMilli();
+            } catch (DateTimeParseException e2) {
                 try {
-                    // Date brute sans heure -> Minuit New York
-                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-                    sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
-                    return sdf.parse(dateStr).getTime();
-                } catch (Exception e3) {
-                    return System.currentTimeMillis();
+                    // Tentative 3 : Format personnalisé d'appoint "yyyy-MM-dd HH:mm"
+                    LocalDateTime localDateTime = LocalDateTime.parse(dateStr, FORMATTER_CUSTOM);
+                    return localDateTime.atZone(targetZone).toInstant().toEpochMilli();
+                } catch (DateTimeParseException e3) {
+                    try {
+                        // Tentative 4 : Journée brute uniquement (ex: 2026-06-05) -> Assigne à minuit pile du fuseau cible
+                        java.time.LocalDate localDate = java.time.LocalDate.parse(dateStr, FORMATTER_DATE_ONLY);
+                        return localDate.atStartOfDay(targetZone).toInstant().toEpochMilli();
+                    } catch (Exception e4) {
+                        // 🛡️ Ceinture de sécurité ultime : Évite le gel du thread de traitement de l'application
+                        Log.e(TAG, "❌ Échec total de décodage de la date sur : " + dateStr + ". Temps système appliqué.");
+                        return System.currentTimeMillis();
+                    }
                 }
             }
         }
@@ -304,7 +326,7 @@ public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hours
         if (value == null || value.isEmpty() || value.equalsIgnoreCase("null")) return "N/A";
         String trimmed = value.trim();
         if (trimmed.startsWith(".")) {
-            trimmed = "0" + trimmed; // (.3% -> 0.3%)
+            trimmed = "0" + trimmed; 
         }
         return trimmed;
     }
@@ -326,142 +348,134 @@ public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hours
         }
     }
 
- public static void refreshMissingActuals(Context context) {
-    logToMain("🔄 [FOREXFACTORY] Vérification des résultats publiés (Actuals)...");
-    try {
-        List<CalendarEvent> currentWeekEvents = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
-        EventDatabase db = EventDatabase.getInstance(context);
-        int updatedCount = 0;
+    public static void refreshMissingActuals(Context context) {
+        logToMain("🔄 [FOREXFACTORY] Vérification des résultats publiés (Actuals)...");
+        try {
+            List<CalendarEvent> currentWeekEvents = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
+            EventDatabase db = EventDatabase.getInstance(context);
+            int updatedCount = 0;
 
-        for (CalendarEvent webEvent : currentWeekEvents) {
-            if (webEvent.actual != null && !webEvent.actual.equalsIgnoreCase("N/A") && !webEvent.actual.isEmpty()) {
-                long timestampSec = Long.parseLong(webEvent.timestamp);
-                boolean updated = db.updateActualIfMissing(webEvent.indicator, timestampSec, webEvent.actual);
-                if (updated) {
-                    updatedCount++;
-                    logToMain("✅ [MAJ ACTUAL] " + webEvent.indicator + " -> " + webEvent.actual);
+            for (CalendarEvent webEvent : currentWeekEvents) {
+                if (webEvent.actual != null && !webEvent.actual.equalsIgnoreCase("N/A") && !webEvent.actual.isEmpty()) {
+                    long timestampSec = Long.parseLong(webEvent.timestamp);
+                    boolean updated = db.updateActualIfMissing(webEvent.indicator, timestampSec, webEvent.actual);
+                    if (updated) {
+                        updatedCount++;
+                        logToMain("✅ [MAJ ACTUAL] " + webEvent.indicator + " -> " + webEvent.actual);
+                    }
                 }
             }
-        }
 
-        // ✅ Persistance des événements non encore en base (futurs + sans actual)
-        persistCalendarEventsToDB(context, currentWeekEvents);
+            persistCalendarEventsToDB(context, currentWeekEvents);
 
-        if (updatedCount > 0) {
-            logToMain("📊 [FOREXFACTORY] Synchronisation terminée : " + updatedCount + " valeurs 'actual' mises à jour.");
-        } else {
-            logToMain("ℹ️ [FOREXFACTORY] Aucun nouveau résultat à mettre à jour.");
-        }
-    } catch (Exception e) {
-        logToMain("❌ [FOREXFACTORY] Erreur lors du refresh des actuals : " + e.getMessage());
-    }
-}
-
-    // ✅ Persistance centralisée des événements calendaires en DB
-public static void persistCalendarEventsToDB(Context context, List<CalendarEvent> events) {
-    if (context == null || events == null || events.isEmpty()) return;
-
-    EventDatabase db = EventDatabase.getInstance(context);
-    int saved = 0;
-    int skipped = 0;
-
-    for (CalendarEvent event : events) {
-        if (event == null || event.indicator == null || event.timestamp == null) continue;
-
-        // Filtrer jours fériés
-        String indUpper = event.indicator.toUpperCase(Locale.US);
-        if (indUpper.contains("BANK HOLIDAY") || indUpper.contains("PUBLIC HOLIDAY") ||
-            indUpper.contains("MARKET HOLIDAY") || indUpper.contains("NATIONAL HOLIDAY")) continue;
-
-        try {
-            long eventTs = Long.parseLong(event.timestamp);
-
-            // Anti-doublon via méthode existante EventDatabase
-            if (db.isEventAlreadySaved(event.indicator, eventTs)) {
-                skipped++;
-                continue;
-            }
-
-            // Fingerprint unique et stable
-            String fingerprint = "CAL_"
-                    + event.indicator.toLowerCase(Locale.US).replaceAll("[^a-z0-9]", "_")
-                    + "_" + eventTs;
-
-            // Contenu structuré lisible par l'IA et getDailyMacroSummary
-            String content = event.indicator
-                    + (event.country != null ? " | " + event.country : "")
-                    + " | Forecast: " + (event.forecast != null ? event.forecast : "N/A")
-                    + " | Previous: " + (event.previous != null ? event.previous : "N/A")
-                    + " | Actual: "   + (event.actual   != null ? event.actual   : "N/A");
-
-            // Poids selon importance et type d'indicateur
-            int weight;
-            if ("HIGH".equalsIgnoreCase(event.importance)) {
-                weight = isSupremeCalendarIndicator(event.indicator) ? 5 : 4;
-            } else if ("MEDIUM".equalsIgnoreCase(event.importance)) {
-                weight = 2;
+            if (updatedCount > 0) {
+                logToMain("📊 [FOREXFACTORY] Synchronisation terminée : " + updatedCount + " valeurs 'actual' mises à jour.");
             } else {
-                weight = 1;
+                logToMain("ℹ️ [FOREXFACTORY] Aucun nouveau résultat à mettre à jour.");
             }
-
-            String assetsStr = (event.affectedAssets != null && !event.affectedAssets.isEmpty())
-                    ? String.join(",", event.affectedAssets)
-                    : "";
-
-            // Impact initial basé sur actual vs forecast
-            String impact = buildCalendarImpact(event);
-
-            db.saveEvent(
-                fingerprint,
-                "CALENDAR",
-                event.country  != null ? event.country  : "Global",
-                "CALENDAR-RESULT",
-                event.indicator,
-                content,
-                assetsStr,
-                impact,
-                eventTs,
-                "synced",
-                weight
-            );
-            saved++;
-
         } catch (Exception e) {
-            Log.e(TAG, "Erreur persistCalendarEventsToDB : " + event.indicator, e);
+            logToMain("❌ [FOREXFACTORY] Erreur lors du refresh des actuals : " + e.getMessage());
         }
     }
-    logToMain("📥 [CALENDRIER DB] " + saved + " persistés, " + skipped + " doublons ignorés.");
-}
 
-private static boolean isSupremeCalendarIndicator(String indicator) {
-    if (indicator == null) return false;
-    String ind = indicator.toUpperCase(Locale.US);
-    return ind.contains("CPI")             ||
-           ind.contains("PCE")             ||
-           ind.contains("NFP")             ||
-           ind.contains("NON-FARM")        ||
-           ind.contains("PAYROLL")         ||
-           ind.contains("FOMC")            ||
-           ind.contains("FEDERAL RESERVE") ||
-           ind.contains("GDP")             ||
-           ind.contains("INTEREST RATE");
-}
+    public static void persistCalendarEventsToDB(Context context, List<CalendarEvent> events) {
+        if (context == null || events == null || events.isEmpty()) return;
 
-private static String buildCalendarImpact(CalendarEvent event) {
-    boolean hasActual   = event.actual   != null && !event.actual.equalsIgnoreCase("N/A")   && !event.actual.isEmpty();
-    boolean hasForecast = event.forecast != null && !event.forecast.equalsIgnoreCase("N/A") && !event.forecast.isEmpty();
+        EventDatabase db = EventDatabase.getInstance(context);
+        int saved = 0;
+        int skipped = 0;
 
-    if (hasActual && hasForecast) {
-        try {
-            double a = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
-            double f = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
-            if (a > f) return "CALENDRIER ÉCONOMIQUE | Haute Volatilité (Biais Haussier)";
-            if (a < f) return "CALENDRIER ÉCONOMIQUE | Haute Volatilité (Biais Baissier)";
-            return "CALENDRIER ÉCONOMIQUE | Conforme aux prévisions";
-        } catch (Exception ignored) {}
+        for (CalendarEvent event : events) {
+            if (event == null || event.indicator == null || event.timestamp == null) continue;
+
+            String indUpper = event.indicator.toUpperCase(Locale.US);
+            if (indUpper.contains("BANK HOLIDAY") || indUpper.contains("PUBLIC HOLIDAY") ||
+                indUpper.contains("MARKET HOLIDAY") || indUpper.contains("NATIONAL HOLIDAY")) continue;
+
+            try {
+                long eventTs = Long.parseLong(event.timestamp);
+
+                if (db.isEventAlreadySaved(event.indicator, eventTs)) {
+                    skipped++;
+                    continue;
+                }
+
+                String fingerprint = "CAL_"
+                        + event.indicator.toLowerCase(Locale.US).replaceAll("[^a-z0-9]", "_")
+                        + "_" + eventTs;
+
+                String content = event.indicator
+                        + (event.country != null ? " | " + event.country : "")
+                        + " | Forecast: " + (event.forecast != null ? event.forecast : "N/A")
+                        + " | Previous: " + (event.previous != null ? event.previous : "N/A")
+                        + " | Actual: "   + (event.actual   != null ? event.actual   : "N/A");
+
+                int weight;
+                if ("HIGH".equalsIgnoreCase(event.importance)) {
+                    weight = isSupremeCalendarIndicator(event.indicator) ? 5 : 4;
+                } else if ("MEDIUM".equalsIgnoreCase(event.importance)) {
+                    weight = 2;
+                } else {
+                    weight = 1;
+                }
+
+                String assetsStr = (event.affectedAssets != null && !event.affectedAssets.isEmpty())
+                        ? String.join(",", event.affectedAssets)
+                        : "";
+
+                String impact = buildCalendarImpact(event);
+
+                db.saveEvent(
+                    fingerprint,
+                    "CALENDAR",
+                    event.country  != null ? event.country  : "Global",
+                    "CALENDAR-RESULT",
+                    event.indicator,
+                    content,
+                    assetsStr,
+                    impact,
+                    eventTs,
+                    "synced",
+                    weight
+                );
+                saved++;
+
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur persistCalendarEventsToDB : " + event.indicator, e);
+            }
+        }
+        logToMain("📥 [CALENDRIER DB] " + saved + " persistés, " + skipped + " doublons ignorés.");
     }
-    if (hasForecast) return "CALENDRIER ÉCONOMIQUE | En attente de publication";
-    return "CALENDRIER ÉCONOMIQUE | Données insuffisantes";
+
+    private static boolean isSupremeCalendarIndicator(String indicator) {
+        if (indicator == null) return false;
+        String ind = indicator.toUpperCase(Locale.US);
+        return ind.contains("CPI")             ||
+               ind.contains("PCE")             ||
+               ind.contains("NFP")             ||
+               ind.contains("NON-FARM")        ||
+               ind.contains("PAYROLL")         ||
+               ind.contains("FOMC")            ||
+               ind.contains("FEDERAL RESERVE") ||
+               ind.contains("GDP")             ||
+               ind.contains("INTEREST RATE");
+    }
+
+    private static String buildCalendarImpact(CalendarEvent event) {
+        boolean hasActual   = event.actual   != null && !event.actual.equalsIgnoreCase("N/A")   && !event.actual.isEmpty();
+        boolean hasForecast = event.forecast != null && !event.forecast.equalsIgnoreCase("N/A") && !event.forecast.isEmpty();
+
+        if (hasActual && hasForecast) {
+            try {
+                double a = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
+                double f = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
+                if (a > f) return "CALENDRIER ÉCONOMIQUE | Haute Volatilité (Biais Haussier)";
+                if (a < f) return "CALENDRIER ÉCONOMIQUE | Haute Volatilité (Biais Baissier)";
+                return "CALENDRIER ÉCONOMIQUE | Conforme aux prévisions";
+            } catch (Exception ignored) {}
+        }
+        if (hasForecast) return "CALENDRIER ÉCONOMIQUE | En attente de publication";
+        return "CALENDRIER ÉCONOMIQUE | Données insuffisantes";
     }
 
     private static void logToMain(String message) {
