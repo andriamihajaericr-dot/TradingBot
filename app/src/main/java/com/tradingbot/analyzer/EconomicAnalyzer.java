@@ -544,6 +544,14 @@ public class EconomicAnalyzer {
             double val = chercherRegex(texteNettoye, p);
             if (!Double.isNaN(val)) { values.forecast = val; break; }
         }
+        // ✅ Extraction de la valeur précédente de référence (Prior/Previous)
+        String[] priorPatterns = {
+            "PRIOR:\\s*([0-9.\\-]+)", "PREVIOUS:\\s*([0-9.\\-]+)", "PRIOR\\s*[=:]\\s*([0-9.\\-]+)"
+        };
+        for (String p : priorPatterns) {
+            double val = chercherRegex(texteNettoye, p);
+            if (!Double.isNaN(val)) { values.previous = val; break; }
+        }
         return values;
     }
 
