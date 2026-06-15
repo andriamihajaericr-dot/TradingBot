@@ -18,7 +18,19 @@ public class EconomicEventDetector {
         /**
          * Extrait l'impact brut normalisé pour l'alignement strict avec EventDatabase
          */
+        // Dans EconomicEventDetector.java
+        public static boolean isSpecialEvent(String title, String description) {
+            String unified = (title + " " + description).toUpperCase(Locale.ROOT);
+            return unified.contains("IPO") || 
+                   unified.contains("SPAC") || 
+                   unified.contains("SPACE X") || 
+                   unified.contains("MERGER") || 
+                   unified.contains("ACQUISITION");
+        }
         public String getRawImpact() {
+            if (isSpecialEvent(description, description)) { // Adaptez les arguments
+                return "HIGH"; // On force l'impact à HIGH immédiatement
+            }
             if (impact == null) return "NEUTRE";
     
             // Rang Suprême — Volatilité confirmée institutionnelle
