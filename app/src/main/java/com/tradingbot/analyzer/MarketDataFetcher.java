@@ -13,7 +13,10 @@ import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.HashMap;
 import java.util.List;
@@ -24,10 +27,28 @@ public class MarketDataFetcher {
     private static final String TAG = "MarketDataFetcher";
 
     private static volatile String twelveDataKey = "32370e1ef17645eb86690e3aee0d0660";
+    
+    // 🧵 Pools de Threads isolés pour éliminer tout risque de Deadlock ou de ralentissement Android
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private static final ExecutorService networkExecutor = Executors.newCachedThreadPool(); 
+    
+    // ⏳ STRUCTURE ET CONFIGURATION DU CACHE SECURISE (LKV avec TTL)
+    private static class CachedEntry {
+        final MarketData data;
+        final long timestamp;
+
+        CachedEntry(MarketData data, long timestamp) {
+            this.data = data;
+            this.timestamp = timestamp;
+        }
+    }
+    
+    private static final Map<String, CachedEntry> MARKET_DATA_CACHE = new ConcurrentHashMap<>();
+    private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(5); // Durée de vie max d'un prix de secours : 5 minutes
+    
     private static volatile boolean isShutdown = false;
 
-    // ✅ POINTS 1 & 2 : Stabilisation sur l'endpoint /quote & gestion prudente du paramètre étendu
+    // ✅ Configuration de l'endpoint et activation des sessions étendues
     private static final boolean ENABLE_PREMARKET_PARAM = true; 
 
     public interface MarketAnalysisCallback {
@@ -40,35 +61,19 @@ public class MarketDataFetcher {
         }
     }
     
+    /**
+     * Récupère les prix sous forme de Map simple (Utilisé par les autres modules de l'application)
+     * Entièrement protégé par le traitement par lot, le timeout 800ms et le cache à expiration automatique.
+     */
     public static Map<String, Double> getPrices(List<String> symbols) {
         Map<String, Double> priceMap = new HashMap<>();
+        if (symbols == null || symbols.isEmpty()) return priceMap;
         
+        Map<String, MarketData> batchData = getMarketDataBatch(symbols);
         for (String symbol : symbols) {
-            try {
-                // Construction de l'URL pour l'endpoint /quote
-                URL url = new URL("https://api.twelvedata.com/quote?symbol=" + symbol + "&apikey=" + twelveDataKey);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-    
-                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    response.append(line);
-                }
-                reader.close();
-    
-                // Utilisation de votre parseur existant
-                JSONObject json = new JSONObject(response.toString());
-                MarketData data = parseSingleQuoteJson(json);
-                
-                if (data != null) {
-                    priceMap.put(symbol, data.price);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Erreur lors de la récupération du prix pour " + symbol, e);
+            MarketData data = batchData.get(symbol);
+            if (data != null) {
+                priceMap.put(symbol, data.price);
             }
         }
         return priceMap;
@@ -105,12 +110,8 @@ public class MarketDataFetcher {
         ASSET_CONFIGS.add(new AssetConfig("US10Y",   "TLT",      false, 1.8, 1.0));
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // ✅ POINT 3 : RÉINTRODUCTION DES MÉTHODES UTILITAIRES HISTORIQUES
-    // ══════════════════════════════════════════════════════════════
-    
     /**
-     * Récupère de manière synchrone le dernier prix d'un actif (Utile pour les calculs internes)
+     * Récupère de manière synchrone le dernier prix d'un actif (Sécurisé par le cache global)
      */
     public static double fetchPriceSync(String assetName) {
         if (assetName == null || assetName.trim().isEmpty()) return 0.0;
@@ -311,7 +312,9 @@ public class MarketDataFetcher {
                 return config.symbol;
             }
         }
-        return null; 
+        // ✅ SECURISATION DES SYMBOLES INCONNUS : Alerte en Logcat pour intercepter les requêtes fantômes / typos
+        Log.w(TAG, "⚠️ [FALLBACK BRUT] L'actif '" + assetName + "' n'est pas cartographié dans ASSET_CONFIGS. Envoi du symbole brut.");
+        return assetName.trim(); 
     }
 
     private static String executeHttpRequestWithRetry(String urlStr) throws Exception {
@@ -329,9 +332,8 @@ public class MarketDataFetcher {
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 
-                // ✅ POINT 5 : Augmentation des seuils de tolérance réseau pour absorber la latence mobile
                 conn.setConnectTimeout(5000);
-                conn.setReadTimeout(10000); // 10 secondes pour sécuriser la lecture du flux complet
+                conn.setReadTimeout(10000); 
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 429 || responseCode >= 500) {
@@ -367,22 +369,68 @@ public class MarketDataFetcher {
         throw new IOException("Impossible de contacter l'API.");
     }
 
+    /**
+     * 🛡️ ENVELOPPE CRITIQUE ANTI-429 & TIMEOUT
+     * Force une attente réseau maximale de 800ms. En cas d'échec ou de lenteur, 
+     * extrait les données du cache LKV à condition qu'elles aient moins de 5 minutes.
+     */
     public static Map<String, MarketData> getMarketDataBatch(List<String> assets) {
-        Map<String, MarketData> results = new HashMap<>();
-        if (assets == null || assets.isEmpty()) return results;
+        if (assets == null || assets.isEmpty()) return new HashMap<>();
 
+        // Traitement réseau asynchrone totalement isolé pour sanctuariser le thread appelant
+        Future<Map<String, MarketData>> future = networkExecutor.submit(() -> getMarketDataBatchRaw(assets));
+
+        try {
+            // 🔥 BARRIÈRE DE PROTECTION TEMPS RÉEL : 800 millisecondes maximum
+            Map<String, MarketData> freshData = future.get(800, TimeUnit.MILLISECONDS);
+            if (freshData != null && !freshData.isEmpty()) {
+                long now = System.currentTimeMillis();
+                // Remplissage dynamique du cache enveloppé de son horodatage (TTL)
+                for (Map.Entry<String, MarketData> entry : freshData.entrySet()) {
+                    MARKET_DATA_CACHE.put(entry.getKey(), new CachedEntry(entry.getValue(), now));
+                }
+                return freshData;
+            }
+        } catch (TimeoutException e) {
+            Log.e(TAG, "⚡ [TIMEOUT] API Prix saturée (>800ms) lors du flux macro. Recours immédiat au cache LKV.");
+            future.cancel(true); // Interruption immédiate du traitement HTTP obsolète
+        } catch (Exception e) {
+            Log.e(TAG, "❌ [BATCH NETWORK] Erreur réseau ou limitation API (Code HTTP 429)", e);
+        }
+
+        // 🔄 INJECTION FILTRÉE DU CACHE LKV AVEC VALIDATION DE LA DURÉE DE VIE (TTL)
+        long currentTime = System.currentTimeMillis();
+        Map<String, MarketData> fallbackResult = new HashMap<>();
+
+        for (String asset : assets) {
+            CachedEntry cached = MARKET_DATA_CACHE.get(asset);
+            if (cached != null) {
+                // Vérification stricte : la donnée a-t-elle moins de 5 minutes ?
+                if (currentTime - cached.timestamp <= CACHE_TTL_MS) {
+                    fallbackResult.put(asset, cached.data);
+                } else {
+                    // Éviction automatique de la donnée périmée pour prémunir le bot contre les faux signaux
+                    Log.w(TAG, "⏳ [CACHE OBSOLÈTE] Rejet de la donnée LKV pour '" + asset + "' car elle a expiré (>" + (CACHE_TTL_MS / 60000) + " min).");
+                    MARKET_DATA_CACHE.remove(asset);
+                }
+            }
+        }
+        return fallbackResult;
+    }
+
+    /**
+     * ⚙️ LOGIQUE INTERNE DE TRAITEMENT PAR BATCH DE 8 SYMBOLES
+     */
+    private static Map<String, MarketData> getMarketDataBatchRaw(List<String> assets) {
+        Map<String, MarketData> results = new HashMap<>();
         List<String> apiSymbols = new ArrayList<>();
         Map<String, String> symbolToAssetMap = new HashMap<>();
         
         for (String asset : assets) {
             String sym = getTwelveDataSymbol(asset);
-            if (sym != null) {
-                if (!apiSymbols.contains(sym)) {
-                    apiSymbols.add(sym);
-                    symbolToAssetMap.put(sym, asset);
-                }
-            } else {
-                Log.w(TAG, "Filtrage pré-requête : Actif ignoré (non présent dans la liste des 11 maîtres) : " + asset);
+            if (sym != null && !apiSymbols.contains(sym)) {
+                apiSymbols.add(sym);
+                symbolToAssetMap.put(sym, asset);
             }
         }
 
@@ -399,7 +447,6 @@ public class MarketDataFetcher {
                 if (k < chunk.size() - 1) sbSymbols.append(",");
             }
 
-            // ✅ POINTS 1 & 2 : Utilisation stable de /quote + injection sécurisée du premarket facultatif
             String queryParams = "&apikey=" + twelveDataKey;
             if (ENABLE_PREMARKET_PARAM) {
                 queryParams += "&premarket=true"; 
@@ -415,8 +462,6 @@ public class MarketDataFetcher {
                     MarketData data = parseSingleQuoteJson(json);
                     if (data != null) {
                         results.put(symbolToAssetMap.get(singleSym), data);
-                    } else {
-                        Log.w(TAG, "Échec d'extraction des métriques pour l'actif unique : " + singleSym);
                     }
                 } else {
                     for (String sym : chunk) {
@@ -424,16 +469,12 @@ public class MarketDataFetcher {
                             MarketData data = parseSingleQuoteJson(json.getJSONObject(sym));
                             if (data != null) {
                                 results.put(symbolToAssetMap.get(sym), data);
-                            } else {
-                                Log.w(TAG, "Données corrompues ou nulles reçues pour l'actif : " + sym);
                             }
-                        } else {
-                            Log.w(TAG, "Symbole absent de la réponse Twelve Data : " + sym);
                         }
                     }
                 }
             } catch (InterruptedException e) {
-                Log.w(TAG, "Interruption détectée dans la boucle Batch. Sortie immédiate.");
+                Log.w(TAG, "Interruption détectée dans la boucle Batch. Sortie réseau.");
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
@@ -445,12 +486,10 @@ public class MarketDataFetcher {
 
     private static MarketData parseSingleQuoteJson(JSONObject json) {
         if (json == null) return null;
-        
         if (json.has("status") && "error".equals(json.optString("status"))) {
             return null;
         }
 
-        // ✅ POINT 1 : Extraction stable sur l'endpoint /quote uniquement
         double price = json.optDouble("close", 0.0);
         double changePercent = json.optDouble("percent_change", 0.0);
         double high = json.optDouble("high", price);
@@ -465,12 +504,16 @@ public class MarketDataFetcher {
     public static void shutdownExecutor() {
         isShutdown = true;
         executor.shutdownNow();
+        networkExecutor.shutdownNow(); 
         try {
             if (!executor.awaitTermination(2, TimeUnit.SECONDS)) {
-                Log.w(TAG, "Forçage de l'extinction de l'exécuteur de tâches.");
+                Log.w(TAG, "Forçage de l'extinction de l'exécuteur logique.");
+            }
+            if (!networkExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                Log.w(TAG, "Forçage de l'extinction de l'exécuteur réseau.");
             }
         } catch (InterruptedException e) {
-            Log.e(TAG, "Interruption reçue pendant l'extinction forcée.", e);
+            Log.e(TAG, "Interruption reçue pendant l'extinction des exécuteurs.", e);
             Thread.currentThread().interrupt();
         }
     }
