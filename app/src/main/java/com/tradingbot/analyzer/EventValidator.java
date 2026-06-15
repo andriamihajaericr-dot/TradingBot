@@ -22,6 +22,35 @@ public class EventValidator {
         return recentFingerprints;
     }
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
+
+    // 🔄 ANTI-AMNÉSIE : Rechargement de la RAM depuis SQLite au démarrage du service
+    public static void hydrateFromDatabase(Context context) {
+        if (context == null) return;
+        try {
+            android.database.sqlite.SQLiteDatabase db = EventDatabase.getInstance(context).getReadableDatabase();
+            long clearWindow = System.currentTimeMillis() - 6 * 60 * 60 * 1000L; // Fenêtre de rétention de 6 heures
+            
+            android.database.Cursor cursor = db.query(EventDatabase.TABLE_EVENTS, 
+                    new String[]{"title", "unix_timestamp"}, "unix_timestamp >= ?", 
+                    new String[]{String.valueOf(clearWindow)}, null, null, null);
+            
+            if (cursor != null) {
+                recentFingerprints.clear(); // Évite les cumuls d'instances obsolètes
+                while (cursor.moveToNext()) {
+                    String titleKey = cursor.getString(0);
+                    long timestampVal = cursor.getLong(1);
+                    if (titleKey != null) {
+                        recentFingerprints.put(titleKey, timestampVal);
+                    }
+                }
+                cursor.close();
+            }
+            Log.d(TAG, "🤖 [RAM HYDRATION] " + recentFingerprints.size() + " empreintes restaurées avec succès.");
+        } catch (Exception e) {
+            Log.e(TAG, "⚠️ Échec de l'hydratation de la RAM au démarrage", e);
+        }
+    }
+
     private static final long DUPLICATE_WINDOW_MS = 30 * 60 * 1000L; // 30 minutes
     private static final String TAG = "EventValidator";
     // ✅ Hash du dernier rapport envoyé — évite les doublons
