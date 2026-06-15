@@ -23,6 +23,7 @@ public class EconomicAnalyzer {
     private static class ParsedValues {
         double actual = Double.NaN;
         double forecast = Double.NaN;
+        double previous = 0.0; // ✅ Ajouté pour accueillir la valeur révisée d'origine
         String currency = "USD";
 
         boolean isValid() {
