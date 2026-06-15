@@ -2395,12 +2395,45 @@ new Thread(new Runnable() {
         return promptDeBase;
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        serviceInstance = null;    // ✅ 
-        scheduler.shutdownNow();
-        exec.shutdownNow();
-        Log.d(TAG, "[SERVICE] Service arrêté");
+  @Override
+  public void onDestroy() {
+    super.onDestroy();
+
+    serviceInstance = null; // ✅ Libération immédiate du singleton
+
+    // 1. Demande d'arrêt simultanée et non bloquante
+    scheduler.shutdown();
+    exec.shutdown();
+    tradingPipelineExecutor.shutdown();
+
+    // 2. Attente de la terminaison propre (500ms max pour éviter les ANR sous Android)
+    try {
+        if (!scheduler.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+            scheduler.shutdownNow();
+        }
+        if (!exec.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+            exec.shutdownNow();
+        }
+        if (!tradingPipelineExecutor.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+            tradingPipelineExecutor.shutdownNow();
+        }
+    } catch (InterruptedException e) {
+        // En cas d'interruption, on force uniquement les exécuteurs encore actifs
+        if (!scheduler.isTerminated()) scheduler.shutdownNow();
+        if (!exec.isTerminated()) exec.shutdownNow();
+        if (!tradingPipelineExecutor.isTerminated()) tradingPipelineExecutor.shutdownNow();
+        Thread.currentThread().interrupt();
     }
+
+    // 3. Arrêt simplifié de MarketDataFetcher (gestion des erreurs interne)
+    MarketDataFetcher.shutdownExecutor();
+
+    // 4. Fermeture sécurisée de la base de données
+    if (eventDb != null) {
+        eventDb.close(); 
+    }
+
+    Log.d(TAG, "[SERVICE] Service arrêté proprement");
+}
+        
 }
