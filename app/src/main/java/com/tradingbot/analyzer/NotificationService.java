@@ -71,6 +71,15 @@ public class NotificationService extends NotificationListenerService {
             this.timestamp = ts;
         }
     }
+    private static final Map<String, String> EMOJI_ASSET_MAP = new HashMap<>();
+    static {
+        EMOJI_ASSET_MAP.put("📈", "US10Y"); EMOJI_ASSET_MAP.put("💻", "NASDAQ");
+        EMOJI_ASSET_MAP.put("📊", "SP500"); EMOJI_ASSET_MAP.put("🏆", "GOLD");
+        EMOJI_ASSET_MAP.put("🛢️", "USOIL"); EMOJI_ASSET_MAP.put("🇪🇺", "EURUSD");
+        EMOJI_ASSET_MAP.put("🇯🇵", "USDJPY"); EMOJI_ASSET_MAP.put("🇨🇦", "USDCAD");
+        EMOJI_ASSET_MAP.put("🇬🇧", "GBPUSD"); EMOJI_ASSET_MAP.put("🇦🇺", "AUDUSD");
+        EMOJI_ASSET_MAP.put("₿", "BITCOIN");
+    }
     private static final String SYSTEM_PROMPT = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
         "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
         "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
