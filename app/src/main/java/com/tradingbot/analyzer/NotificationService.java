@@ -378,36 +378,51 @@ public class NotificationService extends NotificationListenerService {
  * Intercepte le rapport de Groq et injecte les prix live de MarketDataFetcher
  * sans altérer la structure attendue par le reste de l'application.
  */
-   private static String injectLivePrices(String groqReport, List<String> assets) {
-    if (groqReport == null || groqReport.isEmpty()) return groqReport;
+    private static String injectLivePrices(String groqReport, List<String> assets) {
+    if (groqReport == null || groqReport.isEmpty() || assets == null || assets.isEmpty()) 
+        return groqReport;
 
-    // 1. Récupération des prix via Twelve Data (Appel synchrone sécurisé car déjà dans le thread de tâche)
-    java.util.Map<String, Double> livePrices = MarketDataFetcher.getPrices(assets);
-    if (livePrices == null || livePrices.isEmpty()) return groqReport;
+    try {
+        Map<String, MarketDataFetcher.MarketData> liveDataMap = 
+            MarketDataFetcher.getMarketDataBatch(assets);
+        if (liveDataMap == null || liveDataMap.isEmpty()) return groqReport;
 
-    String enrichedReport = groqReport;
+        String[] lignes = groqReport.split("\n");
+        StringBuilder reportAjuste = new StringBuilder();
 
-    // 2. Remplacement chirurgical ligne par ligne
-    for (java.util.Map.Entry<String, Double> entry : livePrices.entrySet()) {
-        String assetName = entry.getKey();
-        Double price = entry.getValue();
-
-        if (price != null) {
-            // Formatage propre du prix selon sa valeur (ex: pips Forex vs indices)
-            String formattedPrice = (price > 1000) ? String.format(Locale.US, "%,.2f", price) : String.format(Locale.US, "%.5f", price);
-            String priceTag = " [Live: " + formattedPrice + "]";
-
-            // Regex qui cible le nom de l'actif suivi des espaces et des deux-points (ex: "• 🏆 GOLD    :")
-            // et injecte le prix juste après les deux-points tout en préservant le reste de la ligne.
-            String regex = "(•\\s*[^:\\n]*\\b" + Pattern.quote(assetName) + "\\b\\s*:)";
+        for (String ligne : lignes) {
+            String ligneModifiee = ligne;
             
-            // Remplacement direct dans le bloc de texte
-            enrichedReport = enrichedReport.replaceAll(regex, "$1" + priceTag);
+            for (String asset : assets) {
+                // Regex blindée contre les légères variations de mise en forme de l'IA
+                String patternStr = "^\\s*[•\\-*]?\\s*\\S*\\s*" + Pattern.quote(asset) + "\\s*:.*";
+                
+                if (ligne.matches(patternStr)) {
+                    MarketDataFetcher.MarketData data = liveDataMap.get(asset);
+                    if (data != null && data.price > 0) {
+                        String sign = (data.changePercent >= 0) ? "+" : "";
+                        String badgeMarche = String.format(Locale.US,
+                            " (%.4f | %s%.2f%%)", data.price, sign, data.changePercent);
+                        
+                        // Insertion propre juste avant les deux-points explicatifs
+                        int indexColon = ligne.indexOf(":");
+                        if (indexColon != -1) {
+                            ligneModifiee = ligne.substring(0, indexColon) + badgeMarche + " :" + ligne.substring(indexColon + 1);
+                        } else {
+                            ligneModifiee = ligne + badgeMarche;
+                        }
+                    }
+                    break; // Un seul actif traitable par ligne de liste
+                }
+            }
+            reportAjuste.append(ligneModifiee).append("\n");
         }
+        return reportAjuste.toString().trim();
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur lors de l'injection des prix live", e);
+        return groqReport;
     }
-
-    return enrichedReport;
-    }
+}
 
     private void processAnalysisWithAI(final String sourceName, final String title, final String body, final List<String> enrichedAssets, final String fingerprint, final String customSystemPrompt, final boolean isSupremeRank){
         // 1. Intégration de votre SYSTEM_PROMPT (Le moule et les contraintes strictes)
@@ -445,7 +460,7 @@ public class NotificationService extends NotificationListenerService {
                 String promptFinal = construirePromptFinalAvecPrompt(body, historique, customSystemPrompt);
                 JSONObject jsonPayload = new JSONObject();
                 jsonPayload.put("model", GROQ_MODEL);
-                jsonPayload.put("temperature", 0.02);
+                jsonPayload.put("temperature", 0.1);
     
                 JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content", promptFinal));
