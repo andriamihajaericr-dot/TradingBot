@@ -54,6 +54,21 @@ public class NotificationService extends NotificationListenerService {
     private static final long GEO_THROTTLE_MS   = 12 * 60 * 1000L;  // 12 minutes pour géo
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
+    private final ConcurrentHashMap<String, PrevailingDirection> lastForecast = new ConcurrentHashMap<>();
+// Protection anti-spam : évite de scanner en boucle si le marché est instable
+    private final ConcurrentHashMap<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
+    private static final long ALERT_COOLDOWN_MS = 60 * 60 * 1000L; // 1 heure de cooldown par actif
+    
+    private static class PrevailingDirection {
+        final String direction; // "BULLISH", "BEARISH" ou "NEUTRE"
+        final double referencePrice;
+        final long timestamp;
+        PrevailingDirection(String dir, double price, long ts) {
+            this.direction = dir;
+            this.referencePrice = price;
+            this.timestamp = ts;
+        }
+    }
     private static final String SYSTEM_PROMPT = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
         "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
         "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
