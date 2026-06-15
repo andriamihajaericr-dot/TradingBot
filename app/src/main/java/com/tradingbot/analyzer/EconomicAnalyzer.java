@@ -8,7 +8,6 @@ import java.util.regex.Pattern;
 public class EconomicAnalyzer {
 
     private static final String TAG = "BOT_ECONOMIC_ANALYZER";
-    
     public static class EvaluationResult {
     public int weight = 1;
     public String marketImpact = "NEUTRAL";
