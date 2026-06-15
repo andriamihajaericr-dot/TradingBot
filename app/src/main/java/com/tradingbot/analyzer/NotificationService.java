@@ -82,6 +82,16 @@ public class NotificationService extends NotificationListenerService {
         EMOJI_ASSET_MAP.put("🇬🇧", "GBPUSD"); EMOJI_ASSET_MAP.put("🇦🇺", "AUDUSD");
         EMOJI_ASSET_MAP.put("₿", "BITCOIN");
     }
+    /**
+     * Identifie si un événement appartient au Rang Suprême (Dominance Absolue).
+     * Ces événements ont l'autorisation de bypasser les verrous temporels (Throttle).
+     */
+    private boolean isSupremeRank(String title) {
+        if (title == null || title.trim().isEmpty()) return false;
+        String t = title.toUpperCase(Locale.ROOT);
+        return t.contains("CPI") || t.contains("NFP") || t.contains("FOMC") 
+            || t.contains("FED RATE") || t.contains("PAYROLLS") || t.contains("PCE");
+    }
     private void captureForecastFromReport(String report) {
         if (report == null || report.isEmpty()) return;
         try {
