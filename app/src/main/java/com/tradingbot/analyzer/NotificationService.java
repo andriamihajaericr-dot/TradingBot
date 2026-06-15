@@ -1145,7 +1145,8 @@ new Thread(new Runnable() {
     
                     // 3. Re-synchronisation du calendrier pour la nouvelle journée
                     EventValidator.preloadCalendar();
-                    Log.d(TAG, "[MAINTENANCE] Calendrier économique mis à jour.");
+                    lastAlertsSent.clear();
+                    Log.d(TAG, "[MAINTENANCE] Cooldowns d'alertes réinitialisés.");
                     
                 } catch (Exception e) {
                     Log.e(TAG, "[MAINTENANCE] Erreur lors de la maintenance à minuit", e);
