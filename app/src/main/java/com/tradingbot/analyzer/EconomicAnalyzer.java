@@ -54,7 +54,6 @@ public class EconomicAnalyzer {
         
         // 🔥 Calcul de la déviation brute initiale
         double deviation = valeurs.actual - valeurs.forecast;
-
         // 🔥 Capture et Ajustement de l'impact réel des Révisions (Prior Revised)
         double revision = parseRevisionAdjustment(text);
         if (revision != 0.0 && valeurs.previous != 0.0) {
