@@ -54,8 +54,10 @@ public class NotificationService extends NotificationListenerService {
     private static final long GEO_THROTTLE_MS   = 12 * 60 * 1000L;  // 12 minutes pour géo
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
+    // Seuil minimal de prix pour considérer la donnée comme valide
+    private static final double MIN_VALID_PRICE = 0.0;
     private final ConcurrentHashMap<String, PrevailingDirection> lastForecast = new ConcurrentHashMap<>();
-// Protection anti-spam : évite de scanner en boucle si le marché est instable
+    // Protection anti-spam : évite de scanner en boucle si le marché est instable
     private final ConcurrentHashMap<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
     private static final long ALERT_COOLDOWN_MS = 60 * 60 * 1000L; // 1 heure de cooldown par actif
     
