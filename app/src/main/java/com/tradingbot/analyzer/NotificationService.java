@@ -1558,13 +1558,12 @@ new Thread(new Runnable() {
             MainActivity.instance.addLog(source + ": Envoi Telegram " + fingerprint);
         }
         sendTelegramSecure(finalPayload, this);
-        
         lastAnalysisTime = System.currentTimeMillis();
-        if (isGeoEvent) {
-            lastGeoTime = System.currentTimeMillis();
-        }
-        
+        if (isGeoEvent) { lastGeoTime = System.currentTimeMillis(); }
         eventDb.markEventAsSynced(fingerprint, "PROCESSED_OK");
+        
+        // Enregistrement des prévisions pour le moniteur de divergence
+        captureForecastFromReport(aiResult); 
         return true;
         } else {
             Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
