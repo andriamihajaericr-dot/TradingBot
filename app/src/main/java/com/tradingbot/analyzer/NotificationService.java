@@ -831,21 +831,51 @@ public class NotificationService extends NotificationListenerService {
                 // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
                 // 9️⃣ Enrichissement dynamique du Prompt Système IA
                 // 9️⃣ ENRICHISSEMENT MARKET DATA & PROMPT IA (Pipeline Intégré)
-                String marketSnapshot = "Marché non analysé.";
-                try {
-                    // Récupération des données uniquement pour les actifs déjà identifiés
-                    Map<String, Double> prices = MarketDataFetcher.getPrices(enrichedAssets);
-                    
-                    if (prices != null && !prices.isEmpty()) {
-                        StringBuilder sb = new StringBuilder("Données marché temps réel : ");
-                        for (Map.Entry<String, Double> entry : prices.entrySet()) {
-                            sb.append(entry.getKey()).append(": ").append(entry.getValue()).append(" | ");
-                        }
-                        marketSnapshot = sb.toString();
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Erreur lors de la récupération des prix", e);
-                }
+                // 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
+String marketSnapshot = "Marché non analysé.";
+try {
+    // Récupération globale instantanée de tous les actifs en 1 seul appel Batch
+    java.util.Map<String, MarketDataFetcher.MarketData> batchSnapshot = 
+        MarketDataFetcher.getMarketDataBatch(enrichedAssets);
+
+    if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
+        StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
+        boolean premierActif = true;
+
+        for (java.util.Map.Entry<String, MarketDataFetcher.MarketData> entry : batchSnapshot.entrySet()) {
+            MarketDataFetcher.MarketData mData = entry.getValue();
+            
+            // 🛡️ MULTI-PROTECTION : Filtrage préventif des valeurs nulles ou prix aberrants (<= 0)
+            if (mData == null || mData.price <= 0) {
+                Log.w(TAG, "Snapshot - Actif ignoré car données invalides ou nulles : " + entry.getKey());
+                continue; 
+            }
+
+            // ✂️ SUPPRESSION DU SÉPARATEUR DE FIN : Ajouté uniquement avant les éléments suivants
+            if (!premierActif) {
+                sb.append(" | ");
+            }
+            premierActif = false;
+
+            String sign = (mData.changePercent >= 0) ? "+" : "";
+            sb.append(entry.getKey())
+              .append(" => ")
+              .append(String.format(Locale.US, "%.4f (%s%.2f%%)", mData.price, sign, mData.changePercent));
+        }
+
+        // Vérification finale au cas où TOUX les actifs auraient été rejetés par le filtre de sécurité
+        if (premierActif) {
+            marketSnapshot = "Données de marché indisponibles (aucun prix valide extrait).";
+        } else {
+            marketSnapshot = sb.toString();
+        }
+    } else {
+        marketSnapshot = "Données de marché indisponibles (Twelve Data hors-ligne ou limite atteinte).";
+    }
+} catch (Exception e) {
+    Log.e(TAG, "Échec de la génération du snapshot marché", e);
+    marketSnapshot = "Erreur technique lors de l'acquisition des données.";
+}
 
                 // Construction du prompt enrichi
                 String baseSystemPrompt = SYSTEM_PROMPT;
