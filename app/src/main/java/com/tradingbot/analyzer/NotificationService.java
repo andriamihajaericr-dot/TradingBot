@@ -80,6 +80,46 @@ public class NotificationService extends NotificationListenerService {
         EMOJI_ASSET_MAP.put("🇬🇧", "GBPUSD"); EMOJI_ASSET_MAP.put("🇦🇺", "AUDUSD");
         EMOJI_ASSET_MAP.put("₿", "BITCOIN");
     }
+    private void captureForecastFromReport(String report) {
+        if (report == null || report.isEmpty()) return;
+        try {
+            Map<String, Double> currentPrices = MarketDataFetcher.getPrices(new ArrayList<>(EMOJI_ASSET_MAP.values()));
+            long now = System.currentTimeMillis();
+    
+            for (String line : report.split("\n")) {
+                if (!line.startsWith("•")) continue;
+                String[] parts = line.split(":");
+                if (parts.length < 2) continue;
+    
+                // Robustesse : trim pour ignorer les espaces avant/après
+                String leftPart = parts[0].trim();
+                String rightPart = parts[1].trim();
+    
+                String asset = null;
+                for (Map.Entry<String, String> entry : EMOJI_ASSET_MAP.entrySet()) {
+                    if (leftPart.contains(entry.getKey())) {
+                        asset = entry.getValue();
+                        break;
+                    }
+                }
+                if (asset == null) continue;
+    
+                String direction = "NEUTRE";
+                // Vérification sur le segment nettoyé
+                if (rightPart.contains("BULLISH") || rightPart.contains("ACHAT")) direction = "BULLISH";
+                else if (rightPart.contains("BEARISH") || rightPart.contains("VENTE")) direction = "BEARISH";
+    
+                double price = currentPrices.getOrDefault(asset, 0.0);
+                
+                // Utilisation de la constante de validation
+                if (price > MIN_VALID_PRICE) {
+                    lastForecast.put(asset, new PrevailingDirection(direction, price, now));
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur parsing prévisions", e);
+        }
+    }
     private static final String SYSTEM_PROMPT = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
         "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
         "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
