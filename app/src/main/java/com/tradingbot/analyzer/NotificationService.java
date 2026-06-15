@@ -341,6 +341,22 @@ public class NotificationService extends NotificationListenerService {
         "   DÉSESCALADE TARIFAIRE (suspension, baisse, accord) :\n" +
         "   Inverser toutes les directions ci-dessus, conviction plafonnée à 50%.\n" +
         "   🏁 FLUX DOMINANT : RISK-ON / APPÉTIT POUR LE RISQUE 🐂\n\n" +
+        "H. ÉVÉNEMENTS SPÉCIAUX (IPO, SPAC, MERGERS)\n" +
+        "─────────────────────────────────────────────\n" +
+        "   Rang TACTIQUE. Impact basé sur le sentiment de marché (Hype vs Risk-On).\n" +
+        "   Annonce IPO majeure (ex: SpaceX) ou Fusion/Acquisition géante :\n\n" +
+        "   • 💻 NASDAQ  : BULLISH 🟢 | Hype et injection de liquidité sectorielle.\n" +
+        "   • 📊 SP500   : BULLISH 🟢 | Même direction que NASDAQ — obligatoire.\n" +
+        "   • ₿ BITCOIN  : BULLISH 🟢 | Actif corrélé positivement à l'appétit pour le risque.\n" +
+        "   • 🏆 GOLD    : BEARISH 🔴 | Délaissé au profit des actifs à rendement plus élevé.\n" +
+        "   • 📈 US10Y   : NEUTRE      | Pas d'impact direct.\n" +
+        "   • 🛢️ USOIL   : NEUTRE      | Pas d'impact direct sauf si lié à l'énergie.\n" +
+        "   • 🇯🇵 USDJPY  : BEARISH 🔴 | Yen délaissé (Risk-On).\n" +
+        "   • 🇪🇺 EURUSD  : BULLISH 🟢 | Dollar faible par appétit pour le risque.\n" +
+        "   • 🇬🇧 GBPUSD  : BULLISH 🟢 | Dollar faible par appétit pour le risque.\n" +
+        "   • 🇦🇺 AUDUSD  : BULLISH 🟢 | Devise cyclique soutenue.\n" +
+        "   • 🇨🇦 USDCAD  : BEARISH 🔴 | Dollar faible face aux devises cycliques.\n\n" +
+        "   🏁 FLUX DOMINANT : RISK-ON / APPÉTIT POUR LE RISQUE 🐂\n\n" +
         "<HARD_CONSTRAINTS>\n" +
         "CONTRAINTE 1 — SECTIONS INTERDITES :\n" +
         "   N'écris JAMAIS 'TIMING D'EFFET', 'ACTION TRADING', 'CONTEXTE' ou toute autre section\n" +
@@ -383,9 +399,9 @@ public class NotificationService extends NotificationListenerService {
         "CONTRAINTE 9 — NOMBRE EXACT DE LIGNES D'IMPACTS :\n" +
         "   ⚠️ TOUTE RÉPONSE DOIT CONTENIR EXACTEMENT 11 LIGNES D’IMPACTS (une par actif), même si l'actif est neutre.\n" +
         "   Aucune ligne ne peut être omise, supprimée ou ajoutée. Le non-respect de cette règle entraîne le rejet automatique de la réponse.\n\n" +
-        "CONTRAINTE 10 — VALEUR EXACTE DU VECTEUR CIBLE :\n" +
-        "   Le champ 🎯 VECTEUR CIBLE doit être choisi UNIQUEMENT parmi : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS.\n" +
-        "   Toute autre valeur est est interdite et invalide la réponse.\n" +
+       "CONTRAINTE 10 — VALEUR EXACTE DU VECTEUR CIBLE :\n" +
+        "Le champ 🎯 VECTEUR CIBLE doit être choisi UNIQUEMENT parmi : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
+        "Toute autre valeur est interdite et invalide la réponse.\n" +
         "   La réponse doit utiliser exactement un de ces six termes, sans ajout ni modification.\n\n" +
         "CONTRAINTE 11 — HIÉRARCHIE ABSOLUE ET EXCEPTION DE CRISE :\n" +
         "   - En règle générale, le RANG SUPRÊME (Politique Monétaire, CPI, PCE) l'emporte sur le RANG TACTIQUE (GÉO).\n" +
