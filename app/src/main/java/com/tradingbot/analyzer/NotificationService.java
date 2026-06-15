@@ -2213,7 +2213,19 @@ new Thread(new Runnable() {
     "   • 🇨🇦 USDCAD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
     "   • 🇬🇧 GBPUSD -> NEUTRE ⚪   [Pas d'impact direct]\n" +
     "   • 🏁 FLUX DOMINANT -> RISK-OFF\n" +
-
+    "RÈGLE 11 : DRIVER ÉVÉNEMENTS SPÉCIAUX (IPO / SPAC / MERGERS)\n" +
+    "A) Annonce IPO majeure ou Fusion/Acquisition géante (ex: SpaceX) :\n" +
+    "   • 💻 NASDAQ  -> BULLISH 🟢 [Hype et injection de liquidité sectorielle]\n" +
+    "   • 📊 SP500   -> BULLISH 🟢 [Symétrie NASDAQ obligatoire]\n" +
+    "   • ₿ BITCOIN  -> BULLISH 🟢 [Actif corrélé positivement à l'appétit pour le risque]\n" +
+    "   • 🏆 GOLD    -> BEARISH 🔴 [Délaissé au profit des actifs à rendement plus élevé]\n" +
+    "   • 🇯🇵 USDJPY  -> BEARISH 🔴 [Yen délaissé dans un contexte Risk-On]\n" +
+    "   • 🇪🇺 EURUSD  -> BULLISH 🟢 [Dollar faible par appétit pour le risque]\n" +
+    "   • 🇦🇺 AUDUSD  -> BULLISH 🟢 [Devise cyclique soutenue]\n" +
+    "   • 🇨🇦 USDCAD  -> BEARISH 🔴 [Dollar faible face aux devises cycliques]\n" +
+    "   • 📈 US10Y, 🛢️ USOIL, 🇬🇧 GBPUSD -> NEUTRE ⚪ [Pas d'impact direct]\n" +
+    "   • 🏁 FLUX DOMINANT -> RISK-ON / APPÉTIT POUR LE RISQUE\n\n" +
+        
     "═══════════════════════════════════════════════════════════════\n" +
     "                    CONTRAINTES DE SÉCURITÉ DE COMPILATION\n" +
     "═══════════════════════════════════════════════════════════════\n\n" +
