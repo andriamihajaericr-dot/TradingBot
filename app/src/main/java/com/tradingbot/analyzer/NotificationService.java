@@ -122,6 +122,60 @@ public class NotificationService extends NotificationListenerService {
             Log.e(TAG, "Erreur parsing prévisions", e);
         }
     }
+    
+    private void checkForecastDivergence() {
+        if (lastForecast.isEmpty()) return;
+    
+        List<String> assets = new ArrayList<>(lastForecast.keySet());
+        Map<String, Double> currentPrices = MarketDataFetcher.getPrices(assets);
+        long now = System.currentTimeMillis();
+    
+        for (Map.Entry<String, PrevailingDirection> entry : lastForecast.entrySet()) {
+            String asset = entry.getKey();
+            PrevailingDirection forecast = entry.getValue();
+            Double currentPrice = currentPrices.get(asset);
+            
+            if (currentPrice == null || currentPrice <= 0) continue;
+    
+            // 1. Vérification atomique du cooldown
+            // On utilise 'compute' pour garantir que l'accès et la mise à jour sont liés
+            final boolean[] canAlert = {false};
+            lastAlertsSent.compute(asset, (k, lastTime) -> {
+                if (lastTime == null || (now - lastTime) >= ALERT_COOLDOWN_MS) {
+                    canAlert[0] = true;
+                    return now; // Met à jour le timestamp
+                }
+                return lastTime; // Trop tôt, ne change pas le timestamp
+            });
+    
+            if (!canAlert[0]) continue;
+    
+            // 2. Calcul de la variation
+            double changePercent = (currentPrice - forecast.referencePrice) / forecast.referencePrice * 100.0;
+            boolean contradiction = (forecast.direction.equals("BULLISH") && changePercent < -DIVERGENCE_THRESHOLD) ||
+                                    (forecast.direction.equals("BEARISH") && changePercent > DIVERGENCE_THRESHOLD);
+    
+            if (contradiction) {
+                Log.w(TAG, "Divergence détectée pour " + asset + " : " + changePercent + "%");
+    
+                // 3. Déclenchement du scan
+                MarketDataFetcher.PreMarketScanner.scan(new MarketDataFetcher.PreMarketScanner.PreMarketCallback() {
+                    @Override
+                    public void onAlerte(String rapport, boolean isChoc) {
+                        String alerteDiv = "🔄 *ALERTE DIVERGENCE MARCHÉ*\n" +
+                                           "Actif : " + asset + " (" + String.format("%.2f", changePercent) + "%)\n" +
+                                           "Nouvelle analyse pré-market :\n" + rapport;
+                        sendTelegramSecure(alerteDiv, NotificationService.this);
+                    }
+                });
+    
+                // 4. On supprime la prévision pour arrêter le monitoring sur cet actif 
+                // tant qu'une nouvelle analyse IA (pipeline complet) n'a pas rafraîchi la donnée.
+                lastForecast.remove(asset);
+            }
+        }
+    }
+    
     private static final String SYSTEM_PROMPT = "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
         "Tu analyses le flux d'actualité en appliquant une HIERARCHIE STRICTE DES DRIVERS.\n\n" +
         "MATRICE DE DOMINANCE (Priorité absolue) :\n" +
