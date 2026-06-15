@@ -576,4 +576,34 @@ public class EconomicAnalyzer {
         } catch (Exception e) { }
         return Double.NaN;
     }
+
+    /**
+     * ✅ MÉTHODE CORRECTIVE : Extrait les ajustements de révision depuis le texte de l'événement
+     * Renvoie 0.0 si aucune révision ou modification n'est détectée.
+     */
+    private static double parseRevisionAdjustment(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return 0.0;
+        }
+        
+        try {
+            String lowerText = text.toLowerCase(java.util.Locale.ROOT);
+            
+            // Si le texte mentionne explicitement une révision (ex: "Revised From 2.1%" ou "Révisé à")
+            if (lowerText.contains("revised") || lowerText.contains("révisé") || lowerText.contains("revision")) {
+                // Expression régulière pour isoler le premier nombre (positif ou négatif, décimal ou entier)
+                java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("[-+]?\\d*\\.?\\d+");
+                java.util.regex.Matcher matcher = pattern.matcher(text);
+                
+                if (matcher.find()) {
+                    String match = matcher.group();
+                    return Double.parseDouble(match);
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.e("EconomicAnalyzer", "⚠️ Échec du parsing de la révision macro : " + text, e);
+        }
+        
+        return 0.0; // Valeur neutre par défaut si aucun chiffre n'est extrait
+    }
 }
