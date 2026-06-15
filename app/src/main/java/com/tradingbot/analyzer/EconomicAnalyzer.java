@@ -51,7 +51,19 @@ public class EconomicAnalyzer {
         result.isParsed  = true;
         result.actual    = valeurs.actual;    // ✅
         result.forecast  = valeurs.forecast;  // ✅
-        result.deviation = valeurs.actual - valeurs.forecast;
+        
+        // 🔥 Calcul de la déviation brute initiale
+        double deviation = valeurs.actual - valeurs.forecast;
+
+        // 🔥 Capture et Ajustement de l'impact réel des Révisions (Prior Revised)
+        double revision = parseRevisionAdjustment(text);
+        if (revision != 0.0 && valeurs.previous != 0.0) {
+            double revisionDelta = revision - valeurs.previous;
+            deviation += revisionDelta; // Ajustement mathématique de l'écart final
+            Log.d(TAG, "⚠️ Révision détectée : " + revisionDelta + ". Écart macro ajusté à : " + deviation);
+        }
+
+        result.deviation = deviation;
         double absEcart  = Math.abs(result.deviation);
 
         // Appliquer l'analyse selon la devise
