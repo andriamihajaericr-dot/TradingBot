@@ -56,6 +56,8 @@ public class NotificationService extends NotificationListenerService {
     private volatile long lastGeoTime = 0;
     // Seuil minimal de prix pour considérer la donnée comme valide
     private static final double MIN_VALID_PRICE = 0.0;
+    // Seuil de divergence (0.5% est plus sûr pour éviter le bruit sur le Forex)
+    private static final double DIVERGENCE_THRESHOLD = 0.5;
     private final ConcurrentHashMap<String, PrevailingDirection> lastForecast = new ConcurrentHashMap<>();
     // Protection anti-spam : évite de scanner en boucle si le marché est instable
     private final ConcurrentHashMap<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
