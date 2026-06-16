@@ -442,10 +442,20 @@ public class EconomicCalendarAPI {
                 // 🔄 CORRECTIF : Si l'événement est déjà sauvegardé
                 if (db.isEventAlreadySaved(event.indicator, eventTs)) {
                     if (hasActual) {
-                        // Crucial : On met à jour l'actual MAIS AUSSI le champ textuel 'content' mis en forme avec la flèche !
+                        // 1. Mise à jour de la valeur réelle
                         db.updateActualIfMissing(event.indicator, eventTs, event.actual);
-                        // Hypothèse : Si votre EventDatabase possède une méthode pour mettre à jour le contenu complet, l'appeler ici.
-                        // Sinon, la mise à jour de l'actual seule fonctionne, mais l'affichage brut devra être géré à la volée.
+                        
+                        // 2. RECONSTRUCTION du contenu complet avec la flèche (biaisStr)
+                        // Vous devez utiliser EXACTEMENT la même logique de construction que définie plus haut
+                        String newContent = event.indicator
+                                + (event.country != null ? " | " + event.country : "")
+                                + " | Cons: " + event.forecast
+                                + " | Préc: " + event.previous
+                                + " " + biaisStr; // 'biaisStr' contient maintenant la flèche ↑ ou ↓
+                
+                        // 3. Appel de la méthode de mise à jour du contenu (À AJOUTER dans EventDatabase)
+                        db.updateContent(event.indicator, eventTs, newContent);
+                        
                         updatedActuals++;
                     }
                     skipped++;
