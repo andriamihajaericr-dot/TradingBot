@@ -1684,11 +1684,13 @@ List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
         event.country != null ? event.country : "United States");
 
 // ✅ Envoi vers Groq + Telegram sécurisé (S'exécutera toujours sans lever d'exception)
-NotificationService.sendToGroqAndTelegram(
-        "Calendrier Économique", title, content, assets, appContext);
-        logToMain("📤 Résultat calendaire : "
-                + event.indicator + " | " + event.actual + " vs " + event.forecast);
-
+// ✅ Envoi vers Groq + Telegram sécurisé (S'exécutera toujours sans lever d'exception)
+    NotificationService.sendToGroqAndTelegram(
+            "Calendrier Économique", title, content, assets, appContext);
+    
+    // 🔄 CORRECTIF : Génération et affichage du bloc compact professionnel (Option 2)
+    String logCompact = genererLogCompact(event, eval);
+    logToMain(logCompact);
     } catch (Exception e) {
         Log.e(TAG, "Erreur analyzeAndSendCalendarResult : " + event.indicator, e);
     }
