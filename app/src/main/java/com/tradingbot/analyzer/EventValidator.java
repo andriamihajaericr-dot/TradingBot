@@ -414,6 +414,10 @@ public class EventValidator {
     String detectedType = (economyDetector != null) ? economyDetector.eventType : "UNKNOWN";
     
     EventDatabase db = (context != null) ? EventDatabase.getInstance(context) : null;
+    if ("FED-WARSH-SIGNAL".equals(detectedType)) {
+        Log.i(TAG, "⚡ Signal Warsh détecté, normalisation vers FED-MONETARY-POLICY pour le routage.");
+        detectedType = "FED-MONETARY-POLICY";
+    }
     if (!detectedType.equals("UNKNOWN") && !detectedType.startsWith("GEO") && db != null) {
         try {
             long currentSeconds = timestamp / 1000;
