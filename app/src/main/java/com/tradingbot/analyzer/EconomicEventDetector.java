@@ -28,7 +28,7 @@ public class EconomicEventDetector {
                    unified.contains("ACQUISITION");
         }
         public String getRawImpact() {
-            if (isSpecialEvent(description, description)) { // Adaptez les arguments
+            if (isSpecialEvent(eventType, description)) {
                 return "HIGH"; // On force l'impact à HIGH immédiatement
             }
             if (impact == null) return "NEUTRE";
