@@ -1662,10 +1662,20 @@ private static void analyzeAndSendCalendarResult(EconomicCalendarAPI.CalendarEve
 String analyseInput = "Indicator: " + event.indicator + " | Actual: " + event.actual + " | Forecast: " + event.forecast;
 
 // ✅ Dérogation de l'analyse surprise à l'EconomicAnalyzer
-EconomicAnalyzer.EvaluationResult eval = EconomicAnalyzer.analyserEvenement(
-        event.indicator, 
-        analyseInput
-);
+// Étape : Calcul de la déviation avec votre classe EconomicAnalyzer
+EconomicAnalyzer.EvaluationResult eval = EconomicAnalyzer.analyserEvenement(event.indicator, "Actual: " + event.actual + " | Forecast: " + event.forecast);
+
+// Étape : Construction du message dynamique
+String statusFleche = "⚪";
+if (eval.deviation > 0) statusFleche = "🟢 ↑"; // Haussier
+else if (eval.deviation < 0) statusFleche = "🔴 ↓"; // Baissier
+
+// Résultat final à intégrer dans le message Telegram
+String ligneCalendrier = String.format("%s | Prévu: %s | Réel: %s %s", 
+                                       event.indicator, 
+                                       event.forecast, 
+                                       event.actual, 
+                                       statusFleche);
 
 // ✅ Alignement strict avec les retours de votre classe EconomicAnalyzer
 if (eval != null && eval.isParsed) {
