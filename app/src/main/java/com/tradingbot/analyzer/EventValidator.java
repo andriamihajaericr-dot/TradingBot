@@ -1635,10 +1635,7 @@ public static void checkUpcomingAlerts() {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────
-//  WATCHER — Analyse résultats calendaires publiés sans news
-// ─────────────────────────────────────────────────────────────
-private static void analyzeAndSendCalendarResult(EconomicCalendarAPI.CalendarEvent event) {
+    private static void analyzeAndSendCalendarResult(EconomicCalendarAPI.CalendarEvent event) {
     if (appContext == null || event == null) return;
     try {
         // ✅ Construction du texte enrichi
@@ -1653,60 +1650,54 @@ private static void analyzeAndSendCalendarResult(EconomicCalendarAPI.CalendarEve
         if (event.previous != null && !event.previous.equals("N/A"))
             content += " PREVIOUS: " + event.previous;
 
-        // ✅ Détection surprise haussière / baissière
-        // Dans la méthode analyzeAndSendCalendarResult
-// ... (code précédent d'assemblage du contenu)
-
-// ✅ Construction d'une chaîne brute propre et standardisée pour le parseur
-// On utilise un format naturel que EconomicAnalyzer sait décoder à l'aide de sa méthode traiterEvenementTextuel ou extraireChiffres
-String analyseInput = "Indicator: " + event.indicator + " | Actual: " + event.actual + " | Forecast: " + event.forecast;
-
-// ✅ Dérogation de l'analyse surprise à l'EconomicAnalyzer
-// Étape : Calcul de la déviation avec votre classe EconomicAnalyzer
-EconomicAnalyzer.EvaluationResult eval = EconomicAnalyzer.analyserEvenement(event.indicator, "Actual: " + event.actual + " | Forecast: " + event.forecast);
-
-// Étape : Construction du message dynamique
-String statusFleche = "⚪";
-if (eval.deviation > 0) statusFleche = "🟢 ↑"; // Haussier
-else if (eval.deviation < 0) statusFleche = "🔴 ↓"; // Baissier
-
-// Résultat final à intégrer dans le message Telegram
-String ligneCalendrier = String.format("%s | Prévu: %s | Réel: %s %s", 
-                                       event.indicator, 
-                                       event.forecast, 
-                                       event.actual, 
-                                       statusFleche);
-
-// ✅ Alignement strict avec les retours de votre classe EconomicAnalyzer
-if (eval != null && eval.isParsed) {
-   if (eval.deviation > 0) {
-    content += " | Status: HIGHER THAN EXPECTED 🟢";
-   } else if (eval.deviation < 0) {
-    content += " | Status: LOWER THAN EXPECTED 🔴";
-   } else {
-    content += " | Status: AS EXPECTED ⚪";
-   } 
-}
-
-// ✅ Récupération des actifs liés
-List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
-        event.indicator,
-        event.country != null ? event.country : "United States");
-
-// ✅ Envoi vers Groq + Telegram sécurisé (S'exécutera toujours sans lever d'exception)
-// ✅ Envoi vers Groq + Telegram sécurisé (S'exécutera toujours sans lever d'exception)
-    NotificationService.sendToGroqAndTelegram(
-            "Calendrier Économique", title, content, assets, appContext);
-    
-    // 🔄 CORRECTIF : Génération et affichage du bloc compact professionnel (Option 2)
-    String logCompact = genererLogCompact(event, eval);
-    logToMain(logCompact);
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur analyzeAndSendCalendarResult : " + event.indicator, e);
-    }
-}
-
-// ==========================================
+        String analyseInput = "Indicator: " + event.indicator + " | Actual: " + event.actual + " | Forecast: " + event.forecast;
+        
+        // ✅ Dérogation de l'analyse surprise à l'EconomicAnalyzer
+        // Étape : Calcul de la déviation avec votre classe EconomicAnalyzer
+        EconomicAnalyzer.EvaluationResult eval = EconomicAnalyzer.analyserEvenement(event.indicator, "Actual: " + event.actual + " | Forecast: " + event.forecast);
+        
+        // Étape : Construction du message dynamique
+        String statusFleche = "⚪";
+        if (eval.deviation > 0) statusFleche = "🟢 ↑"; // Haussier
+        else if (eval.deviation < 0) statusFleche = "🔴 ↓"; // Baissier
+        
+        // Résultat final à intégrer dans le message Telegram
+        String ligneCalendrier = String.format("%s | Prévu: %s | Réel: %s %s", 
+                                               event.indicator, 
+                                               event.forecast, 
+                                               event.actual, 
+                                               statusFleche);
+        
+        // ✅ Alignement strict avec les retours de votre classe EconomicAnalyzer
+        if (eval != null && eval.isParsed) {
+           if (eval.deviation > 0) {
+            content += " | Status: HIGHER THAN EXPECTED 🟢";
+           } else if (eval.deviation < 0) {
+            content += " | Status: LOWER THAN EXPECTED 🔴";
+           } else {
+            content += " | Status: AS EXPECTED ⚪";
+           } 
+        }
+        
+        // ✅ Récupération des actifs liés
+        List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(
+                event.indicator,
+                event.country != null ? event.country : "United States");
+        
+        // ✅ Envoi vers Groq + Telegram sécurisé (S'exécutera toujours sans lever d'exception)
+        // ✅ Envoi vers Groq + Telegram sécurisé (S'exécutera toujours sans lever d'exception)
+            NotificationService.sendToGroqAndTelegram(
+                    "Calendrier Économique", title, content, assets, appContext);
+            
+            // 🔄 CORRECTIF : Génération et affichage du bloc compact professionnel (Option 2)
+            String logCompact = genererLogCompact(event, eval);
+            logToMain(logCompact);
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur analyzeAndSendCalendarResult : " + event.indicator, e);
+            }
+        }
+   
+    // ==========================================
     // 📊 REFORMATAGE MACRO ERGONOMIQUE (OPTION 2)
     // ==========================================
     public static String genererLogCompact(EconomicCalendarAPI.CalendarEvent event, EconomicAnalyzer.EvaluationResult eval) {
