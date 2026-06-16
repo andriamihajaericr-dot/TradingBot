@@ -410,11 +410,50 @@ public class EconomicCalendarAPI {
                         + event.indicator.toLowerCase(Locale.US).replaceAll("[^a-z0-9]", "_")
                         + "_" + eventTs;
 
-                String content = event.indicator
-                        + (event.country != null ? " | " + event.country : "")
-                        + " | Forecast: " + (event.forecast != null ? event.forecast : "N/A")
-                        + " | Previous: " + (event.previous != null ? event.previous : "N/A")
-                        + " | Actual: "   + (event.actual   != null ? event.actual   : "N/A");
+                //String content = event.indicator
+                      //  + (event.country != null ? " | " + event.country : "")
+                        //+ " | Forecast: " + (event.forecast != null ? event.forecast : "N/A")
+                        //+ " | Previous: " + (event.previous != null ? event.previous : "N/A")
+                        //+ " | Actual: "   + (event.actual   != null ? event.actual   : "N/A");
+               // 1. Vérification si le résultat "Actual" est publié et valide
+                boolean hasActual = event.actual != null && !event.actual.equalsIgnoreCase("N/A") && !event.actual.trim().isEmpty();
+                
+                String content;
+                if (hasActual) {
+                    String biaisStr = "➔ 🟢 Réel: " + event.actual; // Repli par défaut si l'analyse échoue
+                    
+                    // Essai d'analyse numérique pour déterminer dynamiquement la couleur du cercle et la flèche du biais
+                    if (event.forecast != null && !event.forecast.equalsIgnoreCase("N/A") && !event.forecast.trim().isEmpty()) {
+                        try {
+                            double a = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
+                            double f = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
+                            
+                            if (a > f) {
+                                biaisStr = "➔ 🟢 Réel: " + event.actual + " | Biais: ↑";
+                            } else if (a < f) {
+                                biaisStr = "➔ 🔴 Réel: " + event.actual + " | Biais: ↓";
+                            } else {
+                                biaisStr = "➔ ⚪ Réel: " + event.actual + " | Biais: =";
+                            }
+                        } catch (Exception ignored) {
+                            // Reste sur le repli par défaut si la valeur contient des caractères non convertibles
+                        }
+                    }
+                    
+                    // Formatage personnalisé demandé lorsqu'il y a un résultat publié
+                    content = event.indicator
+                            + (event.country != null ? " | " + event.country : "")
+                            + " | Cons: " + event.forecast
+                            + " | Préc: " + event.previous
+                            + " " + biaisStr;
+                } else {
+                    // Format standard classique si le résultat n'est pas encore disponible
+                    content = event.indicator
+                            + (event.country != null ? " | " + event.country : "")
+                            + " | Forecast: " + (event.forecast != null ? event.forecast : "N/A")
+                            + " | Previous: " + (event.previous != null ? event.previous : "N/A")
+                            + " | Actual: N/A";
+                }
 
                 int weight;
                 if ("HIGH".equalsIgnoreCase(event.importance)) {
