@@ -10,7 +10,7 @@ public class EconomicAnalyzer {
     private static final String TAG = "BOT_ECONOMIC_ANALYZER";
     public static class EvaluationResult {
     public int weight = 1;
-    public String marketImpact = "NEUTRAL";
+    public String marketImpact = "NEUTRE";
     public String directionText = "";
     public double deviation = 0.0;
     public double actual = Double.NaN;    // ✅ valeur publiée
