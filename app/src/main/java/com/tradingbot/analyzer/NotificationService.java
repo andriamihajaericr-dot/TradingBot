@@ -1487,61 +1487,21 @@ new Thread(new Runnable() {
 
     // Point 6 : Connexion fermée de manière étanche dans le bloc finally
     private void fetchMissingDataFromInstitutionalAPI() {
-        HttpURLConnection conn = null;
-        try {
-            String macroApiKey = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_MACRO_KEY, "");
-            if (macroApiKey.isEmpty()) return;
-
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("GMT+3"));
-            String todayStr = dateFormat.format(cal.getTime());
-            cal.add(Calendar.DAY_OF_YEAR, -2);
-            String twoDaysAgoStr = dateFormat.format(cal.getTime());
-
-            String urlString = String.format("https://financialmodelingprep.com/api/v3/economic_calendar?from=%s&to=%s&apikey=%s", twoDaysAgoStr, todayStr, macroApiKey);
-            URL url = new URL(urlString);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(10000);
-
-            if (conn.getResponseCode() == 200) {
-                BufferedReader rd = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = rd.readLine()) != null) response.append(line);
-                rd.close();
-
-                JSONArray calendarEvents = new JSONArray(response.toString());
-                StringBuilder apiMacroBlock = new StringBuilder();
-
-                for (int i = 0; i < calendarEvents.length(); i++) {
-                    JSONObject event = calendarEvents.getJSONObject(i);
-                    String impact = event.optString("impact", "LOW");
-                    String currency = event.optString("currency", "USD");
-
-                    if (impact.equalsIgnoreCase("HIGH") &&
-                       (currency.equals("USD") || currency.equals("AUD") || currency.equals("CAD") ||
-                        currency.equals("JPY") || currency.equals("EUR") || currency.equals("GBP"))) {
-
-                        String date = event.optString("date", "");
-                        String eventName = event.optString("event", "");
-                        double actual = event.optDouble("actual", 0.0);
-                        double estimate = event.optDouble("estimate", 0.0);
-
-                        if (actual != estimate) {
-                            apiMacroBlock.append(String.format("- [%s] (%s) %s | Actuel: %s vs Attendu: %s\n", date, currency, eventName, actual, estimate));
-                        }
-                    }
-                }
-
-                if (apiMacroBlock.length() > 0) {
-                    dispatchHistoricalBulkToGroq(apiMacroBlock.toString());
-                }
+        // Migré vers ForexFactory via EconomicCalendarAPI.fetchHistoricalEvents()
+        // FMP désactivé (plan payant requis)
+        List<EconomicCalendarAPI.CalendarEvent> events = 
+            EconomicCalendarAPI.fetchHistoricalEvents(this, 7);
+        if (events == null || events.isEmpty()) return;
+    
+        StringBuilder apiMacroBlock = new StringBuilder();
+        for (EconomicCalendarAPI.CalendarEvent e : events) {
+            if (e.impact != null && e.impact.equalsIgnoreCase("HIGH") && e.actual != null && e.estimate != null) {
+                apiMacroBlock.append(String.format("- [%s] (%s) %s | Actuel: %s vs Attendu: %s\n",
+                    e.date, e.currency, e.title, e.actual, e.estimate));
             }
-        } catch (Exception e) { 
-            Log.e(TAG, "Échec de récupération API historique", e); 
-        } finally {
-            if (conn != null) conn.disconnect();
+        }
+        if (apiMacroBlock.length() > 0) {
+            dispatchHistoricalBulkToGroq(apiMacroBlock.toString());
         }
     }
 
