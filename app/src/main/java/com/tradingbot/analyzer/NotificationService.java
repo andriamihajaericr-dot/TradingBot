@@ -2271,9 +2271,36 @@ new Thread(new Runnable() {
 
         JSONArray messages = new JSONArray();
         messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
-        messages.put(new JSONObject().put("role", "user").put("content", 
-            "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n" +
-            "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers));
+        // ✅ Snapshot marché injecté dans le daily comme dans le pipeline news live
+String dailyMarketSnapshot = "Données de marché indisponibles.";
+try {
+    List<String> allAssets = new ArrayList<>(Arrays.asList(
+        "GOLD","NASDAQ","SP500","BITCOIN","EURUSD",
+        "USDJPY","GBPUSD","AUDUSD","USDCAD","USOIL","US10Y"
+    ));
+    Map<String, MarketDataFetcher.MarketData> snap =
+        MarketDataFetcher.getMarketDataBatch(allAssets);
+    if (snap != null && !snap.isEmpty()) {
+        StringBuilder sbM = new StringBuilder("📊 COURS AU MOMENT DU RAPPORT :\n");
+        for (Map.Entry<String, MarketDataFetcher.MarketData> e : snap.entrySet()) {
+            MarketDataFetcher.MarketData d = e.getValue();
+            if (d != null && d.price > 0) {
+                String sign = d.changePercent >= 0 ? "+" : "";
+                sbM.append(e.getKey()).append(" => ")
+                   .append(String.format(Locale.US, "%.4f (%s%.2f%%)", d.price, sign, d.changePercent))
+                   .append("\n");
+            }
+        }
+        dailyMarketSnapshot = sbM.toString();
+    }
+} catch (Exception e) {
+    Log.w(TAG, "[DAILY] Snapshot marché indisponible : " + e.getMessage());
+}
+
+messages.put(new JSONObject().put("role", "user").put("content",
+    "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n" +
+    dailyMarketSnapshot + "\n" +
+    "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers));
         payload.put("messages", messages);
 
         URL url = new URL(GROQ_URL);
