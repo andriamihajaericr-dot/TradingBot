@@ -1490,17 +1490,23 @@ new Thread(new Runnable() {
 
     // Point 6 : Connexion fermée de manière étanche dans le bloc finally
     private void fetchMissingDataFromInstitutionalAPI() {
-        // Migré vers ForexFactory via EconomicCalendarAPI.fetchHistoricalEvents()
-        // FMP désactivé (plan payant requis)
-        List<EconomicCalendarAPI.CalendarEvent> events = 
-            EconomicCalendarAPI.fetchHistoricalEvents(this, 7);
-        if (events == null || events.isEmpty()) return;
-    
-        StringBuilder apiMacroBlock = new StringBuilder();
-        for (EconomicCalendarAPI.CalendarEvent e : events) {
-            if (e.impact != null && e.impact.equalsIgnoreCase("HIGH") && e.actual != null && e.estimate != null) {
-                apiMacroBlock.append(String.format("- [%s] (%s) %s | Actuel: %s vs Attendu: %s\n",
-                    e.date, e.currency, e.title, e.actual, e.estimate));
+        // À MODIFIER dans NotificationService.java (aux alentours de la ligne 1496-1505)
+        // 1. L'appel compile désormais car la méthode (Context, int) existe :
+        List<EconomicCalendarAPI.CalendarEvent> historicalEvents = EconomicCalendarAPI.fetchHistoricalEvents(this, 7);
+        
+        for (EconomicCalendarAPI.CalendarEvent e : historicalEvents) {
+            if (e == null) continue;
+        
+            // 2. Correction des variables membres (Remplacement des faux symboles manquants)
+            // impact -> importance | estimate -> forecast
+            if (e.importance != null && e.importance.equalsIgnoreCase("HIGH") && e.actual != null && e.forecast != null) {
+                
+                // date -> timestamp | currency -> country (ou une méthode dédiée) | title -> indicator
+                String dateStr = e.timestamp; 
+                String countryOrCurrency = (e.country != null) ? e.country : "USD"; // Fallback ou variable existante
+                
+                logToMain(String.format("High Impact Event: %s, Region: %s, Event: %s, Act: %s, Fcst: %s",
+                        dateStr, countryOrCurrency, e.indicator, e.actual, e.forecast));
             }
         }
         if (apiMacroBlock.length() > 0) {
