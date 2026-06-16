@@ -36,10 +36,17 @@ public class EventDatabase extends SQLiteOpenHelper {
         return instance;
     }
     // À ajouter dans EventDatabase.java si absent
-  @Override
-public void close() {
-    super.close(); // ✅ Utilise la fermeture native de SQLiteOpenHelper d'Android
-}
+    @Override
+    public void close() {
+        super.close(); // ✅ Utilise la fermeture native de SQLiteOpenHelper d'Android
+    }
+
+    public void updateContent(String indicator, long timestamp, String newContent) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("content", newContent); // Assurez-vous que votre colonne s'appelle bien 'content'
+        db.update("events", values, "indicator=? AND timestamp=?", new String[]{indicator, String.valueOf(timestamp)});
+    }
 
     // =========================================================================
     // ✅ CORRECTIF : Ajout de la méthode manquante appelée par MainActivity
