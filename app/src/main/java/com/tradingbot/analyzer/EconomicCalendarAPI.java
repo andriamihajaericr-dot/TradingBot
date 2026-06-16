@@ -133,10 +133,12 @@ public class EconomicCalendarAPI {
                 if (!isTrackedCurrency(country)) continue;
 
                 // ✅ INTÉGRATION VALIDÉE : Appel du nouveau module strict gérant le fuseau de la devise
+                // ✅ INTÉGRATION VALIDÉE : Appel du nouveau module strict gérant le fuseau de la devise
                 long eventMs = parseTimestampStrict(dateStr, country);
                 long maxFutureMs = nowMs + ((long) hoursAhead * 60 * 60 * 1000);
-                long minPastMs = nowMs - (45 * 60 * 1000L); 
-
+                // 🔄 CORRECTIF : Fenêtre élargie à 24 heures pour éviter de manquer des publications en cours de journée
+                long minPastMs = nowMs - (24 * 60 * 60 * 1000L); 
+                
                 if (hoursAhead == 168 || (eventMs <= maxFutureMs && eventMs >= minPastMs)) {
                     CalendarEvent event = new CalendarEvent();
                     event.timestamp  = String.valueOf(eventMs / 1000);
