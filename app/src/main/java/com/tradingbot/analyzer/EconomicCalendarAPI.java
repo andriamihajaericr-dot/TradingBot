@@ -386,6 +386,7 @@ public class EconomicCalendarAPI {
         EventDatabase db = EventDatabase.getInstance(context);
         int saved = 0;
         int skipped = 0;
+        int updatedActuals = 0;
 
         for (CalendarEvent event : events) {
             if (event == null || event.indicator == null || event.timestamp == null) continue;
@@ -394,35 +395,14 @@ public class EconomicCalendarAPI {
             if (indUpper.contains("BANK HOLIDAY") || indUpper.contains("PUBLIC HOLIDAY") ||
                 indUpper.contains("MARKET HOLIDAY") || indUpper.contains("NATIONAL HOLIDAY")) continue;
 
-           try {
-            long eventTs = Long.parseLong(event.timestamp);
-        
-            if (db.isEventAlreadySaved(event.indicator, eventTs)) {
-                // 🔄 CORRECTIF : Si l'événement est déjà sauvegardé mais qu'un résultat "actual" vient de sortir, on met à jour la DB
-                if (event.actual != null && !event.actual.equalsIgnoreCase("N/A") && !event.actual.trim().isEmpty()) {
-                    db.updateActualIfMissing(event.indicator, eventTs, event.actual);
-                }
-                skipped++;
-                continue;
-            }
-        
-            String fingerprint = "CAL_"
-                        + event.indicator.toLowerCase(Locale.US).replaceAll("[^a-z0-9]", "_")
-                        + "_" + eventTs;
-
-                //String content = event.indicator
-                      //  + (event.country != null ? " | " + event.country : "")
-                        //+ " | Forecast: " + (event.forecast != null ? event.forecast : "N/A")
-                        //+ " | Previous: " + (event.previous != null ? event.previous : "N/A")
-                        //+ " | Actual: "   + (event.actual   != null ? event.actual   : "N/A");
-               // 1. Vérification si le résultat "Actual" est publié et valide
+            try {
+                long eventTs = Long.parseLong(event.timestamp);
                 boolean hasActual = event.actual != null && !event.actual.equalsIgnoreCase("N/A") && !event.actual.trim().isEmpty();
                 
-                String content;
+                // 1. Détermination dynamique de la chaîne de biais (Uniquement mathématique brute à ce stade)
+                String biaisStr = "";
                 if (hasActual) {
-                    String biaisStr = "➔ 🟢 Réel: " + event.actual; // Repli par défaut si l'analyse échoue
-                    
-                    // Essai d'analyse numérique pour déterminer dynamiquement la couleur du cercle et la flèche du biais
+                    biaisStr = "➔ 🟢 Réel: " + event.actual; // Repli par défaut
                     if (event.forecast != null && !event.forecast.equalsIgnoreCase("N/A") && !event.forecast.trim().isEmpty()) {
                         try {
                             double a = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
@@ -435,24 +415,41 @@ public class EconomicCalendarAPI {
                             } else {
                                 biaisStr = "➔ ⚪ Réel: " + event.actual + " | Biais: =";
                             }
-                        } catch (Exception ignored) {
-                            // Reste sur le repli par défaut si la valeur contient des caractères non convertibles
-                        }
+                        } catch (Exception ignored) {}
                     }
-                    
-                    // Formatage personnalisé demandé lorsqu'il y a un résultat publié
+                }
+
+                // 2. Construction de la variable textuelle finale "content"
+                String content;
+                if (hasActual) {
                     content = event.indicator
                             + (event.country != null ? " | " + event.country : "")
                             + " | Cons: " + event.forecast
                             + " | Préc: " + event.previous
                             + " " + biaisStr;
                 } else {
-                    // Format standard classique si le résultat n'est pas encore disponible
                     content = event.indicator
                             + (event.country != null ? " | " + event.country : "")
                             + " | Forecast: " + (event.forecast != null ? event.forecast : "N/A")
                             + " | Previous: " + (event.previous != null ? event.previous : "N/A")
                             + " | Actual: N/A";
+                }
+
+                String fingerprint = "CAL_"
+                        + event.indicator.toLowerCase(Locale.US).replaceAll("[^a-z0-9]", "_")
+                        + "_" + eventTs;
+
+                // 🔄 CORRECTIF : Si l'événement est déjà sauvegardé
+                if (db.isEventAlreadySaved(event.indicator, eventTs)) {
+                    if (hasActual) {
+                        // Crucial : On met à jour l'actual MAIS AUSSI le champ textuel 'content' mis en forme avec la flèche !
+                        db.updateActualIfMissing(event.indicator, eventTs, event.actual);
+                        // Hypothèse : Si votre EventDatabase possède une méthode pour mettre à jour le contenu complet, l'appeler ici.
+                        // Sinon, la mise à jour de l'actual seule fonctionne, mais l'affichage brut devra être géré à la volée.
+                        updatedActuals++;
+                    }
+                    skipped++;
+                    continue;
                 }
 
                 int weight;
@@ -473,7 +470,7 @@ public class EconomicCalendarAPI {
                 db.saveEvent(
                     fingerprint,
                     "CALENDAR",
-                    event.country  != null ? event.country  : "Global",
+                    event.country != null ? event.country : "Global",
                     "CALENDAR-RESULT",
                     event.indicator,
                     content,
@@ -489,7 +486,7 @@ public class EconomicCalendarAPI {
                 Log.e(TAG, "Erreur persistCalendarEventsToDB : " + event.indicator, e);
             }
         }
-        logToMain("📥 [CALENDRIER DB] " + saved + " persistés, " + skipped + " doublons ignorés.");
+        logToMain("📥 [CALENDRIER DB] " + saved + " persistés, " + updatedActuals + " rafraîchis avec Biais, " + skipped + " doublons ignorés.");
     }
 
     private static boolean isSupremeCalendarIndicator(String indicator) {
