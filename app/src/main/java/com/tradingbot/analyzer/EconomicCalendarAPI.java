@@ -73,11 +73,25 @@ public class EconomicCalendarAPI {
     }
 
     interface FetchFunction {
-        List<CalendarEvent> fetch(int hoursAhead) throws Exception;
+            List<CalendarEvent> fetch(int hoursAhead) throws Exception;
     }
-
-    public static List<CalendarEvent> fetchUpcomingEvents(int hoursAhead) {
-        return fetchUpcomingEvents(globalAppContext, hoursAhead);
+    
+    public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
+        if (context == null) return Collections.emptyList();
+        return fetchUpcomingEventsInternal(context, hoursAhead);
+    }
+    
+    // Méthode de traitement unique réelle (Pour éviter les conflits de signature)
+    private static List<CalendarEvent> fetchUpcomingEventsInternal(Context context, int hoursAhead) {
+        logToMain("🔄 [CALENDRIER] Chargement ForexFactory (This Week)...");
+        List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, h), hoursAhead);
+        
+        if (events != null && !events.isEmpty()) {
+            logToMain("✅ [CALENDRIER] Succès : " + events.size() + " événements chargés.");
+            return events;
+        }
+        logToMain("⚠️ [CALENDRIER] Aucune donnée disponible pour le moment.");
+        return new ArrayList<>();
     }
 
     private static List<CalendarEvent> fetchFromForexFactoryUrl(String urlString, int hoursAhead) throws Exception {
@@ -164,12 +178,46 @@ public class EconomicCalendarAPI {
     }
 
     private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
-    public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
-        return fetchHistoricalEvents(globalAppContext, daysBack);
+    
+    public static List<CalendarEvent> fetchHistoricalEvents(Context context, int daysBack) {
+        if (context == null) return Collections.emptyList();
+        return fetchHistoricalEventsInternal(context, daysBack);
     }
-
-    // Dans EconomicCalendarAPI.java
-
+    // Méthode de traitement unique réelle
+    private static List<CalendarEvent> fetchHistoricalEventsInternal(Context context, int daysBack) {
+        List<CalendarEvent> allEvents = new ArrayList<>();
+        long nowSec = System.currentTimeMillis() / 1000;
+    
+        if (daysBack > 7) {
+            logToMain("⚠️ [BACKFILL] ForexFactory couvre uniquement la semaine en cours. daysBack=" + daysBack + " ignoré.");
+        }
+    
+        try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+    
+        try {
+            logToMain("🔄 [BACKFILL] Étape 2 : Récupération de THIS_WEEK...");
+            List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
+            int countThis = 0;
+            if (thisWeek != null) {
+                for (CalendarEvent e : thisWeek) {
+                    if (isValidPastEvent(e, nowSec)) {
+                        allEvents.add(e);
+                        countThis++;
+                    }
+                }
+            }
+            logToMain("✅ [BACKFILL] ThisWeek traités : " + countThis + " événements passés trouvés.");
+        } catch (Exception e) {
+            logToMain("❌ [BACKFILL] Erreur sur THIS_WEEK : " + e.getMessage());
+        }
+    
+        if (!allEvents.isEmpty()) {
+            persistCalendarEventsToDB(context, allEvents);
+        }
+    
+        logToMain("📊 [BACKFILL] Total validé pour insertion SQLite : " + allEvents.size() + " événements.");
+        return allEvents;
+    }
     public static List<CalendarEvent> fetchUpcomingEvents(int hoursAhead) {
         // 🛡️ GUARD : Empêche la NPE et informe le log en cas d'init manqué
         if (globalAppContext == null) {
