@@ -43,19 +43,19 @@ public class EventDatabase extends SQLiteOpenHelper {
 
    // À ajouter dans votre classe EventDatabase.java
     public void updateContent(String indicator, long timestamp, String newContent) {
-        SQLiteDatabase db = this.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put("content", newContent);
-    
-        // Ajustez les noms de colonnes "title" et "timestamp" selon votre schéma réel
-        String whereClause = "title = ? AND timestamp = ?";
-        String[] whereArgs = new String[]{ indicator, String.valueOf(timestamp) };
-    
-        try {
-            db.update("events_table", values, whereClause, whereArgs); // Remplacez events_table par votre table
-        } catch (Exception e) {
-            Log.e("EventDatabase", "Erreur lors de updateContent pour " + indicator, e);
-        }
+    SQLiteDatabase db = this.getWritableDatabase();
+    ContentValues values = new ContentValues();
+    values.put("content", newContent);
+
+    // Ajustez les noms de colonnes "title" et "timestamp" selon votre schéma réel
+    String whereClause = "title = ? AND timestamp = ?";
+    String[] whereArgs = new String[]{ indicator, String.valueOf(timestamp) };
+
+    try {
+        db.update("events_table", values, whereClause, whereArgs); // Remplacez events_table par votre table
+    } catch (Exception e) {
+        Log.e("EventDatabase", "Erreur lors de updateContent pour " + indicator, e);
+    }
     }
 
     // =========================================================================
