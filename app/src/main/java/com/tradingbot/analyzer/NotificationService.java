@@ -1076,22 +1076,17 @@ try {
     NotificationService instance = serviceInstance;
 
     // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report (INCHANGÉ)
-    if (instance != null && instance.eventDb != null) {
-        String assetsStr = assets != null ? android.text.TextUtils.join(",", assets) : "";
-        instance.eventDb.saveEvent(
-            fingerprint,
-            "com.tradingbot.calendar",
-            source,
-            "CALENDAR-RESULT",
-            title,
-            body,
-            assetsStr,
-            "pending",
-            System.currentTimeMillis() / 1000,
-            "pending",
-            3 // Ajusté à 3 selon votre révision de pipeline pour les drivers confirmés
-        );
-    }
+    // ✅ Ne pas re-sauvegarder si déjà en DB — updateActualIfMissing l'a déjà mis à jour
+// Sauvegarder uniquement si vraiment absent (fingerprint non existant)
+if (!instance.eventDb.isEventAlreadySaved(title, System.currentTimeMillis() / 1000)) {
+    int dynamicWeight = EconomicCalendarAPI.isSupremeCalendarIndicator(title) ? 5 : 3;
+    instance.eventDb.saveEvent(
+        fingerprint, "com.tradingbot.calendar", source,
+        "CALENDAR-RESULT", title, body, assetsStr,
+        "pending", System.currentTimeMillis() / 1000,
+        "pending", dynamicWeight
+    );
+}
    // 🚀 INJECTION : Déportation réseau simplifiée et ultra-rapide via Batch API
 new Thread(new Runnable() {
     @Override
