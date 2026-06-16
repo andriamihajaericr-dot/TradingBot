@@ -1490,24 +1490,37 @@ new Thread(new Runnable() {
 
     // Point 6 : Connexion fermée de manière étanche dans le bloc finally
     private void fetchMissingDataFromInstitutionalAPI() {
-        // À MODIFIER dans NotificationService.java (aux alentours de la ligne 1496-1505)
-        // 1. L'appel compile désormais car la méthode (Context, int) existe :
+        // 🟢 1. Récupération sécurisée des événements historiques (7 jours)
         List<EconomicCalendarAPI.CalendarEvent> historicalEvents = EconomicCalendarAPI.fetchHistoricalEvents(this, 7);
+        
+        // 🟢 2. Initialisation du StringBuilder qui manquait au compilateur
+        StringBuilder apiMacroBlock = new StringBuilder();
         
         for (EconomicCalendarAPI.CalendarEvent e : historicalEvents) {
             if (e == null) continue;
         
-            // 2. Correction des variables membres (Remplacement des faux symboles manquants)
-            // impact -> importance | estimate -> forecast
+            // Vérification des critères d'impact et de publication des chiffres
             if (e.importance != null && e.importance.equalsIgnoreCase("HIGH") && e.actual != null && e.forecast != null) {
                 
-                // date -> timestamp | currency -> country (ou une méthode dédiée) | title -> indicator
                 String dateStr = e.timestamp; 
-                String countryOrCurrency = (e.country != null) ? e.country : "USD"; // Fallback ou variable existante
+                String countryOrCurrency = (e.country != null) ? e.country : "USD";
                 
-                logToMain(String.format("High Impact Event: %s, Region: %s, Event: %s, Act: %s, Fcst: %s",
+                // 🟢 FIX : Remplacement de logToMain par le Log d'Android standard
+                Log.i("NotificationService", String.format("High Impact Event: %s, Region: %s, Event: %s, Act: %s, Fcst: %s",
                         dateStr, countryOrCurrency, e.indicator, e.actual, e.forecast));
+        
+                // Formatage de la ligne pour le bloc macro envoyé à Groq
+                apiMacroBlock.append("- ")
+                            .append(e.indicator)
+                            .append(" (").append(countryOrCurrency).append(") | ")
+                            .append("Actual: ").append(e.actual).append(" | ")
+                            .append("Forecast: ").append(e.forecast).append("\n");
             }
+        }
+        
+        // 🟢 3. Envoi groupé à l'analyse Groq si des données sont présentes
+        if (apiMacroBlock.length() > 0) {
+            dispatchHistoricalBulkToGroq(apiMacroBlock.toString());
         }
         if (apiMacroBlock.length() > 0) {
             dispatchHistoricalBulkToGroq(apiMacroBlock.toString());
