@@ -42,21 +42,40 @@ public class EventDatabase extends SQLiteOpenHelper {
     }
 
    // À ajouter dans votre classe EventDatabase.java
-    public void updateContent(String indicator, long timestamp, String newContent) {
+     public synchronized void updateContent(String indicator, long timestamp, String newContent) {
+    if (indicator == null || newContent == null) return;
+
     SQLiteDatabase db = this.getWritableDatabase();
     ContentValues values = new ContentValues();
-    values.put("content", newContent);
+    values.put("feed_content", newContent); // ✅ Colonne correcte
 
-    // Ajustez les noms de colonnes "title" et "timestamp" selon votre schéma réel
-    String whereClause = "title = ? AND timestamp = ?";
-    String[] whereArgs = new String[]{ indicator, String.valueOf(timestamp) };
+    // ✅ Fenêtre ±2h identique à updateActualIfMissing pour cohérence
+    long secondsTimestamp = (timestamp > 9999999999L) ? (timestamp / 1000L) : timestamp;
+    long windowStart = secondsTimestamp - (2 * 60 * 60);
+    long windowEnd   = secondsTimestamp + (2 * 60 * 60);
+    String searchPattern = "%" + indicator.trim() + "%";
 
     try {
-        db.update("events_table", values, whereClause, whereArgs); // Remplacez events_table par votre table
+        int rows = db.update(
+            TABLE_EVENTS,           // ✅ Table correcte
+            values,
+            "unix_timestamp >= ? AND unix_timestamp <= ? AND (title LIKE ? OR feed_content LIKE ?)",
+            new String[]{
+                String.valueOf(windowStart),
+                String.valueOf(windowEnd),
+                searchPattern,
+                searchPattern
+            }
+        );
+        if (rows > 0) {
+            Log.d("EventDatabase", "✅ updateContent : " + rows + " ligne(s) mises à jour pour " + indicator);
+        } else {
+            Log.w("EventDatabase", "⚠️ updateContent : aucune ligne trouvée pour " + indicator);
+        }
     } catch (Exception e) {
-        Log.e("EventDatabase", "Erreur lors de updateContent pour " + indicator, e);
+        Log.e("EventDatabase", "Erreur updateContent pour " + indicator, e);
     }
-    }
+     }
 
     // =========================================================================
     // ✅ CORRECTIF : Ajout de la méthode manquante appelée par MainActivity
