@@ -39,8 +39,8 @@ public class EconomicAnalyzer {
         if (combinedCheck.contains("WARSH")) {
             EvaluationResult warshResult = new EvaluationResult();
             warshResult.isParsed = true;
-            warshResult.deviation = 10.0; // Force un signal directionnel maximal
-            warshResult.weight = 10.0;    // Poids maximum
+            warshResult.deviation = 10; // Force un signal directionnel maximal
+            warshResult.weight = 10;    // Poids maximum
             warshResult.directionText = "HAWKISH"; // Par défaut, Warsh est traité comme restrictif
             warshResult.marketImpact = "HIGH_PRIORITY_FOMC_SIGNAL";
             Log.e(TAG, "🚀 Signal prioritaire détecté : KEVIN WARSH. Bypass du parsing.");
