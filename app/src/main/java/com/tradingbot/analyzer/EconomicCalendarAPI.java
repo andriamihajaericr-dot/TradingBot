@@ -415,16 +415,8 @@ public class EconomicCalendarAPI {
                         // 1. Mise à jour de la valeur réelle
                         db.updateActualIfMissing(event.indicator, eventTs, event.actual);
                         
-                        // 2. RECONSTRUCTION du contenu complet avec la flèche (biaisStr)
-                        // Vous devez utiliser EXACTEMENT la même logique de construction que définie plus haut
-                        String newContent = event.indicator
-                                + (event.country != null ? " | " + event.country : "")
-                                + " | Cons: " + event.forecast
-                                + " | Préc: " + event.previous
-                                + " " + biaisStr; // 'biaisStr' contient maintenant la flèche ↑ ou ↓
-                
-                        // 3. Appel de la méthode de mise à jour du contenu (À AJOUTER dans EventDatabase)
-                        db.updateContent(event.indicator, eventTs, newContent);
+                        // 2. Plus besoin de recréer 'newContent', la variable 'content' est déjà parfaite !
+                        db.updateContent(event.indicator, eventTs, content);
                         
                         updatedActuals++;
                     }
