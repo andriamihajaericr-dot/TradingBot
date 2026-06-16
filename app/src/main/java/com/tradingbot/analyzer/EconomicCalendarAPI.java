@@ -394,15 +394,19 @@ public class EconomicCalendarAPI {
             if (indUpper.contains("BANK HOLIDAY") || indUpper.contains("PUBLIC HOLIDAY") ||
                 indUpper.contains("MARKET HOLIDAY") || indUpper.contains("NATIONAL HOLIDAY")) continue;
 
-            try {
-                long eventTs = Long.parseLong(event.timestamp);
-
-                if (db.isEventAlreadySaved(event.indicator, eventTs)) {
-                    skipped++;
-                    continue;
+           try {
+            long eventTs = Long.parseLong(event.timestamp);
+        
+            if (db.isEventAlreadySaved(event.indicator, eventTs)) {
+                // 🔄 CORRECTIF : Si l'événement est déjà sauvegardé mais qu'un résultat "actual" vient de sortir, on met à jour la DB
+                if (event.actual != null && !event.actual.equalsIgnoreCase("N/A") && !event.actual.trim().isEmpty()) {
+                    db.updateActualIfMissing(event.indicator, eventTs, event.actual);
                 }
-
-                String fingerprint = "CAL_"
+                skipped++;
+                continue;
+            }
+        
+            String fingerprint = "CAL_"
                         + event.indicator.toLowerCase(Locale.US).replaceAll("[^a-z0-9]", "_")
                         + "_" + eventTs;
 
