@@ -164,58 +164,28 @@ public class EconomicCalendarAPI {
     }
 
     private static final String FF_URL_THIS_WEEK = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
-
-    public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
-        logToMain("🔄 [CALENDRIER] Chargement ForexFactory (This Week)...");
-        
-        List<CalendarEvent> events = fetchWithRetry(h -> fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, h), hoursAhead);
-        
-        if (events != null && !events.isEmpty()) {
-            logToMain("✅ [CALENDRIER] Succès : " + events.size() + " événements chargés.");
-            return events;
-        }
-
-        logToMain("⚠️ [CALENDRIER] Aucune donnée disponible pour le moment.");
-        return new ArrayList<>();
-    }
-
     public static List<CalendarEvent> fetchHistoricalEvents(int daysBack) {
         return fetchHistoricalEvents(globalAppContext, daysBack);
     }
 
-    public static List<CalendarEvent> fetchHistoricalEvents(Context context, int daysBack) {
-        List<CalendarEvent> allEvents = new ArrayList<>();
-        long nowSec = System.currentTimeMillis() / 1000;
+    // Dans EconomicCalendarAPI.java
 
-        if (daysBack > 7) {
-            logToMain("⚠️ [BACKFILL] ForexFactory couvre uniquement la semaine en cours. daysBack=" + daysBack + " ignoré.");
+    public static List<CalendarEvent> fetchUpcomingEvents(int hoursAhead) {
+        // 🛡️ GUARD : Empêche la NPE et informe le log en cas d'init manqué
+        if (globalAppContext == null) {
+            Log.e(TAG, "⚠️ [CALENDRIER] Tentative de fetch sans contexte initialisé (init() manquant)");
+            return Collections.emptyList();
         }
-
-        try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
-
-        try {
-            logToMain("🔄 [BACKFILL] Étape 2 : Récupération de THIS_WEEK...");
-            List<CalendarEvent> thisWeek = fetchFromForexFactoryUrl(FF_URL_THIS_WEEK, 168);
-            int countThis = 0;
-            if (thisWeek != null) {
-                for (CalendarEvent e : thisWeek) {
-                    if (isValidPastEvent(e, nowSec)) {
-                        allEvents.add(e);
-                        countThis++;
-                    }
-                }
-            }
-            logToMain("✅ [BACKFILL] ThisWeek traités : " + countThis + " événements passés trouvés.");
-        } catch (Exception e) {
-            logToMain("❌ [BACKFILL] Erreur sur THIS_WEEK : " + e.getMessage());
+        return fetchUpcomingEvents(globalAppContext, hoursAhead);
+    }
+    
+    public static List<CalendarEvent> fetchHistoricalEvents(int hoursBack) {
+        // 🛡️ GUARD : Sécurisation identique pour l'historique
+        if (globalAppContext == null) {
+            Log.e(TAG, "⚠️ [CALENDRIER] Tentative de fetch historique sans contexte initialisé");
+            return Collections.emptyList();
         }
-
-        if (context != null && !allEvents.isEmpty()) {
-            persistCalendarEventsToDB(context, allEvents);
-        }
-
-        logToMain("📊 [BACKFILL] Total validé pour insertion SQLite : " + allEvents.size() + " événements.");
-        return allEvents;
+        return fetchHistoricalEvents(globalAppContext, hoursBack);
     }
 
     private static boolean isValidPastEvent(CalendarEvent e, long nowSec) {
