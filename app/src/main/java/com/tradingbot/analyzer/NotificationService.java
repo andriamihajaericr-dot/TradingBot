@@ -1995,7 +1995,7 @@ new Thread(new Runnable() {
     "👉 LOI DE DOMINANCE ABSOLUE : Si un driver RANG SUPRÊME est présent dans les données, sa logique directionnelle dicte TOUTE la matrice. Un driver tactique ne peut ni inverser ni annuler la direction suprême SAUF exceptions explicites des RÈGLES 6 et 7 (Or et Pétrole en crise géopolitique confirmée).\n\n" +
 
     "RÈGLE 2 : DRIVER FED / ÉCONOMIE US\n" +
-    "A) HAWKISH / FORT (CPI > prévisions, NFP fort, PIB hausse, Powell restrictif, Kevin Warsh hawkish) :\n" +
+    "A) HAWKISH / FORT (CPI > prévisions, NFP fort, PIB hausse, Powell restrictif, Kevin Warsh hawkish) :\n" + 
     "   • 📈 US10Y   -> BULLISH 🟢  [Rendements montent mécaniquement avec anticipation de taux hauts]\n" +
     "   • 💻 NASDAQ  -> BEARISH 🔴  [Taux hauts compriment les valorisations des valeurs de croissance]\n" +
     "   • 📊 SP500   -> BEARISH 🔴  [Symétrie absolue obligatoire avec le NASDAQ — aucune divergence tolérée]\n" +
