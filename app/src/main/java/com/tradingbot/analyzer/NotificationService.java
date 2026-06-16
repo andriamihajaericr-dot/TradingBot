@@ -1990,6 +1990,9 @@ new Thread(new Runnable() {
 
     "RÈGLE 1 : HIÉRARCHIE DES DRIVERS (LOI DE DOMINANCE)\n" +
     "- RANG SUPRÊME : Politiques monétaires (FED, BCE, BoJ, BoE, RBA, BoC) et indicateurs clés (CPI, PCE, NFP, PPI, FOMC, GDP, ISM, Michigan Sentiment, PMI Flash, Ventes au détail, Chômage, Kevin Warsh).\n" +
+    "- Jerome Powell (Chair) : signal à suivre pour la direction long terme.\n" +
+    "- Kevin Warsh (futur Chair pressenti) : signal à pondération MAXIMALE, traiter comme décision FOMC imminente.\n" + // <--- PATCH ICI
+    "- Autres membres FOMC : à pondérer selon leur hawkish/dovish-ness habituel.\n" +
     "- RANG SECONDAIRE : Données sectorielles majeures (Stocks EIA, OPEC, Big Tech Earnings, Données Chine/PBOC).\n" +
     "- RANG TACTIQUE : Événements géopolitiques, tarifs douaniers, sanctions, indices de confiance secondaires.\n" +
     "👉 LOI DE DOMINANCE ABSOLUE : Si un driver RANG SUPRÊME est présent dans les données, sa logique directionnelle dicte TOUTE la matrice. Un driver tactique ne peut ni inverser ni annuler la direction suprême SAUF exceptions explicites des RÈGLES 6 et 7 (Or et Pétrole en crise géopolitique confirmée).\n\n" +
