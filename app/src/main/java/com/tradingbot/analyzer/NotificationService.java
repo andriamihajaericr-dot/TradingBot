@@ -1078,11 +1078,13 @@ try {
     // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report (INCHANGÉ)
     // ✅ Ne pas re-sauvegarder si déjà en DB — updateActualIfMissing l'a déjà mis à jour
 // Sauvegarder uniquement si vraiment absent (fingerprint non existant)
-      
-    List<String> assetsStr = new ArrayList<>(Arrays.asList(
+      // 2. Gestion intelligente des actifs (Priorité aux paramètres, repli sur la liste globale)
+    List<String> finalAssetsList = (assets != null && !assets.isEmpty()) ? assets : new ArrayList<>(Arrays.asList(
         "GOLD","NASDAQ","SP500","BITCOIN","EURUSD",
         "USDJPY","GBPUSD","AUDUSD","USDCAD","USOIL","US10Y"
     ));
+    // Conversion de la Liste en String pour correspondre au schéma SQLite
+    String assetsStr = String.join(",", finalAssetsList);
 if (!instance.eventDb.isEventAlreadySaved(title, System.currentTimeMillis() / 1000)) {
     int dynamicWeight = EconomicCalendarAPI.isSupremeCalendarIndicator(title) ? 5 : 3;
     instance.eventDb.saveEvent(
