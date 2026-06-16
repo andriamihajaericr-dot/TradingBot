@@ -509,7 +509,7 @@ public class EconomicCalendarAPI {
         logToMain("📥 [CALENDRIER DB] " + saved + " persistés, " + updatedActuals + " rafraîchis avec Biais, " + skipped + " doublons ignorés.");
     }
 
-    private static boolean isSupremeCalendarIndicator(String indicator) {
+    public static boolean isSupremeCalendarIndicator(String indicator) {
         if (indicator == null) return false;
         String ind = indicator.toUpperCase(Locale.US);
         return ind.contains("CPI")             ||
