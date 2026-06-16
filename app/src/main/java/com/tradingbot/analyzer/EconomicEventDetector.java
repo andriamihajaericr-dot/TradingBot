@@ -249,7 +249,6 @@ if (containsAny(unified, "WARSH", "KEVIN WARSH")) {
             impact      = "Haute Volatilité";
         }
 
-        // ── 2. EXTRACTION ET ACCUMULATION...
         // ── 2. EXTRACTION ET ACCUMULATION DU BIAIS DIRECTIONNEL FONDAMENTAL ──
         if (containsAny(unified, "HIGHER THAN EXPECTED", "BEATS ESTIMATES", "ABOVE FORECAST",
                        "ABOVE EXPECTATIONS", "BETTER THAN EXPECTED", "HAWKISH")) {
