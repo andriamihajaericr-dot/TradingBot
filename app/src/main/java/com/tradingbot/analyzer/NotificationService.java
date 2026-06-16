@@ -74,26 +74,26 @@ public class NotificationService extends NotificationListenerService {
         }
     }
     // Ajoutez cette méthode à la fin de votre classe NotificationService.java
-public static String formatEventForDisplay(EconomicCalendarAPI.CalendarEvent e) {
-    if (e.actual == null || e.actual.equals("N/A") || e.actual.isEmpty()) {
-        return e.indicator + " | Prévu: " + e.forecast;
-    }
-    
-    try {
-        // Nettoyage des chaînes pour obtenir uniquement des nombres
-        double a = Double.parseDouble(e.actual.replaceAll("[^\\d.\\-]", ""));
-        double f = Double.parseDouble(e.forecast.replaceAll("[^\\d.\\-]", ""));
+    public static String formatEventForDisplay(EconomicCalendarAPI.CalendarEvent e) {
+        if (e.actual == null || e.actual.equals("N/A") || e.actual.isEmpty()) {
+            return e.indicator + " | Prévu: " + e.forecast;
+        }
         
-        // Logique de flèche
-        String fleche = (a > f) ? "↑" : "↓";
-        if (a == f) fleche = "="; // Optionnel : cas d'égalité
-        
-        return String.format("%s | Prévu: %s | Réel: %s %s", e.indicator, e.forecast, e.actual, fleche);
-    } catch (Exception ex) {
-        // En cas d'erreur de conversion, on retourne le format de base
-        return e.indicator + " | Prévu: " + e.forecast + " | Réel: " + e.actual;
+        try {
+            // Nettoyage des chaînes pour obtenir uniquement des nombres
+            double a = Double.parseDouble(e.actual.replaceAll("[^\\d.\\-]", ""));
+            double f = Double.parseDouble(e.forecast.replaceAll("[^\\d.\\-]", ""));
+            
+            // Logique de flèche
+            String fleche = (a > f) ? "↑" : "↓";
+            if (a == f) fleche = "="; // Optionnel : cas d'égalité
+            
+            return String.format("%s | Prévu: %s | Réel: %s %s", e.indicator, e.forecast, e.actual, fleche);
+        } catch (Exception ex) {
+            // En cas d'erreur de conversion, on retourne le format de base
+            return e.indicator + " | Prévu: " + e.forecast + " | Réel: " + e.actual;
+        }
     }
-}
     
     private static final Map<String, String> EMOJI_ASSET_MAP = new HashMap<>();
     static {
