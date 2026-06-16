@@ -1693,5 +1693,81 @@ NotificationService.sendToGroqAndTelegram(
         Log.e(TAG, "Erreur analyzeAndSendCalendarResult : " + event.indicator, e);
     }
 }
+
+// ==========================================
+    // 📊 REFORMATAGE MACRO ERGONOMIQUE (OPTION 2)
+    // ==========================================
+    public static String genererLogCompact(EconomicCalendarAPI.CalendarEvent event, EconomicAnalyzer.EvaluationResult eval) {
+        if (event == null) return "[MACRO] Événement null";
+
+        StringBuilder sb = new StringBuilder();
+        String statusIcon = "⚪";
+        if (eval != null && eval.isParsed) {
+            if (eval.deviation > 0) statusIcon = "🟢";
+            if (eval.deviation < 0) statusIcon = "🔴";
+        }
+        
+        String currency = (eval != null && eval.currency != null) ? eval.currency : "USD";
+        String impactText = (eval != null && eval.marketImpact != null) ? eval.marketImpact.toUpperCase() : "NEUTRE";
+        String deviationStr = "0.0%";
+        
+        if (eval != null && eval.isParsed) {
+            deviationStr = (eval.deviation > 0 ? "+" : "") + String.format("%.2f", eval.deviation) + "%";
+        }
+
+        sb.append(String.format("[MACRO] %s %s • %s\n", statusIcon, currency, event.indicator));
+        sb.append("─────────────────────────────────────────────\n");
+        sb.append(String.format("• RÉSULTAT : %s (Prévu: %s | Écart: %s)\n", 
+                (event.actual != null ? event.actual : "N/A"), 
+                (event.forecast != null ? event.forecast : "N/A"), 
+                deviationStr));
+        sb.append(String.format("• BIAIS    : %s\n", impactText));
+        sb.append("─────────────────────────────────────────────\n");
+        sb.append("🎯 MATRICE DE TRADING :\n");
+        
+        String paysId = (event.country != null && !event.country.isEmpty()) ? event.country : "United States";
+        List<String> assets = EconomicCalendarAPI.mapIndicatorToAssetsIntermarket(event.indicator, paysId);
+        
+        if (assets == null || assets.isEmpty()) {
+            sb.append("  🔹 Aucun actif directement corrélé détecté.\n");
+        } else {
+            for (String asset : assets) {
+                double dev = (eval != null) ? eval.deviation : 0.0;
+                String signal = calculerSignalAsset(asset, currency, dev);
+                sb.append(String.format("  🔹 %-8s ➔  %s\n", asset, signal));
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    private static String calculerSignalAsset(String asset, String currency, double deviation) {
+        if (deviation == 0.0) return "WAIT  ⚪";
+        boolean isPositiveShock = deviation > 0;
+        String assetUpper = asset.toUpperCase(java.util.Locale.ROOT);
+        String currencyUpper = currency.toUpperCase(java.util.Locale.ROOT);
+        
+        if (assetUpper.contains("10Y")) {
+            if (currencyUpper.equals("USD")) return isPositiveShock ? "BUY  📈" : "SELL 📉";
+            return "WAIT  ⚪";
+        }
+        if (assetUpper.contains("500") || assetUpper.contains("SPX") || assetUpper.contains("NAS") || assetUpper.contains("100")) {
+            return isPositiveShock ? "SELL 📉" : "BUY  📈";
+        }
+        if (assetUpper.contains("GOLD") || assetUpper.startsWith("XAU")) {
+            if (currencyUpper.equals("USD")) return isPositiveShock ? "SELL 📉" : "BUY  📈";
+            return "WAIT  ⚪";
+        }
+        if (assetUpper.contains("OIL") || assetUpper.contains("PETROLE") || assetUpper.contains("WTI")) {
+            return isPositiveShock ? "BUY  📈" : "SELL 📉";
+        }
+        if (assetUpper.equals("BITCOIN")) assetUpper = "BTCUSD";
+        if (assetUpper.length() == 6) {
+            String baseCurrency = assetUpper.substring(0, 3);
+            String quoteCurrency = assetUpper.substring(3, 6);
+            if (baseCurrency.equals(currencyUpper)) return isPositiveShock ? "BUY  📈" : "SELL 📉";
+            if (quoteCurrency.equals(currencyUpper)) return isPositiveShock ? "SELL 📉" : "BUY  📈";
+        }
+        return "WAIT  ⚪";
+    }
     
 }
