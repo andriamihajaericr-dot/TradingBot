@@ -34,6 +34,18 @@ public class EconomicAnalyzer {
      * Point d'entrée principal avec détection de la devise
      */
     public static EvaluationResult analyserEvenement(String title, String text) {
+        // 1. PATCH PRIORITÉ MAXIMALE : KEVIN WARSH
+        String combinedCheck = (title + " " + text).toUpperCase(Locale.ROOT);
+        if (combinedCheck.contains("WARSH")) {
+            EvaluationResult warshResult = new EvaluationResult();
+            warshResult.isParsed = true;
+            warshResult.deviation = 10.0; // Force un signal directionnel maximal
+            warshResult.weight = 10.0;    // Poids maximum
+            warshResult.directionText = "HAWKISH"; // Par défaut, Warsh est traité comme restrictif
+            warshResult.marketImpact = "HIGH_PRIORITY_FOMC_SIGNAL";
+            Log.e(TAG, "🚀 Signal prioritaire détecté : KEVIN WARSH. Bypass du parsing.");
+            return warshResult;
+        }
         EvaluationResult result = new EvaluationResult();
         if (title == null || text == null) return result;
 
