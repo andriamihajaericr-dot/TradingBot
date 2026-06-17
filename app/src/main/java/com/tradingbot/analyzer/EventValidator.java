@@ -1410,16 +1410,30 @@ public static void preloadCalendar() {
 
         // ── Stockage dans la map interne ──
         // ── Stockage dans la map interne ──
-for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
-    if (event == null) continue;
-    String key = createEventKey(event.indicator, event.timestamp);
-    upcomingEvents.put(key, event);
-}
-
-// ✅ Persistance en DB pour cohérence inter-sessions et analyse IA enrichie
-if (appContext != null) {
-    EconomicCalendarAPI.persistCalendarEventsToDB(appContext, sortedEvents);
-}
+// ── Construction du rapport Telegram ──
+        for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
+            if (event == null || event.indicator == null || event.timestamp == null) continue;
+        
+            // 🟢 LE CORRECTIF : Aller chercher l'Actual en DB s'il est absent du flux Internet
+            if (event.actual == null || event.actual.equals("N/A") || event.actual.isEmpty()) {
+                // On demande à la DB si FinancialJuice ou un précédent process a enregistré le chiffre
+                String actualEnDB = EconomicCalendarAPI.getActualValueFromDB(appContext, event.indicator, event.timestamp);
+                if (actualEnDB != null && !actualEnDB.equals("N/A") && !actualEnDB.isEmpty()) {
+                    event.actual = actualEnDB; // On injecte la vraie valeur dans l'objet en mémoire
+                }
+            }
+        
+            // ✅ Filtrer les jours fériés et événements sans impact (INCHANGÉ)
+           String indUpper = event.indicator.toUpperCase(Locale.ROOT);
+            // Un simple "HOLIDAY" intercepte automatiquement Bank Holiday, Public Holiday, National Holiday, etc.
+            if (indUpper.contains("HOLIDAY") || indUpper.contains("DAY OFF") || indUpper.contains("ELECTION DAY")) {
+                continue;
+            }
+        
+        // ✅ Persistance en DB pour cohérence inter-sessions et analyse IA enrichie
+        if (appContext != null) {
+            EconomicCalendarAPI.persistCalendarEventsToDB(appContext, sortedEvents);
+        }
 
 
         // ── Construction du rapport Telegram ──
