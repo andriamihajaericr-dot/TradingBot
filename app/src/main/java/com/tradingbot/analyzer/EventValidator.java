@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import android.util.Log;
 import android.content.Context;
 import java.util.Collections; // ✅ ajouter si absent
+import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import java.time.LocalDateTime;
