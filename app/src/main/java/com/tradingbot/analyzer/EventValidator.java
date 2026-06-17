@@ -61,7 +61,9 @@ public class EventValidator {
             Log.e(TAG, "⚠️ Échec de l'hydratation de la RAM au démarrage", e);
         }
     }
-
+    // À ajouter au niveau des variables globales de la classe :
+    private static long lastSuccessfulFetchTime = 0;
+    private static final long COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes de sécurité anti-429
     private static final long DUPLICATE_WINDOW_MS = 30 * 60 * 1000L; // 30 minutes
     private static final String TAG = "EventValidator";
     // ✅ Hash du dernier rapport envoyé — évite les doublons
