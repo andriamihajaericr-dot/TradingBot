@@ -1299,12 +1299,104 @@ public class EventValidator {
     // ─────────────────────────────────────────────────────────────
     //  UTILITAIRES SÉCURISÉS (inchangés)
     // ─────────────────────────────────────────────────────────────
-    private static String createEventKey(String indicator, String timestamp) {
-        if (indicator == null || timestamp == null) {
-            return UUID.randomUUID().toString();
+    // ─── COMPOSANTS DU MOTEUR DE CLÉ UNIQUE V3 ──────────────────────────────────
+private static final String SEPARATEUR = "::";
+
+private static final Map<String, String> SEMANTIC_MAP = new java.util.LinkedHashMap<>();
+static {
+    SEMANTIC_MAP.put("personal consumption expenditures", "pce");
+    SEMANTIC_MAP.put("gross domestic product", "gdp");
+    SEMANTIC_MAP.put("consumer price index", "cpi");
+    SEMANTIC_MAP.put("producer price index", "ppi");
+    SEMANTIC_MAP.put("purchasing managers index", "pmi");
+    SEMANTIC_MAP.put("initial jobless claims", "ijc");
+    SEMANTIC_MAP.put("unemployment rate", "unemprate");
+    SEMANTIC_MAP.put("non farm payrolls", "nfp");
+    SEMANTIC_MAP.put("nonfarm payrolls", "nfp");
+    SEMANTIC_MAP.put("industrial production", "indprod");
+    SEMANTIC_MAP.put("capacity utilization", "caputil");
+    SEMANTIC_MAP.put("building permits", "buildperm");
+    SEMANTIC_MAP.put("consumer confidence", "confsent");
+    SEMANTIC_MAP.put("michigan sentiment", "michsent");
+    SEMANTIC_MAP.put("ism manufacturing", "ismmfg");
+    SEMANTIC_MAP.put("ism services", "ismsrv");
+    SEMANTIC_MAP.put("fomc minutes", "fomcmin");
+    SEMANTIC_MAP.put("trade balance", "tradebal");
+    SEMANTIC_MAP.put("current account", "curracct");
+    SEMANTIC_MAP.put("retail sales", "retail");
+    SEMANTIC_MAP.put("housing starts", "houstarts");
+    SEMANTIC_MAP.put("durable goods", "durables");
+    SEMANTIC_MAP.put("beige book", "beige");
+    SEMANTIC_MAP.put("philly fed", "philly");
+    SEMANTIC_MAP.put("empire state", "empire");
+    SEMANTIC_MAP.put("chicago pmi", "chicago");
+}
+
+private static final Pattern MATURITY_PATTERN =
+        Pattern.compile("\\b(\\d+)\\s*(?:-?\\s*years?|-?\\s*yr|-?\\s*y)\\b", Pattern.CASE_INSENSITIVE);
+
+public static String createEventKey(String source, String currency, String rawIndicator, String rawTimestamp) {
+    String src = (source != null) ? source.trim().toLowerCase(Locale.ROOT) : "unknown";
+    String cur = (currency != null) ? currency.trim().toUpperCase(Locale.ROOT) : "GLOBAL";
+
+    String timestampSec = parseTimestampToSeconds(rawTimestamp);
+
+    String indicatorSig = "unknown_indicator";
+    if (rawIndicator != null && !rawIndicator.isEmpty()) {
+        String processed = rawIndicator.toLowerCase(Locale.ROOT).trim();
+
+        Matcher matcher = MATURITY_PATTERN.matcher(processed);
+        processed = matcher.replaceAll("$1y");
+
+        for (Map.Entry<String, String> entry : SEMANTIC_MAP.entrySet()) {
+            if (processed.contains(entry.getKey())) {
+                processed = processed.replace(entry.getKey(), entry.getValue());
+            }
         }
-        return indicator.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "_") + "_" + timestamp;
+
+        processed = processed.replaceAll("\\b(m/m|mom)\\b", "mom")
+                             .replaceAll("\\b(y/y|yoy)\\b", "yoy")
+                             .replaceAll("\\b(q/q|qoq)\\b", "qoq")
+                             .replaceAll("\\b(w/w|wow)\\b", "wow");
+
+        indicatorSig = Arrays.stream(processed.split("[\\s\\(\\)\\[\\]\\-,\\+\\&\\/]+"))
+                .map(String::trim)
+                .filter(token -> !token.isEmpty())
+                .filter(token -> !token.matches("^(of|in|the|for|index)$"))
+                .sorted()
+                .collect(Collectors.joining("-"));
     }
+
+    return src + SEPARATEUR + cur + SEPARATEUR + indicatorSig + SEPARATEUR + timestampSec;
+}
+
+private static String parseTimestampToSeconds(String rawTimestamp) {
+    if (rawTimestamp == null || rawTimestamp.isEmpty()) return "0";
+    String trimmed = rawTimestamp.trim();
+
+    if (trimmed.matches("\\d+")) {
+        try {
+            long ts = Long.parseLong(trimmed);
+            return String.valueOf(ts > 99999999999L ? ts / 1000 : ts);
+        } catch (NumberFormatException e) {
+            return trimmed;
+        }
+    }
+
+    try {
+        return String.valueOf(java.time.OffsetDateTime.parse(trimmed).toEpochSecond());
+    } catch (java.time.format.DateTimeParseException e1) {
+        try {
+            return String.valueOf(java.time.ZonedDateTime.parse(trimmed).toEpochSecond());
+        } catch (java.time.format.DateTimeParseException e2) {
+            try {
+                return String.valueOf(java.time.LocalDateTime.parse(trimmed).toInstant(java.time.ZoneOffset.UTC).getEpochSecond());
+            } catch (java.time.format.DateTimeParseException e3) {
+                return trimmed.replaceAll("[^a-zA-Z0-9]", "_");
+            }
+        }
+    }
+}
 
     private static long parseTimestamp(String timestamp) {
     if (timestamp == null) return System.currentTimeMillis();
