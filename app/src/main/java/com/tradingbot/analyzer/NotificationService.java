@@ -50,7 +50,6 @@ public class NotificationService extends NotificationListenerService {
     private static final String PREF_TG_CHAT_ID = "tg_chat_id";
     private static final String PREF_MACRO_KEY  = "macro_api_key";
     private static final String PREFS_NAME      = "TradingBot";
-    //private static final long GLOBAL_THROTTLE_MS = 8 * 60 * 1000L;   // 8 minute
     private static final long GEO_THROTTLE_MS   = 12 * 60 * 1000L;  // 12 minutes pour géo
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
@@ -104,17 +103,7 @@ public class NotificationService extends NotificationListenerService {
         EMOJI_ASSET_MAP.put("🇬🇧", "GBPUSD"); EMOJI_ASSET_MAP.put("🇦🇺", "AUDUSD");
         EMOJI_ASSET_MAP.put("₿", "BITCOIN");
     }
-    /**
-     * Identifie si un événement appartient au Rang Suprême (Dominance Absolue).
-     * Ces événements ont l'autorisation de bypasser les verrous temporels (Throttle).
-     
-    private boolean isSupremeRank(String title) {
-        if (title == null || title.trim().isEmpty()) return false;
-        String t = title.toUpperCase(Locale.ROOT);
-        return t.contains("CPI") || t.contains("NFP") || t.contains("FOMC") 
-            || t.contains("FED RATE") || t.contains("PAYROLLS") || t.contains("PCE");
-    }
-    */
+   
     private void captureForecastFromReport(String report) {
         if (report == null || report.isEmpty()) return;
         try {
@@ -548,10 +537,6 @@ public class NotificationService extends NotificationListenerService {
         return 0;
     }
 
-    /**
- * Intercepte le rapport de Groq et injecte les prix live de MarketDataFetcher
- * sans altérer la structure attendue par le reste de l'application.
- */
     private static String injectLivePrices(String groqReport, List<String> assets) {
     if (groqReport == null || groqReport.isEmpty() || assets == null || assets.isEmpty()) 
         return groqReport;
@@ -861,12 +846,6 @@ public class NotificationService extends NotificationListenerService {
                         currentSpeaker = "ECB";
                     }
     
-                    // Détection sémantique/lexicale des types d'événements (Drivers macro & géopolitique)
-                   // Détection sémantique/lexicale des types d'événements (Drivers macro & géopolitique)
-                    // Détection sémantique/lexicale des types d'événements (Drivers macro & géopolitique)
-                    // 🔁 BUG #2 FIX : Branchement du détecteur riche EconomicEventDetector (26 catégories : Warsh, ISM,
-                    // PMI Flash, Michigan, GDP-Advance, tariffs, etc.) qui était orphelin dans processIncomingMacroFeed()
-                    // (jamais appelée). On l'utilise désormais comme source de vérité pour eventTypeStr.
                     EconomicEventDetector.DetectedEvent detectedEvt = EconomicEventDetector.detectEvent(title, finalUnifiedFeed);
                     String eventTypeStr = detectedEvt.eventType;
                     boolean isSupremeRank = false;
