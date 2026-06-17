@@ -861,32 +861,37 @@ public class NotificationService extends NotificationListenerService {
                     }
     
                     // Détection sémantique/lexicale des types d'événements (Drivers macro & géopolitique)
-                    String eventTypeStr = "UNKNOWN";
+                   // Détection sémantique/lexicale des types d'événements (Drivers macro & géopolitique)
+                    // Détection sémantique/lexicale des types d'événements (Drivers macro & géopolitique)
+                    // 🔁 BUG #2 FIX : Branchement du détecteur riche EconomicEventDetector (26 catégories : Warsh, ISM,
+                    // PMI Flash, Michigan, GDP-Advance, tariffs, etc.) qui était orphelin dans processIncomingMacroFeed()
+                    // (jamais appelée). On l'utilise désormais comme source de vérité pour eventTypeStr.
+                    EconomicEventDetector.DetectedEvent detectedEvt = EconomicEventDetector.detectEvent(title, finalUnifiedFeed);
+                    String eventTypeStr = detectedEvt.eventType;
                     boolean isSupremeRank = false;
-    
-                    if (upperFeed.contains("CPI") || upperFeed.contains("PCE") || upperFeed.contains("PPI") || upperFeed.contains("INFLATION") || upperFeed.contains("CORE")) {
-                        eventTypeStr = "INFLATION-DATA";
-                    } else if (upperFeed.contains("FOMC") || upperFeed.contains("FED RATE") || upperFeed.contains("INTEREST RATE") || upperFeed.contains("POWELL")) {
-                        eventTypeStr = "FED-MONETARY-POLICY";
-                    } else if (upperFeed.contains("NFP") || upperFeed.contains("NON-FARM") || upperFeed.contains("NONFARM PAYROLLS")) {
-                        eventTypeStr = "EMPLOYMENT-REPORT";
-                    } else if (upperFeed.contains("JOBLESS CLAIMS") || upperFeed.contains("INITIAL CLAIMS") || upperFeed.contains("UNEMPLOYMENT")) {
-                        eventTypeStr = "JOBLESS-CLAIMS";
-                    } else if (upperFeed.contains("GDP") || upperFeed.contains("PIB") || upperFeed.contains("GROWTH") || upperFeed.contains("CROISSANCE")) {
-                        eventTypeStr = "ECONOMIC-GROWTH-DATA";
-                    } else if (upperFeed.contains("PMI") || upperFeed.contains("ISM")) {
-                        eventTypeStr = "PMI-ISM";
-                    } else if (upperFeed.contains("OIL") || upperFeed.contains("WTI") || upperFeed.contains("BRENT") || upperFeed.contains("CRUDE") || 
-                               upperFeed.contains("EIA") || upperFeed.contains("OPEC") || upperFeed.contains("INVENTORIES") || upperFeed.contains("PETROLE")) {
-                        eventTypeStr = "OIL-INVENTORY";
-                    } else if (upperFeed.contains("HORMUZ") || upperFeed.contains("ORMUZ") || upperFeed.contains("IRAN") || upperFeed.contains("ISRAEL") || 
-                               upperFeed.contains("HEZBOLLAH") || upperFeed.contains("HOUTHI") || upperFeed.contains("GAZA") || upperFeed.contains("LEBANON") || 
-                               upperFeed.contains("MOYEN-ORIENT") || upperFeed.contains("MIDDLE EAST") || upperFeed.contains("WAR") || upperFeed.contains("STRIKE") || 
-                               upperFeed.contains("FRAPPE") || upperFeed.contains("ESCALADE") || upperFeed.contains("CONFLIT") || upperFeed.contains("MILITARY") || 
-                               upperFeed.contains("TAIWAN") || upperFeed.contains("UKRAINE") || upperFeed.contains("RUSSIA")) {
-                        eventTypeStr = "GEOPOLITICAL";
+
+                    // 🛡️ Préservation de TOUTE la logique géo en aval (allocation d'actifs, bypass throttle, seuils)
+                    // EconomicEventDetector retourne des types granulaires (GEO-MIDDLE-EAST, GEO-EUROPE-EST,
+                    // GEO-ASIA-PACIFIC) là où l'ancien code inline utilisait un seul marqueur générique "GEOPOLITICAL".
+                    // On normalise ici pour ne rien casser dans le reste de la méthode.
+                    boolean isGeoDetected = eventTypeStr.startsWith("GEO-")
+                            || upperFeed.contains("HORMUZ") || upperFeed.contains("ORMUZ") || upperFeed.contains("IRAN") || upperFeed.contains("ISRAEL")
+                            || upperFeed.contains("HEZBOLLAH") || upperFeed.contains("HOUTHI") || upperFeed.contains("GAZA") || upperFeed.contains("LEBANON")
+                            || upperFeed.contains("MOYEN-ORIENT") || upperFeed.contains("MIDDLE EAST") || upperFeed.contains("WAR") || upperFeed.contains("STRIKE")
+                            || upperFeed.contains("FRAPPE") || upperFeed.contains("ESCALADE") || upperFeed.contains("CONFLIT") || upperFeed.contains("MILITARY")
+                            || upperFeed.contains("TAIWAN") || upperFeed.contains("UKRAINE") || upperFeed.contains("RUSSIA");
+
+                    if (isGeoDetected) {
+                        eventTypeStr = "GEOPOLITICAL"; // Conserve le marqueur exact attendu par toute la logique en aval
                         isSupremeRank = false;
+                    } else if (upperFeed.contains("OIL") || upperFeed.contains("WTI") || upperFeed.contains("BRENT") || upperFeed.contains("CRUDE") ||
+                               upperFeed.contains("EIA") || upperFeed.contains("OPEC") || upperFeed.contains("INVENTORIES") || upperFeed.contains("PETROLE")) {
+                        // Cas non couvert nommément par EconomicEventDetector → on garde le comportement historique
+                        eventTypeStr = "OIL-INVENTORY";
                     }
+                    // Sinon : eventTypeStr reste la valeur riche fournie par EconomicEventDetector
+                    // (ex: FED-WARSH-SIGNAL, INFLATION-DATA, ISM-INDICATOR, PMI-FLASH, MICHIGAN-SENTIMENT,
+                    // GDP-ADVANCE, TRADE-TARIFF, CHINA-MACRO, etc.)
     
                     // 3️⃣ SYNCHRONISATION MACRO DÉTERMINISTE avec enrichissement calendaire
                     // Enrichir le contenu avec les données du calendrier (ACTUAL/FORECAST) si disponibles
