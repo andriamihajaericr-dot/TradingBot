@@ -1468,12 +1468,22 @@ private static String parseTimestampToSeconds(String rawTimestamp) {
     }
 
     public static void preloadCalendar() {
+    // 🟢 MODIFICATION : Vérification du Cooldown avant de solliciter le serveur
+    long now = System.currentTimeMillis();
+    if (now - lastSuccessfulFetchTime < COOLDOWN_MS) {
+        logToMain("⏭️ [CALENDRIER] Requête ignorée (Protection anti-429). Cache conservé.");
+        return;
+    }
+
     try {
         List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(72);
         if (events == null || events.isEmpty()) {
             logToMain("⚠️ Calendrier vide ou non disponible.");
             return;
         }
+
+        // 🟢 MODIFICATION : Le réseau a répondu avec succès, on valide le timestamp
+        lastSuccessfulFetchTime = System.currentTimeMillis();
 
         // ✅ WATCHER — Détecter les nouveaux résultats publiés depuis le dernier chargement
         List<EconomicCalendarAPI.CalendarEvent> newlyPublished = new ArrayList<>();
