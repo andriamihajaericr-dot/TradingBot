@@ -43,39 +43,106 @@ public class EventDatabase extends SQLiteOpenHelper {
 
    // À ajouter dans votre classe EventDatabase.java
      public synchronized void updateContent(String indicator, long timestamp, String newContent) {
-    if (indicator == null || newContent == null) return;
-
-    SQLiteDatabase db = this.getWritableDatabase();
-    ContentValues values = new ContentValues();
-    values.put("feed_content", newContent); // ✅ Colonne correcte
-
-    // ✅ Fenêtre ±2h identique à updateActualIfMissing pour cohérence
-    long secondsTimestamp = (timestamp > 9999999999L) ? (timestamp / 1000L) : timestamp;
-    long windowStart = secondsTimestamp - (2 * 60 * 60);
-    long windowEnd   = secondsTimestamp + (2 * 60 * 60);
-    String searchPattern = "%" + indicator.trim() + "%";
-
-    try {
-        int rows = db.update(
-            TABLE_EVENTS,           // ✅ Table correcte
-            values,
-            "unix_timestamp >= ? AND unix_timestamp <= ? AND (title LIKE ? OR feed_content LIKE ?)",
-            new String[]{
-                String.valueOf(windowStart),
-                String.valueOf(windowEnd),
-                searchPattern,
-                searchPattern
+        if (indicator == null || newContent == null) return;
+    
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("feed_content", newContent); // ✅ Colonne correcte
+    
+        // ✅ Fenêtre ±2h identique à updateActualIfMissing pour cohérence
+        long secondsTimestamp = (timestamp > 9999999999L) ? (timestamp / 1000L) : timestamp;
+        long windowStart = secondsTimestamp - (2 * 60 * 60);
+        long windowEnd   = secondsTimestamp + (2 * 60 * 60);
+        String searchPattern = "%" + indicator.trim() + "%";
+    
+        try {
+            int rows = db.update(
+                TABLE_EVENTS,           // ✅ Table correcte
+                values,
+                "unix_timestamp >= ? AND unix_timestamp <= ? AND (title LIKE ? OR feed_content LIKE ?)",
+                new String[]{
+                    String.valueOf(windowStart),
+                    String.valueOf(windowEnd),
+                    searchPattern,
+                    searchPattern
+                }
+            );
+            if (rows > 0) {
+                Log.d("EventDatabase", "✅ updateContent : " + rows + " ligne(s) mises à jour pour " + indicator);
+            } else {
+                Log.w("EventDatabase", "⚠️ updateContent : aucune ligne trouvée pour " + indicator);
             }
-        );
-        if (rows > 0) {
-            Log.d("EventDatabase", "✅ updateContent : " + rows + " ligne(s) mises à jour pour " + indicator);
-        } else {
-            Log.w("EventDatabase", "⚠️ updateContent : aucune ligne trouvée pour " + indicator);
+        } catch (Exception e) {
+            Log.e("EventDatabase", "Erreur updateContent pour " + indicator, e);
         }
-    } catch (Exception e) {
-        Log.e("EventDatabase", "Erreur updateContent pour " + indicator, e);
     }
-     }
+
+    /**
+ * Cherche un événement correspondant dans la DB et tente d'en extraire la valeur réelle (Actual)
+ */
+    public synchronized String getActualValueFromDB(String indicator, long timestamp) {
+        if (indicator == null) return null;
+        SQLiteDatabase db = this.getReadableDatabase();
+    
+        // ── Même logique de fenêtre ±2h que votre méthode updateContent ──
+        long secondsTimestamp = (timestamp > 9999999999L) ? (timestamp / 1000L) : timestamp;
+        long windowStart = secondsTimestamp - (2 * 60 * 60);
+        long windowEnd   = secondsTimestamp + (2 * 60 * 60);
+        String searchPattern = "%" + indicator.trim() + "%";
+    
+        Cursor cursor = null;
+        try {
+            cursor = db.query(
+                TABLE_EVENTS,
+                new String[]{"feed_content", "title"},
+                "unix_timestamp >= ? AND unix_timestamp <= ? AND (title LIKE ? OR feed_content LIKE ?)",
+                new String[]{
+                    String.valueOf(windowStart),
+                    String.valueOf(windowEnd),
+                    searchPattern,
+                    searchPattern
+                },
+                null, null, "unix_timestamp DESC", "1" // On prend le flash le plus récent
+            );
+    
+            if (cursor != null && cursor.moveToFirst()) {
+                String feedContent = cursor.getString(0);
+                String title = cursor.getString(1);
+                
+                // On combine titre et contenu pour maximiser les chances de capture
+                return extractActualFromText(title + " " + feedContent);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur getActualValueFromDB pour " + indicator, e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return null;
+    }
+    
+    /**
+     * Extrait intelligemment le nombre lié à la publication (gère "Actual: 3.4%", "Réel: -0.1", etc.)
+     */
+    private String extractActualFromText(String text) {
+        if (text == null || text.isEmpty()) return null;
+        
+        // Regex insensible à la casse cherchant un mot-clé suivi du chiffre (avec %, k, M, ou - optionnels)
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "(?:ACTUAL|RÉEL|ACTUEL|RÉSULTAT)\\s*[:\\-]?\\s*([\\-\\d.,]+[%kKM]?)", 
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(text);
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+        
+        // Sécurité : si le texte complet est déjà un simple chiffre propre
+        String trimmed = text.trim();
+        if (trimmed.matches("^[\\-\\d.,]+[%kKM]?$")) {
+            return trimmed;
+        }
+        return null;
+    }
 
     // =========================================================================
     // ✅ CORRECTIF : Ajout de la méthode manquante appelée par MainActivity
