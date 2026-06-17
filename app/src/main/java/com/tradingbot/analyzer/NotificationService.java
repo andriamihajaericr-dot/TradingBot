@@ -1682,10 +1682,8 @@ new Thread(new Runnable() {
                   if (inImpactSection && trimmed.startsWith("•")) {
                       String upperLine = line.toUpperCase(Locale.ROOT);
 
-                      boolean isSignificant = upperLine.contains("ACHAT CHOC") || 
-                                             upperLine.contains("VENTE CHOC") || 
-                                             upperLine.contains("INCLINATION ACHAT") || 
-                                             upperLine.contains("INCLINATION VENTE");
+                      boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
+                      boolean isSignificant = !isInclinationNeutral && (upperLine.contains("BULLISH") || upperLine.contains("BEARISH"));
 
                       if (isSignificant) {
                           filteredMessage.append(line).append("\n");
