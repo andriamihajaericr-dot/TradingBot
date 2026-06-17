@@ -1611,11 +1611,14 @@ private static String parseTimestampToSeconds(String rawTimestamp) {
 
         report.append("\n─────────────────────────────────────────\n");
         report.append("📊 *Total :* ").append(totalAffiche).append(" événements\n");
-        report.append("🕒 *Mis à jour :* ").append(getMadaTimeNow()).append(" (Mada)");
 
-        // ✅ Gestion des doublons d'envoi Telegram via Signature Hash
+        // 🟢 MODIFICATION : On calcule le hash UNIQUEMENT sur les données stables (sans l'heure)
+        String coreContent = report.toString();
+        String newHash     = String.valueOf(coreContent.hashCode());
+
+        // 🟢 MODIFICATION : On injecte l'horloge APRÈS le calcul du hash pour l'affichage visuel
+        report.append("🕒 *Mis à jour :* ").append(getMadaTimeNow()).append(" (Mada)");
         String reportStr = report.toString();
-        String newHash   = String.valueOf(reportStr.hashCode());
 
         if (!newHash.equals(lastCalendarHash)) {
             lastCalendarHash = newHash;
