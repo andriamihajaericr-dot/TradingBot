@@ -75,6 +75,20 @@ public class EconomicCalendarAPI {
     interface FetchFunction {
             List<CalendarEvent> fetch(int hoursAhead) throws Exception;
     }
+
+    public static String getActualValueFromDB(Context context, String indicator, String timestampStr) {
+        if (context == null || indicator == null || timestampStr == null) return null;
+        try {
+            // On convertit le timestamp String du calendrier en long (en gérant le parsing selon votre format)
+            long timestamp = Long.parseLong(timestampStr); 
+            
+            // Appel de la méthode d'instance via votre Singleton propre
+            return EventDatabase.getInstance(context).getActualValueFromDB(indicator, timestamp);
+        } catch (Exception e) {
+            Log.e("EconomicCalendarAPI", "Erreur lors du pont DB-Calendar", e);
+            return null;
+        }
+    }
     
     public static List<CalendarEvent> fetchUpcomingEvents(Context context, int hoursAhead) {
         if (context == null) return Collections.emptyList();
