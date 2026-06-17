@@ -50,7 +50,7 @@ public class NotificationService extends NotificationListenerService {
     private static final String PREF_TG_CHAT_ID = "tg_chat_id";
     private static final String PREF_MACRO_KEY  = "macro_api_key";
     private static final String PREFS_NAME      = "TradingBot";
-    private static final long GLOBAL_THROTTLE_MS = 8 * 60 * 1000L;   // 8 minute
+    //private static final long GLOBAL_THROTTLE_MS = 8 * 60 * 1000L;   // 8 minute
     private static final long GEO_THROTTLE_MS   = 12 * 60 * 1000L;  // 12 minutes pour géo
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
@@ -107,13 +107,14 @@ public class NotificationService extends NotificationListenerService {
     /**
      * Identifie si un événement appartient au Rang Suprême (Dominance Absolue).
      * Ces événements ont l'autorisation de bypasser les verrous temporels (Throttle).
-     */
+     
     private boolean isSupremeRank(String title) {
         if (title == null || title.trim().isEmpty()) return false;
         String t = title.toUpperCase(Locale.ROOT);
         return t.contains("CPI") || t.contains("NFP") || t.contains("FOMC") 
             || t.contains("FED RATE") || t.contains("PAYROLLS") || t.contains("PCE");
     }
+    */
     private void captureForecastFromReport(String report) {
         if (report == null || report.isEmpty()) return;
         try {
@@ -1071,7 +1072,18 @@ try {
                             "L'analyseur mathématique déterministe a détecté un écart type. " +
                             "Direction recommandée : " + ecoResult.directionText + "\n\n" + promptAI;
                 }
-
+                 // 🛡️ THROTTLE GÉO CIBLÉ (12 min) — seul angle mort non couvert par l'inertie macro 2h,
+                // qui exclut volontairement les types GEO-* (cf. EventValidator.validate(), ÉTAPE 4).
+                // Remplace l'ancien GEO_THROTTLE_MS mort de processIncomingMacroFeed(), sans réimporter
+                // le reste de sa mécanique (rollback, etc.) devenue inutile face aux 3 autres garde-fous actifs.
+                if (eventTypeStr.equals("GEOPOLITICAL")) {
+                    if (!isSupremeRank && (currentTime - lastGeoTime < GEO_THROTTLE_MS)) {
+                        Log.d(TAG, "[THROTTLE GÉO] Notification bloquée (12 min) - dernier choc géo il y a "
+                                + (currentTime - lastGeoTime) / 1000 + "s");
+                        return;
+                    }
+                    lastGeoTime = currentTime;
+                }
                 // 🔟 Exécution finale de l'analyse cognitive LLM
                 processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank);
 
@@ -1243,226 +1255,6 @@ new Thread(new Runnable() {
         }, 15, 15, TimeUnit.MINUTES);
     }
 
-    private void processIncomingMacroFeed(String source, String title, String text, String feed, 
-                                          String pkg, long postTime, String fingerprint, String promptAI, boolean isSupremeParam) {
-        // 1. Nettoyage automatique des empreintes obsolètes au début de chaque cycle
-        EventValidator.cleanupOldFingerprints();
-    
-        // 🛡️ [CIRCUIT BREAKER] Capture des états temporels ORIGINAUX dès l'entrée de la méthode
-        final long previousGeoTime = lastGeoTime;
-        final long previousAnalysisTime = lastAnalysisTime;
-
-        String heureExacteMada = getMadaFormattedDateTime();
-        // 2. Injection du contexte temporel au début de la variable feed avant l'analyse
-        feed = "CONTEXTE TEMPOREL : Nous sommes le " + heureExacteMada + " (Heure de Madagascar).\n\n" + feed;
-            
-        long now = System.currentTimeMillis();
-        boolean isGeoEvent = isGeoEvent(feed.toUpperCase(Locale.ROOT));
-    
-        // Throttle géopolitique prioritaire
-        if (isGeoEvent && (now - lastGeoTime < GEO_THROTTLE_MS)) {
-            Log.d(TAG, "[THROTTLE] Notification Géo bloquée (12 min) - dernier il y a " + (now - lastGeoTime)/1000 + "s");
-            return;
-        }
-    
-        // ⚡ [SUPREME BYPASS] Throttle global uniquement pour les événements non-géo
-        if (!isGeoEvent) {
-            if (isSupremeParam || isSupremeRank(title)) {
-                // Autorisation immédiate pour les chocs majeurs simultanés
-                Log.d(TAG, "⚡ [SUPREME BYPASS] Événement majeur simultané autorisé sans restriction temporelle : " + title);
-            } else if (now - lastAnalysisTime < GLOBAL_THROTTLE_MS) {
-                // Blocage des bruits/données secondaires si la fenêtre de tir globale (8 min) est active
-                Log.w(TAG, "⏳ [THROTTLE] Notification instantanée bloquée par le Throttle Global (8 min) pour : " + title);
-                return;
-            }
-        }
-
-        List<String> targetAssets = filterActiveAssets(feed);
-        // 🛡️ PROTECTION NPE : Évite un crash fatal dans String.join si aucun actif n'est retourné
-        if (targetAssets == null) {
-            targetAssets = new ArrayList<>();
-        }
-
-        EventValidator.ValidationResult vr = EventValidator.validate(NotificationService.this, title, feed, postTime, targetAssets);
-        
-        // Détection élargie de TOUTES les actualités majeures
-        String upFeed = feed.toUpperCase(Locale.ROOT);
-        boolean isSupremeNews = upFeed.contains("FOMC") || upFeed.contains("FED ") || 
-                                upFeed.contains("CPI")  || upFeed.contains("PCE")  || 
-                                upFeed.contains("NFP")  || upFeed.contains("BCE")  || 
-                                upFeed.contains("ECB")  || upFeed.contains("BOJ")  || 
-                                upFeed.contains("BOE")  || upFeed.contains("RBA")  || 
-                                upFeed.contains("BOC")  || upFeed.contains("PIB")  || 
-                                upFeed.contains("GDP")  || upFeed.contains("OPEC") ||
-                                upFeed.contains("INFLATION") || upFeed.contains("INTEREST RATE") ||
-                                upFeed.contains("POWELL") || upFeed.contains("LAGARDE") || upFeed.contains("WARSH") ||
-                                upFeed.contains("PMI") || upFeed.contains("ISM");
-    
-        int weight = assignDriverWeight(feed);
-    
-        if (vr.isConfirmed && !vr.geoContext.isEmpty() && vr.confidence >= 70) {
-            weight = Math.max(weight, 4);
-        }
-    
-        String hash = generateSecureHash(title + text);
-        Log.d(TAG, "🟢 Nouvelle notification : source=" + source + ", title=" + title + ", hash=" + hash);
-            
-        // Filtre stratégique anti-bruit
-        if (!vr.isConfirmed && weight < 3 && !isSupremeNews && !detectDriverDeviation(feed)) {
-            eventDb.saveEvent(hash, pkg, source, "Soft-Data", title, feed,
-                    String.join(", ", targetAssets), "Conforme (Filtré)", (long)(postTime/1000), "synced", weight);
-            return;
-        }
-    
-        // ✅ LE SECOND IF DESTRUCTEUR A ÉTÉ SUPPRIMÉ ICI : Les news suprêmes continuent leur route.
-    
-        EconomicEventDetector.DetectedEvent detected = EconomicEventDetector.detectEvent(title, feed);
-    
-        // --- APPLICATION DE LA CONTRAINTE DE FORCE BRUTE GÉOPOLITIQUE ---
-        String initialImpact = ""; 
-    
-        if (!vr.geoContext.isEmpty()) {
-            if (targetAssets.contains("USDJPY")) {
-                detected.impact = "ACHAT CHOC";
-                detected.description = "Dollar Dominance Absolue (Régime de Crise Géo Asie/Moyen-Orient)";
-            }
-            initialImpact = "🌍 CHOC GÉOPOLITIQUE [" + vr.geoContext + "] — Conviction: " + vr.confidence + "% | " + detected.impact + " (Poids: " + weight + ")";
-            lastGeoTime = now;
-        } else if (isSupremeNews && (upFeed.contains("FOMC") || upFeed.contains("FED "))) {
-            initialImpact = "💥 PIVOT MAJEUR BANQUE CENTRALE | " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
-            lastAnalysisTime = now;
-        } else {
-            initialImpact = "⚡ [" + detected.eventType + "] " + detected.description + " | " + detected.impact + " (Poids: " + weight + ")";
-            lastAnalysisTime = now;
-        } 
-    
-        Log.d(TAG, "Impact final qualifié : " + initialImpact);
-    
-        if (vr.geoContext.isEmpty() && !(upFeed.contains("FOMC") || upFeed.contains("FED "))) {
-            if (detected.impact != null && (detected.impact.equalsIgnoreCase("Neutre") || detected.impact.toUpperCase().contains("NEUTRE"))) {
-                if (weight < 3) {
-                    Log.d(TAG, "Événement filtré (Bruit Neutre standard). Annulation.");
-                    return;
-                }
-            }
-        }
-    
-        long timestampSec = System.currentTimeMillis() / 1000;
-        int geoWeight = (vr.confidence >= 80) ? 4 : (vr.confidence >= 60) ? 3 : 1;
-        int finalWeightForStorage = (!vr.geoContext.isEmpty()) ? geoWeight : weight;
-
-        boolean saved = eventDb.saveEvent(hash, pkg, source, "Macro-Choc", title, feed, String.join(", ", targetAssets), initialImpact, timestampSec, "pending", finalWeightForStorage);
-        if (saved && isDeviceOnline()) {
-            triggerQueueSynchronization();
-        }
-    
-        // ✅ PIPELINE ASYNCHRONE SÉCURISÉ
-        if (weight >= 3 || (weight >= 3 && vr.isConfirmed) || (vr.isConfirmed && vr.confidence >= 70)) {
-            Log.d(TAG, "[SIGNAL TRIGGER] Driver majeur qualifié (Poids=" + weight + ") → Préparation du pipeline.");
-            
-            List<String> listeHistorique = new ArrayList<>();
-            try {
-                listeHistorique = eventDb.obtenirTexteEvenementsRecents();
-            } catch (Exception dbEx) {
-                Log.w(TAG, "Impossible de charger l'historique de la DB.", dbEx);
-            }
-    
-            // Verrouillage préventif immédiat pendant la durée du traitement en arrière-plan
-            if (isGeoEvent) {
-                lastGeoTime = System.currentTimeMillis();
-            } else {
-                lastAnalysisTime = System.currentTimeMillis();
-            }
-    
-            // Captures finales immuables pour le thread de calcul
-            final String currentFeed = feed;
-            final String currentSource = source;
-            final String currentHash = hash;
-            final long currentPostTime = postTime;
-            final List<String> assets = targetAssets;
-            final List<String> finalHistorique = listeHistorique;
-            final boolean finalIsGeo = isGeoEvent;
-    
-            exec.submit(() -> {
-                boolean pipelineSucces = false;
-                try {
-                    String promptFinal = construirePromptFinalAvecPrompt(currentFeed, finalHistorique, SYSTEM_PROMPT);
-                    executeAnalysisPipeline(currentSource, currentFeed, promptFinal, assets, currentPostTime, currentHash);
-                    pipelineSucces = true; 
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "Erreur critique dans le pipeline d'analyse asynchrone", e);
-                } finally {
-                    // 🛡️ [CIRCUIT BREAKER] Restauration des VRAIS timestamps initiaux en cas d'échec
-                    if (!pipelineSucces) {
-                        Log.w(TAG, "🔄 [ROLLBACK THROTTLE] Échec du traitement API/Réseau. Libération du verrou temporel d'origine.");
-                        if (finalIsGeo) {
-                            lastGeoTime = previousGeoTime;
-                        } else {
-                            lastAnalysisTime = previousAnalysisTime;
-                        }
-                    }
-                }
-            });
-        }
-    }
-    
-    private int assignDriverWeight(String text) {
-        String u = text.toUpperCase();
-        
-        // CORRECTION ACTIFS CRUCIAUX : Ajout de la détection des synonymes/surnoms institutionnels
-        if (u.contains("CPI")            || u.contains("INFLATION")       || u.contains("NFP")          ||
-            u.contains("NON-FARM PAYROLLS") || u.contains("FOMC")           || u.contains("INTEREST RATE") ||
-            u.contains("RBA")            || u.contains("BOC")             || u.contains("BOJ")           ||
-            u.contains("BOE")            || u.contains("ECB")             || u.contains("BCE")           ||
-            u.contains("LAGARDE")        || u.contains("BAILEY")          || u.contains("MACKLEM")       ||
-            u.contains("BULLOCK")        || u.contains("UEDA")            || u.contains("CABLE")         || 
-            u.contains("STERLING")       || u.contains("AUSSIE")          || u.contains("LOONIE")        ||
-            u.contains("WARSH")          || u.contains("POWELL")) return 5;
-            
-        if (u.contains("GDP")                || u.contains("PIB")                    ||
-            u.contains("RETAIL SALES")       || u.contains("EMPLOYMENT RATE")        ||
-            u.contains("STOCKS")             || u.contains("JOBLESS")                ||
-            u.contains("ADP")                || u.contains("JOLTS")                  ||
-            u.contains("JOB OPENINGS")       || u.contains("PPI")                    ||
-            u.contains("PRODUCER PRICE")     || u.contains("DURABLE GOODS")          ||
-            u.contains("TRADE BALANCE")      || u.contains("CURRENT ACCOUNT")        ||
-            u.contains("INDUSTRIAL PRODUCTION") || u.contains("CAPACITY UTILIZATION") ||
-            u.contains("PHILLY FED")         || u.contains("EMPIRE STATE")           ||
-            u.contains("CHICAGO PMI")        || u.contains("BEIGE BOOK")             ||
-            u.contains("PERSONAL SPENDING")  || u.contains("PERSONAL INCOME")        ||
-            u.contains("HOUSING STARTS")     || u.contains("BUILDING PERMITS")       ||
-            u.contains("WTI")                || u.contains("BRENT")                  || 
-            u.contains("CRUDE OIL")          || u.contains("XAUUSD")                 ||
-            u.contains("HOME SALES")         || u.contains("CHALLENGER")) return 4;
-            
-        if (u.contains("PMI")               || u.contains("ISM")                  ||
-            u.contains("MICHIGAN")          || u.contains("CONSUMER CONFIDENCE")   ||
-            u.contains("CONSUMER SENTIMENT")|| u.contains("IMPORT PRICE")          ||
-            u.contains("NAS100")            || u.contains("SPX")                  ||
-            u.contains("US500")             || u.contains("USTECH")                ||
-            u.contains("EXPORT PRICE")      || u.contains("NATURAL GAS")) return 3;
-            
-        return 1;
-    }
-
-    private boolean detectDriverDeviation(String text) {
-        String upper = text.toUpperCase();
-        if (upper.contains("HIGHER THAN EXPECTED") || upper.contains("LOWER THAN EXPECTED") ||
-            upper.contains("ABOVE FORECAST") || upper.contains("BELOW FORECAST") ||
-            upper.contains("SURPRISE") || upper.contains("SHOCK") || upper.contains("MISSES")) return true;
-
-        Pattern pattern = Pattern.compile("(ACTUAL|ACT):?\\s*([\\d\\.\\-%]+).*?(FORECAST|EST|EXP):?\\s*([\\d\\.\\-%]+)");
-        Matcher matcher = pattern.matcher(upper);
-        if (matcher.find()) {
-            try {
-                double actual = Double.parseDouble(matcher.group(2).replaceAll("[^\\d\\.]", ""));
-                double forecast = Double.parseDouble(matcher.group(4).replaceAll("[^\\d\\.]", ""));
-                return actual != forecast;
-            } catch (Exception e) { return true; }
-        }
-        return false;
-    }
 
     private synchronized void triggerQueueSynchronization() {
         if (isSyncing || !isDeviceOnline()) return;
