@@ -1372,164 +1372,165 @@ public class EventValidator {
         return false;
     }
 
-public static void preloadCalendar() {
-    try {
-        List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(72);
-        if (events == null || events.isEmpty()) {
-            logToMain("⚠️ Calendrier vide ou non disponible.");
-            return;
-        }
-
-        // ✅ WATCHER — Détecter les nouveaux résultats publiés depuis le dernier chargement
-        List<EconomicCalendarAPI.CalendarEvent> newlyPublished = new ArrayList<>();
-        for (EconomicCalendarAPI.CalendarEvent event : events) {
-            if (event == null) continue;
-            boolean hasActual = event.actual != null
-                    && !event.actual.equals("N/A")
-                    && !event.actual.isEmpty();
-            if (hasActual) {
-                String key = createEventKey(event.indicator, event.timestamp);
-                EconomicCalendarAPI.CalendarEvent previous = upcomingEvents.get(key);
-                boolean isNew = (previous == null)
-                        || (previous.actual == null
-                        || previous.actual.equals("N/A")
-                        || previous.actual.isEmpty());
-                if (isNew) newlyPublished.add(event);
+    public static void preloadCalendar() {
+        try {
+            List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(72);
+            if (events == null || events.isEmpty()) {
+                logToMain("⚠️ Calendrier vide ou non disponible.");
+                return;
             }
-        }
-
-        upcomingEvents.clear();
-
-        // ── Tri par timestamp croissant ──
-        List<EconomicCalendarAPI.CalendarEvent> sortedEvents = new ArrayList<>(events);
-        Collections.sort(sortedEvents, (a, b) -> {
-            long tsA = parseTimestamp(a.timestamp);
-            long tsB = parseTimestamp(b.timestamp);
-            return Long.compare(tsA, tsB);
-        });
-
-        // ── Stockage dans la map interne ──
-        // ── Stockage dans la map interne ──
-// ── Construction du rapport Telegram ──
-        for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
-            if (event == null || event.indicator == null || event.timestamp == null) continue;
-        
-            // 🟢 LE CORRECTIF : Aller chercher l'Actual en DB s'il est absent du flux Internet
-            if (event.actual == null || event.actual.equals("N/A") || event.actual.isEmpty()) {
-                // On demande à la DB si FinancialJuice ou un précédent process a enregistré le chiffre
-                String actualEnDB = EconomicCalendarAPI.getActualValueFromDB(appContext, event.indicator, event.timestamp);
-                if (actualEnDB != null && !actualEnDB.equals("N/A") && !actualEnDB.isEmpty()) {
-                    event.actual = actualEnDB; // On injecte la vraie valeur dans l'objet en mémoire
+    
+            // ✅ WATCHER — Détecter les nouveaux résultats publiés depuis le dernier chargement
+            List<EconomicCalendarAPI.CalendarEvent> newlyPublished = new ArrayList<>();
+            for (EconomicCalendarAPI.CalendarEvent event : events) {
+                if (event == null) continue;
+                boolean hasActual = event.actual != null
+                        && !event.actual.equals("N/A")
+                        && !event.actual.isEmpty();
+                if (hasActual) {
+                    String key = createEventKey(event.indicator, event.timestamp);
+                    EconomicCalendarAPI.CalendarEvent previous = upcomingEvents.get(key);
+                    boolean isNew = (previous == null)
+                            || (previous.actual == null
+                            || previous.actual.equals("N/A")
+                            || previous.actual.isEmpty());
+                    if (isNew) newlyPublished.add(event);
                 }
             }
-        
-            // ✅ Filtrer les jours fériés et événements sans impact (INCHANGÉ)
-           String indUpper = event.indicator.toUpperCase(Locale.ROOT);
-            // Un simple "HOLIDAY" intercepte automatiquement Bank Holiday, Public Holiday, National Holiday, etc.
-            if (indUpper.contains("HOLIDAY") || indUpper.contains("DAY OFF") || indUpper.contains("ELECTION DAY")) {
-                continue;
-            }
-        
-        // ✅ Persistance en DB pour cohérence inter-sessions et analyse IA enrichie
-        if (appContext != null) {
-            EconomicCalendarAPI.persistCalendarEventsToDB(appContext, sortedEvents);
-        }
-
-
-        // ── Construction du rapport Telegram ──
-        // ✅ Envoyer uniquement si le contenu a changé
-        // ── Construction du rapport Telegram ──
-        StringBuilder report = new StringBuilder();
-        report.append("📅 *CALENDRIER ÉCONOMIQUE — PROCHAINS ÉVÉNEMENTS*\n");
-        report.append("─────────────────────────────────────────\n");
-
-        String lastDay = "";
-        int totalAffiche = 0;
-
-        for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
-    if (event == null || event.indicator == null || event.timestamp == null) continue;
-
-    // ✅ Filtrer les jours fériés et événements sans impact
-    String indUpper = event.indicator.toUpperCase(Locale.ROOT);
-    if (indUpper.contains("BANK HOLIDAY") || indUpper.contains("PUBLIC HOLIDAY") ||
-        indUpper.contains("MARKET HOLIDAY") || indUpper.contains("DAY OFF") ||
-        indUpper.contains("NATIONAL HOLIDAY")) continue;
-            String currentDay = formatEventDay(event.timestamp);
-            if (!currentDay.equals(lastDay)) {
-                report.append("\n📆 *").append(currentDay).append("*\n");
-                lastDay = currentDay;
-            }
-
-            String imp = event.importance != null ? event.importance.toUpperCase(Locale.ROOT) : "";
-            String impactIcon;
-            if      (imp.equals("HIGH"))   impactIcon = "🔴";
-            else if (imp.equals("MEDIUM")) impactIcon = "🟠";
-            else                           impactIcon = "⚪";
-
-            String pays = (event.country != null && !event.country.isEmpty()) ? event.country : "?";
-            String time = formatEventTime(event.timestamp);
-
-            report.append(impactIcon)
-                  .append(" `").append(time).append("` ")
-                  .append("[").append(pays).append("] ")
-                  .append(event.indicator);
-
-            boolean hasActual   = event.actual   != null && !event.actual.equals("N/A")   && !event.actual.isEmpty();
-            boolean hasForecast = event.forecast != null && !event.forecast.equals("N/A") && !event.forecast.isEmpty();
-            boolean hasPrevious = event.previous != null && !event.previous.equals("N/A") && !event.previous.isEmpty();
-
-            if (hasActual && hasForecast) {
-                report.append(" | Réel: `").append(event.actual)
-                      .append("` Prévu: `").append(event.forecast).append("`");
-                try {
-                    double a = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
-                    double f = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
-                    double diff = a - f;
-                    if (Math.abs(diff) > 0.0) {
-                        report.append(diff > 0 ? " 📈 SURPRISE HAUSSIÈRE" : " 📉 SURPRISE BAISSIÈRE");
+    
+            // On vide la mémoire pour la rafraîchir
+            upcomingEvents.clear();
+    
+            // ── Tri par timestamp croissant ──
+            List<EconomicCalendarAPI.CalendarEvent> sortedEvents = new ArrayList<>(events);
+            Collections.sort(sortedEvents, (a, b) -> {
+                long tsA = parseTimestamp(a.timestamp);
+                long tsB = parseTimestamp(b.timestamp);
+                return Long.compare(tsA, tsB);
+            });
+    
+            // ── BOUCLE 1 : Enrichissement via la DB locale & Remplissage de la Map ──
+            for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
+                if (event == null || event.indicator == null || event.timestamp == null) continue;
+            
+                // 🟢 CORRECTIF : Injecter l'Actual de la DB si absent du flux Internet
+                if (event.actual == null || event.actual.equals("N/A") || event.actual.isEmpty()) {
+                    String actualEnDB = EconomicCalendarAPI.getActualValueFromDB(appContext, event.indicator, event.timestamp);
+                    if (actualEnDB != null && !actualEnDB.equals("N/A") && !actualEnDB.isEmpty()) {
+                        event.actual = actualEnDB; 
                     }
-                } catch (Exception ignored) {}
-            } else if (hasForecast) {
-                report.append(" | Prévu: `").append(event.forecast).append("`");
-            } else if (hasActual) {
-                report.append(" | Réel: `").append(event.actual).append("`");
+                }
+            
+                // ✅ Filtrer les jours fériés globaux du stockage interne
+                String indUpper = event.indicator.toUpperCase(Locale.ROOT);
+                if (indUpper.contains("HOLIDAY") || indUpper.contains("DAY OFF") || indUpper.contains("ELECTION DAY")) {
+                    continue;
+                }
+            
+                // ✅ Sauvegarde dans la Map interne (Rétabli)
+                String key = createEventKey(event.indicator, event.timestamp);
+                upcomingEvents.put(key, event);
             }
-
-            if (hasPrevious) report.append(" Préc: `").append(event.previous).append("`");
-            report.append("\n");
-            totalAffiche++;
+    
+            // ✅ Persistance en DB (Placée hors de la boucle pour préserver le CPU et le disque)
+            if (appContext != null) {
+                EconomicCalendarAPI.persistCalendarEventsToDB(appContext, sortedEvents);
+            }
+    
+            // ── BOUCLE 2 : Construction du rapport Telegram ──
+            StringBuilder report = new StringBuilder();
+            report.append("📅 *CALENDRIER ÉCONOMIQUE — PROCHAINS ÉVÉNEMENTS*\n");
+            report.append("─────────────────────────────────────────\n");
+    
+            String lastDay = "";
+            int totalAffiche = 0;
+    
+            for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
+                if (event == null || event.indicator == null || event.timestamp == null) continue;
+    
+                // ✅ Filtrer les variantes de jours fériés pour l'affichage du rapport
+                String indUpper = event.indicator.toUpperCase(Locale.ROOT);
+                if (indUpper.contains("BANK HOLIDAY") || indUpper.contains("PUBLIC HOLIDAY") ||
+                    indUpper.contains("MARKET HOLIDAY") || indUpper.contains("DAY OFF") ||
+                    indUpper.contains("NATIONAL HOLIDAY")) continue;
+                    
+                String currentDay = formatEventDay(event.timestamp);
+                if (!currentDay.equals(lastDay)) {
+                    report.append("\n📆 *").append(currentDay).append("*\n");
+                    lastDay = currentDay;
+                }
+    
+                String imp = event.importance != null ? event.importance.toUpperCase(Locale.ROOT) : "";
+                String impactIcon;
+                if      (imp.equals("HIGH"))   impactIcon = "🔴";
+                else if (imp.equals("MEDIUM")) impactIcon = "🟠";
+                else                           impactIcon = "⚪";
+    
+                String pays = (event.country != null && !event.country.isEmpty()) ? event.country : "?";
+                String time = formatEventTime(event.timestamp);
+    
+                report.append(impactIcon)
+                      .append(" `").append(time).append("` ")
+                      .append("[").append(pays).append("] ")
+                      .append(event.indicator);
+    
+                boolean hasActual   = event.actual   != null && !event.actual.equals("N/A")   && !event.actual.isEmpty();
+                boolean hasForecast = event.forecast != null && !event.forecast.equals("N/A") && !event.forecast.isEmpty();
+                boolean hasPrevious = event.previous != null && !event.previous.equals("N/A") && !event.previous.isEmpty();
+    
+                if (hasActual && hasForecast) {
+                    report.append(" | Réel: `").append(event.actual)
+                          .append("` Prévu: `").append(event.forecast).append("`");
+                    try {
+                        double a = Double.parseDouble(event.actual.replaceAll("[^\\d.\\-]", ""));
+                        double f = Double.parseDouble(event.forecast.replaceAll("[^\\d.\\-]", ""));
+                        double diff = a - f;
+                        if (Math.abs(diff) > 0.0) {
+                            report.append(diff > 0 ? " 📈 SURPRISE HAUSSIÈRE" : " 📉 SURPRISE BAISSIÈRE");
+                        }
+                    } catch (Exception ignored) {}
+                } else if (hasForecast) {
+                    report.append(" | Prévu: `").append(event.forecast).append("`");
+                } else if (hasActual) {
+                    report.append(" | Réel: `").append(event.actual).append("`");
+                }
+    
+                if (hasPrevious) report.append(" Préc: `").append(event.previous).append("`");
+                report.append("\n");
+                totalAffiche++;
+            }
+    
+            report.append("\n─────────────────────────────────────────\n");
+            report.append("📊 *Total :* ").append(totalAffiche).append(" événements\n");
+            report.append("🕒 *Mis à jour :* ").append(getMadaTimeNow()).append(" (Mada)");
+    
+            // ✅ Gestion des doublons d'envoi Telegram via Signature Hash
+            String reportStr = report.toString();
+            String newHash   = String.valueOf(reportStr.hashCode());
+    
+            if (!newHash.equals(lastCalendarHash)) {
+                lastCalendarHash = newHash;
+                sendCalendarToTelegram(reportStr);
+                logToMain("📤 [CALENDRIER] Rapport envoyé — contenu modifié");
+            } else {
+                logToMain("⏭️ [CALENDRIER] Rapport inchangé — envoi ignoré");
+            }
+    
+            // ✅ Traitement final du Watcher (Notification instantanée des résultats)
+            for (EconomicCalendarAPI.CalendarEvent event : newlyPublished) {
+                analyzeAndSendCalendarResult(event);
+            }
+            
+            // ✅ Affichage des logs de synchronisation précis
+            logToMain("✅ Calendrier chargé : " + upcomingEvents.size()
+            + " stockés / " + events.size() + " reçus — "
+            + newlyPublished.size() + " nouveaux résultats.");
+    
+        } catch (Exception e) {
+            logToMain("⚠️ Échec préchargement calendrier : " + e.getMessage());
+            Log.e(TAG, "Erreur preloadCalendar", e);
         }
-
-        report.append("\n─────────────────────────────────────────\n");
-        report.append("📊 *Total :* ").append(totalAffiche).append(" événements\n");
-        report.append("🕒 *Mis à jour :* ").append(getMadaTimeNow()).append(" (Mada)");
-
-        // ✅ Hash pour éviter les doublons Telegram
-        String reportStr = report.toString();
-        String newHash   = String.valueOf(reportStr.hashCode());
-
-        if (!newHash.equals(lastCalendarHash)) {
-            lastCalendarHash = newHash;
-            sendCalendarToTelegram(reportStr);
-            logToMain("📤 [CALENDRIER] Rapport envoyé — contenu modifié");
-        } else {
-            logToMain("⏭️ [CALENDRIER] Rapport inchangé — envoi ignoré");
-        }
-
-        // ✅ Analyse et envoi immédiat des nouveaux résultats publiés sans notification Android
-        for (EconomicCalendarAPI.CalendarEvent event : newlyPublished) {
-            analyzeAndSendCalendarResult(event);
-        }
-        // ✅ Log cohérent — affiche brut reçu ET stocké
-        logToMain("✅ Calendrier chargé : " + upcomingEvents.size()
-        + " stockés / " + events.size() + " reçus — "
-        + newlyPublished.size() + " nouveaux résultats.");
-
-    } catch (Exception e) {
-        logToMain("⚠️ Échec préchargement calendrier : " + e.getMessage());
-        Log.e(TAG, "Erreur preloadCalendar", e);
     }
-}
 
 // ── Envoi Telegram avec découpage automatique (limite 4000 chars) ──
 private static void sendCalendarToTelegram(String fullMessage) {
