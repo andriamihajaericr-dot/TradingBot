@@ -901,7 +901,12 @@ public class NotificationService extends NotificationListenerService {
                     // Le poids n'est plus forcé à 5 ou 3 statiquement, il découle de la surprise de l'écart mathématique (1 à 4)
                     int finalCalculatedWeight = ecoResult.weight;
                     // Ajustement du pavillon suprême selon le verdict de l'analyseur mathématique ou de l'urgence géopolitique
-                    if (finalCalculatedWeight >= 3 || currentSpeaker.equals("FED") || eventTypeStr.equals("GEOPOLITICAL")) {
+                    // 🆕 Exploite désormais detectedEvt.getRawImpact() (HIGH/MEDIUM/LOW/NEUTRE) en plus du score
+                    // mathématique d'EconomicAnalyzer, pour que les types riches (Warsh, ISM, PMI Flash, Michigan,
+                    // GDP-Advance) déclenchent eux aussi le statut suprême même si le calcul de poids reste bas.
+                    String rawImpact = detectedEvt.getRawImpact();
+                    if (finalCalculatedWeight >= 3 || currentSpeaker.equals("FED") || eventTypeStr.equals("GEOPOLITICAL")
+                            || "HIGH".equals(rawImpact) || "FED-WARSH-SIGNAL".equals(detectedEvt.eventType)) {
                         isSupremeRank = true;
                     }
     
