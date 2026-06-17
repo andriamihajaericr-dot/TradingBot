@@ -702,11 +702,13 @@ public class NotificationService extends NotificationListenerService {
                         }
                         if (inImpactSection && trimmed.startsWith("•")) {
                             String upperLine = line.toUpperCase(Locale.ROOT);
-                            boolean isSignificant = upperLine.contains("BULLISH") || upperLine.contains("BEARISH") || upperLine.contains("INCLINATION BULLISH") || upperLine.contains("INCLINATION BEARISH");
-                            if (isSignificant) {
-                                filteredMessage.append(line).append("\n");
-                                activeSignalsCount++;
-                            }
+                            boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
+                            boolean isSignificant = !isInclinationNeutral &&
+                             (upperLine.contains("BULLISH") || upperLine.contains("BEARISH"));
+                                if (isSignificant) {
+                                    filteredMessage.append(line).append("\n");
+                                    activeSignalsCount++;
+                                }
                         }
                     }
     
