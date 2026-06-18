@@ -459,7 +459,7 @@ public class EventValidator {
     }
 
     // ── ÉTAPE 7 : Sécurité Géopolitique Fallback ──
-    if (geo != null && geo.confidence >= 65) {
+    if (geo != null && geo.confidence >= 60) {
         result.isConfirmed = true;
         result.confidence = geo.confidence;
         result.reason = "Événement géopolitique confirmé (Fallback)";
