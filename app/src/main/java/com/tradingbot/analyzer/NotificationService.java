@@ -2205,17 +2205,31 @@ messages.put(new JSONObject().put("role", "user").put("content",
         }
     }
 
-    private void registerNetworkCallback() {
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
-                @Override
-                public void onAvailable(Network network) {
-                    triggerQueueSynchronization();
+    // Garde temporel anti-spam : empêche syncCalendarAndPurge() de se déclencher
+// plus d'une fois toutes les 30 minutes lors de reconnexions réseau répétées (wifi instable, etc.)
+private static volatile long lastCalendarBackfillMillis = 0L;
+private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
+
+private void registerNetworkCallback() {
+    ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+    if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                triggerQueueSynchronization();
+
+                long now = System.currentTimeMillis();
+                if (now - lastCalendarBackfillMillis >= CALENDAR_BACKFILL_GUARD_MS) {
+                    lastCalendarBackfillMillis = now;
+                    Log.d(TAG, "[NETWORK] Reconnexion détectée → backfill calendrier (guard 30min respecté).");
+                    syncCalendarAndPurge();
+                } else {
+                    Log.d(TAG, "[NETWORK] Reconnexion détectée → backfill ignoré (guard 30min actif).");
                 }
-            });
-        }
+            }
+        });
     }
+}
 
     private boolean isDeviceOnline() {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
