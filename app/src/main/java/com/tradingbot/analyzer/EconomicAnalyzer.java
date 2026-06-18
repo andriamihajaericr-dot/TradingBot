@@ -309,6 +309,49 @@ public class EconomicAnalyzer {
                r.directionText = "🕊️ SALAIRES FAIBLES US: USD ↘️, GOLD ↗️, NASDAQ ↗️ (détente inflation)";
              }
         }
+       // ==================== 🛠️ LES AJOUTS SONT ICI ====================
+
+        // 1. Décision de Taux d'intérêt de la FED
+        else if (combined.contains("FEDERAL FUNDS RATE") || combined.contains("INTEREST RATE DECISION") || combined.contains("FED RATE")) {
+            attribuerPoids(absEcart, 0.25, 0.5, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "FED_RATE_HIKE";
+                r.directionText = "🦅 HAUSSE DES TAUX FED (HAWKISH): USD 🚀, GOLD 📉, NASDAQ/SP500 📉, BTC 📉";
+            } else if (r.deviation < 0) {
+                r.marketImpact = "FED_RATE_CUT";
+                r.directionText = "🕊️ BAISSE DES TAUX FED (DOVISH): USD 📉, GOLD 🚀, NASDAQ/SP500 🚀, BTC 🚀";
+            } else {
+                r.marketImpact = "FED_RATE_UNCHANGED";
+                r.directionText = "⚖️ TAUX FED INCHANGÉS: Volatilité attendue sur le communiqué du FOMC";
+            }
+        }
+
+        // 2. Enquêtes Manufacturières Régionales (Indicateurs Avancés du PMI/ISM)
+        else if (combined.contains("PHILLY FED") || combined.contains("EMPIRE STATE")) {
+            attribuerPoids(absEcart, 5.0, 12.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_REGIONAL_MANUFACTURING_STRONG";
+                r.directionText = "🏭 ACTIVITÉ RÉGIONALE FORTE US (Leading ISM): USD ↗️, INDICES ↗️";
+            } else {
+                r.marketImpact = "US_REGIONAL_MANUFACTURING_WEAK";
+                r.directionText = "🛑 ACTIVITÉ RÉGIONALE EN BERNE US (Leading ISM): USD ↘️, GOLD ↗️";
+            }
+        }
+
+        // 3. Ventes de logements (Complément Immobilier)
+        else if (combined.contains("HOME SALES") || combined.contains("PENDING HOME SALES")) {
+            attribuerPoids(absEcart, 20.0, 50.0, r);
+            if (r.deviation > 0) {
+                r.marketImpact = "US_HOUSING_SALES_STRONG";
+                r.directionText = "🏠 VENTES IMMOBILIÈRES FORTES: Consommation US solide -> USD ↗️";
+            } else {
+                r.marketImpact = "US_HOUSING_SALES_WEAK";
+                r.directionText = "🏠 RALENTISSEMENT IMMOBILIER US: USD ↘️";
+            }
+        }
+
+        // ====================================================================
+        
         else {
             attribuerPoids(absEcart, 1.0, 2.0, r);
             r.marketImpact = "US_MACRO_OTHER";
