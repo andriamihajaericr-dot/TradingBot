@@ -552,32 +552,29 @@ public class EconomicAnalyzer {
     ParsedValues values = new ParsedValues();
     if (texte == null || texte.isEmpty()) return values;
 
-    // 1. On harmonise uniquement la ponctuation de base pour faciliter la capture
+    // ✅ COHÉRENCE 1 : On harmonise uniquement les virgules en points pour le parsing double
     String textePrepare = texte.replace(',', '.');
 
-    // 2. Patterns mis à jour (avec (?i) pour ignorer la casse et acceptation de l'espace [:==\s]+)
+    // ✅ COHÉRENCE 2 : Ordre du plus spécifique au plus générique avec tolérance Casse/Espace
     String[] actualPatterns = {
-        "(?i)ACTUAL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-        "(?i)ACT[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-        "(?i)REAL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-        "(?i)ACTUEL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)"
+        "(?i)ACTUAL[:=\\s]+\\s*([0-9.\\-]+)", // Gère "Actual: 31.2", "ACTUAL 31.2", "Actual=31.2"
+        "(?i)ACT[:=\\s]+\\s*([0-9.\\-]+)",    // Gère "Act 31.2", "ACT:31.2"
+        "(?i)REAL[:=\\s]+\\s*([0-9.\\-]+)"    // Gère "Real 31.2"
     };
 
     String[] forecastPatterns = {
-        "(?i)FORECAST[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-        "(?i)EXP[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-        "(?i)EST[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-        "(?i)CONSENSUS[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-        "(?i)ATTENDU[:=\\s]+\\s*([0-9.\\-]+[kM%]?)"
+        "(?i)FORECAST[:=\\s]+\\s*([0-9.\\-]+)", // Gère "Forecast 25.8", "FORECAST:25.8"
+        "(?i)EXP[:=\\s]+\\s*([0-9.\\-]+)",      // Gère "Exp 25.8"
+        "(?i)EST[:=\\s]+\\s*([0-9.\\-]+)",      // Gère "Est: 25.8"
+        "(?i)CONSENSUS[:=\\s]+\\s*([0-9.\\-]+)" // Gère "Consensus 25.8"
     };
 
     String[] priorPatterns = {
-        "(?i)PRIOR[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-        "(?i)PREVIOUS[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-        "(?i)PRECEDENT[:=\\s]+\\s*([0-9.\\-]+[kM%]?)"
+        "(?i)PRIOR[:=\\s]+\\s*([0-9.\\-]+)",   // Gère "Prior 26.5"
+        "(?i)PREVIOUS[:=\\s]+\\s*([0-9.\\-]+)" // Gère "Previous 26.5" (Format FinancialJuice)
     };
 
-    // 3. Extraction sélective
+    // ✅ COHÉRENCE 3 : Extraction via votre méthode utilitaire
     for (String p : actualPatterns) {
         double val = chercherRegex(textePrepare, p);
         if (!Double.isNaN(val)) { values.actual = val; break; }
@@ -592,7 +589,7 @@ public class EconomicAnalyzer {
     }
 
     return values;
-    }
+}
     
     private static double chercherRegex(String texte, String expression) {
         try {
