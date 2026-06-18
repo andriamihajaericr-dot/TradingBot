@@ -1191,10 +1191,11 @@ new Thread(new Runnable() {
                     Log.d(TAG, "🕒 [MAINTENANCE] Déclenchement automatique de minuit (Heure de Madagascar)...");
                     
                     // 1. Purge SQLite des événements ayant dépassé la fenêtre de validité de 48 heures
-                    long thresholdSeconds = (System.currentTimeMillis() - (48 * 60 * 60 * 1000L)) / 1000;
-                    eventDb.purgeOldEvents(thresholdSeconds); 
-                    Log.d(TAG, "[MAINTENANCE] Base de données SQLite purgée des données > 48h.");
-    
+                    // 1. Purge SQLite à deux vitesses (bruit 48h / piliers macro 45j) — purgeOldEvents calcule
+                    // lui-même les deux seuils en interne à partir du timestamp courant, donc on lui passe "now" brut.
+                    long nowSeconds = System.currentTimeMillis() / 1000;
+                    eventDb.purgeOldEvents(nowSeconds);
+                    Log.d(TAG, "[MAINTENANCE] Base de données SQLite purgée (bruit > 48h, piliers > 45j).");
                     // 2. Nettoyage de la table des empreintes pour éviter les fuites RAM
                     EventValidator.cleanupOldFingerprints();
                     Log.d(TAG, "[MAINTENANCE] Table des empreintes mémoires RAM nettoyée.");
