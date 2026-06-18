@@ -303,11 +303,14 @@ public class MainActivity extends AppCompatActivity {
      }
 
     private void importDatabaseFromUri(Uri uri) {
-    try {
-        addLog("⏳ [IMPORT] Début de la restauration de la base de données macro...");
+// ✅ CORRECTIF BUG 9 : signale au service en arrière-plan de suspendre tout accès DB
+// pendant la fenêtre dangereuse (close + delete + copie + réinstanciation).
+NotificationService.isDatabaseImportInProgress = true;
+try {
+    addLog("⏳ [IMPORT] Début de la restauration de la base de données macro...");
 
-        // 1. Fermer proprement la connexion locale active pour libérer les verrous SQLite
-        if (eventDb != null) {
+    // 1. Fermer proprement la connexion locale active pour libérer les verrous SQLite
+    if (eventDb != null) {
             eventDb.close();
             eventDb = null;
         }
@@ -357,17 +360,21 @@ public class MainActivity extends AppCompatActivity {
         addLog("✅ Base de données importée et moteur SQL réinitialisé avec succès.");
 
     } catch (Exception e) {
-        Log.e(TAG, "Erreur critique lors de l'importation", e);
-        Toast.makeText(this, "Échec de l'importation : " + e.getMessage(), Toast.LENGTH_LONG).show();
-        addLog("❌ [ERREUR IMPORT] : " + e.getMessage());
-        
-        // Mesure de secours : réinitialiser l'instance pour ne pas laisser le bot ou l'UI plantés
-        try {
-            EventDatabase.resetInstance();
-            eventDb = EventDatabase.getInstance(this);
-        } catch (Exception ignored) {}
+    Log.e(TAG, "Erreur critique lors de l'importation", e);
+    Toast.makeText(this, "Échec de l'importation : " + e.getMessage(), Toast.LENGTH_LONG).show();
+    addLog("❌ [ERREUR IMPORT] : " + e.getMessage());
+    
+    // Mesure de secours : réinitialiser l'instance pour ne pas laisser le bot ou l'UI plantés
+    try {
+        EventDatabase.resetInstance();
+        eventDb = EventDatabase.getInstance(this);
+    } catch (Exception ignored) {}
+} finally {
+    // ✅ Réautorise le service à utiliser la base, que l'import ait réussi ou échoué.
+    NotificationService.isDatabaseImportInProgress = false;
+}
     }
-    }
+    
     private void exportDatabaseToStorage() {
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
