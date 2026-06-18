@@ -20,7 +20,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.FileProvider;
-import com.tradingbot.analyzer.MarketDataFetcher
+import com.tradingbot.analyzer.MarketDataFetcher;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
