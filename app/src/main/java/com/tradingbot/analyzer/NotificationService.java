@@ -1163,12 +1163,10 @@ new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    EventValidator.preloadCalendar(); 
-                    if (System.currentTimeMillis() % (30 * 60 * 1000) < 60000) { // toutes les 30 min
-                        Log.d(TAG, "Refresh forcé du calendrier économique");
-                    }
+                EventValidator.preloadCalendar();
+                  Log.d(TAG, "[SERVICE] Préchargement initial du calendrier économique terminé.");
                 } catch (Exception e) {
-                    Log.e(TAG, "[SERVICE] Erreur lors du préchargement du calendrier", e);
+                  Log.e(TAG, "[SERVICE] Erreur lors du préchargement du calendrier", e);
                 }
             }
         }).start();
