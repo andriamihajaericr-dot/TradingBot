@@ -549,45 +549,51 @@ public class EconomicAnalyzer {
     }
 
     private static ParsedValues extraireChiffres(String texte) {
-        ParsedValues values = new ParsedValues();
-        if (texte == null) return values;
-        String texteNettoye = texte.replace(',', '.')
-                                   .replaceAll("[^\\d.\\-\\s%]", " ");
-        String[] actualPatterns = {
-    // Gère "ACTUAL: 31.2", "ACTUAL=31.2", "ACTUAL 31.2", "ACT 31.2", etc.
-    "ACTUAL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-    "ACT[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-    "REAL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-    "ACTUEL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)"
-};
+    ParsedValues values = new ParsedValues();
+    if (texte == null || texte.isEmpty()) return values;
 
-String[] forecastPatterns = {
-    // Gère "FORECAST: 25.8", "FORECAST 25.8", "EXP 25.8", "EST 25.8", etc.
-    "FORECAST[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-    "EXP[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-    "EST[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-    "CONSENSUS[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
-    "ATTENDU[:=\\s]+\\s*([0-9.\\-]+[kM%]?)"
-};
-        for (String p : actualPatterns) {
-            double val = chercherRegex(texteNettoye, p);
-            if (!Double.isNaN(val)) { values.actual = val; break; }
-        }
-        for (String p : forecastPatterns) {
-            double val = chercherRegex(texteNettoye, p);
-            if (!Double.isNaN(val)) { values.forecast = val; break; }
-        }
-        // ✅ Extraction de la valeur précédente de référence (Prior/Previous)
-        String[] priorPatterns = {
-            "PRIOR:\\s*([0-9.\\-]+)", "PREVIOUS:\\s*([0-9.\\-]+)", "PRIOR\\s*[=:]\\s*([0-9.\\-]+)"
-        };
-        for (String p : priorPatterns) {
-            double val = chercherRegex(texteNettoye, p);
-            if (!Double.isNaN(val)) { values.previous = val; break; }
-        }
-        return values;
+    // 1. On harmonise uniquement la ponctuation de base pour faciliter la capture
+    String textePrepare = texte.replace(',', '.');
+
+    // 2. Patterns mis à jour (avec (?i) pour ignorer la casse et acceptation de l'espace [:==\s]+)
+    String[] actualPatterns = {
+        "(?i)ACTUAL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+        "(?i)ACT[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+        "(?i)REAL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+        "(?i)ACTUEL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)"
+    };
+
+    String[] forecastPatterns = {
+        "(?i)FORECAST[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+        "(?i)EXP[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+        "(?i)EST[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+        "(?i)CONSENSUS[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+        "(?i)ATTENDU[:=\\s]+\\s*([0-9.\\-]+[kM%]?)"
+    };
+
+    String[] priorPatterns = {
+        "(?i)PRIOR[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+        "(?i)PREVIOUS[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+        "(?i)PRECEDENT[:=\\s]+\\s*([0-9.\\-]+[kM%]?)"
+    };
+
+    // 3. Extraction sélective
+    for (String p : actualPatterns) {
+        double val = chercherRegex(textePrepare, p);
+        if (!Double.isNaN(val)) { values.actual = val; break; }
+    }
+    for (String p : forecastPatterns) {
+        double val = chercherRegex(textePrepare, p);
+        if (!Double.isNaN(val)) { values.forecast = val; break; }
+    }
+    for (String p : priorPatterns) {
+        double val = chercherRegex(textePrepare, p);
+        if (!Double.isNaN(val)) { values.previous = val; break; }
     }
 
+    return values;
+    }
+    
     private static double chercherRegex(String texte, String expression) {
         try {
             Pattern pattern = Pattern.compile(expression, Pattern.CASE_INSENSITIVE);
