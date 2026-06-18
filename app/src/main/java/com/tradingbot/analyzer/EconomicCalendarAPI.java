@@ -304,6 +304,23 @@ public class EconomicCalendarAPI {
             if (ind.contains("ecb") || ind.contains("cpi") || ind.contains("inflation")) {
                 assets.addAll(Arrays.asList("GBPUSD", "GOLD", "SP500", "USDJPY"));
             }
+        } else if (cty.contains("canada")) {
+            assets.add("USDCAD");
+            if (ind.contains("boc") || ind.contains("bank of canada") || ind.contains("interest rate") || ind.contains("rate decision")) {
+                assets.addAll(Arrays.asList("USOIL", "GOLD"));
+            } else if (ind.contains("employment") || ind.contains("jobless") || ind.contains("cpi") || ind.contains("inflation")) {
+                assets.addAll(Arrays.asList("USOIL"));
+            }
+        } else if (cty.contains("australia")) {
+            assets.add("AUDUSD");
+            if (ind.contains("rba") || ind.contains("interest rate") || ind.contains("rate decision")) {
+                assets.addAll(Arrays.asList("GOLD", "NASDAQ"));
+            } else if (ind.contains("cpi") || ind.contains("inflation") || ind.contains("gdp")) {
+                assets.addAll(Arrays.asList("GOLD"));
+            }
+        } else if (cty.contains("china")) {
+            // Chine traitée comme proxy AUD (corrélation matières premières / Asie-Pacifique)
+            assets.addAll(Arrays.asList("AUDUSD", "NASDAQ", "USOIL"));
         }
         return new ArrayList<>(new LinkedHashSet<>(assets));
     }
