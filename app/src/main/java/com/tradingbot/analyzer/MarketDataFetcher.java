@@ -42,6 +42,37 @@ public class MarketDataFetcher {
             this.timestamp = timestamp;
         }
     }
+        /**
+     * Méthode de diagnostic : Teste la fraîcheur réelle des données
+     */
+    public static void testRealTimeFreshness() {
+        Log.d(TAG, "🔍 === TEST FRESHNESS MARKET DATA ===");
+        
+        List<String> testAssets = Arrays.asList("SP500", "NASDAQ", "GOLD", "BITCOIN", "EURUSD");
+        
+        long start = System.currentTimeMillis();
+        Map<String, MarketData> data = getMarketDataBatch(testAssets);
+        long duration = System.currentTimeMillis() - start;
+        
+        Log.d(TAG, "⏱️ Temps d'exécution du batch : " + duration + "ms");
+        
+        for (String asset : testAssets) {
+            MarketData md = data.get(asset);
+            CachedEntry cache = MARKET_DATA_CACHE.get(asset);
+            
+            if (md != null) {
+                long ageMs = cache != null ? (System.currentTimeMillis() - cache.timestamp) : 0;
+                Log.d(TAG, String.format("✅ %s | Prix: %.4f | Var: %+.2f%% | Âge: %ds", 
+                    asset, md.price, md.changePercent, ageMs/1000));
+            } else {
+                Log.w(TAG, "❌ " + asset + " → Aucune donnée (timeout ou erreur)");
+            }
+        }
+        
+        if (duration > 800) {
+            Log.w(TAG, "⚠️ ATTENTION : Temps > 800ms → risque fréquent de fallback cache");
+        }
+    }
     
     private static final Map<String, CachedEntry> MARKET_DATA_CACHE = new ConcurrentHashMap<>();
     private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(5); // Durée de vie max d'un prix de secours : 5 minutes
