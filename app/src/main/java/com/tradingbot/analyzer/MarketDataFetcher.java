@@ -42,13 +42,33 @@ public class MarketDataFetcher {
             this.timestamp = timestamp;
         }
     }
+     
+    
+    private static final Map<String, CachedEntry> MARKET_DATA_CACHE = new ConcurrentHashMap<>();
+    private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(5); // Durée de vie max d'un prix de secours : 5 minutes
+    
+    private static volatile boolean isShutdown = false;
+
+    // ✅ Configuration de l'endpoint et activation des sessions étendues
+    private static final boolean ENABLE_PREMARKET_PARAM = true; 
+
+    public interface MarketAnalysisCallback {
+        void onAnalysisComplete(String report);
+    }
+
+    public static void setApiKey(String key) {
+        if (key != null && !key.trim().isEmpty()) {
+            twelveDataKey = key;
+        }
+    }
+
         /**
      * Méthode de diagnostic : Teste la fraîcheur réelle des données
      */
     public static void testRealTimeFreshness() {
         Log.d(TAG, "🔍 === TEST FRESHNESS MARKET DATA ===");
         
-        List<String> testAssets = Arrays.asList("SP500", "NASDAQ", "GOLD", "BITCOIN", "EURUSD");
+        List<String> testAssets = Arrays.asList("SP500", "NASDAQ", "GOLD", "BITCOIN", "EURUSD", "USDJPY");
         
         long start = System.currentTimeMillis();
         Map<String, MarketData> data = getMarketDataBatch(testAssets);
@@ -71,24 +91,6 @@ public class MarketDataFetcher {
         
         if (duration > 800) {
             Log.w(TAG, "⚠️ ATTENTION : Temps > 800ms → risque fréquent de fallback cache");
-        }
-    }
-    
-    private static final Map<String, CachedEntry> MARKET_DATA_CACHE = new ConcurrentHashMap<>();
-    private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(5); // Durée de vie max d'un prix de secours : 5 minutes
-    
-    private static volatile boolean isShutdown = false;
-
-    // ✅ Configuration de l'endpoint et activation des sessions étendues
-    private static final boolean ENABLE_PREMARKET_PARAM = true; 
-
-    public interface MarketAnalysisCallback {
-        void onAnalysisComplete(String report);
-    }
-
-    public static void setApiKey(String key) {
-        if (key != null && !key.trim().isEmpty()) {
-            twelveDataKey = key;
         }
     }
     
