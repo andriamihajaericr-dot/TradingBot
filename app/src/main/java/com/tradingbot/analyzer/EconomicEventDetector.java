@@ -8,27 +8,41 @@ public class EconomicEventDetector {
         public String eventType;
         public String description;
         public String impact; // Chaîne combinée descriptive (ex: "Haute Volatilité (Biais Haussier)")
+        public String rawTitle; // Texte source brut (titre) — nécessaire pour isSpecialEvent
+        public String rawText;  // Texte source brut (corps) — nécessaire pour isSpecialEvent
 
         public DetectedEvent(String eventType, String description, String impact) {
+            this(eventType, description, impact, "", "");
+        }
+
+        public DetectedEvent(String eventType, String description, String impact, String rawTitle, String rawText) {
             this.eventType   = eventType;
             this.description = description;
             this.impact      = impact;
+            this.rawTitle    = (rawTitle != null) ? rawTitle : "";
+            this.rawText     = (rawText  != null) ? rawText  : "";
+        }
+
+        /**
+         * Détecte un événement corporate spécial (IPO/SPAC/Merger/Acquisition) à partir du
+         * texte SOURCE brut (titre + contenu), et non des champs déjà normalisés (eventType/description)
+         * qui ne contiennent jamais ces mots-clés.
+         */
+        public static boolean isSpecialEvent(String title, String text) {
+            String unified = ((title != null ? title : "") + " " + (text != null ? text : "")).toUpperCase(Locale.ROOT);
+            return unified.contains("IPO") ||
+                   unified.contains("SPAC") ||
+                   unified.contains("SPACEX") ||
+                   unified.contains("SPACE X") ||
+                   unified.contains("MERGER") ||
+                   unified.contains("ACQUISITION");
         }
 
         /**
          * Extrait l'impact brut normalisé pour l'alignement strict avec EventDatabase
          */
-        // Dans EconomicEventDetector.java
-        public static boolean isSpecialEvent(String title, String description) {
-            String unified = (title + " " + description).toUpperCase(Locale.ROOT);
-            return unified.contains("IPO") || 
-                   unified.contains("SPAC") || 
-                   unified.contains("SPACE X") || 
-                   unified.contains("MERGER") || 
-                   unified.contains("ACQUISITION");
-        }
         public String getRawImpact() {
-            if (isSpecialEvent(eventType, description)) {
+            if (isSpecialEvent(rawTitle, rawText)) {
                 return "HIGH"; // On force l'impact à HIGH immédiatement
             }
             if (impact == null) return "NEUTRE";
@@ -49,12 +63,18 @@ public class EconomicEventDetector {
         }                    
 
         /**
-         * Extrait le biais directionnel de manière isolée pour les décisions algorithmiques de l'IA
+         * Extrait le biais directionnel de manière isolée pour les décisions algorithmiques de l'IA.
+         * NB: "HAWKISH"/"DOVISH" ne sont jamais injectés dans `impact` (qui ne contient que
+         * "Biais Haussier"/"Biais Baissier"), donc on retombe sur le texte source brut pour ces mots-clés.
          */
         public String getDirectionalBias() {
-            if (impact == null) return "NEUTRE";
-            if (impact.contains("Biais Haussier") || impact.contains("HAWKISH")) return "HAWKISH";
-            if (impact.contains("Biais Baissier") || impact.contains("DOVISH")) return "DOVISH";
+            if (impact != null) {
+                if (impact.contains("Biais Haussier")) return "HAWKISH";
+                if (impact.contains("Biais Baissier")) return "DOVISH";
+            }
+            String unified = (rawTitle + " " + rawText).toUpperCase(Locale.ROOT);
+            if (unified.contains("HAWKISH")) return "HAWKISH";
+            if (unified.contains("DOVISH")) return "DOVISH";
             return "NEUTRE";
         }
     }
@@ -89,7 +109,7 @@ if (containsAny(unified, "WARSH", "KEVIN WARSH")) {
     impact      = "Haute Volatilité";
 
         // Inflation US (Rang Suprême - Poids 5)
-        } else if (containsAny(unified, "CORE CPI", "CORE PCE", "CPI ", "PCE", "PPI", "INFLATION")) {
+        } else if (containsAny(unified, "CORE CPI", "CORE PCE", "CPI ", "PCE ", "PPI", "INFLATION")) {
             eventType   = "INFLATION-DATA";
             description = "Données d'Inflation (CPI / PCE / PPI)";
             impact      = "Haute Volatilité";
@@ -120,11 +140,22 @@ if (containsAny(unified, "WARSH", "KEVIN WARSH")) {
             impact      = "Choc Géopolitique EUR/USOIL";
 
         // Géopolitique — Asie-Pacifique (Sécurisation AUD/NASDAQ - Poids 4)
-        } else if (containsAny(unified, "TAIWAN STRAIT", "XI JINPING", "CHINA", "TAIWAN", "TSMC")) {
+        // NB: "CHINA" seul a été retiré ici (trop générique, il masquait systématiquement
+        // la branche CHINA-MACRO ci-dessous). On ne déclenche le statut géopolitique que sur
+        // des signaux de tension réelle (Taïwan, Xi Jinping, TSMC).
+        } else if (containsAny(unified, "TAIWAN STRAIT", "XI JINPING", "TAIWAN", "TSMC")) {
             eventType   = "GEO-ASIA-PACIFIC";
             description = "Événement Géopolitique — Asie-Pacifique";
             impact      = "Choc Géopolitique AUD/NASDAQ";
-            // Ajouter dans detectEvent — avant "Macro secondaire"
+
+        // Chine — Macro / PBOC (remontée avant les blocs génériques pour ne plus être du code mort)
+        } else if (containsAny(unified, "CHINA CPI", "CHINA PPI", "CHINA GDP", "CHINA PMI", "PBOC", "YUAN", "CNY",
+                "RENMINBI", "CHINESE ECONOMY", "CHINA STIMULUS", "CHINA PROPERTY", "EVERGRANDE",
+                "NPC", "POLITBURO", "XI JINPING ECONOMY", "CHINA")) {
+            eventType   = "CHINA-MACRO";
+            description = "Données Macroéconomiques Chine / PBOC";
+            impact      = "Haute Volatilité";
+
         } else if (containsAny(unified, "TARIFF", "TARIFFS", "TRADE WAR", "TRADE DEAL", "IMPORT TAX", "CUSTOMS DUTY", "SANCTIONS", "EMBARGO", "TRADE AGREEMENT", "SECTION 301", "SECTION 232")) {
             eventType   = "TRADE-TARIFF";
             description = "Tarifs Douaniers / Guerre Commerciale";
@@ -134,9 +165,8 @@ if (containsAny(unified, "WARSH", "KEVIN WARSH")) {
             eventType   = "DATA-REVISION";
             description = "Révision de Donnée Macro — Impact sur Sentiment";
             impact      = "Moyenne Volatilité";
-        // Macro secondaire (Poids 2)
-        // ── ISM Services / Manufacturing — Leading Indicator US (Poids 4) ──
-// ── GDP Advance — Rang Suprême Trimestriel (Poids 4) ──
+
+        // ── GDP Advance — Rang Suprême Trimestriel (Poids 4) ──
 } else if (containsAny(unified, "ADVANCE GDP",
            "GDP GROWTH", "GROSS DOMESTIC PRODUCT", "GDP QOQ",
            "GDP YOY", "GDP ANNUALIZED", "GDP FLASH")) {
@@ -180,11 +210,6 @@ if (containsAny(unified, "WARSH", "KEVIN WARSH")) {
         } else if (containsAny(unified, "NOMINATED", "APPOINTED", "NOMINATION", "APPOINTMENT", "FED CHAIR", "FED VICE CHAIR", "ECB PRESIDENT", "BOJ GOVERNOR", "REPLACE POWELL", "REPLACE LAGARDE", "REPLACE UEDA")) {
             eventType   = "CENTRAL-BANK-NOMINATION";
             description = "Nomination Banque Centrale — Changement de Politique Potentiel";
-            impact      = "Haute Volatilité";
-        
-        } else if (containsAny(unified, "CHINA CPI", "CHINA PPI", "CHINA GDP", "CHINA PMI", "PBOC", "YUAN", "CNY", "RENMINBI", "CHINESE ECONOMY", "CHINA STIMULUS", "CHINA PROPERTY", "EVERGRANDE","NPC", "POLITBURO", "XI JINPING ECONOMY")) {
-            eventType   = "CHINA-MACRO";
-            description = "Données Macroéconomiques Chine / PBOC";
             impact      = "Haute Volatilité";
 
         // ── Treasury / Debt Ceiling ──
@@ -274,7 +299,7 @@ if (containsAny(unified, "WARSH", "KEVIN WARSH")) {
             }
         }
 
-        return new DetectedEvent(eventType, description, impact);
+        return new DetectedEvent(eventType, description, impact, cleanTitle, cleanText);
     }
 
     private static boolean containsAny(String text, String... keywords) {
