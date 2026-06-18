@@ -848,27 +848,37 @@ public class NotificationService extends NotificationListenerService {
                         Log.d(TAG, "🔄 [FRED] Requête en arrière-plan lancée de manière non-bloquante pour ICSA...");
                         String actualClaims = EconomicCalendarAPI.fetchFredActualValue("ICSA", "K");
                         
-                        // 1. Nettoyage et conversion sécurisée de la String actualClaims en long
-                        long claimsLong = 0;
-                        try {
-                            if (actualClaims != null && !actualClaims.isEmpty()) {
+                        // L'interception n'est poursuivie que si l'extraction en ligne a fonctionné
+                        if (actualClaims != null && !actualClaims.isEmpty()) {
+                            
+                            // 1. Nettoyage et conversion sécurisée de la String actualClaims en long
+                            long claimsLong = 0;
+                            try {
                                 // Supprime tout ce qui n'est pas un chiffre (ex: "215,000" devient "215000")
                                 String cleanClaims = actualClaims.replaceAll("[^\\d]", "");
                                 if (!cleanClaims.isEmpty()) {
                                     claimsLong = Long.parseLong(cleanClaims);
                                 }
+                            } catch (NumberFormatException e) {
+                                Log.e(TAG, "⚠️ Échec du parsing de actualClaims en long : " + actualClaims, e);
                             }
-                        } catch (NumberFormatException e) {
-                            Log.e(TAG, "⚠️ Échec du parsing de actualClaims en long : " + actualClaims, e);
-                        }
-                        
-                        // 2. Appel de la méthode avec la variable convertie en long
-                        EventDatabase.getInstance(getApplicationContext())
-                                     .updateActualIfMissing(title, claimsLong, getApplicationContext());
-                            if (updated) {
-                                Log.d(TAG, "✅ [FRED] Base de données synchronisée avec succès pour l'indicateur.");
+                            
+                            if (claimsLong > 0) {
+                                // 2. Appel de la méthode ET récupération du résultat booléen
+                                boolean updated = EventDatabase.getInstance(getApplicationContext())
+                                             .updateActualIfMissing(title, claimsLong, getApplicationContext());
+                                
+                                if (updated) {
+                                    Log.d(TAG, "✅ [FRED] Base de données synchronisée avec succès pour l'indicateur.");
+                                } else {
+                                    Log.d(TAG, "ℹ️ [FRED] Donnée reçue, mais aucune mise à jour nécessaire (déjà présente en DB).");
+                                }
+                            } else {
+                                Log.w(TAG, "⚠️ [FRED FAILURE] Le texte extrait n'a pu être converti en valeur numérique positive : " + actualClaims);
                             }
+            
                         } else {
+                            // Ce bloc else est désormais parfaitement rattaché à l'échec de la requête HTTP FRED
                             Log.w(TAG, "⚠️ [FRED FAILURE] Impossible d'extraire la donnée en ligne.");
                         }
                     }
