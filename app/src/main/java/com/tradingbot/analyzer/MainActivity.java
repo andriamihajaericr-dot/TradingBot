@@ -120,10 +120,10 @@ public class MainActivity extends AppCompatActivity {
                 "📡 Flux : Liaison montante et descendante OK.",
                 this
             );
-            runOnUiThread(() -> addLog("✅ [TEST] Telegram OK"));
-
-            // ✅ NOUVEAU TEST : Market Data Freshness
-            runOnUiThread(() -> addLog("📡 [TEST] Lancement du test MarketDataFetcher..."));
+                                // === TEST MARKET DATA ===
+                    runOnUiThread(() -> addLog("📡 [TEST] Lancement MarketDataFetcher..."));
+                    MarketDataFetcher.testRealTimeFreshness();
+                    runOnUiThread(() -> addLog("✅ [TEST] MarketDataFetcher terminé - Vérifie Logcat"));
             MarketDataFetcher.testRealTimeFreshness();
 
             // ... autres tests existants (régime, calendrier, etc.) ...
