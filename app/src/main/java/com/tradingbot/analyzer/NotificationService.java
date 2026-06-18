@@ -1096,15 +1096,23 @@ try {
     ));
     // Conversion de la Liste en String pour correspondre au schéma SQLite
     String assetsStr = String.join(",", finalAssetsList);
-if (!instance.eventDb.isEventAlreadySaved(title, System.currentTimeMillis() / 1000)) {
-    int dynamicWeight = EconomicCalendarAPI.isSupremeCalendarIndicator(title) ? 5 : 3;
-    instance.eventDb.saveEvent(
-        fingerprint, "com.tradingbot.calendar", source,
-        "CALENDAR-RESULT", title, body, assetsStr,
-        "pending", System.currentTimeMillis() / 1000,
-        "pending", dynamicWeight
-    );
-}
+    // ✅ AUDIT EXHAUSTIF (bug 9) : double garde NPE — instance peut être null (service non démarré)
+    // et getEventDb() peut être null (import de base en cours) ; sans ce garde, un appelant futur
+    // sans try/catch dédié ferait planter le service au lieu de simplement ignorer la sauvegarde.
+    EventDatabase db = (instance != null) ? instance.getEventDb() : null;
+    if (db != null) {
+        if (!db.isEventAlreadySaved(title, System.currentTimeMillis() / 1000)) {
+            int dynamicWeight = EconomicCalendarAPI.isSupremeCalendarIndicator(title) ? 5 : 3;
+            db.saveEvent(
+                fingerprint, "com.tradingbot.calendar", source,
+                "CALENDAR-RESULT", title, body, assetsStr,
+                "pending", System.currentTimeMillis() / 1000,
+                "pending", dynamicWeight
+            );
+        }
+    } else {
+        Log.w(TAG, "[sendToGroqAndTelegram] Sauvegarde DB ignorée (service/DB indisponible) pour : " + title);
+    }
    // 🚀 INJECTION : Déportation réseau simplifiée et ultra-rapide via Batch API
 new Thread(new Runnable() {
     @Override
