@@ -554,14 +554,21 @@ public class EconomicAnalyzer {
         String texteNettoye = texte.replace(',', '.')
                                    .replaceAll("[^\\d.\\-\\s%]", " ");
         String[] actualPatterns = {
-            "ACTUAL:\\s*([0-9.\\-]+)", "ACTUAL\\s*[=:]\\s*([0-9.\\-]+)",
-            "ACT\\s*[=:]\\s*([0-9.\\-]+)", "REAL\\s*[=:]\\s*([0-9.\\-]+)"
-        };
-        String[] forecastPatterns = {
-            "FORECAST:\\s*([0-9.\\-]+)", "FORECAST\\s*[=:]\\s*([0-9.\\-]+)",
-            "EXP\\s*[=:]\\s*([0-9.\\-]+)", "EST\\s*[=:]\\s*([0-9.\\-]+)",
-            "CONSENSUS\\s*[=:]\\s*([0-9.\\-]+)"
-        };
+    // Gère "ACTUAL: 31.2", "ACTUAL=31.2", "ACTUAL 31.2", "ACT 31.2", etc.
+    "ACTUAL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+    "ACT[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+    "REAL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+    "ACTUEL[:=\\s]+\\s*([0-9.\\-]+[kM%]?)"
+};
+
+String[] forecastPatterns = {
+    // Gère "FORECAST: 25.8", "FORECAST 25.8", "EXP 25.8", "EST 25.8", etc.
+    "FORECAST[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+    "EXP[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+    "EST[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+    "CONSENSUS[:=\\s]+\\s*([0-9.\\-]+[kM%]?)",
+    "ATTENDU[:=\\s]+\\s*([0-9.\\-]+[kM%]?)"
+};
         for (String p : actualPatterns) {
             double val = chercherRegex(texteNettoye, p);
             if (!Double.isNaN(val)) { values.actual = val; break; }
