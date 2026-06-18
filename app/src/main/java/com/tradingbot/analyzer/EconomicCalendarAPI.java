@@ -30,7 +30,7 @@ public class EconomicCalendarAPI {
         CURRENCY_ZONES.put("JPY", ZoneId.of("Asia/Tokyo"));
         CURRENCY_ZONES.put("AUD", ZoneId.of("Australia/Sydney"));
     }
-
+    
     // 🕒 Formateurs réutilisables partagés (Évite de saturer la mémoire dans les boucles de traitement)
     private static final DateTimeFormatter FORMATTER_ISO_T = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
     private static final DateTimeFormatter FORMATTER_CUSTOM = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US);
@@ -51,6 +51,67 @@ public class EconomicCalendarAPI {
         if (context != null) {
             globalAppContext = context.getApplicationContext();
         }
+    }
+    /**
+     * Exécute l'appel réseau vers FRED et applique le formatage attendu par ton parser.
+     * Doit impérativement être appelé depuis un thread secondaire (Background Thread).
+     */
+    public static String fetchFredActualValue(String seriesId, String formatType) {
+        // Utilisation d'une clé d'API (Idéalement déportée en constante de classe)
+        String apiKey = "3c8e91053632183a7706de448bb505d9";
+        String urlStr = "https://api.stlouisfed.org/fred/series/observations?series_id=" 
+                + seriesId + "&api_key=" + apiKey + "&file_type=json&sort_order=desc&limit=1";
+    
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
+    
+            if (conn.getResponseCode() == 200) {
+                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = in.readLine()) != null) {
+                    response.append(line);
+                }
+                in.close();
+    
+                JSONObject json = new JSONObject(response.toString());
+                if (!json.has("observations")) return null;
+                
+                JSONArray obs = json.getJSONArray("observations");
+                if (obs.length() > 0) {
+                    String rawValue = obs.getJSONObject(0).optString("value", "");
+                    if (rawValue.isEmpty() || rawValue.equals(".")) return null;
+    
+                    // Normalisation du format pour ton EventValidator / Diagramme Telegram
+                    if ("K".equals(formatType)) {
+                        double val = Double.parseDouble(rawValue);
+                        // 🛡️ CORRECTIF : Si la valeur est déjà inférieure à 1000 (ex: 250 pour le NFP), 
+                        // c'est qu'elle est déjà exprimée en milliers sur la FRED. On ne divise pas.
+                        if (Math.abs(val) >= 1000) {
+                            return ((int) (val / 1000)) + "K"; // 226000 -> 226K
+                        } else {
+                            return ((int) val) + "K"; // 250 -> 250K
+                        }
+                    } else if ("%".equals(formatType)) {
+                        // Évite de dupliquer le symbole si la FRED le renvoie (rare mais possible)
+                        return rawValue.contains("%") ? rawValue : rawValue + "%"; 
+                    }
+                    return rawValue;
+                }
+            } else {
+                Log.w(TAG, "⚠️ FRED API a répondu avec le code : " + conn.getResponseCode());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "⚠️ Erreur récupération FRED pour " + seriesId + " : " + e.getMessage(), e);
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+        return null;
     }
     
     private static final int MAX_RETRIES = 3;
