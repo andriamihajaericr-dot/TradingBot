@@ -775,399 +775,424 @@ public class NotificationService extends NotificationListenerService {
     }
 
     @Override
-public void onNotificationPosted(StatusBarNotification sbn) {
-    // 1️⃣ Vérification de l'état d'activation du bot (Doit être ultra-rapide sur le thread UI)
-    if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
-
-    // ✅ CORRECTIF BUG 9 : ignore toute notification pendant un import/restauration de base
-    // (MainActivity ferme et recrée le fichier .db -> tout traitement ici lirait/écrirait
-    // sur une connexion fermée ou un fichier en cours de remplacement).
-    if (isDatabaseImportInProgress) {
-        Log.w(TAG, "[SERVICE] Notification ignorée : import de base de données en cours.");
-        return;
-    }
+    public void onNotificationPosted(StatusBarNotification sbn) {
+        // 1️⃣ Vérification de l'état d'activation du bot (Doit être ultra-rapide sur le thread UI)
+        if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
     
-        // Détection et filtrage immédiat des packages sources autorisés
-        String packageName = sbn.getPackageName().toLowerCase(Locale.ROOT);
-        String sourceName = "Source Institutionnelle";
-        if (packageName.contains("financialjuice")) {
-        sourceName = "FinancialJuice";
-        } else if (packageName.contains("nikkei")) {
-            sourceName = "TradingEconomics";
-        } else if (packageName.contains("forex.portal")) {
-            sourceName = "Myfxbook";
-        } else if (packageName.contains("twitter") || packageName.contains("periscope")) {
-            sourceName = "X /Twitter";
-        } else if (packageName.contains("chrome") || packageName.equals("com.android.chrome")) {
-            sourceName = "Chrome";
-        } else {
-            return; // Ignore immédiatement tout le reste
-        }
-    
-        // Extraction sécurisée des chaînes de caractères brutes fournies par Android
-        Bundle extras = sbn.getNotification().extras;
-        final String title = extras.getString(Notification.EXTRA_TITLE, "");
-        String bigText = extras.getString(Notification.EXTRA_BIG_TEXT, "");
-        String text = extras.getString(Notification.EXTRA_TEXT, "");
-    
-        // 🔴 SÉCURITÉ REGEX : Conservation du texte brut le plus complet pour l'extraction mathématique d'EconomicAnalyzer
-        final String bodyTextRaw = bigText.length() > text.length() ? bigText : text;
-    
-        // Reconstruction standard du flux texte unifié pour le reste des modules
-        String subText = extras.getString(Notification.EXTRA_SUB_TEXT, "");
-        String summary = extras.getString(Notification.EXTRA_SUMMARY_TEXT, "");
-        String tempBody = bodyTextRaw;
-        if (subText.length() > tempBody.length()) tempBody = subText;
-        if (summary.length() > tempBody.length()) tempBody = summary;
-    
-        String tempUnifiedFeed = (title + " " + tempBody).trim();
-        CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
-        if (lines != null && lines.length > 0) {
-            StringBuilder bundled = new StringBuilder(title).append(" ");
-            for (CharSequence line : lines) {
-                if (line != null) bundled.append(line).append(" ");
-            }
-            String bundledFeed = bundled.toString().trim();
-            if (bundledFeed.length() > tempUnifiedFeed.length()) {
-                tempUnifiedFeed = bundledFeed;
-            }
-        }
-    
-        if (tempUnifiedFeed.length() < 6) return;
-        
-        final String finalUnifiedFeed = tempUnifiedFeed;
-        final String finalSourceName = sourceName;
-        final long postTimeMs = sbn.getPostTime();
-    
-        // 2️⃣ BASCOULEMENT IMMÉDIAT ET ISOLÉ DANS LE PIPELINE ASYNCHRONE (THREAD D'ARRIÈRE-PLAN)
-        // Utilisation de l'exécuteur existant de la classe pour stabiliser la RAM et le CPU
-        tradingPipelineExecutor.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    String upperFeed = finalUnifiedFeed.toUpperCase(Locale.ROOT);
-                    long currentTime = System.currentTimeMillis();
-                    String currentSpeaker = "";
-    
-                    // Identification des Speakers de Banques Centrales
-                    if (upperFeed.contains("POWELL") || upperFeed.contains("WARSH") || upperFeed.contains("WALLER") ||
-                        upperFeed.contains("BARKIN") || upperFeed.contains("GOOLSBEE") || upperFeed.contains("WILLIAMS") ||
-                        upperFeed.contains("KUGLER") || upperFeed.contains("BOSTIC") || upperFeed.contains("DALY") ||
-                        upperFeed.contains("LOGAN") || upperFeed.contains("FED")) {
-                        currentSpeaker = "FED";
-                    } else if (upperFeed.contains("LAGARDE") || upperFeed.contains("SCHNABEL") || upperFeed.contains("NAGEL")) {
-                        currentSpeaker = "ECB";
-                    }
-    
-                    EconomicEventDetector.DetectedEvent detectedEvt = EconomicEventDetector.detectEvent(title, finalUnifiedFeed);
-                    String eventTypeStr = detectedEvt.eventType;
-                    boolean isSupremeRank = false;
-
-                    // 🛡️ Préservation de TOUTE la logique géo en aval (allocation d'actifs, bypass throttle, seuils)
-                    // EconomicEventDetector retourne des types granulaires (GEO-MIDDLE-EAST, GEO-EUROPE-EST,
-                    // GEO-ASIA-PACIFIC) là où l'ancien code inline utilisait un seul marqueur générique "GEOPOLITICAL".
-                    // On normalise ici pour ne rien casser dans le reste de la méthode.
-                    boolean isGeoDetected = eventTypeStr.startsWith("GEO-")
-                            || upperFeed.contains("HORMUZ") || upperFeed.contains("ORMUZ") || upperFeed.contains("IRAN") || upperFeed.contains("ISRAEL")
-                            || upperFeed.contains("HEZBOLLAH") || upperFeed.contains("HOUTHI") || upperFeed.contains("GAZA") || upperFeed.contains("LEBANON")
-                            || upperFeed.contains("MOYEN-ORIENT") || upperFeed.contains("MIDDLE EAST") || upperFeed.contains("WAR") || upperFeed.contains("STRIKE")
-                            || upperFeed.contains("FRAPPE") || upperFeed.contains("ESCALADE") || upperFeed.contains("CONFLIT") || upperFeed.contains("MILITARY")
-                            || upperFeed.contains("TAIWAN") || upperFeed.contains("UKRAINE") || upperFeed.contains("RUSSIA");
-
-                    if (isGeoDetected) {
-                        eventTypeStr = "GEOPOLITICAL"; // Conserve le marqueur exact attendu par toute la logique en aval
-                        isSupremeRank = false;
-                    } else if (upperFeed.contains("OIL") || upperFeed.contains("WTI") || upperFeed.contains("BRENT") || upperFeed.contains("CRUDE") ||
-                               upperFeed.contains("EIA") || upperFeed.contains("OPEC") || upperFeed.contains("INVENTORIES") || upperFeed.contains("PETROLE")) {
-                        // Cas non couvert nommément par EconomicEventDetector → on garde le comportement historique
-                        eventTypeStr = "OIL-INVENTORY";
-                    }
-                    // Sinon : eventTypeStr reste la valeur riche fournie par EconomicEventDetector
-                    // (ex: FED-WARSH-SIGNAL, INFLATION-DATA, ISM-INDICATOR, PMI-FLASH, MICHIGAN-SENTIMENT,
-                    // GDP-ADVANCE, TRADE-TARIFF, CHINA-MACRO, etc.)
-    
-                    // 3️⃣ SYNCHRONISATION MACRO DÉTERMINISTE avec enrichissement calendaire
-                    // Enrichir le contenu avec les données du calendrier (ACTUAL/FORECAST) si disponibles
-                    String enrichedBody = EventValidator.enrichWithCalendar(title, bodyTextRaw, postTimeMs);
-                    EconomicAnalyzer.EvaluationResult ecoResult = EconomicAnalyzer.analyserEvenement(title, enrichedBody);
-                    Log.d(TAG, "Devise détectée : " + ecoResult.currency + ", poids : " + ecoResult.weight);
-                    // Le poids n'est plus forcé à 5 ou 3 statiquement, il découle de la surprise de l'écart mathématique (1 à 4)
-                    int finalCalculatedWeight = ecoResult.weight;
-                    // Ajustement du pavillon suprême selon le verdict de l'analyseur mathématique ou de l'urgence géopolitique
-                    // 🆕 Exploite désormais detectedEvt.getRawImpact() (HIGH/MEDIUM/LOW/NEUTRE) en plus du score
-                    // mathématique d'EconomicAnalyzer, pour que les types riches (Warsh, ISM, PMI Flash, Michigan,
-                    // GDP-Advance) déclenchent eux aussi le statut suprême même si le calcul de poids reste bas.
-                    String rawImpact = detectedEvt.getRawImpact();
-                    if (finalCalculatedWeight >= 3 || currentSpeaker.equals("FED") || eventTypeStr.equals("GEOPOLITICAL")
-                            || "HIGH".equals(rawImpact) || "FED-WARSH-SIGNAL".equals(detectedEvt.eventType)) {
-                        isSupremeRank = true;
-                    }
-    
-                    // 4️⃣ Anti-spam / Protection contre les flux de paroles répétitifs des speakers
-                    String speakerToken = currentSpeaker.trim();
-                    if (!speakerToken.isEmpty()) {
-                        if (!isSupremeRank && speakerToken.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
-                            Log.d(TAG, "Doublon de discours filtré (" + speakerToken + ")");
-                            return;
-                        }
-                        lastSpeechTime = currentTime;
-                        lastSpeaker = speakerToken;
-                    }
-                    // 5️⃣ Matrice de ciblage et d'allocation des Actifs Financiers (Thread-safe via liste locale)
-                    List<String> enrichedAssets = new ArrayList<>();
-                    if (upperFeed.contains("EUR") || upperFeed.contains("ECB") || upperFeed.contains("LAGARDE")) enrichedAssets.add("EURUSD");
-                    if (upperFeed.contains("JPY") || upperFeed.contains("YEN") || upperFeed.contains("BOJ")) enrichedAssets.add("USDJPY");
-                    if (upperFeed.contains("GBP") || upperFeed.contains("BOE")) enrichedAssets.add("GBPUSD");
-                    if (upperFeed.contains("AUD") || upperFeed.contains("RBA")) enrichedAssets.add("AUDUSD");
-                    if (upperFeed.contains("CAD") || upperFeed.contains("BOC")) enrichedAssets.add("USDCAD");
-                    if (upperFeed.contains("GOLD") || upperFeed.contains("XAU")) enrichedAssets.add("GOLD");
-                    if (upperFeed.contains("NASDAQ") || upperFeed.contains("TECH") || upperFeed.contains("AI")) enrichedAssets.add("NASDAQ");
-                    if (upperFeed.contains("SP500") || upperFeed.contains("S&P")) enrichedAssets.add("SP500");
-                    if (upperFeed.contains("BITCOIN") || upperFeed.contains("BTC")) enrichedAssets.add("BITCOIN");
-    
-                    // Association contextuelle Pétrole / Risque d'approvisionnement (Hormuz)
-                    if (upperFeed.contains("OIL") || upperFeed.contains("WTI") || upperFeed.contains("CRUDE") || 
-                        upperFeed.contains("EIA") || upperFeed.contains("HORMUZ") || upperFeed.contains("ORMUZ")) {
-                        if (!enrichedAssets.contains("USOIL")) enrichedAssets.add("USOIL");
-                        if (!enrichedAssets.contains("USDCAD")) enrichedAssets.add("USDCAD");
-                        if (!enrichedAssets.contains("GOLD")) enrichedAssets.add("GOLD");
-                    }
-    
-                    // Profil d'allocation en Régime de Crise Géopolitique
-                    if (eventTypeStr.equals("GEOPOLITICAL")) {
-                        String[] geoAssets = {"GOLD", "USOIL", "USDJPY", "US10Y", "NASDAQ", "SP500"};
-                        for (String asset : geoAssets) {
-                            if (!enrichedAssets.contains(asset)) enrichedAssets.add(asset);
-                        }
-                    }
-    
-                    // Profil d'allocation standard lors des chocs macroéconomiques majeurs
-                    if (isSupremeRank && !eventTypeStr.equals("GEOPOLITICAL")) {
-                        String[] macroAssets = {"US10Y", "NASDAQ", "SP500", "GOLD", "EURUSD", "USDJPY", "BITCOIN"};
-                        for (String asset : macroAssets) {
-                            if (!enrichedAssets.contains(asset)) enrichedAssets.add(asset);
-                        }
-                    }
-    
-                    // Panier de secours par défaut si aucun mot-clé d'actif n'a matché
-                    if (enrichedAssets.isEmpty()) {
-                        enrichedAssets.add("NASDAQ");
-                        enrichedAssets.add("SP500");
-                        enrichedAssets.add("US10Y");
-                    }
-    
-                    // 6️⃣ Validation de cohérence temporelle et historique via EventValidator
-                    EventValidator.ValidationResult validationResult = EventValidator.validate(NotificationService.this, title, bodyTextRaw, currentTime, enrichedAssets);
-                    
-                    // Log dans l'Ui
-                    if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog(finalSourceName + ": " + (validationResult.isConfirmed ? "CONFIRMÉ" : "REJETÉ") + " - " + validationResult.reason);
-                    }
-                    // Coupe-circuit du Validateur : On bloque les doublons temporels, sauf s'il s'agit d'un choc absolu de poids 4
-                    if (validationResult != null && !validationResult.isConfirmed) {
-        // Cas particulier : inertie macro (driver déjà actif) → on envoie un rappel Telegram
-        if (validationResult.isInertiaBlock) {
-            String reminderMsg = "⏳ *RAPPEL : DRIVER DÉJÀ ACTIF*\n" +
-                                 "🔹 " + validationResult.reason + "\n\n" +
-                                 "📋 *Dernier événement similaire :*\n" +
-                                 validationResult.lastEventSummary;
-            sendTelegramSecure(reminderMsg, NotificationService.this);
-            Log.d(TAG, "[RAPPEL] Driver actif : rappel envoyé.");
-            return; // On arrête le traitement normal
-        }
-        // Pour les autres cas de rejet (doublon, rumeur, faible confiance, etc.)
-        if (finalCalculatedWeight < 4) {
-            Log.d(TAG, "[COUPE-CIRCUIT TIMING] Événement rejeté : " + validationResult.reason);
+        // ✅ CORRECTIF BUG 9 : ignore toute notification pendant un import/restauration de base
+        // (MainActivity ferme et recrée le fichier .db -> tout traitement ici lirait/écrirait
+        // sur une connexion fermée ou un fichier en cours de remplacement).
+        if (isDatabaseImportInProgress) {
+            Log.w(TAG, "[SERVICE] Notification ignorée : import de base de données en cours.");
             return;
         }
-        }
-
-                // 7️⃣ RÈGLE DE QUALIFICATION MINIMALE DU PIPELINE : Seuil fixé à 3 pour valider les drivers confirmés
-                if (finalCalculatedWeight < 3 && !eventTypeStr.equals("GEOPOLITICAL")) {
-                    Log.d(TAG, "[COUPE-CIRCUIT MACRO] Impact mathématique insuffisant (" + finalCalculatedWeight + "). Fin de tâche.");
-                    return; // Stoppe le traitement lourd et évite l'appel à Groq pour du bruit de fond conformes aux attentes
+        
+            // Détection et filtrage immédiat des packages sources autorisés
+            String packageName = sbn.getPackageName().toLowerCase(Locale.ROOT);
+            String sourceName = "Source Institutionnelle";
+            if (packageName.contains("financialjuice")) {
+            sourceName = "FinancialJuice";
+            } else if (packageName.contains("nikkei")) {
+                sourceName = "TradingEconomics";
+            } else if (packageName.contains("forex.portal")) {
+                sourceName = "Myfxbook";
+            } else if (packageName.contains("twitter") || packageName.contains("periscope")) {
+                sourceName = "X /Twitter";
+            } else if (packageName.contains("chrome") || packageName.equals("com.android.chrome")) {
+                sourceName = "Chrome";
+            } else {
+                return; // Ignore immédiatement tout le reste
+            }
+        
+            // Extraction sécurisée des chaînes de caractères brutes fournies par Android
+            Bundle extras = sbn.getNotification().extras;
+            final String title = extras.getString(Notification.EXTRA_TITLE, "");
+            String bigText = extras.getString(Notification.EXTRA_BIG_TEXT, "");
+            String text = extras.getString(Notification.EXTRA_TEXT, "");
+        
+            // 🔴 SÉCURITÉ REGEX : Conservation du texte brut le plus complet pour l'extraction mathématique d'EconomicAnalyzer
+            final String bodyTextRaw = bigText.length() > text.length() ? bigText : text;
+        
+            // Reconstruction standard du flux texte unifié pour le reste des modules
+            String subText = extras.getString(Notification.EXTRA_SUB_TEXT, "");
+            String summary = extras.getString(Notification.EXTRA_SUMMARY_TEXT, "");
+            String tempBody = bodyTextRaw;
+            if (subText.length() > tempBody.length()) tempBody = subText;
+            if (summary.length() > tempBody.length()) tempBody = summary;
+        
+            String tempUnifiedFeed = (title + " " + tempBody).trim();
+            CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+            if (lines != null && lines.length > 0) {
+                StringBuilder bundled = new StringBuilder(title).append(" ");
+                for (CharSequence line : lines) {
+                    if (line != null) bundled.append(line).append(" ");
                 }
-
-                // 8️⃣ Génération de la signature cryptographique et persistance SQLite en base de données
-                String fingerprint = generateSecureHash(packageName + "_" + title + "_" + bodyTextRaw + "_" + (postTimeMs / 60000));
-
-                StringBuilder assetsSb = new StringBuilder();
-                for (int i = 0; i < enrichedAssets.size(); i++) {
-                    assetsSb.append(enrichedAssets.get(i));
-                    if (i < enrichedAssets.size() - 1) assetsSb.append(",");
+                String bundledFeed = bundled.toString().trim();
+                if (bundledFeed.length() > tempUnifiedFeed.length()) {
+                    tempUnifiedFeed = bundledFeed;
                 }
-
-                // Sauvegarde de l'événement en base de données persistante avec injection du vrai poids macro calculé
-                boolean saved = eventDb.saveEvent(
-                        fingerprint, packageName, finalSourceName, eventTypeStr, title, bodyTextRaw,
-                        assetsSb.toString(), "pending", postTimeMs / 1000, "pending", finalCalculatedWeight);
-
-                if (saved) {
-                    Log.i(TAG, "[DATABASE] Match " + eventTypeStr + " enregistré avec succès. Poids affecté : " + finalCalculatedWeight);
-                }
-
-                // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
-                // 9️⃣ Enrichissement dynamique du Prompt Système IA
-                // 9️⃣ ENRICHISSEMENT MARKET DATA & PROMPT IA (Pipeline Intégré)
-                // 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
-String marketSnapshot = "Marché non analysé.";
-try {
-    // Récupération globale instantanée de tous les actifs en 1 seul appel Batch
-    java.util.Map<String, MarketDataFetcher.MarketData> batchSnapshot = 
-        MarketDataFetcher.getMarketDataBatch(enrichedAssets);
-
-    if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
-        StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
-        boolean premierActif = true;
-
-        for (java.util.Map.Entry<String, MarketDataFetcher.MarketData> entry : batchSnapshot.entrySet()) {
-            MarketDataFetcher.MarketData mData = entry.getValue();
+            }
+        
+            if (tempUnifiedFeed.length() < 6) return;
             
-            // 🛡️ MULTI-PROTECTION : Filtrage préventif des valeurs nulles ou prix aberrants (<= 0)
-            if (mData == null || mData.price <= 0) {
-                Log.w(TAG, "Snapshot - Actif ignoré car données invalides ou nulles : " + entry.getKey());
-                continue; 
-            }
-
-            // ✂️ SUPPRESSION DU SÉPARATEUR DE FIN : Ajouté uniquement avant les éléments suivants
-            if (!premierActif) {
-                sb.append(" | ");
-            }
-            premierActif = false;
-
-            String sign = (mData.changePercent >= 0) ? "+" : "";
-            sb.append(entry.getKey())
-              .append(" => ")
-              .append(String.format(Locale.US, "%.4f (%s%.2f%%)", mData.price, sign, mData.changePercent));
-        }
-
-        // Vérification finale au cas où TOUX les actifs auraient été rejetés par le filtre de sécurité
-        if (premierActif) {
-            marketSnapshot = "Données de marché indisponibles (aucun prix valide extrait).";
-        } else {
-            marketSnapshot = sb.toString();
-        }
-    } else {
-        marketSnapshot = "Données de marché indisponibles (Twelve Data hors-ligne ou limite atteinte).";
-    }
-} catch (Exception e) {
-    Log.e(TAG, "Échec de la génération du snapshot marché", e);
-    marketSnapshot = "Erreur technique lors de l'acquisition des données.";
-}
-
-                // Construction du prompt enrichi
-                String baseSystemPrompt = SYSTEM_PROMPT;
-                String promptAI = "📊 [CONTEXTE MARCHÉ ACTUEL] : " + marketSnapshot + "\n\n" + baseSystemPrompt;
-
-                if (ecoResult.isParsed) {
-                    promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
-                            "L'analyseur mathématique déterministe a détecté un écart type. " +
-                            "Direction recommandée : " + ecoResult.directionText + "\n\n" + promptAI;
-                }
-                 // 🛡️ THROTTLE GÉO CIBLÉ (12 min) — seul angle mort non couvert par l'inertie macro 2h,
-                // qui exclut volontairement les types GEO-* (cf. EventValidator.validate(), ÉTAPE 4).
-                // Remplace l'ancien GEO_THROTTLE_MS mort de processIncomingMacroFeed(), sans réimporter
-                // le reste de sa mécanique (rollback, etc.) devenue inutile face aux 3 autres garde-fous actifs.
-                if (eventTypeStr.equals("GEOPOLITICAL")) {
-                    if (!isSupremeRank && (currentTime - lastGeoTime < GEO_THROTTLE_MS)) {
-                        Log.d(TAG, "[THROTTLE GÉO] Notification bloquée (12 min) - dernier choc géo il y a "
-                                + (currentTime - lastGeoTime) / 1000 + "s");
-                        return;
+            final String finalUnifiedFeed = tempUnifiedFeed;
+            final String finalSourceName = sourceName;
+            final long postTimeMs = sbn.getPostTime();
+            // ==================== 🔥 INTERCEPTION ET ENRICHISSEMENT FRED IMMÉDIAT ====================
+            String upperCheck = finalUnifiedFeed.toUpperCase(Locale.ROOT);
+            if (upperCheck.contains("JOBLESS CLAIMS") || upperCheck.contains("INITIAL CLAIMS") || upperCheck.contains("CHÔMAGE US")) {
+                // Déclenchement en tâche de fond sur le pool secondaire 'exec' pour préserver 'tradingPipelineExecutor'
+                exec.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.d(TAG, "🔄 [FRED] Requête en arrière-plan lancée de manière non-bloquante pour ICSA...");
+                        String actualClaims = EconomicCalendarAPI.fetchFredActualValue("ICSA", "K");
+                        
+                        if (actualClaims != null) {
+                            Log.d(TAG, "🎯 [FRED SUCCESS] Valeur récupérée : " + actualClaims);
+                            
+                            // Injection automatique en SQLite (mettra à jour et notifiera si configuré)
+                            boolean updated = EventDatabase.getInstance(getApplicationContext())
+                                    .updateActualIfMissing(title, actualClaims, getApplicationContext());
+                            if (updated) {
+                                Log.d(TAG, "✅ [FRED] Base de données synchronisée avec succès pour l'indicateur.");
+                            }
+                        } else {
+                            Log.w(TAG, "⚠️ [FRED FAILURE] Impossible d'extraire la donnée en ligne.");
+                        }
                     }
-                    lastGeoTime = currentTime;
-                }
-                // 🔟 Exécution finale de l'analyse cognitive LLM
-                processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank);
-
-            } catch (Exception e) {
-                Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
+                });
             }
-        }
-        });
-    }
-
-  public static void sendToGroqAndTelegram(String source, String title, String body, List<String> assets, Context context) {
-    if (context == null) return;
-    String fingerprint = String.valueOf((source + title + body).hashCode());
-    NotificationService instance = serviceInstance;
-
-    // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report (INCHANGÉ)
-    // ✅ Ne pas re-sauvegarder si déjà en DB — updateActualIfMissing l'a déjà mis à jour
-// Sauvegarder uniquement si vraiment absent (fingerprint non existant)
-      // 2. Gestion intelligente des actifs (Priorité aux paramètres, repli sur la liste globale)
-    List<String> finalAssetsList = (assets != null && !assets.isEmpty()) ? assets : new ArrayList<>(Arrays.asList(
-        "GOLD","NASDAQ","SP500","BITCOIN","EURUSD",
-        "USDJPY","GBPUSD","AUDUSD","USDCAD","USOIL","US10Y"
-    ));
-    // Conversion de la Liste en String pour correspondre au schéma SQLite
-    String assetsStr = String.join(",", finalAssetsList);
-    // ✅ AUDIT EXHAUSTIF (bug 9) : double garde NPE — instance peut être null (service non démarré)
-    // et getEventDb() peut être null (import de base en cours) ; sans ce garde, un appelant futur
-    // sans try/catch dédié ferait planter le service au lieu de simplement ignorer la sauvegarde.
-    EventDatabase db = (instance != null) ? instance.getEventDb() : null;
-    if (db != null) {
-        if (!db.isEventAlreadySaved(title, System.currentTimeMillis() / 1000)) {
-            int dynamicWeight = EconomicCalendarAPI.isSupremeCalendarIndicator(title) ? 5 : 3;
-            db.saveEvent(
-                fingerprint, "com.tradingbot.calendar", source,
-                "CALENDAR-RESULT", title, body, assetsStr,
-                "pending", System.currentTimeMillis() / 1000,
-                "pending", dynamicWeight
-            );
-        }
-    } else {
-        Log.w(TAG, "[sendToGroqAndTelegram] Sauvegarde DB ignorée (service/DB indisponible) pour : " + title);
-    }
-   // 🚀 INJECTION : Déportation réseau simplifiée et ultra-rapide via Batch API
-new Thread(new Runnable() {
-    @Override
-    public void run() {
-        try {
-            StringBuilder blocPrix = new StringBuilder();
-
-            if (assets != null && !assets.isEmpty()) {
-                blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
-                
-                // Un seul appel réseau unifié pour TOUS les actifs qualifiés simultanément
-                java.util.Map<String, MarketDataFetcher.MarketData> batchPrices = 
-                        MarketDataFetcher.getMarketDataBatch(assets);
-
-                for (String asset : assets) {
-                    MarketDataFetcher.MarketData data = batchPrices.get(asset);
+            // =========================================================================================
+            // 2️⃣ BASCOULEMENT IMMÉDIAT ET ISOLÉ DANS LE PIPELINE ASYNCHRONE (THREAD D'ARRIÈRE-PLAN)
+            // Utilisation de l'exécuteur existant de la classe pour stabiliser la RAM et le CPU
+            tradingPipelineExecutor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        String upperFeed = finalUnifiedFeed.toUpperCase(Locale.ROOT);
+                        long currentTime = System.currentTimeMillis();
+                        String currentSpeaker = "";
+        
+                        // Identification des Speakers de Banques Centrales
+                        if (upperFeed.contains("POWELL") || upperFeed.contains("WARSH") || upperFeed.contains("WALLER") ||
+                            upperFeed.contains("BARKIN") || upperFeed.contains("GOOLSBEE") || upperFeed.contains("WILLIAMS") ||
+                            upperFeed.contains("KUGLER") || upperFeed.contains("BOSTIC") || upperFeed.contains("DALY") ||
+                            upperFeed.contains("LOGAN") || upperFeed.contains("FED")) {
+                            currentSpeaker = "FED";
+                        } else if (upperFeed.contains("LAGARDE") || upperFeed.contains("SCHNABEL") || upperFeed.contains("NAGEL")) {
+                            currentSpeaker = "ECB";
+                        }
+        
+                        EconomicEventDetector.DetectedEvent detectedEvt = EconomicEventDetector.detectEvent(title, finalUnifiedFeed);
+                        String eventTypeStr = detectedEvt.eventType;
+                        boolean isSupremeRank = false;
+    
+                        // 🛡️ Préservation de TOUTE la logique géo en aval (allocation d'actifs, bypass throttle, seuils)
+                        // EconomicEventDetector retourne des types granulaires (GEO-MIDDLE-EAST, GEO-EUROPE-EST,
+                        // GEO-ASIA-PACIFIC) là où l'ancien code inline utilisait un seul marqueur générique "GEOPOLITICAL".
+                        // On normalise ici pour ne rien casser dans le reste de la méthode.
+                        boolean isGeoDetected = eventTypeStr.startsWith("GEO-")
+                                || upperFeed.contains("HORMUZ") || upperFeed.contains("ORMUZ") || upperFeed.contains("IRAN") || upperFeed.contains("ISRAEL")
+                                || upperFeed.contains("HEZBOLLAH") || upperFeed.contains("HOUTHI") || upperFeed.contains("GAZA") || upperFeed.contains("LEBANON")
+                                || upperFeed.contains("MOYEN-ORIENT") || upperFeed.contains("MIDDLE EAST") || upperFeed.contains("WAR") || upperFeed.contains("STRIKE")
+                                || upperFeed.contains("FRAPPE") || upperFeed.contains("ESCALADE") || upperFeed.contains("CONFLIT") || upperFeed.contains("MILITARY")
+                                || upperFeed.contains("TAIWAN") || upperFeed.contains("UKRAINE") || upperFeed.contains("RUSSIA");
+    
+                        if (isGeoDetected) {
+                            eventTypeStr = "GEOPOLITICAL"; // Conserve le marqueur exact attendu par toute la logique en aval
+                            isSupremeRank = false;
+                        } else if (upperFeed.contains("OIL") || upperFeed.contains("WTI") || upperFeed.contains("BRENT") || upperFeed.contains("CRUDE") ||
+                                   upperFeed.contains("EIA") || upperFeed.contains("OPEC") || upperFeed.contains("INVENTORIES") || upperFeed.contains("PETROLE")) {
+                            // Cas non couvert nommément par EconomicEventDetector → on garde le comportement historique
+                            eventTypeStr = "OIL-INVENTORY";
+                        }
+                        // Sinon : eventTypeStr reste la valeur riche fournie par EconomicEventDetector
+                        // (ex: FED-WARSH-SIGNAL, INFLATION-DATA, ISM-INDICATOR, PMI-FLASH, MICHIGAN-SENTIMENT,
+                        // GDP-ADVANCE, TRADE-TARIFF, CHINA-MACRO, etc.)
+        
+                        // 3️⃣ SYNCHRONISATION MACRO DÉTERMINISTE avec enrichissement calendaire
+                        // Enrichir le contenu avec les données du calendrier (ACTUAL/FORECAST) si disponibles
+                        String enrichedBody = EventValidator.enrichWithCalendar(title, bodyTextRaw, postTimeMs);
+                        EconomicAnalyzer.EvaluationResult ecoResult = EconomicAnalyzer.analyserEvenement(title, enrichedBody);
+                        Log.d(TAG, "Devise détectée : " + ecoResult.currency + ", poids : " + ecoResult.weight);
+                        // Le poids n'est plus forcé à 5 ou 3 statiquement, il découle de la surprise de l'écart mathématique (1 à 4)
+                        int finalCalculatedWeight = ecoResult.weight;
+                        // Ajustement du pavillon suprême selon le verdict de l'analyseur mathématique ou de l'urgence géopolitique
+                        // 🆕 Exploite désormais detectedEvt.getRawImpact() (HIGH/MEDIUM/LOW/NEUTRE) en plus du score
+                        // mathématique d'EconomicAnalyzer, pour que les types riches (Warsh, ISM, PMI Flash, Michigan,
+                        // GDP-Advance) déclenchent eux aussi le statut suprême même si le calcul de poids reste bas.
+                        String rawImpact = detectedEvt.getRawImpact();
+                        if (finalCalculatedWeight >= 3 || currentSpeaker.equals("FED") || eventTypeStr.equals("GEOPOLITICAL")
+                                || "HIGH".equals(rawImpact) || "FED-WARSH-SIGNAL".equals(detectedEvt.eventType)) {
+                            isSupremeRank = true;
+                        }
+        
+                        // 4️⃣ Anti-spam / Protection contre les flux de paroles répétitifs des speakers
+                        String speakerToken = currentSpeaker.trim();
+                        if (!speakerToken.isEmpty()) {
+                            if (!isSupremeRank && speakerToken.equals(lastSpeaker) && (currentTime - lastSpeechTime < 60000)) {
+                                Log.d(TAG, "Doublon de discours filtré (" + speakerToken + ")");
+                                return;
+                            }
+                            lastSpeechTime = currentTime;
+                            lastSpeaker = speakerToken;
+                        }
+                        // 5️⃣ Matrice de ciblage et d'allocation des Actifs Financiers (Thread-safe via liste locale)
+                        List<String> enrichedAssets = new ArrayList<>();
+                        if (upperFeed.contains("EUR") || upperFeed.contains("ECB") || upperFeed.contains("LAGARDE")) enrichedAssets.add("EURUSD");
+                        if (upperFeed.contains("JPY") || upperFeed.contains("YEN") || upperFeed.contains("BOJ")) enrichedAssets.add("USDJPY");
+                        if (upperFeed.contains("GBP") || upperFeed.contains("BOE")) enrichedAssets.add("GBPUSD");
+                        if (upperFeed.contains("AUD") || upperFeed.contains("RBA")) enrichedAssets.add("AUDUSD");
+                        if (upperFeed.contains("CAD") || upperFeed.contains("BOC")) enrichedAssets.add("USDCAD");
+                        if (upperFeed.contains("GOLD") || upperFeed.contains("XAU")) enrichedAssets.add("GOLD");
+                        if (upperFeed.contains("NASDAQ") || upperFeed.contains("TECH") || upperFeed.contains("AI")) enrichedAssets.add("NASDAQ");
+                        if (upperFeed.contains("SP500") || upperFeed.contains("S&P")) enrichedAssets.add("SP500");
+                        if (upperFeed.contains("BITCOIN") || upperFeed.contains("BTC")) enrichedAssets.add("BITCOIN");
+        
+                        // Association contextuelle Pétrole / Risque d'approvisionnement (Hormuz)
+                        if (upperFeed.contains("OIL") || upperFeed.contains("WTI") || upperFeed.contains("CRUDE") || 
+                            upperFeed.contains("EIA") || upperFeed.contains("HORMUZ") || upperFeed.contains("ORMUZ")) {
+                            if (!enrichedAssets.contains("USOIL")) enrichedAssets.add("USOIL");
+                            if (!enrichedAssets.contains("USDCAD")) enrichedAssets.add("USDCAD");
+                            if (!enrichedAssets.contains("GOLD")) enrichedAssets.add("GOLD");
+                        }
+        
+                        // Profil d'allocation en Régime de Crise Géopolitique
+                        if (eventTypeStr.equals("GEOPOLITICAL")) {
+                            String[] geoAssets = {"GOLD", "USOIL", "USDJPY", "US10Y", "NASDAQ", "SP500"};
+                            for (String asset : geoAssets) {
+                                if (!enrichedAssets.contains(asset)) enrichedAssets.add(asset);
+                            }
+                        }
+        
+                        // Profil d'allocation standard lors des chocs macroéconomiques majeurs
+                        if (isSupremeRank && !eventTypeStr.equals("GEOPOLITICAL")) {
+                            String[] macroAssets = {"US10Y", "NASDAQ", "SP500", "GOLD", "EURUSD", "USDJPY", "BITCOIN"};
+                            for (String asset : macroAssets) {
+                                if (!enrichedAssets.contains(asset)) enrichedAssets.add(asset);
+                            }
+                        }
+        
+                        // Panier de secours par défaut si aucun mot-clé d'actif n'a matché
+                        if (enrichedAssets.isEmpty()) {
+                            enrichedAssets.add("NASDAQ");
+                            enrichedAssets.add("SP500");
+                            enrichedAssets.add("US10Y");
+                        }
+        
+                        // 6️⃣ Validation de cohérence temporelle et historique via EventValidator
+                        EventValidator.ValidationResult validationResult = EventValidator.validate(NotificationService.this, title, bodyTextRaw, currentTime, enrichedAssets);
+                        
+                        // Log dans l'Ui
+                        if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(finalSourceName + ": " + (validationResult.isConfirmed ? "CONFIRMÉ" : "REJETÉ") + " - " + validationResult.reason);
+                        }
+                        // Coupe-circuit du Validateur : On bloque les doublons temporels, sauf s'il s'agit d'un choc absolu de poids 4
+                        if (validationResult != null && !validationResult.isConfirmed) {
+                        // Cas particulier : inertie macro (driver déjà actif) → on envoie un rappel Telegram
+                        if (validationResult.isInertiaBlock) {
+                            String reminderMsg = "⏳ *RAPPEL : DRIVER DÉJÀ ACTIF*\n" +
+                                                 "🔹 " + validationResult.reason + "\n\n" +
+                                                 "📋 *Dernier événement similaire :*\n" +
+                                                 validationResult.lastEventSummary;
+                            sendTelegramSecure(reminderMsg, NotificationService.this);
+                            Log.d(TAG, "[RAPPEL] Driver actif : rappel envoyé.");
+                            return; // On arrête le traitement normal
+                        }
+                        // Pour les autres cas de rejet (doublon, rumeur, faible confiance, etc.)
+                        if (finalCalculatedWeight < 4) {
+                            Log.d(TAG, "[COUPE-CIRCUIT TIMING] Événement rejeté : " + validationResult.reason);
+                            return;
+                        }
+                        }
+    
+                    // 7️⃣ RÈGLE DE QUALIFICATION MINIMALE DU PIPELINE : Seuil fixé à 3 pour valider les drivers confirmés
+                    if (finalCalculatedWeight < 3 && !eventTypeStr.equals("GEOPOLITICAL")) {
+                        Log.d(TAG, "[COUPE-CIRCUIT MACRO] Impact mathématique insuffisant (" + finalCalculatedWeight + "). Fin de tâche.");
+                        return; // Stoppe le traitement lourd et évite l'appel à Groq pour du bruit de fond conformes aux attentes
+                    }
+    
+                    // 8️⃣ Génération de la signature cryptographique et persistance SQLite en base de données
+                    String fingerprint = generateSecureHash(packageName + "_" + title + "_" + bodyTextRaw + "_" + (postTimeMs / 60000));
+    
+                    StringBuilder assetsSb = new StringBuilder();
+                    for (int i = 0; i < enrichedAssets.size(); i++) {
+                        assetsSb.append(enrichedAssets.get(i));
+                        if (i < enrichedAssets.size() - 1) assetsSb.append(",");
+                    }
+    
+                    // Sauvegarde de l'événement en base de données persistante avec injection du vrai poids macro calculé
+                    boolean saved = eventDb.saveEvent(
+                            fingerprint, packageName, finalSourceName, eventTypeStr, title, bodyTextRaw,
+                            assetsSb.toString(), "pending", postTimeMs / 1000, "pending", finalCalculatedWeight);
+    
+                    if (saved) {
+                        Log.i(TAG, "[DATABASE] Match " + eventTypeStr + " enregistré avec succès. Poids affecté : " + finalCalculatedWeight);
+                    }
+    
+                    // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
+                    // 9️⃣ Enrichissement dynamique du Prompt Système IA
+                    // 9️⃣ ENRICHISSEMENT MARKET DATA & PROMPT IA (Pipeline Intégré)
+                    // 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
+                    String marketSnapshot = "Marché non analysé.";
+                    try {
+                        // Récupération globale instantanée de tous les actifs en 1 seul appel Batch
+                        java.util.Map<String, MarketDataFetcher.MarketData> batchSnapshot = 
+                            MarketDataFetcher.getMarketDataBatch(enrichedAssets);
                     
-                    if (data != null && data.price > 0) {
-                        String tendance = data.changePercent >= 0 ? "📈" : "📉";
-                        // ✅ Correction Markdown : Remplacement des ** par * pour le parse_mode standard de Telegram
-                        String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
-                        blocPrix.append(String.format(Locale.US, formatPrix, tendance, asset, data.price, data.changePercent));
-                    } else {
-                        blocPrix.append("\n🔸 ").append(asset).append(" : (Cours indisponible)");
+                        if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
+                            StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
+                            boolean premierActif = true;
+                    
+                            for (java.util.Map.Entry<String, MarketDataFetcher.MarketData> entry : batchSnapshot.entrySet()) {
+                                MarketDataFetcher.MarketData mData = entry.getValue();
+                                
+                                // 🛡️ MULTI-PROTECTION : Filtrage préventif des valeurs nulles ou prix aberrants (<= 0)
+                                if (mData == null || mData.price <= 0) {
+                                    Log.w(TAG, "Snapshot - Actif ignoré car données invalides ou nulles : " + entry.getKey());
+                                    continue; 
+                                }
+                    
+                                // ✂️ SUPPRESSION DU SÉPARATEUR DE FIN : Ajouté uniquement avant les éléments suivants
+                                if (!premierActif) {
+                                    sb.append(" | ");
+                                }
+                                premierActif = false;
+                    
+                                String sign = (mData.changePercent >= 0) ? "+" : "";
+                                sb.append(entry.getKey())
+                                  .append(" => ")
+                                  .append(String.format(Locale.US, "%.4f (%s%.2f%%)", mData.price, sign, mData.changePercent));
+                            }
+                    
+                            // Vérification finale au cas où TOUX les actifs auraient été rejetés par le filtre de sécurité
+                            if (premierActif) {
+                                marketSnapshot = "Données de marché indisponibles (aucun prix valide extrait).";
+                            } else {
+                                marketSnapshot = sb.toString();
+                            }
+                        } else {
+                            marketSnapshot = "Données de marché indisponibles (Twelve Data hors-ligne ou limite atteinte).";
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Échec de la génération du snapshot marché", e);
+                        marketSnapshot = "Erreur technique lors de l'acquisition des données.";
                     }
+    
+                    // Construction du prompt enrichi
+                    String baseSystemPrompt = SYSTEM_PROMPT;
+                    String promptAI = "📊 [CONTEXTE MARCHÉ ACTUEL] : " + marketSnapshot + "\n\n" + baseSystemPrompt;
+    
+                    if (ecoResult.isParsed) {
+                        promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
+                                "L'analyseur mathématique déterministe a détecté un écart type. " +
+                                "Direction recommandée : " + ecoResult.directionText + "\n\n" + promptAI;
+                    }
+                     // 🛡️ THROTTLE GÉO CIBLÉ (12 min) — seul angle mort non couvert par l'inertie macro 2h,
+                    // qui exclut volontairement les types GEO-* (cf. EventValidator.validate(), ÉTAPE 4).
+                    // Remplace l'ancien GEO_THROTTLE_MS mort de processIncomingMacroFeed(), sans réimporter
+                    // le reste de sa mécanique (rollback, etc.) devenue inutile face aux 3 autres garde-fous actifs.
+                    if (eventTypeStr.equals("GEOPOLITICAL")) {
+                        if (!isSupremeRank && (currentTime - lastGeoTime < GEO_THROTTLE_MS)) {
+                            Log.d(TAG, "[THROTTLE GÉO] Notification bloquée (12 min) - dernier choc géo il y a "
+                                    + (currentTime - lastGeoTime) / 1000 + "s");
+                            return;
+                        }
+                        lastGeoTime = currentTime;
+                    }
+                    // 🔟 Exécution finale de l'analyse cognitive LLM
+                    processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank);
+    
+                } catch (Exception e) {
+                    Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
                 }
             }
+            });
+        }
 
-            String bodyEnrichi = body + blocPrix.toString();
-
-            if (instance != null) {
-                instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true);
-            } else {
-                String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
-                sendTelegramSecure(msg, context);
+      public static void sendToGroqAndTelegram(String source, String title, String body, List<String> assets, Context context) {
+        if (context == null) return;
+        String fingerprint = String.valueOf((source + title + body).hashCode());
+        NotificationService instance = serviceInstance;
+    
+        // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report (INCHANGÉ)
+        // ✅ Ne pas re-sauvegarder si déjà en DB — updateActualIfMissing l'a déjà mis à jour
+    // Sauvegarder uniquement si vraiment absent (fingerprint non existant)
+          // 2. Gestion intelligente des actifs (Priorité aux paramètres, repli sur la liste globale)
+        List<String> finalAssetsList = (assets != null && !assets.isEmpty()) ? assets : new ArrayList<>(Arrays.asList(
+            "GOLD","NASDAQ","SP500","BITCOIN","EURUSD",
+            "USDJPY","GBPUSD","AUDUSD","USDCAD","USOIL","US10Y"
+        ));
+        // Conversion de la Liste en String pour correspondre au schéma SQLite
+        String assetsStr = String.join(",", finalAssetsList);
+        // ✅ AUDIT EXHAUSTIF (bug 9) : double garde NPE — instance peut être null (service non démarré)
+        // et getEventDb() peut être null (import de base en cours) ; sans ce garde, un appelant futur
+        // sans try/catch dédié ferait planter le service au lieu de simplement ignorer la sauvegarde.
+        EventDatabase db = (instance != null) ? instance.getEventDb() : null;
+        if (db != null) {
+            if (!db.isEventAlreadySaved(title, System.currentTimeMillis() / 1000)) {
+                int dynamicWeight = EconomicCalendarAPI.isSupremeCalendarIndicator(title) ? 5 : 3;
+                db.saveEvent(
+                    fingerprint, "com.tradingbot.calendar", source,
+                    "CALENDAR-RESULT", title, body, assetsStr,
+                    "pending", System.currentTimeMillis() / 1000,
+                    "pending", dynamicWeight
+                );
             }
-
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur critique lors de l'enrichissement par Batch API", e);
-            // Mode dégradé sécurisé (Fallback) : transmission du corps initial sans bloc de prix
-            if (instance != null) {
-                instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true);
-            } else {
-                String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
-                sendTelegramSecure(msg, context);
+        } else {
+            Log.w(TAG, "[sendToGroqAndTelegram] Sauvegarde DB ignorée (service/DB indisponible) pour : " + title);
+        }
+       // 🚀 INJECTION : Déportation réseau simplifiée et ultra-rapide via Batch API
+    new Thread(new Runnable() {
+        @Override
+        public void run() {
+            try {
+                StringBuilder blocPrix = new StringBuilder();
+    
+                if (assets != null && !assets.isEmpty()) {
+                    blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
+                    
+                    // Un seul appel réseau unifié pour TOUS les actifs qualifiés simultanément
+                    java.util.Map<String, MarketDataFetcher.MarketData> batchPrices = 
+                            MarketDataFetcher.getMarketDataBatch(assets);
+    
+                    for (String asset : assets) {
+                        MarketDataFetcher.MarketData data = batchPrices.get(asset);
+                        
+                        if (data != null && data.price > 0) {
+                            String tendance = data.changePercent >= 0 ? "📈" : "📉";
+                            // ✅ Correction Markdown : Remplacement des ** par * pour le parse_mode standard de Telegram
+                            String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
+                            blocPrix.append(String.format(Locale.US, formatPrix, tendance, asset, data.price, data.changePercent));
+                        } else {
+                            blocPrix.append("\n🔸 ").append(asset).append(" : (Cours indisponible)");
+                        }
+                    }
+                }
+    
+                String bodyEnrichi = body + blocPrix.toString();
+    
+                if (instance != null) {
+                    instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true);
+                } else {
+                    String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
+                    sendTelegramSecure(msg, context);
+                }
+    
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur critique lors de l'enrichissement par Batch API", e);
+                // Mode dégradé sécurisé (Fallback) : transmission du corps initial sans bloc de prix
+                if (instance != null) {
+                    instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true);
+                } else {
+                    String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
+                    sendTelegramSecure(msg, context);
+                }
             }
         }
-    }
-}).start();
-   }
+    }).start();
+       }
 
     @Override
     public void onCreate() {
