@@ -400,7 +400,7 @@ public class EventValidator {
             result.confidence = 100;
             result.isConfirmed = true;
             result.reason = "Interception Complète Calendrier Macro (" + detectedAssets.toString() + ")";
-            result.assetEnriched = true; // ✅ CORRIGÉ (Du singulier d'après ta classe ValidationResult)
+            result.assetsEnriched = true; // ✅ CORRIGÉ (Du singulier d'après ta classe ValidationResult)
             Log.d("EventValidator", "🟢 [MACRO PRODUCTION INTERCEPT] Intégrité 100% validée pour : " + detectedAssets);
             return result;
         }
