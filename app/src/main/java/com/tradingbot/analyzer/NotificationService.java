@@ -770,9 +770,17 @@ public class NotificationService extends NotificationListenerService {
     }
 
     @Override
-    public void onNotificationPosted(StatusBarNotification sbn) {
-        // 1️⃣ Vérification de l'état d'activation du bot (Doit être ultra-rapide sur le thread UI)
-        if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
+public void onNotificationPosted(StatusBarNotification sbn) {
+    // 1️⃣ Vérification de l'état d'activation du bot (Doit être ultra-rapide sur le thread UI)
+    if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
+
+    // ✅ CORRECTIF BUG 9 : ignore toute notification pendant un import/restauration de base
+    // (MainActivity ferme et recrée le fichier .db -> tout traitement ici lirait/écrirait
+    // sur une connexion fermée ou un fichier en cours de remplacement).
+    if (isDatabaseImportInProgress) {
+        Log.w(TAG, "[SERVICE] Notification ignorée : import de base de données en cours.");
+        return;
+    }
     
         // Détection et filtrage immédiat des packages sources autorisés
         String packageName = sbn.getPackageName().toLowerCase(Locale.ROOT);
