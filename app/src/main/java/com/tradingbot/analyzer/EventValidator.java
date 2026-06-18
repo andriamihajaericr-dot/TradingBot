@@ -267,16 +267,20 @@ public class EventValidator {
         }
     }
 
-    // ── ⚡ INTERCEPTION & DÉROGATION ABSOLUE : CALENDRIER FINANCIALJUICE ──
-    if (rawExtracted.contains("ACTUAL:") && (rawExtracted.contains("FORECAST:") || rawExtracted.contains("PREVIOUS:"))) {
+    // ── ⚡ INTERCEPTION & DÉROGATION ABSOLUE : CALENDRIER FINANCIALJUICE & MACRO CORE ──
+    // CORRECTION : On accepte avec ou sans deux-points, ou si ce sont les Jobless Claims (indicateur US par défaut)
+    if ((rawExtracted.contains("ACTUAL") && (rawExtracted.contains("FORECAST") || rawExtracted.contains("PREVIOUS"))) || 
+        rawExtracted.contains("JOBLESS CLAIMS") || rawExtracted.contains("INITIAL CLAIMS")) {
         
         boolean assetsEnrichedInThisBlock = false;
-
+    
         // ── BLOC 1 : RANG SUPRÊME / MACRO US ──
+        // CORRECTION : Si le texte parle de JOBLESS ou CLAIMS, c'est obligatoirement de la macro US, même si "US" n'est pas écrit !
         if (rawExtracted.contains("US ") || rawExtracted.contains("USA ") || rawExtracted.contains("UNITED STATES") || 
             rawExtracted.contains("FOMC") || rawExtracted.contains("FED ") || rawExtracted.contains("POWELL") ||
             rawExtracted.contains("NFP") || rawExtracted.contains("PAYROLL") || rawExtracted.contains("TREASURY") ||
-            rawExtracted.contains("USD") || rawExtracted.contains("DOLLAR")) { 
+            rawExtracted.contains("USD") || rawExtracted.contains("DOLLAR") ||
+            rawExtracted.contains("JOBLESS") || rawExtracted.contains("CLAIMS")) { 
             
             if (rawExtracted.contains("CPI") || rawExtracted.contains("PCE") || rawExtracted.contains("INFLATION") || 
                 rawExtracted.contains("PPI") || rawExtracted.contains("RATE DECISION") || rawExtracted.contains("INTEREST RATE") ||
@@ -303,7 +307,7 @@ public class EventValidator {
                 }
             }
         }
-
+    
         // ── BLOC 2 : ZONE EURO 🇪🇺 ──
         if (rawExtracted.contains("EUROZONE") || rawExtracted.contains("GERMANY") || rawExtracted.contains("FRANCE") || 
             rawExtracted.contains("ITALY") || rawExtracted.contains("ECB") || rawExtracted.contains("BCE") || rawExtracted.contains("LAGARDE")) {
@@ -377,7 +381,7 @@ public class EventValidator {
             rawExtracted.contains("CRYPTO") || rawExtracted.contains("BINANCE")) {
             if (!detectedAssets.contains("BITCOIN")) { detectedAssets.add("BITCOIN"); assetsEnrichedInThisBlock = true; }
         }
-
+    
         // ── BLOC 8 : SÉCURITÉ RENDEMENTS & EARNINGS CORPORATE ──
         if (rawExtracted.contains("REAL YIELDS") || rawExtracted.contains("REAL RATES") || 
             rawExtracted.contains("GOLD RESERVES") || rawExtracted.contains("TIPS")) {
@@ -390,14 +394,14 @@ public class EventValidator {
             if (!detectedAssets.contains("NASDAQ")) { detectedAssets.add("NASDAQ"); assetsEnrichedInThisBlock = true; }
             if (!detectedAssets.contains("SP500")) { detectedAssets.add("SP500"); assetsEnrichedInThisBlock = true; }
         }
-
-        // Validation finale si le bloc a traité un événement calendaire chiffré
+    
+        // Validation finale forcée à 100% pour la macro pour bypasser l'Étape 8
         if (assetsEnrichedInThisBlock || !detectedAssets.isEmpty()) {
             result.confidence = 100;
             result.isConfirmed = true;
-            result.reason = "Interception Complète Calendrier FinancialJuice (" + detectedAssets.toString() + ")";
-            result.assetsEnriched = true;
-            logToMain("🟢 [FJ PRODUCTION INTERCEPT] Intégrité 100% validée pour : " + detectedAssets);
+            result.reason = "Interception Complète Calendrier Macro (" + detectedAssets.toString() + ")";
+            result.assetEnriched = true; // ✅ CORRIGÉ (Du singulier d'après ta classe ValidationResult)
+            Log.d("EventValidator", "🟢 [MACRO PRODUCTION INTERCEPT] Intégrité 100% validée pour : " + detectedAssets);
             return result;
         }
     }
