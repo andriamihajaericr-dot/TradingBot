@@ -552,26 +552,34 @@ public class EconomicAnalyzer {
     ParsedValues values = new ParsedValues();
     if (texte == null || texte.isEmpty()) return values;
 
-    // ✅ COHÉRENCE 1 : On harmonise uniquement les virgules en points pour le parsing double
-    String textePrepare = texte.replace(',', '.');
+    // ✅ COHÉRENCE 1 : Gestion correcte des séparateurs numériques anglophones.
+    // "1,234.5" = mille-deux-cent-trente-quatre virgule cinq (virgule = séparateur de MILLIERS, pas décimal).
+    // Un simple replace(',', '.') transformait ce nombre en "1.234.5", illisible par Double.parseDouble
+    // (échec silencieux absorbé par le try/catch de chercherRegex -> NaN -> signal macro perdu).
+    // On retire donc la virgule UNIQUEMENT quand elle sépare des milliers (suivie de 3 chiffres),
+    // puis on traite toute virgule restante comme un séparateur décimal (cas FR éventuel).
+    String textePrepare = texte.replaceAll("(\\d),(\\d{3})", "$1$2").replace(',', '.');
 
     // ✅ COHÉRENCE 2 : Ordre du plus spécifique au plus générique avec tolérance Casse/Espace
     String[] actualPatterns = {
-        "(?i)ACTUAL[:=\\s]+\\s*([0-9.\\-]+)", // Gère "Actual: 31.2", "ACTUAL 31.2", "Actual=31.2"
-        "(?i)ACT[:=\\s]+\\s*([0-9.\\-]+)",    // Gère "Act 31.2", "ACT:31.2"
-        "(?i)REAL[:=\\s]+\\s*([0-9.\\-]+)"    // Gère "Real 31.2"
+        "(?i)\\bACTUAL[:=\\s]+\\s*([0-9.\\-]+)", // Gère "Actual: 31.2", "ACTUAL 31.2", "Actual=31.2"
+        // ⚠️ ACT/REAL exigent un séparateur ':' ou '=' STRICT (pas un simple espace) : "ACT 5" matchait
+        // n'importe quel mot finissant par "act" suivi d'un nombre (ex: "impact 5", "contact 911").
+        "(?i)\\bACT[:=]\\s*([0-9.\\-]+)",    // Gère "Act:31.2", "ACT=31.2" (PAS "Act 31.2" sans séparateur)
+        "(?i)\\bREAL[:=]\\s*([0-9.\\-]+)"    // Gère "Real:31.2" (PAS "Real 31.2" sans séparateur)
     };
 
     String[] forecastPatterns = {
-        "(?i)FORECAST[:=\\s]+\\s*([0-9.\\-]+)", // Gère "Forecast 25.8", "FORECAST:25.8"
-        "(?i)EXP[:=\\s]+\\s*([0-9.\\-]+)",      // Gère "Exp 25.8"
-        "(?i)EST[:=\\s]+\\s*([0-9.\\-]+)",      // Gère "Est: 25.8"
-        "(?i)CONSENSUS[:=\\s]+\\s*([0-9.\\-]+)" // Gère "Consensus 25.8"
+        "(?i)\\bFORECAST[:=\\s]+\\s*([0-9.\\-]+)", // Gère "Forecast 25.8", "FORECAST:25.8"
+        // ⚠️ Même correctif pour EXP/EST : trop courts pour tolérer un espace comme séparateur
+        "(?i)\\bEXP[:=]\\s*([0-9.\\-]+)",      // Gère "Exp:25.8" (PAS "Exp 25.8")
+        "(?i)\\bEST[:=]\\s*([0-9.\\-]+)",      // Gère "Est:25.8" (PAS "Est 25.8")
+        "(?i)\\bCONSENSUS[:=\\s]+\\s*([0-9.\\-]+)" // Gère "Consensus 25.8"
     };
 
     String[] priorPatterns = {
-        "(?i)PRIOR[:=\\s]+\\s*([0-9.\\-]+)",   // Gère "Prior 26.5"
-        "(?i)PREVIOUS[:=\\s]+\\s*([0-9.\\-]+)" // Gère "Previous 26.5" (Format FinancialJuice)
+        "(?i)\\bPRIOR[:=\\s]+\\s*([0-9.\\-]+)",   // Gère "Prior 26.5"
+        "(?i)\\bPREVIOUS[:=\\s]+\\s*([0-9.\\-]+)" // Gère "Previous 26.5" (Format FinancialJuice)
     };
 
     // ✅ COHÉRENCE 3 : Extraction via votre méthode utilitaire
@@ -589,7 +597,7 @@ public class EconomicAnalyzer {
     }
 
     return values;
-}
+    }
     
     private static double chercherRegex(String texte, String expression) {
         try {
