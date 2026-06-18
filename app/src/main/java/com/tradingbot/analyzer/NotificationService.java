@@ -42,6 +42,9 @@ public class NotificationService extends NotificationListenerService {
     }
     // ✅ CORRECTIF : Variable de verrouillage globale pour l'import SQLite
     public static volatile boolean isDatabaseImportInProgress = false;
+    public EventDatabase getEventDb() {
+        return this.eventDb;
+    }
     //private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>();
     private static final String CHANNEL_ID = "trading_alerts";
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
