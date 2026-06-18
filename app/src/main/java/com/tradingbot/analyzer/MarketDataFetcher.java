@@ -453,11 +453,11 @@ public class MarketDataFetcher {
         if (assets == null || assets.isEmpty()) return new HashMap<>();
 
         // Traitement réseau asynchrone totalement isolé pour sanctuariser le thread appelant
-        Future<Map<String, MarketData>> future = networkExecutor.submit(() -> getMarketDataBatchRaw(assets));
+                Future<Map<String, MarketData>> future = networkExecutor.submit(() -> getMarketDataBatchRaw(assets));
 
         try {
-            // 🔥 BARRIÈRE DE PROTECTION TEMPS RÉEL : 800 millisecondes maximum
-            Map<String, MarketData> freshData = future.get(800, TimeUnit.MILLISECONDS);
+            // 🔥 Timeout augmenté à 2 secondes pour plus de chances d'avoir des données
+            Map<String, MarketData> freshData = future.get(2000, TimeUnit.MILLISECONDS);
             if (freshData != null && !freshData.isEmpty()) {
                 long now = System.currentTimeMillis();
                 // Remplissage dynamique du cache enveloppé de son horodatage (TTL)
