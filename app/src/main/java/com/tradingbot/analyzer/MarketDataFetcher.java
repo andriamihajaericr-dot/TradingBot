@@ -62,36 +62,77 @@ public class MarketDataFetcher {
             twelveDataKey = key;
         }
     }
-
         /**
-     * Méthode de diagnostic : Teste la fraîcheur réelle des données
+     * Test diagnostic amélioré - affiche dans l'UI + Logcat
      */
     public static void testRealTimeFreshness() {
         Log.d(TAG, "🔍 === TEST FRESHNESS MARKET DATA ===");
-        
+
+        // Affichage dans l'UI
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog("🔍 === TEST FRESHNESS MARKET DATA ===");
+        }
+
         List<String> testAssets = Arrays.asList("SP500", "NASDAQ", "GOLD", "BITCOIN", "EURUSD", "USDJPY");
         
         long start = System.currentTimeMillis();
-        Map<String, MarketData> data = getMarketDataBatch(testAssets);
-        long duration = System.currentTimeMillis() - start;
         
-        Log.d(TAG, "⏱️ Temps d'exécution du batch : " + duration + "ms");
-        
-        for (String asset : testAssets) {
-            MarketData md = data.get(asset);
-            CachedEntry cache = MARKET_DATA_CACHE.get(asset);
-            
-            if (md != null) {
-                long ageMs = cache != null ? (System.currentTimeMillis() - cache.timestamp) : 0;
-                Log.d(TAG, String.format("✅ %s | Prix: %.4f | Var: %+.2f%% | Âge: %ds", 
-                    asset, md.price, md.changePercent, ageMs/1000));
-            } else {
-                Log.w(TAG, "❌ " + asset + " → Aucune donnée (timeout ou erreur)");
+        try {
+            Map<String, MarketData> data = getMarketDataBatch(testAssets);
+            long duration = System.currentTimeMillis() - start;
+
+            String timeMsg = "⏱️ Temps total du batch : " + duration + "ms";
+            Log.d(TAG, timeMsg);
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(timeMsg);
             }
-        }
-        
-        if (duration > 800) {
-            Log.w(TAG, "⚠️ ATTENTION : Temps > 800ms → risque fréquent de fallback cache");
+
+            boolean hasData = false;
+            for (String asset : testAssets) {
+                MarketData md = data.get(asset);
+                CachedEntry cache = MARKET_DATA_CACHE.get(asset);
+                
+                if (md != null) {
+                    hasData = true;
+                    long ageMs = cache != null ? (System.currentTimeMillis() - cache.timestamp) : 0;
+                    String result = String.format("✅ %s | Prix: %.4f | Var: %+.2f%% | Âge: %ds", 
+                        asset, md.price, md.changePercent, ageMs/1000);
+                    
+                    Log.d(TAG, result);
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(result);
+                    }
+                } else {
+                    String error = "❌ " + asset + " → Aucune donnée";
+                    Log.w(TAG, error);
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(error);
+                    }
+                }
+            }
+
+            if (!hasData) {
+                String warning = "⚠️ AUCUNE DONNÉE RÉCUPÉRÉE - Problème réseau / clé API / timeout";
+                Log.w(TAG, warning);
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(warning);
+                }
+            }
+
+            if (duration > 1000) {
+                String slow = "⚠️ Temps très long (" + duration + "ms) → Timeout trop strict";
+                Log.w(TAG, slow);
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(slow);
+                }
+            }
+
+        } catch (Exception e) {
+            String error = "❌ Erreur pendant le test MarketData : " + e.getMessage();
+            Log.e(TAG, error, e);
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(error);
+            }
         }
     }
     
