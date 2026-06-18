@@ -34,18 +34,22 @@ public class EconomicAnalyzer {
      * Point d'entrée principal avec détection de la devise
      */
     public static EvaluationResult analyserEvenement(String title, String text) {
-        // 1. PATCH PRIORITÉ MAXIMALE : KEVIN WARSH
-        String combinedCheck = (title + " " + text).toUpperCase(Locale.ROOT);
-        if (combinedCheck.contains("WARSH")) {
-            EvaluationResult warshResult = new EvaluationResult();
-            warshResult.isParsed = true;
-            warshResult.deviation = 10; // Force un signal directionnel maximal
-            warshResult.weight = 10;    // Poids maximum
-            warshResult.directionText = "HAWKISH"; // Par défaut, Warsh est traité comme restrictif
-            warshResult.marketImpact = "HIGH_PRIORITY_FOMC_SIGNAL";
-            Log.e(TAG, "🚀 Signal prioritaire détecté : KEVIN WARSH. Bypass du parsing.");
-            return warshResult;
-        }
+    // 1. PATCH PRIORITÉ MAXIMALE : KEVIN WARSH
+    String combinedCheck = (title + " " + text).toUpperCase(Locale.ROOT);
+    if (combinedCheck.contains("WARSH")) {
+        EvaluationResult warshResult = new EvaluationResult();
+        warshResult.isParsed = true;
+        warshResult.deviation = 10; // Force un signal directionnel maximal (usage interne, hors échelle SQL)
+        // ⚠️ Plafonné à 5 (et non 10) : EventDatabase.driver_weight teste une égalité stricte "= 5"
+        // pour la rétention longue durée (45j) et le registre mensuel des piliers macro.
+        // Une valeur > 5 ne correspondrait à AUCUNE des conditions de purge ("< 5" ni "= 5") et
+        // l'événement resterait en base indéfiniment, hors de toute logique de rétention voulue.
+        warshResult.weight = 5; // Rang Suprême — aligné sur le palier maximal reconnu par EventDatabase
+        warshResult.directionText = "HAWKISH"; // Par défaut, Warsh est traité comme restrictif
+        warshResult.marketImpact = "HIGH_PRIORITY_FOMC_SIGNAL";
+        Log.e(TAG, "🚀 Signal prioritaire détecté : KEVIN WARSH. Bypass du parsing.");
+        return warshResult;
+    }
         EvaluationResult result = new EvaluationResult();
         if (title == null || text == null) return result;
 
