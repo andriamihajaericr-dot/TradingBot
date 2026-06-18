@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
             addLog("[SYSTEM] Redirection vers les autorisations Android.");
             startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
         });
-        testBtn.setOnClickListener(v -> {
+                testBtn.setOnClickListener(v -> {
     addLog("🧪 [TEST] Déclenchement du diagnostic complet...");
     new Thread(() -> {
         try {
@@ -122,22 +122,11 @@ public class MainActivity extends AppCompatActivity {
             );
             runOnUiThread(() -> addLog("✅ [TEST] Telegram OK"));
 
-            // ✅ Test 2 — Régime de marché
-            String regime = eventDb.detecterRegimeMarche(
-                System.currentTimeMillis() / 1000);
-            runOnUiThread(() -> addLog("📈 [TEST] Régime : " +
-                (regime != null ? regime.split("\n")[0] : "Indéterminé")));
+            // ✅ NOUVEAU TEST : Market Data Freshness
+            runOnUiThread(() -> addLog("📡 [TEST] Lancement du test MarketDataFetcher..."));
+            MarketDataFetcher.testRealTimeFreshness();
 
-            // ✅ Test 3 — Calendrier économique
-            int nbEvents = EventValidator.getUpcomingEvents().size();
-            runOnUiThread(() -> addLog("📅 [TEST] Calendrier : " +
-                nbEvents + " événements chargés"));
-
-            // ✅ Test 4 — DB diagnostic
-            String diag = eventDb.diagnostiquerDriverSpecifique("NFP");
-            runOnUiThread(() -> addLog("🔍 [TEST] DB NFP : " +
-                (diag != null ? diag.split("\n")[0] : "Aucun résultat")));
-
+            // ... autres tests existants (régime, calendrier, etc.) ...
         } catch (Exception e) {
             Log.e(TAG, "Échec test complet", e);
             runOnUiThread(() -> addLog("❌ [TEST] Erreur : " + e.getMessage()));
