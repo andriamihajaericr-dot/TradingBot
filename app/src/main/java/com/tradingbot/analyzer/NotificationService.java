@@ -851,34 +851,21 @@ public class NotificationService extends NotificationListenerService {
                         // L'interception n'est poursuivie que si l'extraction en ligne a fonctionné
                         if (actualClaims != null && !actualClaims.isEmpty()) {
                             
-                            // 1. Nettoyage et conversion sécurisée de la String actualClaims en long
-                            long claimsLong = 0;
-                            try {
-                                // Supprime tout ce qui n'est pas un chiffre (ex: "215,000" devient "215000")
-                                String cleanClaims = actualClaims.replaceAll("[^\\d]", "");
-                                if (!cleanClaims.isEmpty()) {
-                                    claimsLong = Long.parseLong(cleanClaims);
-                                }
-                            } catch (NumberFormatException e) {
-                                Log.e(TAG, "⚠️ Échec du parsing de actualClaims en long : " + actualClaims, e);
-                            }
+                            // 🕒 1. Récupération du timestamp actuel en secondes
+                            // Ta méthode DB applique une tolérance de ±2h, le temps actuel fitte parfaitement
+                            long currentUnixTimestamp = System.currentTimeMillis() / 1000L;
                             
-                            if (claimsLong > 0) {
-                                // 2. Appel de la méthode ET récupération du résultat booléen
-                                boolean updated = EventDatabase.getInstance(getApplicationContext())
-                                             .updateActualIfMissing(title, claimsLong, getApplicationContext());
-                                
-                                if (updated) {
-                                    Log.d(TAG, "✅ [FRED] Base de données synchronisée avec succès pour l'indicateur.");
-                                } else {
-                                    Log.d(TAG, "ℹ️ [FRED] Donnée reçue, mais aucune mise à jour nécessaire (déjà présente en DB).");
-                                }
+                            // 🚀 2. Appel avec la signature exacte : (String, long, String)
+                            boolean updated = EventDatabase.getInstance(getApplicationContext())
+                                         .updateActualIfMissing(title, currentUnixTimestamp, actualClaims);
+                            
+                            if (updated) {
+                                Log.d(TAG, "✅ [FRED] Base de données synchronisée avec succès pour l'indicateur.");
                             } else {
-                                Log.w(TAG, "⚠️ [FRED FAILURE] Le texte extrait n'a pu être converti en valeur numérique positive : " + actualClaims);
+                                Log.d(TAG, "ℹ️ [FRED] Donnée reçue (" + actualClaims + "), mais aucun événement 'Actual: N/A' à mettre à jour dans la fenêtre de ±2h.");
                             }
             
                         } else {
-                            // Ce bloc else est désormais parfaitement rattaché à l'échec de la requête HTTP FRED
                             Log.w(TAG, "⚠️ [FRED FAILURE] Impossible d'extraire la donnée en ligne.");
                         }
                     }
