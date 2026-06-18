@@ -222,7 +222,7 @@ public class EventValidator {
     // ✅ ÉTAPE 1 : Gestion de crise et désescalade événementielle
     GeoAssessment geo = assessGeopoliticalEvent(combined, upperCombined);
     
-    if (geo != null && geo.confidence >= 65) {
+    if (geo != null && geo.confidence >= 60) {
         if (combined.contains("ceasefire") || combined.contains("cessez-le-feu") || combined.contains("peace") || combined.contains("pourparlers")) { 
             if (isWarRegimeActive(context)) { // ✅ Lecture sécurisée avec vérification du TTL
                 setWarRegime(context, false); // 🕊️ Désactivation immédiate persistante
