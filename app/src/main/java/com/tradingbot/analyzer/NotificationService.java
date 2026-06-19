@@ -990,7 +990,11 @@ public class NotificationService extends NotificationListenerService {
                         }
         
                         // 6️⃣ Validation de cohérence temporelle et historique via EventValidator
-                        EventValidator.ValidationResult validationResult = EventValidator.validate(NotificationService.this, title, bodyTextRaw, currentTime, enrichedAssets);
+                        // APRÈS
+                        // ✅ CORRECTIF : on injecte la source déjà identifiée (finalSourceName) dans le contenu passé
+                        // au validateur, pour que calculateBreakingNewsConfidence() puisse réellement la reconnaître
+                        // au lieu de chercher en vain le mot "financialjuice" dans le texte de l'actu elle-même.
+                        EventValidator.ValidationResult validationResult = EventValidator.validate(NotificationService.this, title, bodyTextRaw + " [" + finalSourceName + "]", currentTime, enrichedAssets);
                         
                         // Log dans l'Ui
                         if (MainActivity.instance != null) {
