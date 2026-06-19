@@ -824,8 +824,10 @@ if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", fal
                 sourceName = "X /Twitter";
             } else if (packageName.contains("chrome") || packageName.equals("com.android.chrome")) {
                 sourceName = "Chrome";
+            // APRÈS
             } else {
-                return; // Ignore immédiatement tout le reste
+                Log.v(TAG, "[FILTRE PACKAGE] Ignoré (source non suivie) : " + packageName);
+                return;
             }
         
             // Extraction sécurisée des chaînes de caractères brutes fournies par Android
