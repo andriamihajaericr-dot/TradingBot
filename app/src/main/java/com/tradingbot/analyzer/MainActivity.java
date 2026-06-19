@@ -123,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
                                 // === TEST MARKET DATA ===
                     runOnUiThread(() -> addLog("📡 [TEST] Lancement MarketDataFetcher..."));
                     MarketDataFetcher.testRealTimeFreshness();
-                    runOnUiThread(() -> addLog("✅ [TEST] MarketDataFetcher terminé - Vérifie Logcat"));
+                    runOnUiThread(() -> addLog("✅ [TEST] MarketDataFetcher terminé - Voir les messages 🔴 ci-dessus pour le détail des erreurs"));
             MarketDataFetcher.testRealTimeFreshness();
 
             // ... autres tests existants (régime, calendrier, etc.) ...
