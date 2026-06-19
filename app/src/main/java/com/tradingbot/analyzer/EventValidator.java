@@ -183,8 +183,10 @@ public class EventValidator {
         public String  geoContext     = "";  // Description de la zone géopolitique détectée
         
         // Nouveaux champs pour l'inertie macro
+        // APRÈS
         public boolean isInertiaBlock = false;
         public String  lastEventSummary = "";
+        public boolean isCalendarIntercept = false; // ✅ Bypass explicite du seuil de poids dans NotificationService
         public ValidationResult() {}
 
         public ValidationResult(boolean isConfirmed, int confidence, String reason) {
