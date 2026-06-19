@@ -1083,7 +1083,7 @@ if (saved) {
 } else {
     Log.w(TAG, "[DATABASE] ⚠️ ÉCHEC saveEvent pour '" + title + "' (fingerprint=" + fingerprint + ") — doublon déjà connu ou erreur SQLite.");
 }
-    
+
                     // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
                     // 9️⃣ Enrichissement dynamique du Prompt Système IA
                     // 9️⃣ ENRICHISSEMENT MARKET DATA & PROMPT IA (Pipeline Intégré)
