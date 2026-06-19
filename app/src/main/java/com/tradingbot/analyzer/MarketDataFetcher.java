@@ -392,9 +392,10 @@ public class MarketDataFetcher {
         return assetName.trim(); 
     }
 
+    // APRÈS
     private static String executeHttpRequestWithRetry(String urlStr) throws Exception {
-        int maxRetries = 2;
-        int backoffMs = 2000;
+        int maxRetries = 1;
+        int backoffMs = 500;
 
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             if (Thread.currentThread().isInterrupted()) {
@@ -407,8 +408,8 @@ public class MarketDataFetcher {
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(10000); 
+                conn.setConnectTimeout(3000);
+                conn.setReadTimeout(3000);
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 429 || responseCode >= 500) {
