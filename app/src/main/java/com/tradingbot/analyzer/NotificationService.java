@@ -795,9 +795,14 @@ public void onListenerDisconnected() {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        // 1️⃣ Vérification de l'état d'activation du bot (Doit être ultra-rapide sur le thread UI)
-        if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) return;
-    
+        // APRÈS
+if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) {
+    String pkg = sbn.getPackageName();
+    if (pkg != null && (pkg.contains("financialjuice") || pkg.contains("nikkei") || pkg.contains("forex.portal"))) {
+        Log.w(TAG, "⏸️ [BOT INACTIF] Notif de '" + pkg + "' ignorée — bot_active=false.");
+    }
+    return;
+}
         // ✅ CORRECTIF BUG 9 : ignore toute notification pendant un import/restauration de base
         // (MainActivity ferme et recrée le fichier .db -> tout traitement ici lirait/écrirait
         // sur une connexion fermée ou un fichier en cours de remplacement).
