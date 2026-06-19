@@ -455,9 +455,11 @@ public class MarketDataFetcher {
         // Traitement réseau asynchrone totalement isolé pour sanctuariser le thread appelant
                 Future<Map<String, MarketData>> future = networkExecutor.submit(() -> getMarketDataBatchRaw(assets));
 
+       // APRÈS
         try {
-            // 🔥 Timeout augmenté à 2 secondes pour plus de chances d'avoir des données
-            Map<String, MarketData> freshData = future.get(2000, TimeUnit.MILLISECONDS);
+            // 🔥 Timeout aligné sur le budget réseau réel (connect 5s + marge) pour laisser
+            // le temps à executeHttpRequestWithRetry() de répondre avant abandon
+            Map<String, MarketData> freshData = future.get(7000, TimeUnit.MILLISECONDS);
             if (freshData != null && !freshData.isEmpty()) {
                 long now = System.currentTimeMillis();
                 // Remplissage dynamique du cache enveloppé de son horodatage (TTL)
