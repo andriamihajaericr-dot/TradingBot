@@ -46,7 +46,7 @@ public class MarketDataFetcher {
      
     
     private static final Map<String, CachedEntry> MARKET_DATA_CACHE = new ConcurrentHashMap<>();
-    private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(2); // Durée de vie max d'un prix de secours : 5 minutes
+    private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(2); // Durée de vie max d'un prix de secours : 2 minutes
 
     private static volatile boolean isShutdown = false;
 
@@ -138,7 +138,7 @@ public class MarketDataFetcher {
     
     /**
      * Récupère les prix sous forme de Map simple (Utilisé par les autres modules de l'application)
-     * Entièrement protégé par le traitement par lot, le timeout 800ms et le cache à expiration automatique.
+     * Entièrement protégé par le traitement par lot, le timeout 7000ms et le cache à expiration automatique.
      */
     public static Map<String, Double> getPrices(List<String> symbols) {
         Map<String, Double> priceMap = new HashMap<>();
@@ -413,14 +413,21 @@ public class MarketDataFetcher {
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 429 || responseCode >= 500) {
-                    if (attempt == maxRetries) throw new IOException("Erreur HTTP persistante: " + responseCode);
+                    if (attempt == maxRetries) {
+                        String errBody = readErrorStream(conn);
+                        throw new IOException("Erreur HTTP persistante: " + responseCode + " - " + errBody);
+                    }
                     Log.w(TAG, "HTTP " + responseCode + " - Tentative de réévaluation dans " + backoffMs + "ms...");
                     Thread.sleep((long) backoffMs * (attempt + 1));
                     continue;
                 }
 
                 if (responseCode != HttpURLConnection.HTTP_OK) {
-                    throw new IOException("Mauvaise réponse serveur: " + responseCode);
+                    // ⚠️ Cas typique d'une clé API invalide (401) ou d'un symbole/paramètre
+                    // rejeté (400). On lit le corps via getErrorStream() pour récupérer le
+                    // message exact de Twelve Data au lieu de juste perdre le code.
+                    String errBody = readErrorStream(conn);
+                    throw new IOException("Mauvaise réponse serveur: " + responseCode + " - " + errBody);
                 }
 
                 try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
@@ -446,9 +453,24 @@ public class MarketDataFetcher {
     }
 
     /**
+     * Lit le corps d'une réponse HTTP d'erreur (4xx/5xx) pour exposer le message
+     * exact renvoyé par l'API (ex: "Invalid API key"), au lieu de se contenter du code.
+     */
+    private static String readErrorStream(HttpURLConnection conn) {
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) sb.append(line);
+            return truncate(sb.toString(), 300);
+        } catch (Exception ex) {
+            return "(corps d'erreur indisponible)";
+        }
+    }
+
+    /**
      * 🛡️ ENVELOPPE CRITIQUE ANTI-429 & TIMEOUT
-     * Force une attente réseau maximale de 800ms. En cas d'échec ou de lenteur, 
-     * extrait les données du cache LKV à condition qu'elles aient moins de 5 minutes.
+     * Attend jusqu'à 7000ms le résultat réseau. En cas d'échec ou de dépassement,
+     * extrait les données du cache LKV à condition qu'elles aient moins de 2 minutes (CACHE_TTL_MS).
      */
     public static Map<String, MarketData> getMarketDataBatch(List<String> assets) {
         if (assets == null || assets.isEmpty()) return new HashMap<>();
@@ -458,8 +480,8 @@ public class MarketDataFetcher {
 
        // APRÈS
         try {
-            // 🔥 Timeout aligné sur le budget réseau réel (connect 5s + marge) pour laisser
-            // le temps à executeHttpRequestWithRetry() de répondre avant abandon
+            // 🔥 Timeout aligné sur le budget réseau réel (connect 3s + 1 retry + marge) pour
+            // laisser le temps à executeHttpRequestWithRetry() de répondre avant abandon
             Map<String, MarketData> freshData = future.get(7000, TimeUnit.MILLISECONDS);
             if (freshData != null && !freshData.isEmpty()) {
                 long now = System.currentTimeMillis();
@@ -469,11 +491,24 @@ public class MarketDataFetcher {
                 }
                 return freshData;
             }
+            // freshData est vide ou null : les erreurs détaillées par symbole/lot ont déjà
+            // été remontées dans le terminal applicatif par getMarketDataBatchRaw() ci-dessus.
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("⚠️ [BATCH] Réponse réseau vide pour " + assets + " — voir messages 🔴 ci-dessus pour la cause exacte.");
+            }
         } catch (TimeoutException e) {
-            Log.e(TAG, "⚡ [TIMEOUT] API Prix saturée (>800ms) lors du flux macro. Recours immédiat au cache LKV.");
+            String msg = "⚡ [TIMEOUT] API Prix saturée (>7000ms) lors du flux macro. Recours immédiat au cache LKV.";
+            Log.e(TAG, msg);
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(msg);
+            }
             future.cancel(true); // Interruption immédiate du traitement HTTP obsolète
         } catch (Exception e) {
-            Log.e(TAG, "❌ [BATCH NETWORK] Erreur réseau ou limitation API (Code HTTP 429)", e);
+            String msg = "❌ [BATCH NETWORK] Erreur réseau ou limitation API : " + e.getClass().getSimpleName() + " - " + e.getMessage();
+            Log.e(TAG, msg, e);
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog(msg);
+            }
         }
 
         // 🔄 INJECTION FILTRÉE DU CACHE LKV AVEC VALIDATION DE LA DURÉE DE VIE (TTL)
@@ -483,7 +518,7 @@ public class MarketDataFetcher {
         for (String asset : assets) {
             CachedEntry cached = MARKET_DATA_CACHE.get(asset);
             if (cached != null) {
-                // Vérification stricte : la donnée a-t-elle moins de 5 minutes ?
+                // Vérification stricte : la donnée a-t-elle moins de 2 minutes (CACHE_TTL_MS) ?
                 if (currentTime - cached.timestamp <= CACHE_TTL_MS) {
                     fallbackResult.put(asset, cached.data);
                 } else {
@@ -535,19 +570,49 @@ public class MarketDataFetcher {
                 String responseBody = executeHttpRequestWithRetry(urlStr);
                 JSONObject json = new JSONObject(responseBody);
 
+                // 🩺 DIAGNOSTIC : détecte une erreur API globale (ex: quota dépassé, clé
+                // invalide) même quand la requête contient plusieurs symboles. Twelve Data
+                // renvoie alors un objet {"code":..,"message":..,"status":"error"} à la
+                // racine au lieu d'un objet par symbole — sans ce contrôle, la boucle
+                // ci-dessous ne trouve aucun symbole et échoue silencieusement.
+                if (json.has("status") && "error".equals(json.optString("status"))) {
+                    String apiMsg = "🔴 [API TWELVEDATA] code=" + json.optInt("code", -1)
+                            + " message=" + json.optString("message", "inconnue");
+                    Log.e(TAG, apiMsg);
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(apiMsg);
+                    }
+                    continue; // passe au lot suivant, rien à extraire ici
+                }
+
                 if (chunk.size() == 1) {
                     String singleSym = chunk.get(0);
                     MarketData data = parseSingleQuoteJson(json);
                     if (data != null) {
                         results.put(symbolToAssetMap.get(singleSym), data);
+                    } else {
+                        String msg = "🔴 [PARSE] Réponse inexploitable pour " + singleSym + " : " + truncate(responseBody, 300);
+                        Log.w(TAG, msg);
+                        if (MainActivity.instance != null) {
+                            MainActivity.instance.addLog(msg);
+                        }
                     }
                 } else {
+                    boolean anyMatched = false;
                     for (String sym : chunk) {
                         if (json.has(sym)) {
+                            anyMatched = true;
                             MarketData data = parseSingleQuoteJson(json.getJSONObject(sym));
                             if (data != null) {
                                 results.put(symbolToAssetMap.get(sym), data);
                             }
+                        }
+                    }
+                    if (!anyMatched) {
+                        String msg = "🔴 [PARSE] Aucun symbole du lot (" + sbSymbols + ") trouvé dans la réponse : " + truncate(responseBody, 300);
+                        Log.w(TAG, msg);
+                        if (MainActivity.instance != null) {
+                            MainActivity.instance.addLog(msg);
                         }
                     }
                 }
@@ -556,10 +621,19 @@ public class MarketDataFetcher {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                Log.e(TAG, "Erreur lors du traitement réseau du lot de symboles", e);
+                String msg = "🔴 [RESEAU] Échec requête pour [" + sbSymbols + "] : " + e.getClass().getSimpleName() + " - " + e.getMessage();
+                Log.e(TAG, msg, e);
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog(msg);
+                }
             }
         }
         return results;
+    }
+
+    private static String truncate(String s, int maxLen) {
+        if (s == null) return "null";
+        return s.length() <= maxLen ? s : s.substring(0, maxLen) + "…";
     }
 
     private static MarketData parseSingleQuoteJson(JSONObject json) {
