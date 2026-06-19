@@ -397,9 +397,10 @@ public class EventValidator {
             if (!detectedAssets.contains("SP500")) { detectedAssets.add("SP500"); assetsEnrichedInThisBlock = true; }
         }
     
+        // APRÈS
         // Validation finale forcée à 100% pour la macro pour bypasser l'Étape 8
         // APRÈS
-        if (assetsEnrichedInThisBlock || !detectedAssets.isEmpty()) {
+        if ((assetsEnrichedInThisBlock || !detectedAssets.isEmpty()) && !isRecentDuplicate(title, content)) {
             result.confidence = 100;
             result.isConfirmed = true;
             result.isCalendarIntercept = true; // ✅ AJOUT : permet à NotificationService de bypasser son propre seuil
