@@ -398,9 +398,11 @@ public class EventValidator {
         }
     
         // Validation finale forcée à 100% pour la macro pour bypasser l'Étape 8
+        // APRÈS
         if (assetsEnrichedInThisBlock || !detectedAssets.isEmpty()) {
             result.confidence = 100;
             result.isConfirmed = true;
+            result.isCalendarIntercept = true; // ✅ AJOUT : permet à NotificationService de bypasser son propre seuil
             result.reason = "Interception Complète Calendrier Macro (" + detectedAssets.toString() + ")";
             result.assetsEnriched = true; // ✅ CORRIGÉ (Du singulier d'après ta classe ValidationResult)
             Log.d("EventValidator", "🟢 [MACRO PRODUCTION INTERCEPT] Intégrité 100% validée pour : " + detectedAssets);
