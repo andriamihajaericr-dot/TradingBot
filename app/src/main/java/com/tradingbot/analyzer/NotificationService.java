@@ -1074,9 +1074,15 @@ if (isConfirmedCalendarDrop && finalCalculatedWeight < 3) {
                             fingerprint, packageName, finalSourceName, eventTypeStr, title, bodyTextRaw,
                             assetsSb.toString(), "pending", postTimeMs / 1000, "pending", finalCalculatedWeight);
     
-                    if (saved) {
-                        Log.i(TAG, "[DATABASE] Match " + eventTypeStr + " enregistré avec succès. Poids affecté : " + finalCalculatedWeight);
-                    }
+                    // APRÈS
+if (saved) {
+    Log.i(TAG, "[DATABASE] Match " + eventTypeStr + " enregistré avec succès. Poids affecté : " + finalCalculatedWeight);
+    if (MainActivity.instance != null) {
+        MainActivity.instance.addLog("💾 [DB] " + finalSourceName + " enregistré (" + eventTypeStr + ", poids " + finalCalculatedWeight + ")");
+    }
+} else {
+    Log.w(TAG, "[DATABASE] ⚠️ ÉCHEC saveEvent pour '" + title + "' (fingerprint=" + fingerprint + ") — doublon déjà connu ou erreur SQLite.");
+}
     
                     // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
                     // 9️⃣ Enrichissement dynamique du Prompt Système IA
