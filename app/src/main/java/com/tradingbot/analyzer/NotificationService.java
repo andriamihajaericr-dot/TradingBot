@@ -77,6 +77,25 @@ public class NotificationService extends NotificationListenerService {
             this.timestamp = ts;
         }
     }
+
+    // ✅ AJOUT — Confirme/dément si Android a réellement branché le listener
+@Override
+public void onListenerConnected() {
+    super.onListenerConnected();
+    Log.i(TAG, "✅ [LISTENER] Connecté — le bot reçoit bien le flux système.");
+    if (MainActivity.instance != null) {
+        MainActivity.instance.addLog("✅ [SYSTÈME] Accès notifications confirmé par Android.");
+    }
+}
+
+@Override
+public void onListenerDisconnected() {
+    super.onListenerDisconnected();
+    Log.e(TAG, "🔴 [LISTENER] DÉCONNECTÉ — plus aucune notification ne sera captée !");
+    if (MainActivity.instance != null) {
+        MainActivity.instance.addLog("🔴 [SYSTÈME] Accès notifications COUPÉ (vérifie Paramètres > Accès aux notifications).");
+    }
+}
     // Ajoutez cette méthode à la fin de votre classe NotificationService.java
     public static String formatEventForDisplay(EconomicCalendarAPI.CalendarEvent e) {
         if (e.actual == null || e.actual.equals("N/A") || e.actual.isEmpty()) {
