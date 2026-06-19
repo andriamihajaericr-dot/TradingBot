@@ -1015,11 +1015,15 @@ public class NotificationService extends NotificationListenerService {
                         }
                         }
     
-                    // 7️⃣ RÈGLE DE QUALIFICATION MINIMALE DU PIPELINE : Seuil fixé à 3 pour valider les drivers confirmés
-                    if (finalCalculatedWeight < 3 && !eventTypeStr.equals("GEOPOLITICAL")) {
-                        Log.d(TAG, "[COUPE-CIRCUIT MACRO] Impact mathématique insuffisant (" + finalCalculatedWeight + "). Fin de tâche.");
-                        return; // Stoppe le traitement lourd et évite l'appel à Groq pour du bruit de fond conformes aux attentes
-                    }
+                    // APRÈS
+// 7️⃣ RÈGLE DE QUALIFICATION MINIMALE DU PIPELINE : Seuil fixé à 3 pour valider les drivers confirmés
+// ✅ CORRECTIF : un calendrier déjà confirmé à 100% par EventValidator (Interception Calendrier Macro)
+// ne doit plus être tué ici, sinon aucune publication "dans les clous" n'est jamais enregistrée.
+boolean isConfirmedCalendarDrop = validationResult != null && validationResult.isCalendarIntercept;
+if (finalCalculatedWeight < 3 && !eventTypeStr.equals("GEOPOLITICAL") && !isConfirmedCalendarDrop) {
+    Log.d(TAG, "[COUPE-CIRCUIT MACRO] Impact mathématique insuffisant (" + finalCalculatedWeight + "). Fin de tâche.");
+    return; // Stoppe le traitement lourd et évite l'appel à Groq pour du bruit de fond conformes aux attentes
+}
     
                     // 8️⃣ Génération de la signature cryptographique et persistance SQLite en base de données
                     String fingerprint = generateSecureHash(packageName + "_" + title + "_" + bodyTextRaw + "_" + (postTimeMs / 60000));
