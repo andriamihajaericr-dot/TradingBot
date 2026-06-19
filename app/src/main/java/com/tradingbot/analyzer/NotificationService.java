@@ -859,8 +859,12 @@ if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", fal
                 }
             }
         
-            if (tempUnifiedFeed.length() < 6) return;
-            
+            // APRÈS
+            if (tempUnifiedFeed.length() < 6) {
+               Log.w(TAG, "⚠️ [EXTRACTION VIDE] '" + sourceName + "' rejeté : texte trop court (titre='" + title 
+               + "', len=" + tempUnifiedFeed.length() + "). Possible notif groupée/RemoteViews non standard.");
+               return;
+             }
             final String finalUnifiedFeed = tempUnifiedFeed;
             final String finalSourceName = sourceName;
             final long postTimeMs = sbn.getPostTime();
