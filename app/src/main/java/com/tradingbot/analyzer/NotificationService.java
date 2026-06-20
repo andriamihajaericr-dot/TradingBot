@@ -1266,10 +1266,11 @@ private static boolean isMarketHours() {
             } catch (Exception e) {
                 Log.e(TAG, "Erreur critique lors de l'enrichissement par Batch API", e);
                 // Mode dégradé sécurisé (Fallback) : transmission du corps initial sans bloc de prix
-                if (instance != null) {
-                    Map<String, MarketDataFetcher.MarketData> marketSnapshot = MarketDataFetcher.getMarketDataBatch(assets);
-                    instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true, marketSnapshot);
-                } else {
+            if (instance != null) {
+                // batchPrices peut être null si exception avant sa déclaration → cachedData=null
+                // → processAnalysisWithAI fera son appel réseau via injectLivePrices si nécessaire
+                instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true, batchPrices);
+            } else {
                     String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
                     sendTelegramSecure(msg, context);
                 }
