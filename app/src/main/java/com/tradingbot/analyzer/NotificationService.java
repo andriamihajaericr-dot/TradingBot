@@ -1325,16 +1325,18 @@ if (saved) {
         }, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
         // --- NOUVEAU : Moniteur de divergence (toutes les 15 minutes) ---
         scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    checkForecastDivergence();
-                } catch (Exception e) {
-                    Log.e(TAG, "[DIVERGENCE] Erreur critique dans le moniteur", e);
-                }
-            }
+        @Override
+        public void run() {
+           try {
+            // 🛡️ Guard : appel Twelve Data uniquement si lastForecast
+            // contient des données ET si on est en heure de marché active
+            if (lastForecast.isEmpty()) return; // Rien à surveiller → 0 appel réseau
+            if (!isMarketHours()) return;        // Hors session → 0 appel réseau
+            checkForecastDivergence();
+           } catch (Exception e) { ... }
+          }
         }, 15, 15, TimeUnit.MINUTES);
-    }
+       }
 
 
     private synchronized void triggerQueueSynchronization() {
