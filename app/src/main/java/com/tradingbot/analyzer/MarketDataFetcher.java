@@ -175,14 +175,14 @@ public class MarketDataFetcher {
         ASSET_CONFIGS.add(new AssetConfig("SP500",   "SPY",      false, 1.5, 0.8));
         ASSET_CONFIGS.add(new AssetConfig("NASDAQ",  "QQQ",      false, 1.5, 0.8));
         ASSET_CONFIGS.add(new AssetConfig("GOLD",    "XAU/USD",  false, 1.5, 0.7));
-        ASSET_CONFIGS.add(new AssetConfig("BITCOIN", "BTC/USD",  false, 3.0, 1.5));
-        ASSET_CONFIGS.add(new AssetConfig("EURUSD",  "EUR/USD",  false, 0.5, 0.25));
+        //ASSET_CONFIGS.add(new AssetConfig("BITCOIN", "BTC/USD",  false, 3.0, 1.5));
+        //ASSET_CONFIGS.add(new AssetConfig("EURUSD",  "EUR/USD",  false, 0.5, 0.25));
         ASSET_CONFIGS.add(new AssetConfig("GBPUSD",  "GBP/USD",  false, 0.5, 0.25));
-        ASSET_CONFIGS.add(new AssetConfig("AUDUSD",  "AUD/USD",  false, 0.5, 0.25));
+        //ASSET_CONFIGS.add(new AssetConfig("AUDUSD",  "AUD/USD",  false, 0.5, 0.25));
         ASSET_CONFIGS.add(new AssetConfig("USDJPY",  "USD/JPY",  false, 0.5, 0.25));
-        ASSET_CONFIGS.add(new AssetConfig("USDCAD",  "USD/CAD",  false, 0.5, 0.25));
+        //ASSET_CONFIGS.add(new AssetConfig("USDCAD",  "USD/CAD",  false, 0.5, 0.25));
         ASSET_CONFIGS.add(new AssetConfig("USOIL",   "WTI",      false, 2.0, 1.0));
-        ASSET_CONFIGS.add(new AssetConfig("US10Y",   "TLT",      false, 1.8, 1.0));
+        //ASSET_CONFIGS.add(new AssetConfig("US10Y",   "TLT",      false, 1.8, 1.0));
     }
 
     /**
@@ -358,11 +358,11 @@ public class MarketDataFetcher {
             switch (nom) {
                 case "SP500": case "NASDAQ": return h ? "Risk-on → flux acheteur" : "Risk-off → liquidation boursière";
                 case "GOLD": return h ? "Fuite vers la sécurité → tensions macro/géo" : "Détente macro";
-                case "BITCOIN": return h ? "Spéculation haussière" : "Aversion au risque → capitulation";
-                case "EURUSD": case "GBPUSD": case "AUDUSD": return h ? "Affaiblissement du Dollar US" : "Dollar dominant";
-                case "USDJPY": case "USDCAD": return h ? "Dollar fort" : "Dollar faible";
+                //case "BITCOIN": return h ? "Spéculation haussière" : "Aversion au risque → capitulation";
+                case "GBPUSD": return h ? "Affaiblissement du Dollar US" : "Dollar dominant";
+                case "USDJPY": return h ? "Dollar fort" : "Dollar faible";
                 case "USOIL": return h ? "Tensions sur l'offre / Risque géopolitique" : "Ralentissement global";
-                case "US10Y": return h ? "Obligations ↑ → Taux ↓ (dovish)" : "Obligations ↓ → Taux ↑ (hawkish)";
+                //case "US10Y": return h ? "Obligations ↑ → Taux ↓ (dovish)" : "Obligations ↓ → Taux ↑ (hawkish)";
                 default: return "";
             }
         }
