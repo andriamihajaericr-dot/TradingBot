@@ -1255,11 +1255,10 @@ private static boolean isMarketHours() {
                 }
     
                 String bodyEnrichi = body + blocPrix.toString();
-    
-                if (instance != null) {
-                    Map<String, MarketDataFetcher.MarketData> marketSnapshot = MarketDataFetcher.getMarketDataBatch(assets);
-                    instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true, marketSnapshot);
-                } else {
+                 if (instance != null) {
+                  // batchPrices déjà récupéré ligne 1242 — réutilisation directe
+                  instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true, batchPrices);
+                 } else {
                     String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
                     sendTelegramSecure(msg, context);
                 }
