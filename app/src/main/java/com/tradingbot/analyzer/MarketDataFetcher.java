@@ -44,7 +44,12 @@ public class MarketDataFetcher {
         }
     }
      
-    
+    private static final int TIMEOUT_MS = 7000;
+    private static volatile long lastBatchCallTime = 0L;
+
+    public static long getLastBatchCallTime() {
+         return lastBatchCallTime;
+    }
     private static final Map<String, CachedEntry> MARKET_DATA_CACHE = new ConcurrentHashMap<>();
     private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(2); // Durée de vie max d'un prix de secours : 2 minutes
 
