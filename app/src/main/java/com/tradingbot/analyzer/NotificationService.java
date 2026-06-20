@@ -1162,8 +1162,9 @@ if (saved) {
                         lastGeoTime = currentTime;
                     }
                     // 🔟 Exécution finale de l'analyse cognitive LLM
-                    processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank);
-    
+                    // Récupération du snapshot marché juste avant l'appel
+                    Map<String, MarketDataFetcher.MarketData> marketSnapshot = MarketDataFetcher.getMarketDataBatch(enrichedAssets);
+                    processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank, marketSnapshot);
                 } catch (Exception e) {
                     Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
                 }
