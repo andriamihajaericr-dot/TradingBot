@@ -73,7 +73,7 @@ public class MarketDataFetcher {
             MainActivity.instance.addLog("🔍 === TEST FRESHNESS MARKET DATA ===");
         }
 
-        List<String> testAssets = Arrays.asList("SP500", "NASDAQ", "GOLD", "BITCOIN", "EURUSD", "USDJPY");
+        List<String> testAssets = Arrays.asList("SP500", "NASDAQ", "GOLD", "GBPUSD", "USOIL", "USDJPY");
         
         long start = System.currentTimeMillis();
         
