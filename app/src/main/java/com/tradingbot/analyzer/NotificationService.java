@@ -134,7 +134,7 @@ public void onListenerDisconnected() {
     //            aucune prévision à capturer → 0 appel réseau
     if (!report.contains("•")) return;
     try {
-        Map<String, Double> currentPrices = MarketDataFetcher.getPrices(new ArrayList<>(EMOJI_ASSET_MAP.values()));
+    Map<String, Double> currentPrices = MarketDataFetcher.getPrices(new ArrayList<>(TWELVE_DATA_ASSETS)); // 6 actifs actifs uniquement
     long now = System.currentTimeMillis();
     
             for (String line : report.split("\n")) {
