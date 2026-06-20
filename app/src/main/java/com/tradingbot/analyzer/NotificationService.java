@@ -615,7 +615,7 @@ public void onListenerDisconnected() {
 }
 
 private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, String fingerprint, String customSystemPrompt, boolean isSupremeRank,
-    Map<String, MarketDataFetcher.MarketData> cachedMarketData); // ← AJOUT
+    Map<String, MarketDataFetcher.MarketData> cachedMarketData){// ← AJOUT
     final String systemPrompt = (customSystemPrompt != null && !customSystemPrompt.isEmpty())
        ? customSystemPrompt
        : SYSTEM_PROMPT
