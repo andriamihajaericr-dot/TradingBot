@@ -1167,6 +1167,28 @@ if (saved) {
             }
             });
         }
+       /**
+ * Retourne true uniquement pendant les sessions actives
+ * (Londres 08h-17h UTC ou New York 13h30-21h UTC).
+ * Évite les appels Twelve Data inutiles la nuit ou le week-end.
+ */
+private static boolean isMarketHours() {
+    java.util.Calendar utc = java.util.Calendar.getInstance(
+        java.util.TimeZone.getTimeZone("UTC"));
+    int dow  = utc.get(java.util.Calendar.DAY_OF_WEEK);
+    int hour = utc.get(java.util.Calendar.HOUR_OF_DAY);
+    int min  = utc.get(java.util.Calendar.MINUTE);
+    int totalMin = hour * 60 + min;
+
+    // Week-end → fermé
+    if (dow == java.util.Calendar.SATURDAY ||
+        dow == java.util.Calendar.SUNDAY) return false;
+
+    // Session Londres  : 08h00–17h00 UTC (480–1020 min)
+    // Session New York : 13h30–21h00 UTC (810–1260 min)
+    return (totalMin >= 480 && totalMin <= 1020) ||
+           (totalMin >= 810 && totalMin <= 1260);
+   }
 
       public static void sendToGroqAndTelegram(String source, String title, String body, List<String> assets, Context context) {
         if (context == null) return;
