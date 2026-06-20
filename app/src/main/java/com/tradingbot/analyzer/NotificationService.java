@@ -567,8 +567,11 @@ public void onListenerDisconnected() {
         return groqReport;
 
     try {
-        Map<String, MarketDataFetcher.MarketData> liveDataMap = 
-            MarketDataFetcher.getMarketDataBatch(assets);
+        
+    // Réutilise le cache si disponible, sinon appel réseau en dernier recours
+    Map<String, MarketDataFetcher.MarketData> liveDataMap = (cachedData != null && !cachedData.isEmpty())
+            ? cachedData
+            : MarketDataFetcher.getMarketDataBatch(assets);
         if (liveDataMap == null || liveDataMap.isEmpty()) return groqReport;
 
         String[] lignes = groqReport.split("\n");
