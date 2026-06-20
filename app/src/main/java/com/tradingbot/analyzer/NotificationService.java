@@ -77,8 +77,8 @@ public class NotificationService extends NotificationListenerService {
             this.timestamp = ts;
         }
     }
-
-    // ✅ AJOUT — Confirme/dément si Android a réellement branché le listener
+    private static final List<String> TWELVE_DATA_ASSETS = Arrays.asList(
+    "SP500", "NASDAQ", "GOLD", "GBPUSD", "USDJPY", "USOIL");
 @Override
 public void onListenerConnected() {
     super.onListenerConnected();
