@@ -127,12 +127,15 @@ public void onListenerDisconnected() {
         EMOJI_ASSET_MAP.put("🇬🇧", "GBPUSD"); EMOJI_ASSET_MAP.put("🇦🇺", "AUDUSD");
         EMOJI_ASSET_MAP.put("₿", "BITCOIN");
     }
-   
+
     private void captureForecastFromReport(String report) {
-        if (report == null || report.isEmpty()) return;
-        try {
-            Map<String, Double> currentPrices = MarketDataFetcher.getPrices(new ArrayList<>(EMOJI_ASSET_MAP.values()));
-            long now = System.currentTimeMillis();
+    if (report == null || report.isEmpty()) return;
+    // 🛡️ Guard : si aucune ligne bullet dans le rapport, 
+    //            aucune prévision à capturer → 0 appel réseau
+    if (!report.contains("•")) return;
+    try {
+        Map<String, Double> currentPrices = MarketDataFetcher.getPrices(new ArrayList<>(EMOJI_ASSET_MAP.values()));
+    long now = System.currentTimeMillis();
     
             for (String line : report.split("\n")) {
                 if (!line.startsWith("•")) continue;
