@@ -1097,11 +1097,9 @@ if (saved) {
                     // 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
                       // ✅ CORRECTION : renommer la variable String pour éviter le conflit avec la Map
 String marketSnapshotString = "Marché non analysé.";
+java.util.Map<String, MarketDataFetcher.MarketData> batchSnapshot = null;
 try {
-    // Récupération globale instantanée de tous les actifs en 1 seul appel Batch
-    java.util.Map<String, MarketDataFetcher.MarketData> batchSnapshot = 
-        MarketDataFetcher.getMarketDataBatch(enrichedAssets);
-
+    batchSnapshot = MarketDataFetcher.getMarketDataBatch(enrichedAssets);
     if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
         StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
         boolean premierActif = true;
