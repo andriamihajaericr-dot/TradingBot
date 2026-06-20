@@ -561,7 +561,8 @@ public void onListenerDisconnected() {
         return 0;
     }
 
-    private static String injectLivePrices(String groqReport, List<String> assets) {
+    private static String injectLivePrices(String groqReport, List<String> assets,
+        Map<String, MarketDataFetcher.MarketData> cachedData) {
     if (groqReport == null || groqReport.isEmpty() || assets == null || assets.isEmpty()) 
         return groqReport;
 
