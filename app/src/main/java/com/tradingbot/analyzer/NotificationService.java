@@ -607,8 +607,8 @@ public void onListenerDisconnected() {
     }
 }
 
-    private void processAnalysisWithAI(final String sourceName, final String title, final String body, final List<String> enrichedAssets, final String fingerprint, final String customSystemPrompt, final boolean isSupremeRank){
-        // 1. Intégration de votre SYSTEM_PROMPT (Le moule et les contraintes strictes)
+private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, String fingerprint, String customSystemPrompt, boolean isSupremeRank,
+    Map<String, MarketDataFetcher.MarketData> cachedMarketData) // ← AJOUT
     final String systemPrompt = (customSystemPrompt != null && !customSystemPrompt.isEmpty())
        ? customSystemPrompt
        : SYSTEM_PROMPT
