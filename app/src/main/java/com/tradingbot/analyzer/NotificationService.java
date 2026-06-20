@@ -1162,7 +1162,7 @@ if (eventTypeStr.equals("GEOPOLITICAL")) {
     }
     lastGeoTime = currentTime;
 }
-// 🔟 Exécution finale de l'analyse cognitive LLM
+// 🔟 Exécution finale de l'analyse cognitive LLM 
 // Récupération du snapshot marché juste avant l'appel (variable Map, pas de conflit)
 Map<String, MarketDataFetcher.MarketData> marketSnapshot = MarketDataFetcher.getMarketDataBatch(enrichedAssets);
 processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank, marketSnapshot);                              
