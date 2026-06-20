@@ -1340,18 +1340,30 @@ private static boolean isMarketHours() {
                 }
             }
         }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
-    
+         // ✅ NOUVEAU (remplace le 6h)
+        long fiveMinutesMillis = 5 * 60 * 1000L;
+        scheduler.scheduleAtFixedRate(new Runnable() {
+        @Override
+        public void run() {
+         try {
+            Log.d(TAG, "[CALENDAR] Rafraîchissement rapide (5min) pour capturer les Actuals...");
+            EventValidator.preloadCalendar();
+         } catch (Exception e) {
+            Log.e(TAG, "[CALENDAR] Erreur refresh 5min", e);
+         }
+        }
+        }, fiveMinutesMillis, fiveMinutesMillis, TimeUnit.MILLISECONDS);
         // Rafraîchissement du calendrier toutes les 6 heures (21600000 ms)
-        long sixHoursMillis = 6 * 60 * 60 * 1000L;
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                Log.d(TAG, "[CALENDAR] Rafraîchissement périodique du calendrier économique...");
-                EventValidator.preloadCalendar();
-            }
-        }, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
+        //long sixHoursMillis = 6 * 60 * 60 * 1000L;
+        //scheduler.scheduleAtFixedRate(new Runnable() {
+           // @Override
+           // public void run() {
+             //   Log.d(TAG, "[CALENDAR] Rafraîchissement périodique du calendrier économique...");
+            //    EventValidator.preloadCalendar();
+      //      }
+      //  }, sixHoursMillis, sixHoursMillis, TimeUnit.MILLISECONDS);
         // --- NOUVEAU : Moniteur de divergence (toutes les 15 minutes) ---
-        scheduler.scheduleAtFixedRate(new Runnable() {
+    scheduler.scheduleAtFixedRate(new Runnable() {
     @Override
     public void run() {
         try {
