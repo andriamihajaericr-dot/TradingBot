@@ -564,7 +564,8 @@ public class MarketDataFetcher {
                 sbSymbols.append(chunk.get(k));
                 if (k < chunk.size() - 1) sbSymbols.append(",");
             }
-
+             // Enregistre le timestamp du dernier appel
+            lastBatchCallTime = System.currentTimeMillis();
             String queryParams = "&apikey=" + twelveDataKey;
             if (ENABLE_PREMARKET_PARAM) {
                 queryParams += "&premarket=true"; 
