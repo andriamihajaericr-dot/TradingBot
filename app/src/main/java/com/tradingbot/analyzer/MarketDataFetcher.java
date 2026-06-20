@@ -45,8 +45,9 @@ public class MarketDataFetcher {
     }
      
     private static final int TIMEOUT_MS = 7000;
-    private static volatile long lastBatchCallTime = 0L;
-
+    // Initialisé à "maintenant - 65s" pour que le premier appel parte sans attente
+    // mais les appels simultanés au démarrage soient naturellement espacés
+    private static volatile long lastBatchCallTime = System.currentTimeMillis() - 65000L;
     public static long getLastBatchCallTime() {
          return lastBatchCallTime;
     }
