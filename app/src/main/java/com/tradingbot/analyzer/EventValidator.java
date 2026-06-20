@@ -1617,6 +1617,12 @@ private static String parseTimestampToSeconds(String rawTimestamp) {
             report.append("\n");
             totalAffiche++;
         }
+        
+        if (totalAffiche == 0) {
+            logToMain("⏭️ [CALENDRIER] Aucun événement à venir — envoi ignoré.");
+            return; // Ne calcule pas le hash et n'envoie rien
+        }
+        
 
         report.append("\n─────────────────────────────────────────\n");
         report.append("📊 *Total :* ").append(totalAffiche).append(" événements\n");
