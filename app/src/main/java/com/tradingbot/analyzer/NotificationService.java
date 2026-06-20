@@ -1238,7 +1238,12 @@ private static boolean isMarketHours() {
 
     if (assets != null && !assets.isEmpty()) {
         blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
-        
+        // Ligne 1239 environ — juste avant la déclaration de batchPrices
+long now = System.currentTimeMillis();
+long elapsed = now - MarketDataFetcher.getLastBatchCallTime();
+if (elapsed < 65000L) {
+    Thread.sleep(65000L - elapsed);
+}
         // Initialisation ici — 1 seul appel réseau
         batchPrices = MarketDataFetcher.getMarketDataBatch(assets);
 
