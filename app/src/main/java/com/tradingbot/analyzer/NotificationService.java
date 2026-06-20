@@ -1231,50 +1231,49 @@ private static boolean isMarketHours() {
         @Override
         public void run() {
             try {
-                StringBuilder blocPrix = new StringBuilder();
-    
-                if (assets != null && !assets.isEmpty()) {
-                    blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
-                    
-                    // Un seul appel réseau unifié pour TOUS les actifs qualifiés simultanément
-                    java.util.Map<String, MarketDataFetcher.MarketData> batchPrices = 
-                            MarketDataFetcher.getMarketDataBatch(assets);
-    
-                    for (String asset : assets) {
-                        MarketDataFetcher.MarketData data = batchPrices.get(asset);
-                        
-                        if (data != null && data.price > 0) {
-                            String tendance = data.changePercent >= 0 ? "📈" : "📉";
-                            // ✅ Correction Markdown : Remplacement des ** par * pour le parse_mode standard de Telegram
-                            String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
-                            blocPrix.append(String.format(Locale.US, formatPrix, tendance, asset, data.price, data.changePercent));
-                        } else {
-                            blocPrix.append("\n🔸 ").append(asset).append(" : (Cours indisponible)");
-                        }
-                    }
-                }
-    
-                String bodyEnrichi = body + blocPrix.toString();
-                 if (instance != null) {
-                  // batchPrices déjà récupéré ligne 1242 — réutilisation directe
-                  instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true, batchPrices);
-                 } else {
-                    String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
-                    sendTelegramSecure(msg, context);
-                }
-    
-            } catch (Exception e) {
-                Log.e(TAG, "Erreur critique lors de l'enrichissement par Batch API", e);
-                // Mode dégradé sécurisé (Fallback) : transmission du corps initial sans bloc de prix
-            if (instance != null) {
-                // batchPrices peut être null si exception avant sa déclaration → cachedData=null
-                // → processAnalysisWithAI fera son appel réseau via injectLivePrices si nécessaire
-                instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true, batchPrices);
+    StringBuilder blocPrix = new StringBuilder();
+
+    // Déclaré ici — accessible partout dans le try ET le catch
+    java.util.Map<String, MarketDataFetcher.MarketData> batchPrices = null;
+
+    if (assets != null && !assets.isEmpty()) {
+        blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
+        
+        // Initialisation ici — 1 seul appel réseau
+        batchPrices = MarketDataFetcher.getMarketDataBatch(assets);
+
+        for (String asset : assets) {
+            MarketDataFetcher.MarketData data = batchPrices.get(asset);
+            if (data != null && data.price > 0) {
+                String tendance = data.changePercent >= 0 ? "📈" : "📉";
+                String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
+                blocPrix.append(String.format(Locale.US, formatPrix, tendance, asset, data.price, data.changePercent));
             } else {
-                    String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
-                    sendTelegramSecure(msg, context);
-                }
+                blocPrix.append("\n🔸 ").append(asset).append(" : (Cours indisponible)");
             }
+        }
+    }
+
+    String bodyEnrichi = body + blocPrix.toString();
+
+    if (instance != null) {
+        // batchPrices réutilisé — 0 appel réseau supplémentaire
+        instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true, batchPrices);
+    } else {
+        String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
+        sendTelegramSecure(msg, context);
+    }
+
+} catch (Exception e) {
+    Log.e(TAG, "Erreur critique lors de l'enrichissement par Batch API", e);
+    if (instance != null) {
+        // batchPrices peut être null si exception avant son initialisation — cachedMarketData=null est géré dans processAnalysisWithAI
+        instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true, null);
+    } else {
+        String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
+        sendTelegramSecure(msg, context);
+    }
+}
         }
     }).start();
        }
