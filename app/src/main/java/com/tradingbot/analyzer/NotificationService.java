@@ -1257,7 +1257,8 @@ private static boolean isMarketHours() {
                 String bodyEnrichi = body + blocPrix.toString();
     
                 if (instance != null) {
-                    instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true);
+                    Map<String, MarketDataFetcher.MarketData> marketSnapshot = MarketDataFetcher.getMarketDataBatch(assets);
+                    instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true, marketSnapshot);
                 } else {
                     String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
                     sendTelegramSecure(msg, context);
@@ -1268,7 +1269,7 @@ private static boolean isMarketHours() {
                 // Mode dégradé sécurisé (Fallback) : transmission du corps initial sans bloc de prix
                 if (instance != null) {
                     Map<String, MarketDataFetcher.MarketData> marketSnapshot = MarketDataFetcher.getMarketDataBatch(assets);
-                    instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true, marketSnapshot);
+                    instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true, marketSnapshot);
                 } else {
                     String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
                     sendTelegramSecure(msg, context);
