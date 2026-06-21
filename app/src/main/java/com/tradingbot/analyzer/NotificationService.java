@@ -2254,7 +2254,31 @@ private static boolean isMarketHours() {
     "   • 🇨🇦 USDCAD  -> BEARISH 🔴 [Dollar faible face aux devises cycliques]\n" +
     "   • 📈 US10Y, 🛢️ USOIL, 🇬🇧 GBPUSD -> NEUTRE ⚪ [Pas d'impact direct]\n" +
     "   • 🏁 FLUX DOMINANT -> RISK-ON / APPÉTIT POUR LE RISQUE\n\n" +
-        
+
+    "═══════════════════════════════════════════════════════════════\n" +
+    "    RÈGLE 12 — ARBITRAGE CONTRADICTOIRE & PONDÉRATION (PRIORITÉ ABSOLUE)\n" +
+    "═══════════════════════════════════════════════════════════════\n\n" +
+
+   "1. COMPTAGE DES SIGNAUX :\n" +
+   "   - Dans la section DRIVERS PRINCIPAUX, tu dois impérativement compter le nombre d'événements\n" +
+   "     qui poussent vers RISK-OFF (Guerre, Géo, Tarifs) et ceux qui poussent vers RISK-ON (Désescalade, Diplomatie, Accords).\n" +
+   "   - Un événement avec une conviction >= 70% pèse DOUBLE (2 points) par rapport à un événement < 50% (1 point).\n" +
+   "   - Exemple : 2 événements à 80% (RISK-OFF) = 4 points. 3 événements à 40% (RISK-ON) = 3 points. RISK-OFF gagne.\n\n" +
+
+"2. FORCE DE LA SOURCE (Pondération automatique) :\n" +
+"   - Bloomberg, Reuters, Financial Times, FinancialJuice (analyses chiffrées) → Poids FORT.\n" +
+"   - ZeroHedge, Twitter, rumeurs non confirmées → Poids FAIBLE (conviction plafonnée d'office à 40% maximum).\n" +
+"   - Si la source rapporte une ACTION MILITAIRE OU ÉCONOMIQUE CONCRÈTE (frappe, blocus, signature de décrets tarifaires), le poids est MAXIMAL.\n\n" +
+
+"3. ARBITRAGE FINAL & AFFICHAGE LOGIQUE :\n" +
+"   - Tu dois afficher explicitement ton calcul mathématique simplifié sous la forme d'une ligne de score avant de définir le flux.\n" +
+"   - Si le Score RISK-OFF est supérieur au Score RISK-ON → FLUX DOMINANT : 🚨 CRISE GÉOPOLITIQUE / RISK-OFF.\n" +
+"   - Si le Score RISK-ON est supérieur au Score RISK-OFF → FLUX DOMINANT : 💹 APPÉTIT POUR LE RISQUE / RISK-ON.\n" +
+"   - En cas d'égalité stricte des scores (50/50) → FLUX DOMINANT : ⏳ MARCHÉ INCERTAIN / PRUDENCE RECOMMANDÉE.\n\n" +
+
+"4. JUSTIFICATION CHIFFRÉE :\n" +
+"   - Dans le SCÉNARIO ALTERNATIF, tu dois citer précisément le nombre d'événements et la pondération en faveur du scénario opposé.\n" +
+"   - Exemple : '⚠️ SCÉNARIO ALTERNATIF : Si les 2 événements de désescalade (poids 3) venaient à se concrétiser par un accord officiel, le marché basculerait vers RISK-ON.'\n\n"
     "═══════════════════════════════════════════════════════════════\n" +
     "                    CONTRAINTES DE SÉCURITÉ DE COMPILATION\n" +
     "═══════════════════════════════════════════════════════════════\n\n" +
