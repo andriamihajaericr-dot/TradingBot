@@ -2292,14 +2292,26 @@ private static boolean isMarketHours() {
     "8. ANCRAGE DONNÉES : Chaque driver des DRIVERS PRINCIPAUX doit être traçable à une SOURCE + TITRE dans les données brutes. Aucune extrapolation sans ancrage explicite.\n";
                     
         // Traitement de l'enveloppe de prompt (Filtres géopolitiques complexes de votre script)
-        String systemPromptFinal = construirePromptQuotidienSystem(dailyDrivers, DAILY_SYSTEM_PROMPT);
+        // 1. Récupération de la mémoire d'inertie du marché (SharedPreferences)
+SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
+String lastDominantFlow = prefs.getString("last_daily_flow", "NEUTRE / PRUDENCE RECOMMANDÉE");
 
-                JSONObject payload = new JSONObject();
-        payload.put("model", GROQ_MODEL);
-        payload.put("temperature", 0.02);
+// Traitement de l'enveloppe de prompt
+String baseSystemPrompt = construirePromptQuotidienSystem(dailyDrivers, DAILY_SYSTEM_PROMPT);
 
-        JSONArray messages = new JSONArray();
-        messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
+// Enrichissement avec contexte d'hier
+String systemPromptFinal = "CONTEXTE HIER (INERTIE DE MARCHÉ) : Le flux dominant de la veille était : " + lastDominantFlow + ".\n" +
+    "Si les événements actuels ne contredisent pas ce flux de manière écrasante (>70% de conviction), conserve-le pour éviter les faux signaux.\n\n" +
+    baseSystemPrompt + "\n\n" +
+    "Tu es un expert en macroéconomie. Tu dois rédiger ton rapport en terminant obligatoirement par la ligne suivante formatée de cette exacte façon :\n" +
+    "🏁 FLUX DOMINANT : [Insère ici le flux sélectionné]";
+
+JSONObject payload = new JSONObject();
+payload.put("model", GROQ_MODEL);
+payload.put("temperature", 0.02);
+
+JSONArray messages = new JSONArray();
+messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
         // ✅ Snapshot marché injecté dans le daily comme dans le pipeline news live
 
 String dailyMarketSnapshot = "Données de marché indisponibles.";
