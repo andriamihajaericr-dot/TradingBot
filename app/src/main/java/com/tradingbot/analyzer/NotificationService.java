@@ -174,8 +174,11 @@ public void onListenerDisconnected() {
     
     private void checkForecastDivergence() {
         if (lastForecast.isEmpty()) return;
-    
         List<String> assets = new ArrayList<>(lastForecast.keySet());
+        if (!MarketDataFetcher.tryAcquireBatchSlot()) {
+        Log.w(TAG, "[DIVERGENCE] Slot Twelve Data occupé — vérification divergence ignorée ce cycle");
+        return;
+        }
         Map<String, Double> currentPrices = MarketDataFetcher.getPrices(assets);
         long now = System.currentTimeMillis();
     
