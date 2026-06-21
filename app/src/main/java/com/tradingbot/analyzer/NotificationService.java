@@ -2480,8 +2480,8 @@ messages.put(new JSONObject().put("role", "user").put("content",
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(10000);
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(25000);
             conn.setDoOutput(true);
 
             OutputStream os = conn.getOutputStream();
