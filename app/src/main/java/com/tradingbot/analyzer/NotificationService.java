@@ -1298,17 +1298,24 @@ if (elapsed < 65000L) {
         serviceInstance = this;                 // ✅ Assure la survie de l'instance pour l'IA
         
         // ── Déportation du préchargement réseau dans un thread d'arrière-plan ──
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                EventValidator.preloadCalendar();
-                  Log.d(TAG, "[SERVICE] Préchargement initial du calendrier économique terminé.");
-                } catch (Exception e) {
-                  Log.e(TAG, "[SERVICE] Erreur lors du préchargement du calendrier", e);
-                }
+    new Thread(new Runnable() {
+    @Override
+    public void run() {
+        try {
+            // Guard : évite le double appel avec BACKFILL qui se déclenche
+            // quasi simultanément via registerNetworkCallback().onAvailable()
+            long now = System.currentTimeMillis();
+            if (now - lastCalendarBackfillMillis < CALENDAR_BACKFILL_GUARD_MS) {
+                Log.d(TAG, "[SERVICE] Préchargement initial ignoré — BACKFILL déjà actif.");
+                return;
             }
-        }).start();
+            lastCalendarBackfillMillis = now;
+            EventValidator.preloadCalendar();
+        } catch (Exception e) {
+            Log.e(TAG, "[SERVICE] Erreur lors du préchargement du calendrier", e);
+        }
+    }
+    }).start();
     
         createNotificationChannel();
         startDailyBriefScheduler();
