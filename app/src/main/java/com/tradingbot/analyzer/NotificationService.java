@@ -2349,11 +2349,16 @@ try {
     Log.w(TAG, "[DAILY] Snapshot marché indisponible : " + e.getMessage());
 }
 messages.put(new JSONObject().put("role", "user").put("content",
-    "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n" +
+    "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n\n" +
     dailyMarketSnapshot + "\n" +
-    "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers));
+    "─────────────────────────────\n" +
+    "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers + "\n" +
+    "─────────────────────────────\n\n" +
+    "⚠️ INSTRUCTION SPÉCIALE : Identifie dans le texte la source de chaque événement (Bloomberg, FinancialJuice, etc.) " +
+    "et applique la RÈGLE 12 (Pondération des sources et comptage des signaux).\n" +
+    "Tu dois impérativement fournir dans le rapport le nombre d'événements en faveur de RISK-OFF et RISK-ON.\n" +
+    "Si plus de 60% du poids penche vers RISK-OFF, le FLUX DOMINANT doit refléter cette majorité écrasante."));
         payload.put("messages", messages);
-
         URL url = new URL(GROQ_URL);
         conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
