@@ -111,6 +111,33 @@ public class NotificationService extends NotificationListenerService {
         Log.d(TAG, "[WEEKLY] Rapport déjà envoyé cette semaine — pas de rattrapage nécessaire");
     }
     }
+
+    private void checkAndSendMissedMonthlyReport() {
+    SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
+    long lastMonthlySentMs = prefs.getLong("last_monthly_sent_ms", 0L);
+
+    Calendar lastEndOfMonth = Calendar.getInstance(
+        TimeZone.getTimeZone("Indian/Antananarivo"));
+    lastEndOfMonth.set(Calendar.HOUR_OF_DAY, 23);
+    lastEndOfMonth.set(Calendar.MINUTE, 0);
+    lastEndOfMonth.set(Calendar.SECOND, 0);
+    lastEndOfMonth.set(Calendar.MILLISECOND, 0);
+    lastEndOfMonth.set(Calendar.DAY_OF_MONTH, 1);
+    lastEndOfMonth.add(Calendar.DAY_OF_MONTH, -1);
+
+    long lastEndOfMonthMs = lastEndOfMonth.getTimeInMillis();
+
+    if (lastMonthlySentMs < lastEndOfMonthMs
+            && lastEndOfMonthMs < System.currentTimeMillis()) {
+        Log.d(TAG, "[MONTHLY] Rapport mensuel manqué → rattrapage dans 60s");
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog(
+                "📊 [MONTHLY] Rapport manqué → rattrapage en cours");
+        scheduler.schedule(this::generateAndPurgeMonthlyReport, 60, TimeUnit.SECONDS);
+    } else {
+        Log.d(TAG, "[MONTHLY] Rapport mensuel déjà envoyé — pas de rattrapage");
+    }
+}
     
     public static final List<String> TWELVE_DATA_ASSETS = Arrays.asList(
     "SP500", "NASDAQ", "GOLD", "GBPUSD", "USDJPY", "USOIL");
