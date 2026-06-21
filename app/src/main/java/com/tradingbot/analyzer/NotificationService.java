@@ -77,7 +77,7 @@ public class NotificationService extends NotificationListenerService {
             this.timestamp = ts;
         }
     }
-    private static final List<String> TWELVE_DATA_ASSETS = Arrays.asList(
+    public static final List<String> TWELVE_DATA_ASSETS = Arrays.asList(
     "SP500", "NASDAQ", "GOLD", "GBPUSD", "USDJPY", "USOIL");
 @Override
 public void onListenerConnected() {
