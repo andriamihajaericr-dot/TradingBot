@@ -2454,17 +2454,21 @@ messages.put(new JSONObject().put("role", "user").put("content",
 
             long now = System.currentTimeMillis() / 1000;
             String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
-            if (monthlyRegistry.isEmpty()) {
-              Log.w(TAG, "[MONTHLY] Registre mensuel vide — rapport annulé");
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("⚠️ [MONTHLY] Aucune donnée disponible pour le rapport mensuel");
-            }
-            return;
-            }
+if (monthlyRegistry.isEmpty()) {
+    Log.w(TAG, "[MONTHLY] Registre mensuel vide — rapport annulé");
+    if (MainActivity.instance != null) {
+        MainActivity.instance.addLog("⚠️ [MONTHLY] Aucune donnée disponible pour le rapport mensuel");
+    }
+    return;
+}
 
-            JSONObject payload = new JSONObject();
-            payload.put("model", GROQ_MODEL);
-            payload.put("temperature", 0.1);
+// Mémoire d'inertie mensuelle — contexte du mois précédent
+String lastMonthlyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+    .getString("last_monthly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
+
+JSONObject payload = new JSONObject();
+payload.put("model", GROQ_MODEL);
+payload.put("temperature", 0.1);
 
             JSONArray messages = new JSONArray();
             messages.put(new JSONObject().put("role", "system").put("content",
