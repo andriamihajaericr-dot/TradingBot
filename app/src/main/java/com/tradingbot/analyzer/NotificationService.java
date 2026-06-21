@@ -2340,7 +2340,7 @@ private static boolean isMarketHours() {
 
 "4. JUSTIFICATION CHIFFRÉE :\n" +
 "   - Dans le SCÉNARIO ALTERNATIF, tu dois citer précisément le nombre d'événements et la pondération en faveur du scénario opposé.\n" +
-"   - Exemple : '⚠️ SCÉNARIO ALTERNATIF : Si les 2 événements de désescalade (poids 3) venaient à se concrétiser par un accord officiel, le marché basculerait vers RISK-ON.'\n\n"
+"   - Exemple : '⚠️ SCÉNARIO ALTERNATIF : Si les 2 événements de désescalade (poids 3) venaient à se concrétiser par un accord officiel, le marché basculerait vers RISK-ON.'\n\n" +
     "═══════════════════════════════════════════════════════════════\n" +
     "                    CONTRAINTES DE SÉCURITÉ DE COMPILATION\n" +
     "═══════════════════════════════════════════════════════════════\n\n" +
