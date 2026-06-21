@@ -578,7 +578,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
                 if (k < chunk.size() - 1) sbSymbols.append(",");
             }
              // Enregistre le timestamp du dernier appel
-            lastBatchCallTime = System.currentTimeMillis();
+            lastBatchCallTime.set(System.currentTimeMillis());
             String queryParams = "&apikey=" + twelveDataKey;
             if (ENABLE_PREMARKET_PARAM) {
                 queryParams += "&premarket=true"; 
