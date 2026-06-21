@@ -2484,10 +2484,11 @@ messages.put(new JSONObject().put("role", "user").put("content",
             conn.setReadTimeout(25000);
             conn.setDoOutput(true);
 
-            OutputStream os = conn.getOutputStream();
-            os.write(payload.toString().getBytes("UTF-8"));
-            os.flush();
-            os.close();
+            try (OutputStream os = conn.getOutputStream()) {
+             byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+             os.write(input, 0, input.length);
+             os.flush();
+            }
 
             if (conn.getResponseCode() == 200) {
                 BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
