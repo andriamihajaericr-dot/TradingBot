@@ -2454,7 +2454,13 @@ messages.put(new JSONObject().put("role", "user").put("content",
 
             long now = System.currentTimeMillis() / 1000;
             String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
-            if (monthlyRegistry.isEmpty()) return;
+            if (monthlyRegistry.isEmpty()) {
+              Log.w(TAG, "[MONTHLY] Registre mensuel vide — rapport annulé");
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("⚠️ [MONTHLY] Aucune donnée disponible pour le rapport mensuel");
+            }
+            return;
+            }
 
             JSONObject payload = new JSONObject();
             payload.put("model", GROQ_MODEL);
