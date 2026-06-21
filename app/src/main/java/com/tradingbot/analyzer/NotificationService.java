@@ -2576,6 +2576,106 @@ if (report != null && report.trim().length() > 300) {
 private static volatile long lastCalendarBackfillMillis = 0L;
 private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
 
+private void generateAndSendWeeklyReport() {
+    HttpURLConnection conn = null;
+    try {
+        String apiKey = getGroqApiKey();
+        if (apiKey.isEmpty()) return;
+
+        long now = System.currentTimeMillis() / 1000;
+        // Récupère les événements des 7 derniers jours (poids >= 2)
+        String weeklyRegistry = eventDb.getWeeklyMacroSummary(now);
+        if (weeklyRegistry == null || weeklyRegistry.isEmpty()) {
+            Log.w(TAG, "[WEEKLY] Registre hebdo vide — rapport annulé");
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("⚠️ [WEEKLY] Aucune donnée pour le rapport hebdomadaire");
+            return;
+        }
+
+        String lastWeeklyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+            .getString("last_weekly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
+
+        JSONObject payload = new JSONObject();
+        payload.put("model", GROQ_MODEL);
+        payload.put("temperature", 0.05);
+
+        JSONArray messages = new JSONArray();
+        messages.put(new JSONObject().put("role", "system").put("content",
+            "Tu es un analyste macroéconomique senior. Produis un bilan hebdomadaire structuré.\n\n" +
+            "Format OBLIGATOIRE :\n" +
+            "1. 🏆 ÉVÉNEMENTS CLÉS DE LA SEMAINE (top 3)\n" +
+            "2. 📊 BILAN DIRECTIONNEL SEMAINE (RISK-ON vs RISK-OFF)\n" +
+            "3. 🎯 ACTIFS LES PLUS IMPACTÉS cette semaine\n" +
+            "4. 📅 AGENDA MACRO SEMAINE PROCHAINE (points de vigilance)\n" +
+            "5. 🏁 FLUX HEBDO DOMINANT : [flux sélectionné]\n\n" +
+            "CONTRAINTES : Un seul astérisque (*texte*). Pas de doubles astérisques. Concis."));
+
+        messages.put(new JSONObject().put("role", "user").put("content",
+            "CONTEXTE SEMAINE PRÉCÉDENTE : " + lastWeeklyFlow + "\n\n" +
+            "─────────────────────────────\n" +
+            "ÉVÉNEMENTS DE LA SEMAINE :\n" + weeklyRegistry + "\n" +
+            "─────────────────────────────\n\n" +
+            "Produis le bilan hebdomadaire selon le format demandé."));
+
+        payload.put("messages", messages);
+
+        URL url = new URL(GROQ_URL);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(25000);
+        conn.setDoOutput(true);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+            os.flush();
+        }
+
+        if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+            StringBuilder r = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) r.append(line);
+            }
+
+            String report = new JSONObject(r.toString())
+                .getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content");
+
+            if (report != null && report.trim().length() > 300) {
+                sendTelegramSecure(
+                    "📅 *BILAN MACRO HEBDOMADAIRE — VENDREDI*\n\n" + report.trim(), this);
+                Log.d(TAG, "[WEEKLY] Rapport hebdomadaire envoyé.");
+
+                // Persistance flux hebdo
+                Pattern weeklyPattern = Pattern.compile(
+                    "(?i)🏁\\s*FLUX\\s*HEBDO\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
+                Matcher weeklyMatcher = weeklyPattern.matcher(report);
+                if (weeklyMatcher.find()) {
+                    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                        .edit()
+                        .putString("last_weekly_flow", weeklyMatcher.group(1).trim())
+                        .apply();
+                }
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("✅ [WEEKLY] Rapport hebdomadaire envoyé");
+            } else {
+                Log.w(TAG, "[WEEKLY] Réponse Groq insuffisante");
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "[WEEKLY] Erreur rapport hebdomadaire", e);
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
+    }
+
 private void registerNetworkCallback() {
     ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
     if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
