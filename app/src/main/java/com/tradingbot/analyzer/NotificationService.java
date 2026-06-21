@@ -2391,9 +2391,23 @@ messages.put(new JSONObject().put("role", "user").put("content",
                                          .getJSONObject("message")
                                          .getString("content");
 
-            if (aiResult != null && aiResult.trim().length() > 50) {
-               sendTelegramSecure(aiResult.trim(), this);
-               Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
+            if (aiResult != null && aiResult.trim().length() > 300) {
+    sendTelegramSecure(aiResult.trim(), this);
+    Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
+
+    // Parsing et persistance du flux dominant pour le lendemain
+    Pattern flowPattern = Pattern.compile("(?i)🏁\\s*FLUX\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
+    Matcher flowMatcher = flowPattern.matcher(aiResult);
+    if (flowMatcher.find()) {
+        String newFlow = flowMatcher.group(1).trim();
+        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+            .edit()
+            .putString("last_daily_flow", newFlow)
+            .apply();
+        Log.d(TAG, "💾 Inertie mise à jour. Flux enregistré pour demain : " + newFlow);
+    } else {
+        Log.w(TAG, "[DAILY] Balise '🏁 FLUX DOMINANT :' introuvable. Préférences inchangées.");
+    }
             } else {
                Log.w(TAG, "[DAILY] Groq réponse vide — contenu : "
                + (aiResult != null ? aiResult.trim() : "null"));
