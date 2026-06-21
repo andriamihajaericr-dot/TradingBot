@@ -2262,8 +2262,12 @@ private static boolean isMarketHours() {
 String dailyMarketSnapshot = "Données de marché indisponibles.";
 try {
     List<String> twelveDataAssets = new ArrayList<>(TWELVE_DATA_ASSETS);
-    Map<String, MarketDataFetcher.MarketData> snap =
-        MarketDataFetcher.getMarketDataBatch(twelveDataAssets);
+    Map<String, MarketDataFetcher.MarketData> snap = null;
+    if (MarketDataFetcher.tryAcquireBatchSlot()) {
+    snap = MarketDataFetcher.getMarketDataBatch(twelveDataAssets);
+    } else {
+    Log.w(TAG, "[DAILY] Slot Twelve Data occupé — dailyDrivers suffisant");
+    }
 
     StringBuilder sbM = new StringBuilder("📊 COURS AU MOMENT DU RAPPORT :\n");
     boolean hasData = false;
