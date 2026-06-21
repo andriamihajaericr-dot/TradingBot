@@ -1282,20 +1282,15 @@ private static boolean isMarketHours() {
     }
 
     if (!twelveAssets.isEmpty()) {
-        long now = System.currentTimeMillis();
-        long elapsed = now - MarketDataFetcher.getLastBatchCallTime();
-        if (elapsed < 65000L) {
-            try {
-                Thread.sleep(65000L - elapsed);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                Log.w(TAG, "[TWELVE DATA] Sleep interrompu, appel immédiat");
-            }
-        }
-        // Appel Twelve Data uniquement sur les 6 actifs filtrés
+    // tryAcquireBatchSlot() est synchronized — un seul thread obtient le slot
+    if (MarketDataFetcher.tryAcquireBatchSlot()) {
         batchPrices = MarketDataFetcher.getMarketDataBatch(twelveAssets);
         if (batchPrices == null) batchPrices = new java.util.HashMap<>();
-
+    } else {
+        // Slot occupé — utilise le cache LKV existant sans appel réseau
+        Log.w(TAG, "[TWELVE DATA] Slot occupé — cache LKV utilisé pour ce flux");
+        batchPrices = new java.util.HashMap<>();
+    }
         for (String asset : twelveAssets) {
             MarketDataFetcher.MarketData data = batchPrices.get(asset);
             if (data != null && data.price > 0) {
