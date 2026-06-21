@@ -2461,7 +2461,17 @@ messages.put(new JSONObject().put("role", "user").put("content",
             payload.put("temperature", 0.1);
 
             JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content", "Analyse le registre mensuel des ruptures fondamentales."));
+            messages.put(new JSONObject().put("role", "system").put("content",
+    "Tu es un analyste macroéconomique senior. Tu dois produire un rapport mensuel structuré " +
+    "des ruptures fondamentales détectées sur les marchés financiers.\n\n" +
+    "Format OBLIGATOIRE du rapport :\n" +
+    "1. 🏆 ÉVÉNEMENTS MAJEURS DU MOIS (top 3 par impact)\n" +
+    "2. 📊 BILAN DIRECTIONNEL (RISK-ON vs RISK-OFF dominant)\n" +
+    "3. 🎯 ACTIFS LES PLUS IMPACTÉS (avec direction)\n" +
+    "4. ⚠️ RISQUES RÉSIDUELS pour le mois suivant\n" +
+    "5. 🏁 FLUX MENSUEL DOMINANT : [flux sélectionné]\n\n" +
+    "CONTRAINTES : Un seul astérisque (*texte*) pour le gras. " +
+    "Pas de doubles astérisques. Pas de salutations. Concis et factuel."));
             messages.put(new JSONObject().put("role", "user").put("content", "REGISTRE MENSUEL :\n" + monthlyRegistry));
             payload.put("messages", messages);
 
