@@ -2579,7 +2579,14 @@ if (report != null && report.trim().length() > 300) {
     // Mémoire d'inertie mensuelle
     String monthlyFlowLine = "📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report.trim();
     sendTelegramSecure(monthlyFlowLine, this);
-    Log.d(TAG, "[MONTHLY] Rapport mensuel envoyé avec succès.");
+
+// Mémoriser le timestamp pour le rattrapage
+getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+    .edit()
+    .putLong("last_monthly_sent_ms", System.currentTimeMillis())
+    .apply();
+
+Log.d(TAG, "[MONTHLY] Rapport mensuel envoyé avec succès.");
 
     // Persistance du flux mensuel dominant
     Pattern monthlyFlowPattern = Pattern.compile("(?i)🏁\\s*FLUX\\s*MENSUEL\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
