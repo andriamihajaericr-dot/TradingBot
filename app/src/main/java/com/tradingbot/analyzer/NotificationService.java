@@ -1248,11 +1248,11 @@ if (elapsed < 65000L) {
         Log.w(TAG, "[TWELVE DATA] Sleep interrompu, appel immédiat");
     }
 }
-        // Initialisation ici — 1 seul appel réseau
         batchPrices = MarketDataFetcher.getMarketDataBatch(assets);
+        if (batchPrices == null) batchPrices = new java.util.HashMap<>();
 
         for (String asset : assets) {
-            MarketDataFetcher.MarketData data = batchPrices.get(asset);
+         MarketDataFetcher.MarketData data = batchPrices.get(asset);
             if (data != null && data.price > 0) {
                 String tendance = data.changePercent >= 0 ? "📈" : "📉";
                 String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
