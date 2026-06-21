@@ -413,9 +413,9 @@ String[] whereArgs = new String[]{
 
         Cursor cursor = null;
         try {
-            cursor = db.query(TABLE_EVENTS, new String[]{"feed_content", "impact"},
-                    "unix_timestamp >= ? AND (driver_weight = 5 OR impact LIKE '%PIVOT%')",
-                    new String[]{String.valueOf(thirtyDaysAgo)}, null, null, "unix_timestamp ASC");
+            cursor = db.query(TABLE_EVENTS, new String[]{"feed_content", "impact", "event_type", "unix_timestamp"},
+            "unix_timestamp >= ? AND (driver_weight >= 3 OR impact LIKE '%PIVOT%')",
+            new String[]{String.valueOf(thirtyDaysAgo)}, null, null, "unix_timestamp ASC");
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     sb.append("(").append(cursor.getString(1)).append(") ").append(cursor.getString(0)).append("\n");
