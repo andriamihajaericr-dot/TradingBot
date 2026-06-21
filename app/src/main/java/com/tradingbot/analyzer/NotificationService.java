@@ -893,9 +893,9 @@ if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", fal
                             long currentUnixTimestamp = System.currentTimeMillis() / 1000L;
                             
                             // 🚀 2. Appel avec la signature exacte : (String, long, String)
+                            // label = "NFP", "CPI", etc. — plus fiable que le titre brut de la notification
                             boolean updated = EventDatabase.getInstance(getApplicationContext())
-                                         .updateActualIfMissing(title, currentUnixTimestamp, actualClaims);
-                            
+                            .updateActualIfMissing(label, currentUnixTimestamp, actualValue);
                             if (updated) {
                                 Log.d(TAG, "✅ [FRED] Base de données synchronisée avec succès pour l'indicateur.");
                             } else {
