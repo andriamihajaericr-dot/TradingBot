@@ -2458,11 +2458,14 @@ messages.put(new JSONObject().put("role", "user").put("content",
         nextWeekly.add(Calendar.DAY_OF_MONTH, 1);
     }
     scheduler.scheduleAtFixedRate(this::generateAndSendWeeklyReport,
-        nextWeekly.getTimeInMillis() - System.currentTimeMillis(),
-        7L * 24 * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
+    nextWeekly.getTimeInMillis() - System.currentTimeMillis(),
+    7L * 24 * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
 
     Log.d(TAG, "[SCHEDULER] Rapport mensuel → " + nextMonthly.getTime());
     Log.d(TAG, "[SCHEDULER] Rapport hebdomadaire → " + nextWeekly.getTime());
+
+    // ── Rattrapage : si vendredi 22h passé cette semaine sans rapport ──
+    checkAndSendMissedWeeklyReport();
     }
 
     private void generateAndPurgeMonthlyReport() {
