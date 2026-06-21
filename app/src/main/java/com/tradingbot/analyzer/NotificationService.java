@@ -2482,7 +2482,12 @@ payload.put("temperature", 0.1);
     "5. 🏁 FLUX MENSUEL DOMINANT : [flux sélectionné]\n\n" +
     "CONTRAINTES : Un seul astérisque (*texte*) pour le gras. " +
     "Pas de doubles astérisques. Pas de salutations. Concis et factuel."));
-            messages.put(new JSONObject().put("role", "user").put("content", "REGISTRE MENSUEL :\n" + monthlyRegistry));
+            messages.put(new JSONObject().put("role", "user").put("content",
+    "CONTEXTE MOIS PRÉCÉDENT : Le flux dominant du mois passé était : " + lastMonthlyFlow + ".\n\n" +
+    "─────────────────────────────\n" +
+    "REGISTRE MENSUEL DES ÉVÉNEMENTS :\n" + monthlyRegistry + "\n" +
+    "─────────────────────────────\n\n" +
+    "Produis le rapport de transition macroéconomique mensuel selon le format demandé."));
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
