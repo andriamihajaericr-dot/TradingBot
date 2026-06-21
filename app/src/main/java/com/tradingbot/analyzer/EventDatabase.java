@@ -81,7 +81,6 @@ public class EventDatabase extends SQLiteOpenHelper {
     SQLiteDatabase db = this.getReadableDatabase();
     StringBuilder sb = new StringBuilder();
     long sevenDaysAgo = currentUnixTime - (7L * 24 * 60 * 60);
-
     Cursor cursor = null;
     try {
         cursor = db.query(TABLE_EVENTS,
