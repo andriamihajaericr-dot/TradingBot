@@ -575,9 +575,15 @@ public void onListenerDisconnected() {
     try {
         
     // Réutilise le cache si disponible, sinon appel réseau en dernier recours
-    Map<String, MarketDataFetcher.MarketData> liveDataMap = (cachedData != null && !cachedData.isEmpty())
-            ? cachedData
-            : MarketDataFetcher.getMarketDataBatch(assets);
+    Map<String, MarketDataFetcher.MarketData> liveDataMap = null;
+if (cachedData != null && !cachedData.isEmpty()) {
+    liveDataMap = cachedData; // Cache disponible — 0 appel réseau
+} else if (MarketDataFetcher.tryAcquireBatchSlot()) {
+    liveDataMap = MarketDataFetcher.getMarketDataBatch(assets); // Fallback réseau
+} else {
+    Log.w(TAG, "[INJECT] Slot occupé — injectLivePrices ignoré ce cycle");
+}
+if (liveDataMap == null || liveDataMap.isEmpty()) return groqReport;
         if (liveDataMap == null || liveDataMap.isEmpty()) return groqReport;
 
         String[] lignes = groqReport.split("\n");
