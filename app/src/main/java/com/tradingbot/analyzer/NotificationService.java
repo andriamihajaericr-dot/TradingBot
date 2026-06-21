@@ -875,40 +875,85 @@ if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", fal
             final String finalUnifiedFeed = tempUnifiedFeed;
             final String finalSourceName = sourceName;
             final long postTimeMs = sbn.getPostTime();  
+             // ==================== 🔥 INTERCEPTION ET ENRICHISSEMENT FRED IMMÉDIAT ====================
+String upperCheck = finalUnifiedFeed.toUpperCase(Locale.ROOT);
 
-            //RÉCUPÉRATION CALENDRIER ÉCONOMIQUE FRED
-            String upperCheck = finalUnifiedFeed.toUpperCase(Locale.ROOT);
-            if (upperCheck.contains("JOBLESS CLAIMS") || upperCheck.contains("INITIAL CLAIMS") || upperCheck.contains("CHÔMAGE US")) {
-                // Déclenchement en tâche de fond sur le pool secondaire 'exec' pour préserver 'tradingPipelineExecutor'
-                exec.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        Log.d(TAG, "🔄 [FRED] Requête en arrière-plan lancée de manière non-bloquante pour ICSA...");
-                        String actualClaims = EconomicCalendarAPI.fetchFredActualValue("ICSA", "K");
-                        
-                        // L'interception n'est poursuivie que si l'extraction en ligne a fonctionné
-                        if (actualClaims != null && !actualClaims.isEmpty()) {
-                            
-                            // 🕒 1. Récupération du timestamp actuel en secondes
-                            // Ta méthode DB applique une tolérance de ±2h, le temps actuel fitte parfaitement
-                            long currentUnixTimestamp = System.currentTimeMillis() / 1000L;
-                            
-                            // 🚀 2. Appel avec la signature exacte : (String, long, String)
-                            // label = "NFP", "CPI", etc. — plus fiable que le titre brut de la notification
-                            boolean updated = EventDatabase.getInstance(getApplicationContext())
-                            .updateActualIfMissing(label, currentUnixTimestamp, actualValue);
-                            if (updated) {
-                                Log.d(TAG, "✅ [FRED] Base de données synchronisée avec succès pour l'indicateur.");
-                            } else {
-                                Log.d(TAG, "ℹ️ [FRED] Donnée reçue (" + actualClaims + "), mais aucun événement 'Actual: N/A' à mettre à jour dans la fenêtre de ±2h.");
-                            }
-            
-                        } else {
-                            Log.w(TAG, "⚠️ [FRED FAILURE] Impossible d'extraire la donnée en ligne.");
-                        }
+// Table de correspondance : mot-clé dans la notification → série FRED + format
+final String[][] FRED_INDICATORS = {
+    // Emploi
+    {"JOBLESS CLAIMS",    "ICSA",     "K"},
+    {"INITIAL CLAIMS",    "ICSA",     "K"},
+    {"CHÔMAGE US",        "ICSA",     "K"},
+    {"NON-FARM",          "PAYEMS",   "K"},
+    {"NFP",               "PAYEMS",   "K"},
+    {"NONFARM PAYROLL",   "PAYEMS",   "K"},
+    // Inflation
+    {"CPI",               "CPIAUCSL", "%"},
+    {"CONSUMER PRICE",    "CPIAUCSL", "%"},
+    {"PCE",               "PCEPILFE", "%"},
+    {"CORE PCE",          "PCEPILFE", "%"},
+    {"PPI",               "PPIACO",   "%"},
+    // Croissance
+    {"GDP",               "GDPC1",    "%"},
+    {"GROSS DOMESTIC",    "GDPC1",    "%"},
+    // Consommation
+    {"RETAIL SALES",      "RSXFS",    "%"},
+    {"VENTES AU DÉTAIL",  "RSXFS",    "%"},
+    // Sentiment / PMI
+    {"MICHIGAN",          "UMCSENT",  ""},
+    {"CONSUMER SENTIMENT","UMCSENT",  ""},
+    {"ISM MANUFACTUR",    "NAPM",     ""},
+    // Immobilier
+    {"EXISTING HOME",     "EXHOSLUSM227S", "K"},
+    {"NEW HOME SALES",    "HSN1F",    "K"},
+};
+
+String matchedSeries = null;
+String matchedFormat = null;
+String matchedLabel  = null;
+
+for (String[] indicator : FRED_INDICATORS) {
+    if (upperCheck.contains(indicator[0])) {
+        matchedSeries = indicator[1];
+        matchedFormat = indicator[2];
+        matchedLabel  = indicator[0];
+        break; // Premier match suffit
+    }
+}
+
+if (matchedSeries != null) {
+    final String seriesId = matchedSeries;
+    final String format   = matchedFormat;
+    final String label    = matchedLabel;
+
+    exec.execute(new Runnable() {
+        @Override
+        public void run() {
+            Log.d(TAG, "🔄 [FRED] Requête pour " + label + " (série: " + seriesId + ")...");
+            String actualValue = EconomicCalendarAPI.fetchFredActualValue(seriesId, format);
+
+            if (actualValue != null && !actualValue.isEmpty()) {
+                long currentUnixTimestamp = System.currentTimeMillis() / 1000L;
+                boolean updated = EventDatabase.getInstance(getApplicationContext())
+                             .updateActualIfMissing(title, currentUnixTimestamp, actualValue);
+                if (updated) {
+                    Log.d(TAG, "✅ [FRED] Synchronisé : " + label + " = " + actualValue);
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog("✅ [FRED] " + label + " → " + actualValue);
                     }
-                });
+                } else {
+                    Log.d(TAG, "ℹ️ [FRED] " + label + " = " + actualValue + " — aucun événement N/A à mettre à jour.");
+                }
+            } else {
+                Log.w(TAG, "⚠️ [FRED FAILURE] Impossible d'extraire la donnée pour : " + label);
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("⚠️ [FRED] Échec récupération : " + label);
+                }
             }
+        }
+    });
+}
+// =========================================================================================
          // 2️⃣ BASCOULEMENT IMMÉDIAT ET ISOLÉ DANS LE PIPELINE ASYNCHRONE (THREAD D'ARRIÈRE-PLAN)
             // Utilisation de l'exécuteur existant de la classe pour stabiliser la RAM et le CPU
             tradingPipelineExecutor.execute(new Runnable() {
