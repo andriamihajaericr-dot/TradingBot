@@ -309,12 +309,15 @@ public class EventDatabase extends SQLiteOpenHelper {
         "event_type = 'GEOPOLITICAL' OR " +
         "event_type = 'CALENDAR-RESULT' OR " +
         "impact LIKE '%Choc Géopolitique%'" +
-    ") AND driver_weight >= 1)";
+    ") AND driver_weight >= 1) OR " +
+    // Clause 4 : GEOPOLITICAL poids 1 des 24h — couvre les sessions sans poids >= 2
+    "(unix_timestamp >= ? AND event_type = 'GEOPOLITICAL' AND driver_weight >= 1)";
 
 String[] whereArgs = new String[]{
-    String.valueOf(twentyFourHoursAgo),  // clause 1 : 24h poids >= 2
-    String.valueOf(sevenDaysAgo),         // clause 2 : 7j poids 5
-    String.valueOf(twentyFourHoursAgo)    // clause 3 : ← 24h au lieu de 7j pour GEO/CALENDAR
+    String.valueOf(twentyFourHoursAgo),  // clause 1
+    String.valueOf(sevenDaysAgo),         // clause 2
+    String.valueOf(sevenDaysAgo),         // clause 3 — mémoire 7j intacte
+    String.valueOf(twentyFourHoursAgo)    // clause 4 — GEO 24h poids 1
 };
 
     SQLiteDatabase db = this.getReadableDatabase();
