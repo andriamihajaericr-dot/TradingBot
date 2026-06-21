@@ -1350,19 +1350,7 @@ if (elapsed < 65000L) {
             }
         }, initialDelayMillis, period24HoursMillis, TimeUnit.MILLISECONDS);
          // ✅ NOUVEAU (remplace le 6h)
-        long fifteenMinutesMillis = 15 * 60 * 1000L;
-scheduler.scheduleAtFixedRate(new Runnable() {
-    @Override
-    public void run() {
-        try {
-            Log.d(TAG, "[CALENDAR] Rafraîchissement (15min) pour capturer les Actuals...");
-            EventValidator.preloadCalendar();
-        } catch (Exception e) {
-            Log.e(TAG, "[CALENDAR] Erreur refresh 15min", e);
-        }
-    }
-}, fifteenMinutesMillis, fifteenMinutesMillis, TimeUnit.MILLISECONDS);
-        
+    
     scheduler.scheduleAtFixedRate(new Runnable() {
     @Override
     public void run() {
