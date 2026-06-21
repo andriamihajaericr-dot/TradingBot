@@ -2497,10 +2497,35 @@ messages.put(new JSONObject().put("role", "user").put("content",
                 while ((l = br.readLine()) != null) r.append(l);
                 br.close();
 
-                String report = new JSONObject(r.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+                String report = new JSONObject(r.toString())...getString("content");
 
-                sendTelegramSecure("📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report, this);
-                eventDb.purgeOldEvents(now);
+if (report != null && report.trim().length() > 300) {
+    // Mémoire d'inertie mensuelle
+    String monthlyFlowLine = "📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report.trim();
+    sendTelegramSecure(monthlyFlowLine, this);
+    Log.d(TAG, "[MONTHLY] Rapport mensuel envoyé avec succès.");
+
+    // Persistance du flux mensuel dominant
+    Pattern monthlyFlowPattern = Pattern.compile("(?i)🏁\\s*FLUX\\s*MENSUEL\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
+    Matcher monthlyFlowMatcher = monthlyFlowPattern.matcher(report);
+    if (monthlyFlowMatcher.find()) {
+        String newMonthlyFlow = monthlyFlowMatcher.group(1).trim();
+        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+            .edit()
+            .putString("last_monthly_flow", newMonthlyFlow)
+            .apply();
+        Log.d(TAG, "💾 [MONTHLY] Flux mensuel enregistré : " + newMonthlyFlow);
+    }
+    if (MainActivity.instance != null) {
+        MainActivity.instance.addLog("✅ [MONTHLY] Rapport mensuel envoyé");
+    }
+    eventDb.purgeOldEvents(now);
+} else {
+    Log.w(TAG, "[MONTHLY] Groq réponse vide ou insuffisante — purge annulée");
+    if (MainActivity.instance != null) {
+        MainActivity.instance.addLog("⚠️ [MONTHLY] Rapport mensuel vide — non envoyé");
+    }
+}
             }
         } catch (Exception e) { Log.e(TAG, "Erreur Rapport Mensuel", e); }
         finally {
