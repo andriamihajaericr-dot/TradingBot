@@ -2571,8 +2571,6 @@ if (report != null && report.trim().length() > 300) {
         }
     }
 
-    // Garde temporel anti-spam : empêche syncCalendarAndPurge() de se déclencher
-// plus d'une fois toutes les 30 minutes lors de reconnexions réseau répétées (wifi instable, etc.)
 private static volatile long lastCalendarBackfillMillis = 0L;
 private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
 
