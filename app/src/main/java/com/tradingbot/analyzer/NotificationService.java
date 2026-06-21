@@ -2391,7 +2391,7 @@ messages.put(new JSONObject().put("role", "user").put("content",
                                          .getJSONObject("message")
                                          .getString("content");
 
-            if (aiResult != null && aiResult.trim().length() > 300) {
+    if (aiResult != null && aiResult.trim().length() > 300) {
     sendTelegramSecure(aiResult.trim(), this);
     Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
 
