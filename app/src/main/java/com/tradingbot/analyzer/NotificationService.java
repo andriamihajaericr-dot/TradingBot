@@ -1271,22 +1271,33 @@ private static boolean isMarketHours() {
     java.util.Map<String, MarketDataFetcher.MarketData> batchPrices = null;
 
     if (assets != null && !assets.isEmpty()) {
-        blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
-        long now = System.currentTimeMillis();
-long elapsed = now - MarketDataFetcher.getLastBatchCallTime();
-if (elapsed < 65000L) {
-    try {
-        Thread.sleep(65000L - elapsed);
-    } catch (InterruptedException ie) {
-        Thread.currentThread().interrupt();
-        Log.w(TAG, "[TWELVE DATA] Sleep interrompu, appel immédiat");
+    blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
+
+    // Filtrer uniquement les 6 actifs Twelve Data — assets complet va à Groq
+    List<String> twelveAssets = new ArrayList<>();
+    for (String asset : assets) {
+        if (TWELVE_DATA_ASSETS.contains(asset)) {
+            twelveAssets.add(asset);
+        }
     }
-}
-        batchPrices = MarketDataFetcher.getMarketDataBatch(assets);
+
+    if (!twelveAssets.isEmpty()) {
+        long now = System.currentTimeMillis();
+        long elapsed = now - MarketDataFetcher.getLastBatchCallTime();
+        if (elapsed < 65000L) {
+            try {
+                Thread.sleep(65000L - elapsed);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                Log.w(TAG, "[TWELVE DATA] Sleep interrompu, appel immédiat");
+            }
+        }
+        // Appel Twelve Data uniquement sur les 6 actifs filtrés
+        batchPrices = MarketDataFetcher.getMarketDataBatch(twelveAssets);
         if (batchPrices == null) batchPrices = new java.util.HashMap<>();
 
-        for (String asset : assets) {
-         MarketDataFetcher.MarketData data = batchPrices.get(asset);
+        for (String asset : twelveAssets) {
+            MarketDataFetcher.MarketData data = batchPrices.get(asset);
             if (data != null && data.price > 0) {
                 String tendance = data.changePercent >= 0 ? "📈" : "📉";
                 String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
@@ -1296,6 +1307,7 @@ if (elapsed < 65000L) {
             }
         }
     }
+   }
 
     String bodyEnrichi = body + blocPrix.toString();
 
