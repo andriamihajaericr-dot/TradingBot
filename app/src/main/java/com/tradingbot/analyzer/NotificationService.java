@@ -2512,7 +2512,11 @@ payload.put("temperature", 0.1);
                 while ((l = br.readLine()) != null) r.append(l);
                 br.close();
 
-                String report = new JSONObject(r.toString())...getString("content");
+                String report = new JSONObject(r.toString())
+                .getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content");
 
 if (report != null && report.trim().length() > 300) {
     // Mémoire d'inertie mensuelle
