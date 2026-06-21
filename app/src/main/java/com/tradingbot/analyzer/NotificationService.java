@@ -2685,25 +2685,34 @@ private void generateAndSendWeeklyReport() {
                 .getString("content");
 
             if (report != null && report.trim().length() > 300) {
-                sendTelegramSecure(
-                    "📅 *BILAN MACRO HEBDOMADAIRE — VENDREDI*\n\n" + report.trim(), this);
-                Log.d(TAG, "[WEEKLY] Rapport hebdomadaire envoyé.");
 
-                // Persistance flux hebdo
-                Pattern weeklyPattern = Pattern.compile(
-                    "(?i)🏁\\s*FLUX\\s*HEBDO\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
-                Matcher weeklyMatcher = weeklyPattern.matcher(report);
-                if (weeklyMatcher.find()) {
-                    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-                        .edit()
-                        .putString("last_weekly_flow", weeklyMatcher.group(1).trim())
-                        .apply();
-                }
-                if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("✅ [WEEKLY] Rapport hebdomadaire envoyé");
-            } else {
-                Log.w(TAG, "[WEEKLY] Réponse Groq insuffisante");
-            }
+    sendTelegramSecure(
+        "📅 *BILAN MACRO HEBDOMADAIRE — VENDREDI*\n\n" + report.trim(), this);
+    
+    // ← AJOUTER ICI — juste après sendTelegramSecure
+    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+        .edit()
+        .putLong("last_weekly_sent_ms", System.currentTimeMillis())
+        .apply();
+
+    Log.d(TAG, "[WEEKLY] Rapport hebdomadaire envoyé.");
+
+    // Persistance flux hebdo
+    Pattern weeklyPattern = Pattern.compile(
+        "(?i)🏁\\s*FLUX\\s*HEBDO\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
+    Matcher weeklyMatcher = weeklyPattern.matcher(report);
+    if (weeklyMatcher.find()) {
+        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+            .edit()
+            .putString("last_weekly_flow", weeklyMatcher.group(1).trim())
+            .apply();
+    }
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("✅ [WEEKLY] Rapport hebdomadaire envoyé");
+
+} else {
+    Log.w(TAG, "[WEEKLY] Réponse Groq insuffisante");
+}
         }
     } catch (Exception e) {
         Log.e(TAG, "[WEEKLY] Erreur rapport hebdomadaire", e);
