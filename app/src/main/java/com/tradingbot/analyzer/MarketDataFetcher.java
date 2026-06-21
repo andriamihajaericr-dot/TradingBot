@@ -47,10 +47,22 @@ public class MarketDataFetcher {
     private static final int TIMEOUT_MS = 7000; 
     // Initialisé à "maintenant - 65s" pour que le premier appel parte sans attente
     // mais les appels simultanés au démarrage soient naturellement espacés
-    private static volatile long lastBatchCallTime = System.currentTimeMillis() - 65000L;
-    public static long getLastBatchCallTime() {
-         return lastBatchCallTime;
+    private static final java.util.concurrent.atomic.AtomicLong lastBatchCallTime =
+    new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis() - 65000L);
+
+public static long getLastBatchCallTime() {
+    return lastBatchCallTime.get();
+}
+
+// Tente de réserver le slot — retourne true si on peut appeler, false si trop tôt
+public static synchronized boolean tryAcquireBatchSlot() {
+    long now = System.currentTimeMillis();
+    if (now - lastBatchCallTime.get() < 65000L) {
+        return false; // Slot occupé
     }
+    lastBatchCallTime.set(now); // Réserve immédiatement
+    return true;
+}
     private static final Map<String, CachedEntry> MARKET_DATA_CACHE = new ConcurrentHashMap<>();
     private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(2); // Durée de vie max d'un prix de secours : 2 minutes
 
