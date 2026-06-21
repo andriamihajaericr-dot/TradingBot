@@ -77,6 +77,41 @@ public class NotificationService extends NotificationListenerService {
             this.timestamp = ts;
         }
     }
+    
+    private void checkAndSendMissedWeeklyReport() {
+    SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
+    long lastWeeklySentMs = prefs.getLong("last_weekly_sent_ms", 0L);
+
+    // Trouver le dernier vendredi à 22h00 (Mada)
+    Calendar lastFriday = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+    lastFriday.set(Calendar.HOUR_OF_DAY, 22);
+    lastFriday.set(Calendar.MINUTE, 0);
+    lastFriday.set(Calendar.SECOND, 0);
+    lastFriday.set(Calendar.MILLISECOND, 0);
+    // Reculer jusqu'au dernier vendredi
+    while (lastFriday.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY) {
+        lastFriday.add(Calendar.DAY_OF_MONTH, -1);
+    }
+    // Si ce vendredi est dans le futur, reculer d'une semaine
+    if (lastFriday.getTimeInMillis() > System.currentTimeMillis()) {
+        lastFriday.add(Calendar.DAY_OF_MONTH, -7);
+    }
+
+    long lastFridayMs = lastFriday.getTimeInMillis();
+    boolean alreadySent = lastWeeklySentMs >= lastFridayMs;
+
+    if (!alreadySent) {
+        Log.d(TAG, "[WEEKLY] Rapport manqué détecté — envoi immédiat du rattrapage");
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog("📅 [WEEKLY] Rapport manqué → envoi du rattrapage");
+        }
+        // Délai 30s pour laisser le service se stabiliser avant l'appel Groq
+        scheduler.schedule(this::generateAndSendWeeklyReport, 30, TimeUnit.SECONDS);
+    } else {
+        Log.d(TAG, "[WEEKLY] Rapport déjà envoyé cette semaine — pas de rattrapage nécessaire");
+    }
+    }
+    
     public static final List<String> TWELVE_DATA_ASSETS = Arrays.asList(
     "SP500", "NASDAQ", "GOLD", "GBPUSD", "USDJPY", "USOIL");
 @Override
