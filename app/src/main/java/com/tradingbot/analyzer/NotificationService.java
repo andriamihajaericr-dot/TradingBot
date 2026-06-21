@@ -2332,8 +2332,14 @@ messages.put(new JSONObject().put("role", "user").put("content",
                                          .getString("content");
 
             if (aiResult != null && aiResult.trim().length() > 50) {
-                sendTelegramSecure(aiResult.trim(), this);
-                Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
+               sendTelegramSecure(aiResult.trim(), this);
+               Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
+            } else {
+               Log.w(TAG, "[DAILY] Groq réponse vide — contenu : "
+               + (aiResult != null ? aiResult.trim() : "null"));
+              if (MainActivity.instance != null) {
+              MainActivity.instance.addLog("⚠️ [DAILY] Groq réponse vide ou insuffisante");
+              }
             }
         } else {
             try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
