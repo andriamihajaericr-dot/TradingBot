@@ -885,8 +885,8 @@ final String[][] FRED_INDICATORS = {
     {"INITIAL CLAIMS",    "ICSA",     "K"},
     {"CHÔMAGE US",        "ICSA",     "K"},
     {"NON-FARM",          "PAYEMS",   "K"},
-    {"NFP",               "PAYEMS",   "K"},
-    {"NONFARM PAYROLL",   "PAYEMS",   "K"},
+    //{"NFP",               "PAYEMS",   "K"},
+    // {"NONFARM PAYROLL",   "PAYEMS",   "K"},
     // Inflation
     {"CPI",               "CPIAUCSL", "%"},
     {"CONSUMER PRICE",    "CPIAUCSL", "%"},
