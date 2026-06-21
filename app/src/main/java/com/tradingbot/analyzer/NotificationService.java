@@ -2469,38 +2469,42 @@ messages.put(new JSONObject().put("role", "user").put("content",
 
     private void startMonthlyReportScheduler() {
     // ── Rapport MENSUEL — dernier jour du mois à 23h00 (Mada) ──
-    Calendar nextMonthly = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
-    nextMonthly.set(Calendar.DAY_OF_MONTH, nextMonthly.getActualMaximum(Calendar.DAY_OF_MONTH));
+    Calendar nextMonthly = Calendar.getInstance(
+        TimeZone.getTimeZone("Indian/Antananarivo"));
+    nextMonthly.set(Calendar.DAY_OF_MONTH,
+        nextMonthly.getActualMaximum(Calendar.DAY_OF_MONTH));
     nextMonthly.set(Calendar.HOUR_OF_DAY, 23);
     nextMonthly.set(Calendar.MINUTE, 0);
     nextMonthly.set(Calendar.SECOND, 0);
     if (nextMonthly.getTimeInMillis() <= System.currentTimeMillis()) {
         nextMonthly.add(Calendar.MONTH, 1);
-        nextMonthly.set(Calendar.DAY_OF_MONTH, nextMonthly.getActualMaximum(Calendar.DAY_OF_MONTH));
+        nextMonthly.set(Calendar.DAY_OF_MONTH,
+            nextMonthly.getActualMaximum(Calendar.DAY_OF_MONTH));
     }
     scheduler.scheduleAtFixedRate(this::generateAndPurgeMonthlyReport,
         nextMonthly.getTimeInMillis() - System.currentTimeMillis(),
         30L * 24 * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
 
     // ── Rapport HEBDOMADAIRE — chaque vendredi à 22h00 (Mada) ──
-    Calendar nextWeekly = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+    Calendar nextWeekly = Calendar.getInstance(
+        TimeZone.getTimeZone("Indian/Antananarivo"));
     nextWeekly.set(Calendar.HOUR_OF_DAY, 22);
     nextWeekly.set(Calendar.MINUTE, 0);
     nextWeekly.set(Calendar.SECOND, 0);
-    // Avancer au prochain vendredi
     while (nextWeekly.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY
            || nextWeekly.getTimeInMillis() <= System.currentTimeMillis()) {
         nextWeekly.add(Calendar.DAY_OF_MONTH, 1);
     }
     scheduler.scheduleAtFixedRate(this::generateAndSendWeeklyReport,
-    nextWeekly.getTimeInMillis() - System.currentTimeMillis(),
-    7L * 24 * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
+        nextWeekly.getTimeInMillis() - System.currentTimeMillis(),
+        7L * 24 * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
 
     Log.d(TAG, "[SCHEDULER] Rapport mensuel → " + nextMonthly.getTime());
-    Log.d(TAG, "[SCHEDULER] Rapport hebdomadaire → " + nextWeekly.getTime());
+    Log.d(TAG, "[SCHEDULER] Rapport hebdo → " + nextWeekly.getTime());
 
-    // ── Rattrapage : si vendredi 22h passé cette semaine sans rapport ──
+    // ── Rattrapages au démarrage ──
     checkAndSendMissedWeeklyReport();
+    checkAndSendMissedMonthlyReport();
     }
 
     private void generateAndPurgeMonthlyReport() {
