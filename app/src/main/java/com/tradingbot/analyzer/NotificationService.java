@@ -877,35 +877,24 @@ if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", fal
             final long postTimeMs = sbn.getPostTime();  
              // ==================== 🔥 INTERCEPTION ET ENRICHISSEMENT FRED IMMÉDIAT ====================
 String upperCheck = finalUnifiedFeed.toUpperCase(Locale.ROOT);
-
-// Table de correspondance : mot-clé dans la notification → série FRED + format
 final String[][] FRED_INDICATORS = {
     // Emploi
     {"JOBLESS CLAIMS",    "ICSA",     "K"},
     {"INITIAL CLAIMS",    "ICSA",     "K"},
     {"CHÔMAGE US",        "ICSA",     "K"},
-    {"NON-FARM",          "PAYEMS",   "K"},
-    //{"NFP",               "PAYEMS",   "K"},
-    // {"NONFARM PAYROLL",   "PAYEMS",   "K"},
     // Inflation
     {"CPI",               "CPIAUCSL", "%"},
     {"CONSUMER PRICE",    "CPIAUCSL", "%"},
     {"PCE",               "PCEPILFE", "%"},
     {"CORE PCE",          "PCEPILFE", "%"},
     {"PPI",               "PPIACO",   "%"},
-    // Croissance
-    {"GDP",               "GDPC1",    "%"},
-    {"GROSS DOMESTIC",    "GDPC1",    "%"},
-    // Consommation
+    // Consommation / Sentiment
     {"RETAIL SALES",      "RSXFS",    "%"},
     {"VENTES AU DÉTAIL",  "RSXFS",    "%"},
-    // Sentiment / PMI
     {"MICHIGAN",          "UMCSENT",  ""},
     {"CONSUMER SENTIMENT","UMCSENT",  ""},
+    // PMI / ISM
     {"ISM MANUFACTUR",    "NAPM",     ""},
-    // Immobilier
-    {"EXISTING HOME",     "EXHOSLUSM227S", "K"},
-    {"NEW HOME SALES",    "HSN1F",    "K"},
 };
 
 String matchedSeries = null;
