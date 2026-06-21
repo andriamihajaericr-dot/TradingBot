@@ -878,7 +878,7 @@ if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", fal
              // ==================== 🔥 INTERCEPTION ET ENRICHISSEMENT FRED IMMÉDIAT ====================
 String upperCheck = finalUnifiedFeed.toUpperCase(Locale.ROOT);
 final String[][] FRED_INDICATORS = {
-    // Emploi
+    // Emploi 
     {"JOBLESS CLAIMS",    "ICSA",     "K"},
     {"INITIAL CLAIMS",    "ICSA",     "K"},
     {"CHÔMAGE US",        "ICSA",     "K"},
