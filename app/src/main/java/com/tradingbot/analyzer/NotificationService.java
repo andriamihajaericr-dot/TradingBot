@@ -1130,10 +1130,20 @@ if (isConfirmedCalendarDrop && finalCalculatedWeight < 3) {
                     // 9️⃣ ENRICHISSEMENT MARKET DATA & PROMPT IA (Pipeline Intégré)
                     // 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
                       // ✅ CORRECTION : renommer la variable String pour éviter le conflit avec la Map
-String marketSnapshotString = "Marché non analysé.";
+    String marketSnapshotString = "Marché non analysé.";
 java.util.Map<String, MarketDataFetcher.MarketData> batchSnapshot = null;
 try {
-    batchSnapshot = MarketDataFetcher.getMarketDataBatch(enrichedAssets);
+    // Filtrer uniquement les 6 actifs Twelve Data parmi enrichedAssets
+    List<String> twelveFiltered = new ArrayList<>();
+    for (String a : enrichedAssets) {
+        if (TWELVE_DATA_ASSETS.contains(a)) twelveFiltered.add(a);
+    }
+    // tryAcquireBatchSlot — évite les appels simultanés
+    if (!twelveFiltered.isEmpty() && MarketDataFetcher.tryAcquireBatchSlot()) {
+        batchSnapshot = MarketDataFetcher.getMarketDataBatch(twelveFiltered);
+    } else {
+        Log.w(TAG, "[BATCH] Slot occupé ou aucun actif Twelve Data — cache LKV utilisé");
+    }
     if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
         StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
         boolean premierActif = true;
