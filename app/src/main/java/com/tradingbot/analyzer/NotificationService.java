@@ -874,8 +874,9 @@ if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", fal
              }
             final String finalUnifiedFeed = tempUnifiedFeed;
             final String finalSourceName = sourceName;
-            final long postTimeMs = sbn.getPostTime();
-            // ==================== 🔥 INTERCEPTION ET ENRICHISSEMENT FRED IMMÉDIAT ====================
+            final long postTimeMs = sbn.getPostTime();  
+
+            //RÉCUPÉRATION CALENDRIER ÉCONOMIQUE FRED
             String upperCheck = finalUnifiedFeed.toUpperCase(Locale.ROOT);
             if (upperCheck.contains("JOBLESS CLAIMS") || upperCheck.contains("INITIAL CLAIMS") || upperCheck.contains("CHÔMAGE US")) {
                 // Déclenchement en tâche de fond sur le pool secondaire 'exec' pour préserver 'tradingPipelineExecutor'
@@ -908,8 +909,7 @@ if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", fal
                     }
                 });
             }
-            // =========================================================================================
-            // 2️⃣ BASCOULEMENT IMMÉDIAT ET ISOLÉ DANS LE PIPELINE ASYNCHRONE (THREAD D'ARRIÈRE-PLAN)
+         // 2️⃣ BASCOULEMENT IMMÉDIAT ET ISOLÉ DANS LE PIPELINE ASYNCHRONE (THREAD D'ARRIÈRE-PLAN)
             // Utilisation de l'exécuteur existant de la classe pour stabiliser la RAM et le CPU
             tradingPipelineExecutor.execute(new Runnable() {
                 @Override
