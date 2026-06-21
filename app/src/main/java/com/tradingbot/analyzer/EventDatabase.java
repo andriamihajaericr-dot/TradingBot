@@ -77,6 +77,33 @@ public class EventDatabase extends SQLiteOpenHelper {
         }
     }
 
+    public String getWeeklyMacroSummary(long currentUnixTime) {
+    SQLiteDatabase db = this.getReadableDatabase();
+    StringBuilder sb = new StringBuilder();
+    long sevenDaysAgo = currentUnixTime - (7L * 24 * 60 * 60);
+
+    Cursor cursor = null;
+    try {
+        cursor = db.query(TABLE_EVENTS,
+            new String[]{"feed_content", "impact", "event_type", "source"},
+            "unix_timestamp >= ? AND driver_weight >= 2",
+            new String[]{String.valueOf(sevenDaysAgo)},
+            null, null, "unix_timestamp ASC");
+        if (cursor != null && cursor.moveToFirst()) {
+            do {
+                sb.append("[").append(cursor.getString(2)).append("] ")
+                  .append(cursor.getString(3)).append(" — ")
+                  .append(cursor.getString(0)).append("\n");
+            } while (cursor.moveToNext());
+        }
+    } catch (Exception e) {
+        Log.e("EventDatabase", "Erreur registre hebdo", e);
+    } finally {
+        if (cursor != null) cursor.close();
+    }
+    return sb.toString();
+    }
+
     /**
  * Cherche un événement correspondant dans la DB et tente d'en extraire la valeur réelle (Actual)
  */
