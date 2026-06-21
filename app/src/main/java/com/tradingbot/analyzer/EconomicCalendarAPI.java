@@ -346,9 +346,17 @@ public class EconomicCalendarAPI {
             } else if (ind.contains("non-farm") || ind.contains("nfp") || ind.contains("payroll")) {
                 assets.addAll(Arrays.asList("GOLD", "SP500", "NASDAQ", "BITCOIN", "USDJPY", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "USOIL"));
             } else if (ind.contains("gdp") || ind.contains("gross domestic")) {
-                assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY", "GOLD", "USOIL"));
+            assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY", "GOLD", "USOIL"));
+            } else if (ind.contains("retail sales") || ind.contains("ventes au détail")) {
+               assets.addAll(Arrays.asList("SP500", "NASDAQ", "USDJPY", "EURUSD", "GBPUSD"));
+            } else if (ind.contains("michigan") || ind.contains("consumer sentiment") || ind.contains("umcsent")) {
+               assets.addAll(Arrays.asList("SP500", "NASDAQ", "GOLD", "USDJPY"));
+            } else if (ind.contains("ism") || ind.contains("napm") || ind.contains("manufacturing")) {
+               assets.addAll(Arrays.asList("SP500", "NASDAQ", "USOIL", "USDJPY"));
+            } else if (ind.contains("existing home") || ind.contains("new home") || ind.contains("housing")) {
+               assets.addAll(Arrays.asList("SP500", "GOLD", "USDJPY"));
             } else if (ind.contains("crude oil") || ind.contains("eia") || ind.contains("oil inventories")) {
-                assets.addAll(Arrays.asList("USOIL", "USDCAD", "GOLD", "SP500"));
+               assets.addAll(Arrays.asList("USOIL", "USDCAD", "GOLD", "SP500"));
             }
         } else if (cty.contains("united kingdom") || cty.contains("uk")) {
             assets.add("GBPUSD");
