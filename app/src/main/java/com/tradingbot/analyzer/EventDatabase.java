@@ -302,20 +302,20 @@ public class EventDatabase extends SQLiteOpenHelper {
     // Clause 2 : piliers macro suprêmes (poids 5) sur 7 jours — mémoire inter-sessions
     // Clause 3 : géopolitique et calendaire même à poids 1, sur 7 jours
     String selection =
-        "(unix_timestamp >= ? AND driver_weight >= 2) OR " +
-        "(unix_timestamp >= ? AND driver_weight = 5) OR " +
-        "(unix_timestamp >= ? AND (" +
-            "event_type LIKE '%GEO%' OR " +
-            "event_type = 'GEOPOLITICAL' OR " +
-            "event_type = 'CALENDAR-RESULT' OR " +
-            "impact LIKE '%Choc Géopolitique%'" +
-        ") AND driver_weight >= 1)";
+    "(unix_timestamp >= ? AND driver_weight >= 2) OR " +
+    "(unix_timestamp >= ? AND driver_weight = 5) OR " +
+    "(unix_timestamp >= ? AND (" +
+        "event_type LIKE '%GEO%' OR " +
+        "event_type = 'GEOPOLITICAL' OR " +
+        "event_type = 'CALENDAR-RESULT' OR " +
+        "impact LIKE '%Choc Géopolitique%'" +
+    ") AND driver_weight >= 1)";
 
-    String[] whereArgs = new String[]{
-        String.valueOf(twentyFourHoursAgo),
-        String.valueOf(sevenDaysAgo),
-        String.valueOf(sevenDaysAgo)
-    };
+String[] whereArgs = new String[]{
+    String.valueOf(twentyFourHoursAgo),  // clause 1 : 24h poids >= 2
+    String.valueOf(sevenDaysAgo),         // clause 2 : 7j poids 5
+    String.valueOf(twentyFourHoursAgo)    // clause 3 : ← 24h au lieu de 7j pour GEO/CALENDAR
+};
 
     SQLiteDatabase db = this.getReadableDatabase();
     StringBuilder sb = new StringBuilder();
