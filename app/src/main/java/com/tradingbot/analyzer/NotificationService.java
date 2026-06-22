@@ -2081,7 +2081,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
     HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
-        if (apiKey.isEmpty()) return;
+        if (apiKey.isEmpty()) return false; // ✅ Corrigé
 
         long nowSec = System.currentTimeMillis() / 1000;
         String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
@@ -2121,7 +2121,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             } else {
                 Log.d(TAG, "[DAILY] Rappel déjà envoyé récemment, ignoré.");
             }
-            return;
+            return false;
         }
         // =========================================================================
 
