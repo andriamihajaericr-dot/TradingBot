@@ -43,7 +43,7 @@ public class MarketDataFetcher {
             this.timestamp = timestamp;
         }
     }
-    private static final long SUBLOT_DELAY_MS = 1500; // 1,5s entre chaque sous‑lot
+    private static final long SUBLOT_DELAY_MS = 800; // 1,5s entre chaque sous‑lot
     private static final int TIMEOUT_MS = 7000; 
     // Initialisé à "maintenant - 65s" pour que le premier appel parte sans attente
     // mais les appels simultanés au démarrage soient naturellement espacés
