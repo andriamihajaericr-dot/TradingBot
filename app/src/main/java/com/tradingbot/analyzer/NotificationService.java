@@ -2031,16 +2031,23 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
     Log.d(TAG, "[DAILY] Horaire " + targetHour + "h : prochain déclenchement à " + nextRunStr);
 
     // 4. Planification unique (pas de récursion)
+    // 4. Planification unique (pas de récursion)
     scheduler.schedule(() -> {
         String currentDay = dayFormat.format(Calendar.getInstance(tz).getTime());
         String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
         if (!currentDay.equals(lastSent)) {
-            generateAndSendDailyBrief();
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                .edit()
-                .putString(prefKey, currentDay)
-                .apply();
+            // ✅ CORRECTIF : même garde que le rattrapage — on ne marque "envoyé"
+            // que si generateAndSendDailyBrief() a réellement abouti.
+            boolean sent = generateAndSendDailyBrief();
+            if (sent) {
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .edit()
+                    .putString(prefKey, currentDay)
+                    .apply();
+            } else {
+                Log.w(TAG, "[DAILY] Envoi " + targetHour + "h non confirmé — le créneau reste disponible");
+            }
         } else {
             Log.d(TAG, "[DAILY] Rapport déjà envoyé aujourd'hui pour " + targetHour + "h, ignoré");
         }
