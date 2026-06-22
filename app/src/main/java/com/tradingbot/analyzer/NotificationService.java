@@ -874,7 +874,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         // APRÈS
-if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("bot_active", false)) {
+if (!getSharedPreferences("TradingBot", MODE_PRIVATE).getBoolean("bot_active", false)) {
     String pkg = sbn.getPackageName();
     if (pkg != null && (pkg.contains("financialjuice") || pkg.contains("nikkei") || pkg.contains("forex.portal"))) {
         Log.w(TAG, "⏸️ [BOT INACTIF] Notif de '" + pkg + "' ignorée — bot_active=false.");
