@@ -634,18 +634,17 @@ public void onListenerDisconnected() {
     if (groqReport == null || groqReport.isEmpty() || assets == null || assets.isEmpty()) 
         return groqReport;
 
-    try {
+        try {
         
-    // Réutilise le cache si disponible, sinon appel réseau en dernier recours
-    Map<String, MarketDataFetcher.MarketData> liveDataMap = null;
-if (cachedData != null && !cachedData.isEmpty()) {
-    liveDataMap = cachedData; // Cache disponible — 0 appel réseau
-} else if (MarketDataFetcher.tryAcquireBatchSlot()) {
-    liveDataMap = MarketDataFetcher.getMarketDataBatch(assets); // Fallback réseau
-} else {
-    Log.w(TAG, "[INJECT] Slot occupé — injectLivePrices ignoré ce cycle");
-}
-if (liveDataMap == null || liveDataMap.isEmpty()) return groqReport;
+        // Réutilise le cache si disponible, sinon appel réseau en dernier recours
+        Map<String, MarketDataFetcher.MarketData> liveDataMap = null;
+        if (cachedData != null && !cachedData.isEmpty()) {
+            liveDataMap = cachedData; // Cache disponible — 0 appel réseau
+        } else if (MarketDataFetcher.tryAcquireBatchSlot()) {
+            liveDataMap = MarketDataFetcher.getMarketDataBatch(assets); // Fallback réseau
+        } else {
+            Log.w(TAG, "[INJECT] Slot occupé — injectLivePrices ignoré ce cycle");
+        }
         if (liveDataMap == null || liveDataMap.isEmpty()) return groqReport;
 
         String[] lignes = groqReport.split("\n");
