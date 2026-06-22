@@ -841,52 +841,116 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
     }
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
-        new Thread(() -> {
-            HttpURLConnection conn = null;
-            try {
-                android.content.SharedPreferences prefs = context.getSharedPreferences("TradingBot", Context.MODE_PRIVATE);
-                String token  = prefs.getString("tg_token", "");
-                String chatId = prefs.getString("tg_chat_id", "");
-
-                if (token.isEmpty() || chatId.isEmpty()) return;
-
-                URL url = new URL("https://api.telegram.org/bot" + token + "/sendMessage");
-                conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                conn.setDoOutput(true);
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(8000);
-
-                JSONObject payload = new JSONObject();
-                payload.put("chat_id", chatId);
-                payload.put("text", message);
-                payload.put("parse_mode", "Markdown");
-
-                OutputStream os = conn.getOutputStream();
-                os.write(payload.toString().getBytes("UTF-8"));
-                os.flush();
-                os.close();
-
-                conn.getResponseCode();
-            } catch (Exception e) {
-                Log.e(TAG, "Échec Telegram POST", e);
-            } finally {
-                if (conn != null) conn.disconnect();
+    new Thread(() -> {
+        try {
+            android.content.SharedPreferences prefs =
+                context.getSharedPreferences("TradingBot", Context.MODE_PRIVATE);
+            String token  = prefs.getString("tg_token", "");
+            String chatId = prefs.getString("tg_chat_id", "");
+            if (token.isEmpty() || chatId.isEmpty()) {
+                Log.w(TAG, "[TELEGRAM] Token ou Chat ID manquant — envoi annulé.");
+                return;
             }
-        }).start();
+
+            // ✅ Découpage automatique si message > 4000 chars (limite Telegram = 4096)
+            int MAX = 4000;
+            List<String> chunks = new ArrayList<>();
+            if (message.length() <= MAX) {
+                chunks.add(message);
+            } else {
+                // Découpe proprement sur les sauts de ligne pour ne pas couper une ligne en deux
+                String[] lines = message.split("\n");
+                StringBuilder current = new StringBuilder();
+                for (String line : lines) {
+                    if (current.length() + line.length() + 1 > MAX) {
+                        chunks.add(current.toString().trim());
+                        current = new StringBuilder();
+                    }
+                    current.append(line).append("\n");
+                }
+                if (current.length() > 0) chunks.add(current.toString().trim());
+            }
+
+            for (String chunk : chunks) {
+                sendChunkToTelegram(chunk, token, chatId, "Markdown");
+                if (chunks.size() > 1) Thread.sleep(500); // anti-flood entre morceaux
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "[TELEGRAM] Erreur envoi", e);
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("❌ [TELEGRAM] Erreur : " + e.getMessage());
+        }
+    }).start();
+}
+
+    // ✅ NOUVELLE méthode helper — envoie un seul chunk, retente en texte brut si Markdown rejeté
+    private static void sendChunkToTelegram(String text, String token,
+                                             String chatId, String parseMode) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL("https://api.telegram.org/bot" + token + "/sendMessage");
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(8000);
+    
+            JSONObject payload = new JSONObject();
+            payload.put("chat_id", chatId);
+            payload.put("text", text);
+            if (parseMode != null && !parseMode.isEmpty())
+                payload.put("parse_mode", parseMode);
+    
+            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(input, 0, input.length);
+            }
+    
+            int code = conn.getResponseCode();
+            if (code == HttpURLConnection.HTTP_OK) {
+                Log.d(TAG, "[TELEGRAM] ✅ Chunk envoyé (" + text.length() + " chars)");
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("✅ [TELEGRAM] Message envoyé.");
+            } else if (code == 400 && "Markdown".equals(parseMode)) {
+                // ✅ Markdown rejeté (astérisque non fermé, etc.) → retente en texte brut
+                Log.w(TAG, "[TELEGRAM] 400 Markdown rejeté → retry en texte brut");
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("⚠️ [TELEGRAM] Markdown invalide → retry texte brut");
+                conn.disconnect();
+                sendChunkToTelegram(text, token, chatId, "");
+            } else {
+                // Lit le corps d'erreur pour avoir le message exact de Telegram
+                StringBuilder errBody = new StringBuilder();
+                try (java.io.BufferedReader br = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(conn.getErrorStream(),
+                            StandardCharsets.UTF_8))) {
+                    String l;
+                    while ((l = br.readLine()) != null) errBody.append(l);
+                } catch (Exception ignored) {}
+                String errMsg = "❌ [TELEGRAM] HTTP " + code + " : " + errBody;
+                Log.e(TAG, errMsg);
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog(errMsg);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "[TELEGRAM] Échec chunk", e);
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         // APRÈS
-if (!getSharedPreferences("TradingBot", MODE_PRIVATE).getBoolean("bot_active", false)) {
-    String pkg = sbn.getPackageName();
-    if (pkg != null && (pkg.contains("financialjuice") || pkg.contains("nikkei") || pkg.contains("forex.portal"))) {
-        Log.w(TAG, "⏸️ [BOT INACTIF] Notif de '" + pkg + "' ignorée — bot_active=false.");
+    if (!getSharedPreferences("TradingBot", MODE_PRIVATE).getBoolean("bot_active", false)) {
+        String pkg = sbn.getPackageName();
+        if (pkg != null && (pkg.contains("financialjuice") || pkg.contains("nikkei") || pkg.contains("forex.portal"))) {
+            Log.w(TAG, "⏸️ [BOT INACTIF] Notif de '" + pkg + "' ignorée — bot_active=false.");
+        }
+        return;
     }
-    return;
-}
         // ✅ CORRECTIF BUG 9 : ignore toute notification pendant un import/restauration de base
         // (MainActivity ferme et recrée le fichier .db -> tout traitement ici lirait/écrirait
         // sur une connexion fermée ou un fichier en cours de remplacement).
@@ -953,73 +1017,73 @@ if (!getSharedPreferences("TradingBot", MODE_PRIVATE).getBoolean("bot_active", f
             final String finalSourceName = sourceName;
             final long postTimeMs = sbn.getPostTime();  
              // ==================== 🔥 INTERCEPTION ET ENRICHISSEMENT FRED IMMÉDIAT ====================
-String upperCheck = finalUnifiedFeed.toUpperCase(Locale.ROOT);
-final String[][] FRED_INDICATORS = {
-    // Emploi 
-    {"JOBLESS CLAIMS",    "ICSA",     "K"},
-    {"INITIAL CLAIMS",    "ICSA",     "K"},
-    {"CHÔMAGE US",        "ICSA",     "K"},
-    // Inflation
-    {"CPI",               "CPIAUCSL", "%"},
-    {"CONSUMER PRICE",    "CPIAUCSL", "%"},
-    {"PCE",               "PCEPILFE", "%"},
-    {"CORE PCE",          "PCEPILFE", "%"},
-    {"PPI",               "PPIACO",   "%"},
-    // Consommation / Sentiment
-    {"RETAIL SALES",      "RSXFS",    "%"},
-    {"VENTES AU DÉTAIL",  "RSXFS",    "%"},
-    {"MICHIGAN",          "UMCSENT",  ""},
-    {"CONSUMER SENTIMENT","UMCSENT",  ""},
-    // PMI / ISM
-    {"ISM MANUFACTUR",    "NAPM",     ""},
-};
-
-String matchedSeries = null;
-String matchedFormat = null;
-String matchedLabel  = null;
-
-for (String[] indicator : FRED_INDICATORS) {
-    if (upperCheck.contains(indicator[0])) {
-        matchedSeries = indicator[1];
-        matchedFormat = indicator[2];
-        matchedLabel  = indicator[0];
-        break; // Premier match suffit
-    }
-}
-
-if (matchedSeries != null) {
-    final String seriesId = matchedSeries;
-    final String format   = matchedFormat;
-    final String label    = matchedLabel;
-
-    exec.execute(new Runnable() {
-        @Override
-        public void run() {
-            Log.d(TAG, "🔄 [FRED] Requête pour " + label + " (série: " + seriesId + ")...");
-            String actualValue = EconomicCalendarAPI.fetchFredActualValue(seriesId, format);
-
-            if (actualValue != null && !actualValue.isEmpty()) {
-                long currentUnixTimestamp = System.currentTimeMillis() / 1000L;
-                boolean updated = EventDatabase.getInstance(getApplicationContext())
-                             .updateActualIfMissing(title, currentUnixTimestamp, actualValue);
-                if (updated) {
-                    Log.d(TAG, "✅ [FRED] Synchronisé : " + label + " = " + actualValue);
-                    if (MainActivity.instance != null) {
-                        MainActivity.instance.addLog("✅ [FRED] " + label + " → " + actualValue);
-                    }
-                } else {
-                    Log.d(TAG, "ℹ️ [FRED] " + label + " = " + actualValue + " — aucun événement N/A à mettre à jour.");
-                }
-            } else {
-                Log.w(TAG, "⚠️ [FRED FAILURE] Impossible d'extraire la donnée pour : " + label);
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("⚠️ [FRED] Échec récupération : " + label);
+            String upperCheck = finalUnifiedFeed.toUpperCase(Locale.ROOT);
+            final String[][] FRED_INDICATORS = {
+                // Emploi 
+                {"JOBLESS CLAIMS",    "ICSA",     "K"},
+                {"INITIAL CLAIMS",    "ICSA",     "K"},
+                {"CHÔMAGE US",        "ICSA",     "K"},
+                // Inflation
+                {"CPI",               "CPIAUCSL", "%"},
+                {"CONSUMER PRICE",    "CPIAUCSL", "%"},
+                {"PCE",               "PCEPILFE", "%"},
+                {"CORE PCE",          "PCEPILFE", "%"},
+                {"PPI",               "PPIACO",   "%"},
+                // Consommation / Sentiment
+                {"RETAIL SALES",      "RSXFS",    "%"},
+                {"VENTES AU DÉTAIL",  "RSXFS",    "%"},
+                {"MICHIGAN",          "UMCSENT",  ""},
+                {"CONSUMER SENTIMENT","UMCSENT",  ""},
+                // PMI / ISM
+                {"ISM MANUFACTUR",    "NAPM",     ""},
+            };
+            
+            String matchedSeries = null;
+            String matchedFormat = null;
+            String matchedLabel  = null;
+            
+            for (String[] indicator : FRED_INDICATORS) {
+                if (upperCheck.contains(indicator[0])) {
+                    matchedSeries = indicator[1];
+                    matchedFormat = indicator[2];
+                    matchedLabel  = indicator[0];
+                    break; // Premier match suffit
                 }
             }
-        }
-    });
-}
-// =========================================================================================
+            
+            if (matchedSeries != null) {
+                final String seriesId = matchedSeries;
+                final String format   = matchedFormat;
+                final String label    = matchedLabel;
+            
+                exec.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.d(TAG, "🔄 [FRED] Requête pour " + label + " (série: " + seriesId + ")...");
+                        String actualValue = EconomicCalendarAPI.fetchFredActualValue(seriesId, format);
+            
+                        if (actualValue != null && !actualValue.isEmpty()) {
+                            long currentUnixTimestamp = System.currentTimeMillis() / 1000L;
+                            boolean updated = EventDatabase.getInstance(getApplicationContext())
+                                         .updateActualIfMissing(title, currentUnixTimestamp, actualValue);
+                            if (updated) {
+                                Log.d(TAG, "✅ [FRED] Synchronisé : " + label + " = " + actualValue);
+                                if (MainActivity.instance != null) {
+                                    MainActivity.instance.addLog("✅ [FRED] " + label + " → " + actualValue);
+                                }
+                            } else {
+                                Log.d(TAG, "ℹ️ [FRED] " + label + " = " + actualValue + " — aucun événement N/A à mettre à jour.");
+                            }
+                        } else {
+                            Log.w(TAG, "⚠️ [FRED FAILURE] Impossible d'extraire la donnée pour : " + label);
+                            if (MainActivity.instance != null) {
+                                MainActivity.instance.addLog("⚠️ [FRED] Échec récupération : " + label);
+                            }
+                        }
+                    }
+                });
+            }
+            // =========================================================================================
          // 2️⃣ BASCOULEMENT IMMÉDIAT ET ISOLÉ DANS LE PIPELINE ASYNCHRONE (THREAD D'ARRIÈRE-PLAN)
             // Utilisation de l'exécuteur existant de la classe pour stabiliser la RAM et le CPU
             tradingPipelineExecutor.execute(new Runnable() {
@@ -1168,16 +1232,16 @@ if (matchedSeries != null) {
                         }
     
                      // APRÈS (remplace le bloc déjà patché précédemment)
-boolean isConfirmedCalendarDrop = validationResult != null && validationResult.isCalendarIntercept;
-if (finalCalculatedWeight < 3 && !eventTypeStr.equals("GEOPOLITICAL") && !isConfirmedCalendarDrop) {
-    String dropMsg = "[COUPE-CIRCUIT MACRO] " + finalSourceName + " — \"" + title + "\" rejeté (poids=" + finalCalculatedWeight + ", type=" + eventTypeStr + ")";
-    Log.d(TAG, dropMsg);
-    if (MainActivity.instance != null) MainActivity.instance.addLog("⚪ " + dropMsg);
-    return;
-}
-if (isConfirmedCalendarDrop && finalCalculatedWeight < 3) {
-    Log.d(TAG, "🟢 [BYPASS CALENDRIER] Sauvegarde forcée malgré poids=" + finalCalculatedWeight + " (Interception Calendrier Macro confirmée).");
-}
+                    boolean isConfirmedCalendarDrop = validationResult != null && validationResult.isCalendarIntercept;
+                    if (finalCalculatedWeight < 3 && !eventTypeStr.equals("GEOPOLITICAL") && !isConfirmedCalendarDrop) {
+                        String dropMsg = "[COUPE-CIRCUIT MACRO] " + finalSourceName + " — \"" + title + "\" rejeté (poids=" + finalCalculatedWeight + ", type=" + eventTypeStr + ")";
+                        Log.d(TAG, dropMsg);
+                        if (MainActivity.instance != null) MainActivity.instance.addLog("⚪ " + dropMsg);
+                        return;
+                    }
+                    if (isConfirmedCalendarDrop && finalCalculatedWeight < 3) {
+                        Log.d(TAG, "🟢 [BYPASS CALENDRIER] Sauvegarde forcée malgré poids=" + finalCalculatedWeight + " (Interception Calendrier Macro confirmée).");
+                    }
                     // 8️⃣ Génération de la signature cryptographique et persistance SQLite en base de données
                     String fingerprint = generateSecureHash(packageName + "_" + title + "_" + bodyTextRaw + "_" + (postTimeMs / 60000));
     
@@ -1207,213 +1271,213 @@ if (isConfirmedCalendarDrop && finalCalculatedWeight < 3) {
                     // 9️⃣ ENRICHISSEMENT MARKET DATA & PROMPT IA (Pipeline Intégré)
                     // 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
                       // ✅ CORRECTION : renommer la variable String pour éviter le conflit avec la Map
-    String marketSnapshotString = "Marché non analysé.";
-java.util.Map<String, MarketDataFetcher.MarketData> batchSnapshot = null;
-try {
-    // Filtrer uniquement les 6 actifs Twelve Data parmi enrichedAssets
-    List<String> twelveFiltered = new ArrayList<>();
-    for (String a : enrichedAssets) {
-        if (TWELVE_DATA_ASSETS.contains(a)) twelveFiltered.add(a);
-    }
-    // tryAcquireBatchSlot — évite les appels simultanés
-    if (!twelveFiltered.isEmpty() && MarketDataFetcher.tryAcquireBatchSlot()) {
-        batchSnapshot = MarketDataFetcher.getMarketDataBatch(twelveFiltered);
-    } else {
-        Log.w(TAG, "[BATCH] Slot occupé ou aucun actif Twelve Data — cache LKV utilisé");
-    }
-    if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
-        StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
-        boolean premierActif = true;
-
-        for (java.util.Map.Entry<String, MarketDataFetcher.MarketData> entry : batchSnapshot.entrySet()) {
-            MarketDataFetcher.MarketData mData = entry.getValue();
-            
-            // 🛡️ MULTI-PROTECTION : Filtrage préventif des valeurs nulles ou prix aberrants (<= 0)
-            if (mData == null || mData.price <= 0) {
-                Log.w(TAG, "Snapshot - Actif ignoré car données invalides ou nulles : " + entry.getKey());
-                continue; 
+                    String marketSnapshotString = "Marché non analysé.";
+                    java.util.Map<String, MarketDataFetcher.MarketData> batchSnapshot = null;
+                    try {
+                        // Filtrer uniquement les 6 actifs Twelve Data parmi enrichedAssets
+                        List<String> twelveFiltered = new ArrayList<>();
+                        for (String a : enrichedAssets) {
+                            if (TWELVE_DATA_ASSETS.contains(a)) twelveFiltered.add(a);
+                        }
+                        // tryAcquireBatchSlot — évite les appels simultanés
+                        if (!twelveFiltered.isEmpty() && MarketDataFetcher.tryAcquireBatchSlot()) {
+                            batchSnapshot = MarketDataFetcher.getMarketDataBatch(twelveFiltered);
+                        } else {
+                            Log.w(TAG, "[BATCH] Slot occupé ou aucun actif Twelve Data — cache LKV utilisé");
+                        }
+                        if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
+                            StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
+                            boolean premierActif = true;
+                    
+                            for (java.util.Map.Entry<String, MarketDataFetcher.MarketData> entry : batchSnapshot.entrySet()) {
+                                MarketDataFetcher.MarketData mData = entry.getValue();
+                                
+                                // 🛡️ MULTI-PROTECTION : Filtrage préventif des valeurs nulles ou prix aberrants (<= 0)
+                                if (mData == null || mData.price <= 0) {
+                                    Log.w(TAG, "Snapshot - Actif ignoré car données invalides ou nulles : " + entry.getKey());
+                                    continue; 
+                                }
+                    
+                                // ✂️ SUPPRESSION DU SÉPARATEUR DE FIN : Ajouté uniquement avant les éléments suivants
+                                if (!premierActif) {
+                                    sb.append(" | ");
+                                }
+                                premierActif = false;
+                    
+                                String sign = (mData.changePercent >= 0) ? "+" : "";
+                                sb.append(entry.getKey())
+                                  .append(" => ")
+                                  .append(String.format(Locale.US, "%.4f (%s%.2f%%)", mData.price, sign, mData.changePercent));
+                            }
+                    
+                            // Vérification finale au cas où TOUS les actifs auraient été rejetés par le filtre de sécurité
+                            if (premierActif) {
+                                marketSnapshotString = "Données de marché indisponibles (aucun prix valide extrait).";
+                            } else {
+                                marketSnapshotString = sb.toString();
+                            }
+                        } else {
+                            marketSnapshotString = "Données de marché indisponibles (Twelve Data hors-ligne ou limite atteinte).";
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Échec de la génération du snapshot marché", e);
+                        marketSnapshotString = "Erreur technique lors de l'acquisition des données.";
+                    }
+                    
+                    // Construction du prompt enrichi (utilise la variable String renommée)
+                    String baseSystemPrompt = SYSTEM_PROMPT;
+                    String promptAI = "📊 [CONTEXTE MARCHÉ ACTUEL] : " + marketSnapshotString + "\n\n" + baseSystemPrompt;
+                    
+                    if (ecoResult.isParsed) {
+                        promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
+                                "L'analyseur mathématique déterministe a détecté un écart type. " +
+                                "Direction recommandée : " + ecoResult.directionText + "\n\n" + promptAI;
+                    }
+                    // 🛡️ THROTTLE GÉO CIBLÉ (12 min) — seul angle mort non couvert par l'inertie macro 2h,
+                    // qui exclut volontairement les types GEO-* (cf. EventValidator.validate(), ÉTAPE 4).
+                    // Remplace l'ancien GEO_THROTTLE_MS mort de processIncomingMacroFeed(), sans réimporter
+                    // le reste de sa mécanique (rollback, etc.) devenue inutile face aux 3 autres garde-fous actifs.
+                    if (eventTypeStr.equals("GEOPOLITICAL")) {
+                        if (!isSupremeRank && (currentTime - lastGeoTime < GEO_THROTTLE_MS)) {
+                            Log.d(TAG, "[THROTTLE GÉO] Notification bloquée (12 min) - dernier choc géo il y a "
+                                    + (currentTime - lastGeoTime) / 1000 + "s");
+                            return;
+                        }
+                        lastGeoTime = currentTime;
+                    }
+    // 🔟 Exécution finale de l'analyse cognitive LLM 
+    // Récupération du snapshot marché juste avant l'appel (variable Map, pas de conflit)
+    // 🔟 Exécution finale de l'analyse cognitive LLM
+    // Réutilise batchSnapshot déjà récupéré ligne 1103 — 0 appel réseau supplémentaire
+    processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank, batchSnapshot);
+            } catch (Exception e) {
+                        Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
+                    }
+                }
+                });
             }
-
-            // ✂️ SUPPRESSION DU SÉPARATEUR DE FIN : Ajouté uniquement avant les éléments suivants
-            if (!premierActif) {
-                sb.append(" | ");
+           /**
+     * Retourne true uniquement pendant les sessions actives
+     * (Londres 08h-17h UTC ou New York 13h30-21h UTC).
+     * Évite les appels Twelve Data inutiles la nuit ou le week-end.
+     */
+    private static boolean isMarketHours() {
+        java.util.Calendar utc = java.util.Calendar.getInstance(
+            java.util.TimeZone.getTimeZone("UTC"));
+        int dow  = utc.get(java.util.Calendar.DAY_OF_WEEK);
+        int hour = utc.get(java.util.Calendar.HOUR_OF_DAY);
+        int min  = utc.get(java.util.Calendar.MINUTE);
+        int totalMin = hour * 60 + min;
+    
+        // Week-end → fermé
+        if (dow == java.util.Calendar.SATURDAY ||
+            dow == java.util.Calendar.SUNDAY) return false;
+    
+        // Session Londres  : 08h00–17h00 UTC (480–1020 min)
+        // Session New York : 13h30–21h00 UTC (810–1260 min)
+        return (totalMin >= 480 && totalMin <= 1020) ||
+               (totalMin >= 810 && totalMin <= 1260);
+       }
+    
+          public static void sendToGroqAndTelegram(String source, String title, String body, List<String> assets, Context context) {
+            if (context == null) return;
+            String fingerprint = String.valueOf((source + title + body).hashCode());
+            NotificationService instance = serviceInstance;
+        
+            // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report (INCHANGÉ)
+            // ✅ Ne pas re-sauvegarder si déjà en DB — updateActualIfMissing l'a déjà mis à jour
+        // Sauvegarder uniquement si vraiment absent (fingerprint non existant)
+              // 2. Gestion intelligente des actifs (Priorité aux paramètres, repli sur la liste globale)
+            List<String> finalAssetsList = (assets != null && !assets.isEmpty()) ? assets : new ArrayList<>(Arrays.asList(
+                "GOLD","NASDAQ","SP500","BITCOIN","EURUSD",
+                "USDJPY","GBPUSD","AUDUSD","USDCAD","USOIL","US10Y"
+            ));
+            // Conversion de la Liste en String pour correspondre au schéma SQLite
+            String assetsStr = String.join(",", finalAssetsList);
+            // ✅ AUDIT EXHAUSTIF (bug 9) : double garde NPE — instance peut être null (service non démarré)
+            // et getEventDb() peut être null (import de base en cours) ; sans ce garde, un appelant futur
+            // sans try/catch dédié ferait planter le service au lieu de simplement ignorer la sauvegarde.
+            EventDatabase db = (instance != null) ? instance.getEventDb() : null;
+            if (db != null) {
+                if (!db.isEventAlreadySaved(title, System.currentTimeMillis() / 1000)) {
+                    int dynamicWeight = EconomicCalendarAPI.isSupremeCalendarIndicator(title) ? 5 : 3;
+                    db.saveEvent(
+                        fingerprint, "com.tradingbot.calendar", source,
+                        "CALENDAR-RESULT", title, body, assetsStr,
+                        "pending", System.currentTimeMillis() / 1000,
+                        "pending", dynamicWeight
+                    );
+                }
+            } else {
+                Log.w(TAG, "[sendToGroqAndTelegram] Sauvegarde DB ignorée (service/DB indisponible) pour : " + title);
             }
-            premierActif = false;
-
-            String sign = (mData.changePercent >= 0) ? "+" : "";
-            sb.append(entry.getKey())
-              .append(" => ")
-              .append(String.format(Locale.US, "%.4f (%s%.2f%%)", mData.price, sign, mData.changePercent));
+           // 🚀 INJECTION : Déportation réseau simplifiée et ultra-rapide via Batch API
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+        StringBuilder blocPrix = new StringBuilder();
+    
+        // Déclaré ici — accessible partout dans le try ET le catch
+        java.util.Map<String, MarketDataFetcher.MarketData> batchPrices = null;
+    
+        if (assets != null && !assets.isEmpty()) {
+        blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
+    
+        // Filtrer uniquement les 6 actifs Twelve Data — assets complet va à Groq
+        List<String> twelveAssets = new ArrayList<>();
+        for (String asset : assets) {
+            if (TWELVE_DATA_ASSETS.contains(asset)) {
+                twelveAssets.add(asset);
+            }
         }
-
-        // Vérification finale au cas où TOUS les actifs auraient été rejetés par le filtre de sécurité
-        if (premierActif) {
-            marketSnapshotString = "Données de marché indisponibles (aucun prix valide extrait).";
+    
+        if (!twelveAssets.isEmpty()) {
+        // tryAcquireBatchSlot() est synchronized — un seul thread obtient le slot
+        if (MarketDataFetcher.tryAcquireBatchSlot()) {
+            batchPrices = MarketDataFetcher.getMarketDataBatch(twelveAssets);
+            if (batchPrices == null) batchPrices = new java.util.HashMap<>();
         } else {
-            marketSnapshotString = sb.toString();
+            // Slot occupé — utilise le cache LKV existant sans appel réseau
+            Log.w(TAG, "[TWELVE DATA] Slot occupé — cache LKV utilisé pour ce flux");
+            batchPrices = new java.util.HashMap<>();
         }
-    } else {
-        marketSnapshotString = "Données de marché indisponibles (Twelve Data hors-ligne ou limite atteinte).";
-    }
-} catch (Exception e) {
-    Log.e(TAG, "Échec de la génération du snapshot marché", e);
-    marketSnapshotString = "Erreur technique lors de l'acquisition des données.";
-}
-
-// Construction du prompt enrichi (utilise la variable String renommée)
-String baseSystemPrompt = SYSTEM_PROMPT;
-String promptAI = "📊 [CONTEXTE MARCHÉ ACTUEL] : " + marketSnapshotString + "\n\n" + baseSystemPrompt;
-
-if (ecoResult.isParsed) {
-    promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
-            "L'analyseur mathématique déterministe a détecté un écart type. " +
-            "Direction recommandée : " + ecoResult.directionText + "\n\n" + promptAI;
-}
-// 🛡️ THROTTLE GÉO CIBLÉ (12 min) — seul angle mort non couvert par l'inertie macro 2h,
-// qui exclut volontairement les types GEO-* (cf. EventValidator.validate(), ÉTAPE 4).
-// Remplace l'ancien GEO_THROTTLE_MS mort de processIncomingMacroFeed(), sans réimporter
-// le reste de sa mécanique (rollback, etc.) devenue inutile face aux 3 autres garde-fous actifs.
-if (eventTypeStr.equals("GEOPOLITICAL")) {
-    if (!isSupremeRank && (currentTime - lastGeoTime < GEO_THROTTLE_MS)) {
-        Log.d(TAG, "[THROTTLE GÉO] Notification bloquée (12 min) - dernier choc géo il y a "
-                + (currentTime - lastGeoTime) / 1000 + "s");
-        return;
-    }
-    lastGeoTime = currentTime;
-}
-// 🔟 Exécution finale de l'analyse cognitive LLM 
-// Récupération du snapshot marché juste avant l'appel (variable Map, pas de conflit)
-// 🔟 Exécution finale de l'analyse cognitive LLM
-// Réutilise batchSnapshot déjà récupéré ligne 1103 — 0 appel réseau supplémentaire
-processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank, batchSnapshot);
-        } catch (Exception e) {
-                    Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
+            for (String asset : twelveAssets) {
+                MarketDataFetcher.MarketData data = batchPrices.get(asset);
+                if (data != null && data.price > 0) {
+                    String tendance = data.changePercent >= 0 ? "📈" : "📉";
+                    String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
+                    blocPrix.append(String.format(Locale.US, formatPrix, tendance, asset, data.price, data.changePercent));
+                } else {
+                    blocPrix.append("\n🔸 ").append(asset).append(" : (Cours indisponible)");
                 }
             }
-            });
         }
-       /**
- * Retourne true uniquement pendant les sessions actives
- * (Londres 08h-17h UTC ou New York 13h30-21h UTC).
- * Évite les appels Twelve Data inutiles la nuit ou le week-end.
- */
-private static boolean isMarketHours() {
-    java.util.Calendar utc = java.util.Calendar.getInstance(
-        java.util.TimeZone.getTimeZone("UTC"));
-    int dow  = utc.get(java.util.Calendar.DAY_OF_WEEK);
-    int hour = utc.get(java.util.Calendar.HOUR_OF_DAY);
-    int min  = utc.get(java.util.Calendar.MINUTE);
-    int totalMin = hour * 60 + min;
-
-    // Week-end → fermé
-    if (dow == java.util.Calendar.SATURDAY ||
-        dow == java.util.Calendar.SUNDAY) return false;
-
-    // Session Londres  : 08h00–17h00 UTC (480–1020 min)
-    // Session New York : 13h30–21h00 UTC (810–1260 min)
-    return (totalMin >= 480 && totalMin <= 1020) ||
-           (totalMin >= 810 && totalMin <= 1260);
-   }
-
-      public static void sendToGroqAndTelegram(String source, String title, String body, List<String> assets, Context context) {
-        if (context == null) return;
-        String fingerprint = String.valueOf((source + title + body).hashCode());
-        NotificationService instance = serviceInstance;
-    
-        // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report (INCHANGÉ)
-        // ✅ Ne pas re-sauvegarder si déjà en DB — updateActualIfMissing l'a déjà mis à jour
-    // Sauvegarder uniquement si vraiment absent (fingerprint non existant)
-          // 2. Gestion intelligente des actifs (Priorité aux paramètres, repli sur la liste globale)
-        List<String> finalAssetsList = (assets != null && !assets.isEmpty()) ? assets : new ArrayList<>(Arrays.asList(
-            "GOLD","NASDAQ","SP500","BITCOIN","EURUSD",
-            "USDJPY","GBPUSD","AUDUSD","USDCAD","USOIL","US10Y"
-        ));
-        // Conversion de la Liste en String pour correspondre au schéma SQLite
-        String assetsStr = String.join(",", finalAssetsList);
-        // ✅ AUDIT EXHAUSTIF (bug 9) : double garde NPE — instance peut être null (service non démarré)
-        // et getEventDb() peut être null (import de base en cours) ; sans ce garde, un appelant futur
-        // sans try/catch dédié ferait planter le service au lieu de simplement ignorer la sauvegarde.
-        EventDatabase db = (instance != null) ? instance.getEventDb() : null;
-        if (db != null) {
-            if (!db.isEventAlreadySaved(title, System.currentTimeMillis() / 1000)) {
-                int dynamicWeight = EconomicCalendarAPI.isSupremeCalendarIndicator(title) ? 5 : 3;
-                db.saveEvent(
-                    fingerprint, "com.tradingbot.calendar", source,
-                    "CALENDAR-RESULT", title, body, assetsStr,
-                    "pending", System.currentTimeMillis() / 1000,
-                    "pending", dynamicWeight
-                );
-            }
-        } else {
-            Log.w(TAG, "[sendToGroqAndTelegram] Sauvegarde DB ignorée (service/DB indisponible) pour : " + title);
-        }
-       // 🚀 INJECTION : Déportation réseau simplifiée et ultra-rapide via Batch API
-    new Thread(new Runnable() {
-        @Override
-        public void run() {
-            try {
-    StringBuilder blocPrix = new StringBuilder();
-
-    // Déclaré ici — accessible partout dans le try ET le catch
-    java.util.Map<String, MarketDataFetcher.MarketData> batchPrices = null;
-
-    if (assets != null && !assets.isEmpty()) {
-    blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
-
-    // Filtrer uniquement les 6 actifs Twelve Data — assets complet va à Groq
-    List<String> twelveAssets = new ArrayList<>();
-    for (String asset : assets) {
-        if (TWELVE_DATA_ASSETS.contains(asset)) {
-            twelveAssets.add(asset);
-        }
-    }
-
-    if (!twelveAssets.isEmpty()) {
-    // tryAcquireBatchSlot() est synchronized — un seul thread obtient le slot
-    if (MarketDataFetcher.tryAcquireBatchSlot()) {
-        batchPrices = MarketDataFetcher.getMarketDataBatch(twelveAssets);
-        if (batchPrices == null) batchPrices = new java.util.HashMap<>();
-    } else {
-        // Slot occupé — utilise le cache LKV existant sans appel réseau
-        Log.w(TAG, "[TWELVE DATA] Slot occupé — cache LKV utilisé pour ce flux");
-        batchPrices = new java.util.HashMap<>();
-    }
-        for (String asset : twelveAssets) {
-            MarketDataFetcher.MarketData data = batchPrices.get(asset);
-            if (data != null && data.price > 0) {
-                String tendance = data.changePercent >= 0 ? "📈" : "📉";
-                String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
-                blocPrix.append(String.format(Locale.US, formatPrix, tendance, asset, data.price, data.changePercent));
-            } else {
-                blocPrix.append("\n🔸 ").append(asset).append(" : (Cours indisponible)");
-            }
-        }
-    }
-   }
-
-    String bodyEnrichi = body + blocPrix.toString();
-
-    if (instance != null) {
-        // batchPrices réutilisé — 0 appel réseau supplémentaire
-        instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true, batchPrices);
-    } else {
-        String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
-        sendTelegramSecure(msg, context);
-    }
-
-} catch (Exception e) {
-    Log.e(TAG, "Erreur critique lors de l'enrichissement par Batch API", e);
-    if (instance != null) {
-        // batchPrices peut être null si exception avant son initialisation — cachedMarketData=null est géré dans processAnalysisWithAI
-        instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true, null);
-    } else {
-        String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
-        sendTelegramSecure(msg, context);
-    }
-}
-        }
-    }).start();
        }
+    
+        String bodyEnrichi = body + blocPrix.toString();
+    
+        if (instance != null) {
+            // batchPrices réutilisé — 0 appel réseau supplémentaire
+            instance.processAnalysisWithAI(source, title, bodyEnrichi, assets, fingerprint, SYSTEM_PROMPT, true, batchPrices);
+        } else {
+            String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + bodyEnrichi;
+            sendTelegramSecure(msg, context);
+        }
+    
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur critique lors de l'enrichissement par Batch API", e);
+        if (instance != null) {
+            // batchPrices peut être null si exception avant son initialisation — cachedMarketData=null est géré dans processAnalysisWithAI
+            instance.processAnalysisWithAI(source, title, body, assets, fingerprint, SYSTEM_PROMPT, true, null);
+        } else {
+            String msg = "📅 *RÉSULTAT CALENDAIRE*\n📌 *" + title + "*\n📊 " + body;
+            sendTelegramSecure(msg, context);
+        }
+    }
+            }
+    }).start();
+    }
 
     @Override
     public void onCreate() {
