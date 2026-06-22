@@ -2003,11 +2003,21 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
         if (!today.equals(lastSent)) {
             Log.d(TAG, "[DAILY] Rattrapage pour " + targetHour + "h : envoi immédiat");
-            generateAndSendDailyBrief();
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                .edit()
-                .putString(prefKey, today)
-                .apply();
+            // ✅ CORRECTIF : le marquage "envoyé" ne doit avoir lieu QUE si l'envoi a
+            // réellement réussi. Avant, putString() était inconditionnel : si la base
+            // SQLite était encore vide/en cours d'import (cas typique juste après le
+            // lancement du service), generateAndSendDailyBrief() échouait silencieusement
+            // (ou envoyait juste un message de repli) mais le créneau était quand même
+            // marqué "consommé" pour la journée — plus aucune tentative ne suivait.
+            boolean sent = generateAndSendDailyBrief();
+            if (sent) {
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .edit()
+                    .putString(prefKey, today)
+                    .apply();
+            } else {
+                Log.w(TAG, "[DAILY] Rattrapage " + targetHour + "h non confirmé — nouvelle tentative au prochain cycle");
+            }
         }
         nextRun.add(Calendar.DAY_OF_YEAR, 1);
     }
