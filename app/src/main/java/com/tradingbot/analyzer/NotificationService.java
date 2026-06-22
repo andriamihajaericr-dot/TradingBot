@@ -801,10 +801,17 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     }
     
                     // ✅ Application du filtre conviction
+                    // APRÈS
                     if (activeSignalsCount > 0) {
                     int convictionPercent = extrairePourcentageConviction(aiReport);
                       if (convictionPercent >= 40 || isSupremeRank) {
-                            String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + filteredMessage.toString().trim();
+                            // ✅ Injection des prix live inline sur chaque ligne d'actif
+                            String enrichedReport = injectLivePrices(
+                                filteredMessage.toString().trim(),
+                                enrichedAssets,
+                                cachedMarketData
+                            );
+                            String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport;
                             sendTelegramSecure(finalPayload, NotificationService.this);
                             db.markEventAsSynced(fingerprint, "PROCESSED_OK");
                         } else {
