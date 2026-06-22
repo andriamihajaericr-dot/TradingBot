@@ -593,11 +593,14 @@ public static synchronized boolean tryAcquireBatchSlot() {
              // Enregistre le timestamp du dernier appel
             lastBatchCallTime.set(System.currentTimeMillis());
             String queryParams = "&apikey=" + twelveDataKey;
+            // 🛡️ CORRECTIF 429 : le paramètre "premarket" n'existe pas dans l'API Twelve Data.
+            // Le paramètre officiel documenté pour le pré/post-marché est "prepost" (cf.
+            // https://api.twelvedata.com/quote?...&prepost=true). L'ancien paramètre était
+            // donc ignoré ou mal interprété par l'API sans aucun bénéfice réel.
             if (ENABLE_PREMARKET_PARAM) {
-                queryParams += "&premarket=true"; 
+               queryParams += "&prepost=true";
             }
             String urlStr = "https://api.twelvedata.com/quote?symbol=" + sbSymbols.toString() + queryParams;
-
             try {
                 String responseBody = executeHttpRequestWithRetry(urlStr);
                 JSONObject json = new JSONObject(responseBody);
