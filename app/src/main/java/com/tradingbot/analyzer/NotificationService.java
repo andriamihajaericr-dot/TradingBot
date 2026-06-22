@@ -2660,130 +2660,159 @@ messages.put(new JSONObject().put("role", "user").put("content",
     Log.d(TAG, "[SCHEDULER] Rapport mensuel → " + nextMonthly.getTime());
     Log.d(TAG, "[SCHEDULER] Rapport hebdo → " + nextWeekly.getTime());
 
-    // ── Rattrapages au démarrage ──
+    // ── Rattrapares au démarrage ──
     checkAndSendMissedWeeklyReport();
     checkAndSendMissedMonthlyReport();
-    }
-
-    private void generateAndPurgeMonthlyReport() {
-        HttpURLConnection conn = null;
-        try {
-            String apiKey = getGroqApiKey();
-            if (apiKey.isEmpty()) return;
-
-            long now = System.currentTimeMillis() / 1000;
-            String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
-if (monthlyRegistry.isEmpty()) {
-    Log.w(TAG, "[MONTHLY] Registre mensuel vide — rapport annulé");
-    if (MainActivity.instance != null) {
-        MainActivity.instance.addLog("⚠️ [MONTHLY] Aucune donnée disponible pour le rapport mensuel");
-    }
-    return;
-}
-
-// Mémoire d'inertie mensuelle — contexte du mois précédent
-String lastMonthlyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-    .getString("last_monthly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
-
-JSONObject payload = new JSONObject();
-payload.put("model", GROQ_MODEL);
-payload.put("temperature", 0.1);
-
-            JSONArray messages = new JSONArray();
-            messages.put(new JSONObject().put("role", "system").put("content",
-    "Tu es un analyste macroéconomique senior. Tu dois produire un rapport mensuel structuré " +
-    "des ruptures fondamentales détectées sur les marchés financiers.\n\n" +
-    "Format OBLIGATOIRE du rapport :\n" +
-    "1. 🏆 ÉVÉNEMENTS MAJEURS DU MOIS (top 3 par impact)\n" +
-    "2. 📊 BILAN DIRECTIONNEL (RISK-ON vs RISK-OFF dominant)\n" +
-    "3. 🎯 ACTIFS LES PLUS IMPACTÉS (avec direction)\n" +
-    "4. ⚠️ RISQUES RÉSIDUELS pour le mois suivant\n" +
-    "5. 🏁 FLUX MENSUEL DOMINANT : [flux sélectionné]\n\n" +
-    "CONTRAINTES : Un seul astérisque (*texte*) pour le gras. " +
-    "Pas de doubles astérisques. Pas de salutations. Concis et factuel."));
-            messages.put(new JSONObject().put("role", "user").put("content",
-    "CONTEXTE MOIS PRÉCÉDENT : Le flux dominant du mois passé était : " + lastMonthlyFlow + ".\n\n" +
-    "─────────────────────────────\n" +
-    "REGISTRE MENSUEL DES ÉVÉNEMENTS :\n" + monthlyRegistry + "\n" +
-    "─────────────────────────────\n\n" +
-    "Produis le rapport de transition macroéconomique mensuel selon le format demandé."));
-            payload.put("messages", messages);
-
-            URL url = new URL(GROQ_URL);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(25000);
-            conn.setDoOutput(true);
-
-            try (OutputStream os = conn.getOutputStream()) {
-             byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-             os.write(input, 0, input.length);
-             os.flush();
-            }
-
-            if (conn.getResponseCode() == 200) {
-                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-                StringBuilder r = new StringBuilder();
-                String l;
-                while ((l = br.readLine()) != null) r.append(l);
-                br.close();
-
-                String report = new JSONObject(r.toString())
-                .getJSONArray("choices")
-                .getJSONObject(0)
-                .getJSONObject("message")
-                .getString("content");
-
-if (report != null && report.trim().length() > 300) {
-    // Mémoire d'inertie mensuelle
-    String monthlyFlowLine = "📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report.trim();
-    sendTelegramSecure(monthlyFlowLine, this);
-    // Mémoriser le timestamp pour le rattrapage
-    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-    .edit()
-    .putLong("last_monthly_sent_ms", System.currentTimeMillis())
-    .apply();
-    Log.d(TAG, "[MONTHLY] Rapport mensuel envoyé avec succès.");
-
-    // Persistance du flux mensuel dominant
-    Pattern monthlyFlowPattern = Pattern.compile("(?i)🏁\\s*FLUX\\s*MENSUEL\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
-    Matcher monthlyFlowMatcher = monthlyFlowPattern.matcher(report);
-    if (monthlyFlowMatcher.find()) {
-        String newMonthlyFlow = monthlyFlowMatcher.group(1).trim();
-        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-            .edit()
-            .putString("last_monthly_flow", newMonthlyFlow)
-            .apply();
-        Log.d(TAG, "💾 [MONTHLY] Flux mensuel enregistré : " + newMonthlyFlow);
-    }
-    if (MainActivity.instance != null) {
-        MainActivity.instance.addLog("✅ [MONTHLY] Rapport mensuel envoyé");
-    }
-    eventDb.purgeOldEvents(now);
-} else {
-    Log.w(TAG, "[MONTHLY] Groq réponse vide ou insuffisante — purge annulée");
-    if (MainActivity.instance != null) {
-        MainActivity.instance.addLog("⚠️ [MONTHLY] Rapport mensuel vide — non envoyé");
-    }
-}
-            }
-        } catch (Exception e) { Log.e(TAG, "Erreur Rapport Mensuel", e); }
-        finally {
-            if (conn != null) conn.disconnect();
-        }
     }
 
 private static volatile long lastCalendarBackfillMillis = 0L;
 private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
 
-private void generateAndSendWeeklyReport() {
+   private boolean generateAndPurgeMonthlyReport() {
     HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
-        if (apiKey.isEmpty()) return;
+        if (apiKey.isEmpty()) return false; // ✅ Type de retour fixé
+
+        long now = System.currentTimeMillis() / 1000;
+        String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
+        if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
+            Log.w(TAG, "[MONTHLY] Registre mensuel vide — rapport annulé");
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("⚠️ [MONTHLY] Aucune donnée disponible pour le rapport mensuel");
+            }
+            return false; // ✅ Type de retour fixé
+        }
+
+        // Mémoire d'inertie mensuelle — contexte du mois précédent
+        String lastMonthlyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+            .getString("last_monthly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
+
+        JSONObject payload = new JSONObject();
+        payload.put("model", GROQ_MODEL);
+        payload.put("temperature", 0.05); // Baissé à 0.05 pour une précision quantitative maximale
+
+        JSONArray messages = new JSONArray();
+        messages.put(new JSONObject().put("role", "system").put("content",
+            "Tu es un analyste macroéconomique et stratège de marché quant senior de niveau institutionnel.\n" +
+            "Produis un rapport de transition macroéconomique mensuel extrêmement rigoureux analysant les ruptures fondamentales du mois écoulé.\n\n" +
+            "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi notre liste fermée de 11 actifs clés : US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n\n" +
+            "Format OBLIGATOIRE et STRICT :\n" +
+            "1. 🔥 LES 3 CHOCS MACRO MAJEURS DU MOIS :\n" +
+            "   • 1° [Nom du Choc 1] : Impact direct sur le rendement ou la tendance de [Citer l'actif lié parmi les 11]\n" +
+            "   • 2° [Nom du Choc 2] : Modification ou confirmation des anticipations de taux d'intérêt (Fed/BCE)\n" +
+            "   • 3° [Nom du Choc 3] : Impact sur l'inertie des matières premières ou des indices (ex: USOIL/GOLD/SP500)\n\n" +
+            "2. 🏛️ POSITIONNEMENT MONÉTAIRE & ANTICIPATIONS :\n" +
+            "   • Posture de la Réserve Fédérale : [HAWKISH / DOVISH / DATA-DEPENDENT]\n" +
+            "   • Dynamique de rendement du US10Y : [EXPANSION / COMPRESSION / NEUTRE]\n\n" +
+            "3. 📉 MATRICE DE PERFORMANCE & DÉVIATION DE NOS ACTIFS :\n" +
+            "   • Actifs Leaders (Fortes Tendances) : [Lister uniquement les paires ou indices parmi les 11 affichant une tendance claire] → [HAUSSE / BAISSE]\n" +
+            "   • Actifs Sous Tension (Retournements/Volatilité) : [Lister les actifs parmi les 11 piégés dans des zones de volatilité ou de pivot]\n\n" +
+            "4. 🛡️ RISQUES RÉSIDUELS ET INERTIE (Pour le mois suivant) :\n" +
+            "   • Risque Majeur Détecté : [Ex: Réaccélération inflationniste, rupture de liquidité, escalade géopolitique]\n" +
+            "   • Niveau d'Alerte : [MODÉRÉ / ÉLEVÉ / CRITIQUE]\n\n" +
+            "5. 🏁 FLUX MENSUEL DOMINANT : [Rédige une seule phrase chirurgicale résumant l'orientation structurelle pour l'inertie long-terme du bot]\n\n" +
+            "CONTRAINTES : Un seul astérisque (*texte*). Pas de doubles astérisques (**). Style technique, concis, mathématique, sans formules de politesse ni salutations."));
+
+        messages.put(new JSONObject().put("role", "user").put("content",
+            "CONTEXTE MOIS PRÉCÉDENT : Le flux dominant du mois passé était : " + lastMonthlyFlow + ".\n\n" +
+            "─────────────────────────────\n" +
+            "REGISTRE MENSUEL DES ÉVÉNEMENTS ISSUS DU SYSTEME :\n" + monthlyRegistry + "\n" +
+            "─────────────────────────────\n\n" +
+            "Génère le rapport de transition macroéconomique mensuel institutionnel en respectant scrupuleusement la nomenclature et nos 11 actifs spécifiques."));
+        
+        payload.put("messages", messages);
+
+        URL url = new URL(GROQ_URL);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(25000);
+        conn.setDoOutput(true);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+            os.flush();
+        }
+
+        int responseCode = conn.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            StringBuilder r = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) r.append(line);
+            }
+
+            String report = new JSONObject(r.toString())
+                .getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content");
+
+            if (report != null && report.trim().length() > 300) {
+                String monthlyFlowLine = "📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report.trim();
+                sendTelegramSecure(monthlyFlowLine, this);
+                
+                // Mémoriser le timestamp pour le rattrapage
+                getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                    .edit()
+                    .putLong("last_monthly_sent_ms", System.currentTimeMillis())
+                    .apply();
+                Log.d(TAG, "[MONTHLY] Rapport mensuel envoyé avec succès.");
+
+                // Persistance du flux mensuel dominant
+                Pattern monthlyFlowPattern = Pattern.compile("(?i)🏁\\s*FLUX\\s*MENSUEL\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
+                Matcher monthlyFlowMatcher = monthlyFlowPattern.matcher(report);
+                if (monthlyFlowMatcher.find()) {
+                    String newMonthlyFlow = monthlyFlowMatcher.group(1).trim();
+                    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                        .edit()
+                        .putString("last_monthly_flow", newMonthlyFlow)
+                        .apply();
+                    Log.d(TAG, "💾 [MONTHLY] Flux mensuel enregistré : " + newMonthlyFlow);
+                }
+                
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("✅ [MONTHLY] Rapport mensuel envoyé");
+                }
+                
+                // ✅ Purge sécurisée uniquement si le rapport a été généré et transmis avec succès
+                eventDb.purgeOldEvents(now);
+                
+                return true; // ✅ Succès total : On retourne true au planificateur !
+            } else {
+                Log.w(TAG, "[MONTHLY] Groq réponse vide ou insuffisante — purge annulée");
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("⚠️ [MONTHLY] Rapport mensuel vide — non envoyé");
+                }
+            }
+        } else {
+            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
+                StringBuilder errorResponse = new StringBuilder();
+                String line;
+                while ((line = errorReader.readLine()) != null) {
+                    errorResponse.append(line);
+                }
+                Log.e(TAG, "[MONTHLY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
+            }
+        }
+    } catch (Exception e) { 
+        Log.e(TAG, "Erreur Rapport Mensuel", e); 
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
+
+    return false; // ❌ Échec : Renvoie false pour signaler une anomalie et permettre un rattrapage
+}
+
+private boolean generateAndSendWeeklyReport() {
+    HttpURLConnection conn = null;
+    try {
+        String apiKey = getGroqApiKey();
+        if (apiKey.isEmpty()) return false; // ✅ Type de retour fixé
 
         long now = System.currentTimeMillis() / 1000;
         // Récupère les événements des 7 derniers jours (poids >= 2)
@@ -2792,7 +2821,7 @@ private void generateAndSendWeeklyReport() {
             Log.w(TAG, "[WEEKLY] Registre hebdo vide — rapport annulé");
             if (MainActivity.instance != null)
                 MainActivity.instance.addLog("⚠️ [WEEKLY] Aucune donnée pour le rapport hebdomadaire");
-            return;
+            return false; // ✅ Type de retour fixé
         }
 
         String lastWeeklyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
@@ -2804,21 +2833,33 @@ private void generateAndSendWeeklyReport() {
 
         JSONArray messages = new JSONArray();
         messages.put(new JSONObject().put("role", "system").put("content",
-            "Tu es un analyste macroéconomique senior. Produis un bilan hebdomadaire structuré.\n\n" +
-            "Format OBLIGATOIRE :\n" +
-            "1. 🏆 ÉVÉNEMENTS CLÉS DE LA SEMAINE (top 3)\n" +
-            "2. 📊 BILAN DIRECTIONNEL SEMAINE (RISK-ON vs RISK-OFF)\n" +
-            "3. 🎯 ACTIFS LES PLUS IMPACTÉS cette semaine\n" +
-            "4. 📅 AGENDA MACRO SEMAINE PROCHAINE (points de vigilance)\n" +
-            "5. 🏁 FLUX HEBDO DOMINANT : [flux sélectionné]\n\n" +
-            "CONTRAINTES : Un seul astérisque (*texte*). Pas de doubles astérisques. Concis."));
+            "Tu es un analyste macroéconomique et stratège de marché quant senior.\n" +
+            "Produis un rapport de marché hebdomadaire institutionnel, rigoureux et précis.\n\n" +
+            "Tu dois impérativement analyser la dynamique uniquement parmi notre liste de 11 actifs clés : US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n\n" +
+            "Format OBLIGATOIRE et STRICT :\n" +
+            "1. 🏆 ÉVÉNEMENTS CLÉS ET IMPACTS (Top 3)\n" +
+            "   • [Nom de l'événement] | Statut: [Confirmé / Surprise] | Impact: [Majeur / Modéré]\n" +
+            "     └ Synthèse: [Lien logique et concis avec l'actif touché]\n\n" +
+            "2. 📊 BILAN DIRECTIONNEL GLOBAL :\n" +
+            "   ⚖️ RÉGIME : [RISK-OFF / RISK-ON / NEUTRE]\n" +
+            "   └ Moteur macro: [Explique l'orientation par les rendements obligataires US10Y, le Dollar ou la géopolitique]\n\n" +
+            "3. 🎯 IMPACTS DIRECTS SUR NOS ACTIFS SPÉCIFIQUES :\n" +
+            "   • 🇺🇸 INDICES (SP500, NASDAQ) : [HAUSSE / BAISSE / NEUTRE] → [Justification macro]\n" +
+            "   • 🪙 REFUGES & MATIÈRES (GOLD, USOIL) : [HAUSSE / BAISSE / NEUTRE] → [Justification macro]\n" +
+            "   • 💵 FOREX (EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD) :\n" +
+            "     └ [Citer uniquement les paires impactées] : [HAUSSE / BAISSE] → [Raison technique du différentiel]\n" +
+            "   • ⚡ CRYPTO (BTC) : [HAUSSE / BAISSE / NEUTRE]\n\n" +
+            "4. 📅 AGENDA STRATÉGIQUE (Semaine Prochaine) :\n" +
+            "   • [Jour] - [Actif Spécifique Cible] : [Event macro précis, ex: CPI US, FOMC, NFP] | Impact: [Élevé / Critique]\n\n" +
+            "5. 🏁 FLUX HEBDO DOMINANT : [Rédige une seule phrase résumant l'orientation dominante pour l'inertie du bot]\n\n" +
+            "CONTRAINTES : Un seul astérisque (*texte*). Pas de doubles astérisques (**). Style concis, chirurgical, sans bavardage."));
 
         messages.put(new JSONObject().put("role", "user").put("content",
             "CONTEXTE SEMAINE PRÉCÉDENTE : " + lastWeeklyFlow + "\n\n" +
             "─────────────────────────────\n" +
-            "ÉVÉNEMENTS DE LA SEMAINE :\n" + weeklyRegistry + "\n" +
+            "ÉVÉNEMENTS ENREGISTRÉS DANS LA BASE DE DONNÉES :\n" + weeklyRegistry + "\n" +
             "─────────────────────────────\n\n" +
-            "Produis le bilan hebdomadaire selon le format demandé."));
+            "Génère le rapport macroéconomique professionnel en respectant scrupuleusement la nomenclature et la liste de nos actifs."));
 
         payload.put("messages", messages);
 
@@ -2837,7 +2878,8 @@ private void generateAndSendWeeklyReport() {
             os.flush();
         }
 
-        if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+        int responseCode = conn.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) {
             StringBuilder r = new StringBuilder();
             try (BufferedReader br = new BufferedReader(
                     new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
@@ -2852,41 +2894,51 @@ private void generateAndSendWeeklyReport() {
                 .getString("content");
 
             if (report != null && report.trim().length() > 300) {
+                sendTelegramSecure("📅 *BILAN MACRO HEBDOMADAIRE — VENDREDI*\n\n" + report.trim(), this);
+                
+                getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                    .edit()
+                    .putLong("last_weekly_sent_ms", System.currentTimeMillis())
+                    .apply();
 
-    sendTelegramSecure(
-        "📅 *BILAN MACRO HEBDOMADAIRE — VENDREDI*\n\n" + report.trim(), this);
-    
-    // ← AJOUTER ICI — juste après sendTelegramSecure
-    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-        .edit()
-        .putLong("last_weekly_sent_ms", System.currentTimeMillis())
-        .apply();
+                Log.d(TAG, "[WEEKLY] Rapport hebdomadaire envoyé.");
 
-    Log.d(TAG, "[WEEKLY] Rapport hebdomadaire envoyé.");
+                // Persistance flux hebdo
+                Pattern weeklyPattern = Pattern.compile(
+                    "(?i)🏁\\s*FLUX\\s*HEBDO\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
+                Matcher weeklyMatcher = weeklyPattern.matcher(report);
+                if (weeklyMatcher.find()) {
+                    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                        .edit()
+                        .putString("last_weekly_flow", weeklyMatcher.group(1).trim())
+                        .apply();
+                }
+                
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("✅ [WEEKLY] Rapport hebdomadaire envoyé");
 
-    // Persistance flux hebdo
-    Pattern weeklyPattern = Pattern.compile(
-        "(?i)🏁\\s*FLUX\\s*HEBDO\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
-    Matcher weeklyMatcher = weeklyPattern.matcher(report);
-    if (weeklyMatcher.find()) {
-        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-            .edit()
-            .putString("last_weekly_flow", weeklyMatcher.group(1).trim())
-            .apply();
-    }
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("✅ [WEEKLY] Rapport hebdomadaire envoyé");
-
-} else {
-    Log.w(TAG, "[WEEKLY] Réponse Groq insuffisante");
-}
+                return true; // ✅ Succès : On retourne true au planificateur !
+            } else {
+                Log.w(TAG, "[WEEKLY] Réponse Groq insuffisante");
+            }
+        } else {
+            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
+                StringBuilder errorResponse = new StringBuilder();
+                String line;
+                while ((line = errorReader.readLine()) != null) {
+                    errorResponse.append(line);
+                }
+                Log.e(TAG, "[WEEKLY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
+            }
         }
     } catch (Exception e) {
         Log.e(TAG, "[WEEKLY] Erreur rapport hebdomadaire", e);
     } finally {
         if (conn != null) conn.disconnect();
     }
-    }
+
+    return false; // ❌ Échec ou anomalie : Le planificateur pourra retenter l'envoi
+}
 
 private void registerNetworkCallback() {
     ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
