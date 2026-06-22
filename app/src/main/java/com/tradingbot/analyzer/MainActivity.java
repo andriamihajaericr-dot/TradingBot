@@ -146,7 +146,7 @@ public class MainActivity extends AppCompatActivity {
             addLog(isChecked ? "🚀 MOTEUR MACRO ACTIVÉ (EN ÉCOUTE)" : "🛑 MOTEUR EN VEILLE (STANDBY)");
         });
        boolean keysReady = areKeysSaved();
-        botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
+        botSwitch.setChecked(keysReady && getPrefs().getBoolean("bot_active", false));
         if (!keysReady) {
             addLog("⚠️ Aucune clé détectée — remplis les clés puis appuie sur Sauvegarder pour activer le bot.");
         } else {
