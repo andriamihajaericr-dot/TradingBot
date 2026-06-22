@@ -165,7 +165,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }).start();
         }
-        
+    }   
     private boolean areKeysSaved() {
         SharedPreferences p = getPrefs();
         return !p.getString("groq_key", "").isEmpty()
