@@ -84,19 +84,32 @@ public static synchronized boolean tryAcquireBatchSlot() {
      * Test diagnostic amélioré - affiche dans l'UI + Logcat
      */
     public static void testRealTimeFreshness() {
-        Log.d(TAG, "🔍 === TEST FRESHNESS MARKET DATA ===");
+    Log.d(TAG, "🔍 === TEST FRESHNESS MARKET DATA ===");
 
-        // Affichage dans l'UI
+    // Affichage dans l'UI
+    if (MainActivity.instance != null) {
+        MainActivity.instance.addLog("🔍 === TEST FRESHNESS MARKET DATA ===");
+    }
+
+    // 🛡️ CORRECTIF 429 : ce bouton appelait getMarketDataBatch() directement, en
+    // contournant le circuit breaker tryAcquireBatchSlot() respecté par tout le
+    // reste du bot (NotificationService). Un clic pendant que le bot venait déjà
+    // de consommer son quota minute déclenchait l'épuisement HTTP 429 chez Twelve Data.
+    if (!tryAcquireBatchSlot()) {
+        String msg = "⏭️ [TEST] Slot Twelve Data occupé (cooldown 65s) — test annulé pour éviter un 429.";
+        Log.w(TAG, msg);
         if (MainActivity.instance != null) {
-            MainActivity.instance.addLog("🔍 === TEST FRESHNESS MARKET DATA ===");
+            MainActivity.instance.addLog(msg);
         }
+        return;
+    }
 
-        List<String> testAssets = Arrays.asList("SP500", "NASDAQ", "GOLD", "GBPUSD", "USOIL", "USDJPY");
-        
-        long start = System.currentTimeMillis();
-        
-        try {
-            Map<String, MarketData> data = getMarketDataBatch(testAssets);
+    List<String> testAssets = Arrays.asList("SP500", "NASDAQ", "GOLD", "GBPUSD", "USOIL", "USDJPY");
+    
+    long start = System.currentTimeMillis();
+    
+    try {
+        Map<String, MarketData> data = getMarketDataBatch(testAssets);
             long duration = System.currentTimeMillis() - start;
 
             String timeMsg = "⏱️ Temps total du batch : " + duration + "ms";
