@@ -83,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
 
         eventDb = EventDatabase.getInstance(this);
         EventValidator.setAppContext(this);
-        EconomicCalendarAPI.init(getApplicationContext()); // ◄ ✅ AJOUTER CECI
+        //EconomicCalendarAPI.init(getApplicationContext()); // ◄ ✅ AJOUTER CECI
         // Liaison des composants
         mainScrollView      = findViewById(R.id.mainScrollView);
         statusText          = findViewById(R.id.statusText);
@@ -120,11 +120,10 @@ public class MainActivity extends AppCompatActivity {
                 "📡 Flux : Liaison montante et descendante OK.",
                 this
             );
-                                // === TEST MARKET DATA ===
+                               // === TEST MARKET DATA ===
                     runOnUiThread(() -> addLog("📡 [TEST] Lancement MarketDataFetcher..."));
                     MarketDataFetcher.testRealTimeFreshness();
                     runOnUiThread(() -> addLog("✅ [TEST] MarketDataFetcher terminé - Voir les messages 🔴 ci-dessus pour le détail des erreurs"));
-            MarketDataFetcher.testRealTimeFreshness();
 
             // ... autres tests existants (régime, calendrier, etc.) ...
         } catch (Exception e) {
@@ -146,22 +145,34 @@ public class MainActivity extends AppCompatActivity {
             updateStatus();
             addLog(isChecked ? "🚀 MOTEUR MACRO ACTIVÉ (EN ÉCOUTE)" : "🛑 MOTEUR EN VEILLE (STANDBY)");
         });
-
+       boolean keysReady = areKeysSaved();
         botSwitch.setChecked(getPrefs().getBoolean("bot_active", false));
-        addLog("📱 Terminal prêt pour l'acquisition.");
-    eventDb.diagnostiquerTableEvents();
-
-    // ✅ Préchargement du calendrier économique au démarrage
-    new Thread(() -> {
-        try {
-            EventValidator.preloadCalendar();
-            runOnUiThread(() -> addLog("✅ Calendrier économique préchargé."));
-        } catch (Exception e) {
-            runOnUiThread(() -> addLog("⚠️ Erreur préchargement calendrier : " + e.getMessage()));
+        if (!keysReady) {
+            addLog("⚠️ Aucune clé détectée — remplis les clés puis appuie sur Sauvegarder pour activer le bot.");
+        } else {
+            addLog("📱 Terminal prêt pour l'acquisition.");
         }
-    }).start();
- }
+        eventDb.diagnostiquerTableEvents();
 
+        // ✅ Préchargement calendrier uniquement si les clés sont déjà présentes
+        if (keysReady) {
+            new Thread(() -> {
+                try {
+                    EventValidator.preloadCalendar();
+                    runOnUiThread(() -> addLog("✅ Calendrier économique préchargé."));
+                } catch (Exception e) {
+                    runOnUiThread(() -> addLog("⚠️ Erreur préchargement calendrier : " + e.getMessage()));
+                }
+            }).start();
+        }
+        
+    private boolean areKeysSaved() {
+        SharedPreferences p = getPrefs();
+        return !p.getString("groq_key", "").isEmpty()
+            && !p.getString("macro_api_key", "").isEmpty()
+            && !p.getString("tg_token", "").isEmpty()
+            && !p.getString("tg_chat_id", "").isEmpty();
+    }
     @Override
     protected void onResume() {
         super.onResume();
@@ -213,7 +224,17 @@ public class MainActivity extends AppCompatActivity {
         TELEGRAM_CHAT_ID = c;
 
         Toast.makeText(this, "✅ Clés sauvegardées !", Toast.LENGTH_SHORT).show();
-        addLog("✅ Configuration des clés API mise à jour.");
+        addLog("✅ Configuration des clés API mise à jour. Lancement des services...");
+
+        // ✅ Premier démarrage ou mise à jour des clés → initialise les services
+        new Thread(() -> {
+            try {
+                EventValidator.preloadCalendar();
+                runOnUiThread(() -> addLog("✅ Calendrier économique chargé."));
+            } catch (Exception e) {
+                runOnUiThread(() -> addLog("⚠️ Erreur calendrier : " + e.getMessage()));
+            }
+        }).start();
     }
 
     private void loadSavedKeys() {
