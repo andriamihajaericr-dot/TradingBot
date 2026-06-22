@@ -2099,7 +2099,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         // =========================================================================
         if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
             Log.w(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h.");
-        
+    
             // Éviter les envois multiples : utiliser SharedPreferences avec un délai
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
             long lastReminderTime = prefs.getLong("last_empty_db_reminder", 0);
