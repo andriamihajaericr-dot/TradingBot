@@ -1978,11 +1978,14 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
            upperText.contains("GEO");
     }
     private void startDailyBriefScheduler() {
-        TimeZone tz = TimeZone.getTimeZone("Indian/Antananarivo"); // ✅ cohérent partout
-        int[] targetHours = {7, 8, 9, 12, 13, 16, 17};
-        for (int hour : targetHours) {
-            scheduleDailyBriefAt(hour, tz);
-        }
+    TimeZone tz = TimeZone.getTimeZone("Indian/Antananarivo"); // ✅ cohérent partout
+    // 🛡️ CORRECTIF DAILY REPORT : les horaires {7,8,9,12,13,16,17} ne correspondaient
+    // pas aux horaires prévus pour le bot ({7,12,15,19,22} heure Madagascar), ce qui
+    // empêchait l'envoi du rapport aux moments attendus.
+    int[] targetHours = {7, 12, 15, 19, 22};
+    for (int hour : targetHours) {
+        scheduleDailyBriefAt(hour, tz);
+    }
     }
     private void scheduleDailyBriefAt(int targetHour, TimeZone tz) {
     // 1. Créer un formateur de date fiable (UTC+3)
