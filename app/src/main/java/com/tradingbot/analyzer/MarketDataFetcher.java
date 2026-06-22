@@ -580,7 +580,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
 
         if (apiSymbols.isEmpty()) return results;
 
-        int limit = 8;
+        int limit = 4;
         for (int i = 0; i < apiSymbols.size(); i += limit) {
             if (Thread.currentThread().isInterrupted()) return results;
 
