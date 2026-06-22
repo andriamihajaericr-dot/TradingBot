@@ -2077,7 +2077,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
     }, delay, TimeUnit.MILLISECONDS);
    }
     
-   private void generateAndSendDailyBrief() {
+   private boolean generateAndSendDailyBrief() {
     HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
@@ -2584,6 +2584,7 @@ messages.put(new JSONObject().put("role", "user").put("content",
     } else {
         Log.w(TAG, "[DAILY] Balise '🏁 FLUX DOMINANT :' introuvable. Préférences inchangées.");
     }
+        return true ;
             } else {
                Log.w(TAG, "[DAILY] Groq réponse vide — contenu : "
                + (aiResult != null ? aiResult.trim() : "null"));
@@ -2606,6 +2607,7 @@ messages.put(new JSONObject().put("role", "user").put("content",
             } finally {
                 if (conn != null) conn.disconnect();
             }
+       return false ; 
     }
 
     private void startMonthlyReportScheduler() {
