@@ -2514,10 +2514,25 @@ messages.put(new JSONObject().put("role", "user").put("content",
         nextMonthly.set(Calendar.DAY_OF_MONTH,
             nextMonthly.getActualMaximum(Calendar.DAY_OF_MONTH));
     }
-    scheduler.scheduleAtFixedRate(this::generateAndPurgeMonthlyReport,
-        nextMonthly.getTimeInMillis() - System.currentTimeMillis(),
-        30L * 24 * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
-
+   // APRÈS — on remplace scheduleAtFixedRate par un schedule one-shot
+// qui se reprogramme lui-même à chaque exécution
+    scheduler.schedule(new Runnable() {
+        @Override
+        public void run() {
+            generateAndPurgeMonthlyReport();
+            // Recalcule la vraie fin du mois suivant après exécution
+            Calendar next = Calendar.getInstance(
+                TimeZone.getTimeZone("Indian/Antananarivo"));
+            next.add(Calendar.MONTH, 1);
+            next.set(Calendar.DAY_OF_MONTH,
+                next.getActualMaximum(Calendar.DAY_OF_MONTH));
+            next.set(Calendar.HOUR_OF_DAY, 23);
+            next.set(Calendar.MINUTE, 0);
+            next.set(Calendar.SECOND, 0);
+            long delayMs = next.getTimeInMillis() - System.currentTimeMillis();
+            if (delayMs > 0) scheduler.schedule(this, delayMs, TimeUnit.MILLISECONDS);
+        }
+    }, nextMonthly.getTimeInMillis() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     // ── Rapport HEBDOMADAIRE — chaque vendredi à 22h00 (Mada) ──
     Calendar nextWeekly = Calendar.getInstance(
         TimeZone.getTimeZone("Indian/Antananarivo"));
