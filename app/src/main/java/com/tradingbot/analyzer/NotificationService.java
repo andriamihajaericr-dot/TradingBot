@@ -272,16 +272,22 @@ public void onListenerDisconnected() {
             if (contradiction) {
                 Log.w(TAG, "Divergence détectée pour " + asset + " : " + changePercent + "%");
     
-                // 3. Déclenchement du scan
-                MarketDataFetcher.PreMarketScanner.scan(new MarketDataFetcher.PreMarketScanner.PreMarketCallback() {
-                    @Override
-                    public void onAlerte(String rapport, boolean isChoc) {
-                        String alerteDiv = "🔄 *ALERTE DIVERGENCE MARCHÉ*\n" +
-                                           "Actif : " + asset + " (" + String.format("%.2f", changePercent) + "%)\n" +
-                                           "Nouvelle analyse pré-market :\n" + rapport;
-                        sendTelegramSecure(alerteDiv, NotificationService.this);
-                    }
-                });
+                // 3. Déclenchement du scan — protégé par le même slot anti-429 que le reste
+                // du pipeline (PreMarketScanner.scan() fait son propre appel getMarketDataBatch()
+                // qui n'était pas couvert par le tryAcquireBatchSlot() de la ligne 240 ci-dessus).
+                if (MarketDataFetcher.tryAcquireBatchSlot()) {
+                    MarketDataFetcher.PreMarketScanner.scan(new MarketDataFetcher.PreMarketScanner.PreMarketCallback() {
+                        @Override
+                        public void onAlerte(String rapport, boolean isChoc) {
+                            String alerteDiv = "🔄 *ALERTE DIVERGENCE MARCHÉ*\n" +
+                                               "Actif : " + asset + " (" + String.format("%.2f", changePercent) + "%)\n" +
+                                               "Nouvelle analyse pré-market :\n" + rapport;
+                            sendTelegramSecure(alerteDiv, NotificationService.this);
+                        }
+                    });
+                } else {
+                    Log.w(TAG, "[DIVERGENCE] Slot Twelve Data occupé — scan pré-market ignoré ce cycle pour " + asset);
+                }
     
                 // 4. On supprime la prévision pour arrêter le monitoring sur cet actif 
                 // tant qu'une nouvelle analyse IA (pipeline complet) n'a pas rafraîchi la donnée.
