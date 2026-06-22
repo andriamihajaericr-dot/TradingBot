@@ -563,7 +563,8 @@ public static synchronized boolean tryAcquireBatchSlot() {
     }
 
     /**
-     * ⚙️ LOGIQUE INTERNE DE TRAITEMENT PAR BATCH DE 8 SYMBOLES
+     * ⚙️ LOGIQUE INTERNE DE TRAITEMENT PAR BATCH DE 4 SYMBOLES
+     * Corrigé : Intègre l'espacement intelligent de 800ms sans perturber le verrou global de synchronisation.
      */
     private static Map<String, MarketData> getMarketDataBatchRaw(List<String> assets) {
         Map<String, MarketData> results = new HashMap<>();
@@ -590,13 +591,8 @@ public static synchronized boolean tryAcquireBatchSlot() {
                 sbSymbols.append(chunk.get(k));
                 if (k < chunk.size() - 1) sbSymbols.append(",");
             }
-             // Enregistre le timestamp du dernier appel
-            lastBatchCallTime.set(System.currentTimeMillis());
+
             String queryParams = "&apikey=" + twelveDataKey;
-            // 🛡️ CORRECTIF 429 : le paramètre "premarket" n'existe pas dans l'API Twelve Data.
-            // Le paramètre officiel documenté pour le pré/post-marché est "prepost" (cf.
-            // https://api.twelvedata.com/quote?...&prepost=true). L'ancien paramètre était
-            // donc ignoré ou mal interprété par l'API sans aucun bénéfice réel.
             if (ENABLE_PREMARKET_PARAM) {
                queryParams += "&prepost=true";
             }
@@ -605,11 +601,6 @@ public static synchronized boolean tryAcquireBatchSlot() {
                 String responseBody = executeHttpRequestWithRetry(urlStr);
                 JSONObject json = new JSONObject(responseBody);
 
-                // 🩺 DIAGNOSTIC : détecte une erreur API globale (ex: quota dépassé, clé
-                // invalide) même quand la requête contient plusieurs symboles. Twelve Data
-                // renvoie alors un objet {"code":..,"message":..,"status":"error"} à la
-                // racine au lieu d'un objet par symbole — sans ce contrôle, la boucle
-                // ci-dessous ne trouve aucun symbole et échoue silencieusement.
                 if (json.has("status") && "error".equals(json.optString("status"))) {
                     String apiMsg = "🔴 [API TWELVEDATA] code=" + json.optInt("code", -1)
                             + " message=" + json.optString("message", "inconnue");
@@ -617,7 +608,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
                     if (MainActivity.instance != null) {
                         MainActivity.instance.addLog(apiMsg);
                     }
-                    continue; // passe au lot suivant, rien à extraire ici
+                    continue; 
                 }
 
                 if (chunk.size() == 1) {
@@ -651,6 +642,12 @@ public static synchronized boolean tryAcquireBatchSlot() {
                         }
                     }
                 }
+
+                // ✅ Délai entre les sous‑lots (sauf après le dernier sous-lot)
+                if (i + limit < apiSymbols.size()) {
+                    Thread.sleep(SUBLOT_DELAY_MS);
+                }
+
             } catch (InterruptedException e) {
                 Log.w(TAG, "Interruption détectée dans la boucle Batch. Sortie réseau.");
                 Thread.currentThread().interrupt();
@@ -665,7 +662,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
         }
         return results;
     }
-
+    
     private static String truncate(String s, int maxLen) {
         if (s == null) return "null";
         return s.length() <= maxLen ? s : s.substring(0, maxLen) + "…";
