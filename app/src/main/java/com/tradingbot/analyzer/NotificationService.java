@@ -63,9 +63,15 @@ public class NotificationService extends NotificationListenerService {
     // Seuil de divergence (0.5% est plus sûr pour éviter le bruit sur le Forex)
     private static final double DIVERGENCE_THRESHOLD = 0.5;
     private final ConcurrentHashMap<String, PrevailingDirection> lastForecast = new ConcurrentHashMap<>();
-    // Protection anti-spam : évite de scanner en boucle si le marché est instable
-    private final ConcurrentHashMap<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
-    private static final long ALERT_COOLDOWN_MS = 60 * 60 * 1000L; // 1 heure de cooldown par actif
+// Protection anti-spam : évite de scanner en boucle si le marché est instable
+private final ConcurrentHashMap<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
+private static final long ALERT_COOLDOWN_MS = 60 * 60 * 1000L; // 1 heure de cooldown par actif
+
+// 🛡️ CORRECTIF SPAM INERTIE MACRO : le rappel "Driver déjà actif" partait sans
+// aucune limite de fréquence, donc chaque notification rejetée (même non pertinente,
+// ex: une dépêche nécrologique mal classée) renvoyait le même message Telegram en boucle.
+private final ConcurrentHashMap<String, Long> lastInertiaReminderSent = new ConcurrentHashMap<>();
+private static final long INERTIA_REMINDER_COOLDOWN_MS = 30 * 60 * 1000L; // 1 rappel max toutes les 30 min par type de driver
     
     private static class PrevailingDirection {
         final String direction; // "BULLISH", "BEARISH" ou "NEUTRE"
