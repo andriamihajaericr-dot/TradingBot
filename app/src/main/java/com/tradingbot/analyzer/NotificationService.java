@@ -1228,6 +1228,18 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                         if (validationResult != null && !validationResult.isConfirmed) {
                         // Cas particulier : inertie macro (driver déjà actif) → on envoie un rappel Telegram
                         if (validationResult.isInertiaBlock) {
+                            // 🛡️ CORRECTIF SPAM : on déduit le type de driver depuis la raison pour
+                            // appliquer un cooldown par type (FED-MONETARY-POLICY, CORE-MACRO, etc.)
+                            // au lieu d'envoyer un rappel à chaque notification filtrée pendant 2h.
+                            String inertiaKey = eventTypeStr;
+                            long nowMs = System.currentTimeMillis();
+                            Long lastSentForType = lastInertiaReminderSent.get(inertiaKey);
+                            if (lastSentForType != null && (nowMs - lastSentForType) < INERTIA_REMINDER_COOLDOWN_MS) {
+                                Log.d(TAG, "[RAPPEL] Driver " + inertiaKey + " déjà rappelé récemment, ignoré (cooldown).");
+                                return; // On arrête le traitement normal sans renvoyer Telegram
+                            }
+                            lastInertiaReminderSent.put(inertiaKey, nowMs);
+
                             String reminderMsg = "⏳ *RAPPEL : DRIVER DÉJÀ ACTIF*\n" +
                                                  "🔹 " + validationResult.reason + "\n\n" +
                                                  "📋 *Dernier événement similaire :*\n" +
