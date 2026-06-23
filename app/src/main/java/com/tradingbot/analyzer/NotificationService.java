@@ -116,9 +116,16 @@ private static final long INERTIA_REMINDER_COOLDOWN_MS = 30 * 60 * 1000L; // 1 r
             .build();
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(FOREGROUND_NOTIFICATION_ID, fgNotification,
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            // 🛡️ CORRECTIF COMPILATION : FOREGROUND_SERVICE_TYPE_SPECIAL_USE n'existe que depuis
+            // l'API 34 (Android 14). Le compileSdkVersion actuel du projet est probablement
+            // inférieur à 34, donc le symbole est introuvable au moment de la compilation.
+            // On utilise la valeur entière brute (1 << 30, valeur officielle de cette constante
+            // côté plateforme) pour éviter de dépendre du symbole, tout en gardant le même
+            // comportement runtime sur les appareils qui le supportent.
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(FOREGROUND_NOTIFICATION_ID, fgNotification, 1 << 30);
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(FOREGROUND_NOTIFICATION_ID, fgNotification);
             } else {
                 startForeground(FOREGROUND_NOTIFICATION_ID, fgNotification);
             }
@@ -183,7 +190,7 @@ private static final long INERTIA_REMINDER_COOLDOWN_MS = 30 * 60 * 1000L; // 1 r
         if (MainActivity.instance != null)
             MainActivity.instance.addLog(
                 "📊 [MONTHLY] Rapport manqué → rattrapage en cours");
-        scheduler.schedule(this::generateAndPurgeMonthlyReport, 60, TimeUnit.SECONDS);
+        scheduler.schedule((Runnable) this::generateAndPurgeMonthlyReport, 60, TimeUnit.SECONDS);
     } else {
         Log.d(TAG, "[MONTHLY] Rapport mensuel déjà envoyé — pas de rattrapage");
     }
