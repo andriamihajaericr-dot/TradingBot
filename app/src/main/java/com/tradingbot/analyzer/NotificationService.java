@@ -637,6 +637,14 @@ public void onListenerDisconnected() {
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
+
+    // 🛡️ Tronque les réponses d'erreur API longues avant affichage dans le panneau de logs,
+    // pour garder le panneau lisible (les corps d'erreur JSON peuvent être très longs).
+    private String truncateForLog(String s) {
+        if (s == null) return "null";
+        return s.length() <= 200 ? s : s.substring(0, 200) + "…";
+    }
+    
     private boolean estEvenementSuprême(String text) {
         String upper = text.toUpperCase(Locale.ROOT);
         return upper.contains("FOMC") || upper.contains("FED ") ||
