@@ -195,7 +195,11 @@
         <TextView 
             android:layout_width="match_parent" 
             android:layout_height="wrap_content"
-            android:text="📋 Journaux de bord" />
+            android:text="📋 Journaux de bord" 
+            android:textColor="#f5c842" 
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
 
         <TextView 
             android:id="@+id/logText"
