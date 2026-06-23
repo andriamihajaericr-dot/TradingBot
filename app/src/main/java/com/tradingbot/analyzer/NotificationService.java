@@ -2903,7 +2903,6 @@ messages.put(new JSONObject().put("role", "user").put("content",
     } finally {
         if (conn != null) conn.disconnect();
     }
-
     return false; // ❌ Échec : Renvoie false pour signaler une anomalie et permettre un rattrapage
 }
 
