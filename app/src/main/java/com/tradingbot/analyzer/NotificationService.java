@@ -3032,10 +3032,17 @@ public boolean generateAndSendWeeklyReport() {
                     errorResponse.append(line);
                 }
                 Log.e(TAG, "[WEEKLY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("❌ [WEEKLY] Erreur HTTP " + responseCode + " de Groq : "
+                        + truncateForLog(errorResponse.toString()));
+                }
             }
         }
     } catch (Exception e) {
         Log.e(TAG, "[WEEKLY] Erreur rapport hebdomadaire", e);
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog("❌ [WEEKLY] Échec : " + e.getClass().getSimpleName() + " — " + e.getMessage());
+        }
     } finally {
         if (conn != null) conn.disconnect();
     }
