@@ -1512,6 +1512,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
     @Override
     public void onCreate() {
         super.onCreate();
+        startForegroundServiceNotification();
         eventDb = EventDatabase.getInstance(this);
         
         // ── Liaison du contexte pour l'extraction de la clé macro_api_key ──
