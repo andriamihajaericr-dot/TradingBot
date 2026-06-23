@@ -2665,10 +2665,17 @@ messages.put(new JSONObject().put("role", "user").put("content",
                     errorResponse.append(line);
                 }
                 Log.e(TAG, "[DAILY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("❌ [DAILY] Erreur HTTP " + responseCode + " de Groq : "
+                        + truncateForLog(errorResponse.toString()));
+                }
                     }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "[DAILY] Échec critique lors du traitement du briefing journalier", e);
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("❌ [DAILY] Échec : " + e.getClass().getSimpleName() + " — " + e.getMessage());
+                }
             } finally {
                 if (conn != null) conn.disconnect();
             }
