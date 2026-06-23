@@ -2751,9 +2751,14 @@ messages.put(new JSONObject().put("role", "user").put("content",
         public boolean generateAndPurgeMonthlyReport(boolean purgeAfterSend) {
             HttpURLConnection conn = null;
             try {
-        String apiKey = getGroqApiKey();
-        if (apiKey.isEmpty()) return false; // ✅ Type de retour fixé
-
+                String apiKey = getGroqApiKey();
+        if (apiKey.isEmpty()) {
+            Log.w(TAG, "[MONTHLY] Clé API Groq absente — rapport annulé.");
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("❌ [MONTHLY] Clé API Groq absente — vérifie l'onglet Clés API.");
+            }
+            return false;
+        }
         long now = System.currentTimeMillis() / 1000;
         String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
         if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
