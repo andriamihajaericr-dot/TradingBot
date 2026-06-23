@@ -99,6 +99,9 @@ public class MainActivity extends AppCompatActivity {
         Button testBtn = findViewById(R.id.testBtn);
         Button exportBtn = findViewById(R.id.exportBtn);   // Pour exporter la base
         Button importBtn = findViewById(R.id.importBtn);
+        Button dailyReportBtn = findViewById(R.id.dailyReportBtn);
+        Button weeklyReportBtn = findViewById(R.id.weeklyReportBtn);
+        Button monthlyReportBtn = findViewById(R.id.monthlyReportBtn);
 
         loadSavedKeys();
         updateStatus();
@@ -132,8 +135,72 @@ public class MainActivity extends AppCompatActivity {
         }
     }).start();
 });
+         
         exportBtn.setOnClickListener(v -> exportDatabaseToStorage());
         importBtn.setOnClickListener(v -> importDatabaseFromStorage());
+
+        // 🛡️ Déclenchement manuel du Daily Report
+        dailyReportBtn.setOnClickListener(v -> {
+            addLog("📅 [MANUEL] Déclenchement du rapport quotidien...");
+            new Thread(() -> {
+                try {
+                    NotificationService svc = NotificationService.getInstance();
+                    if (svc == null) {
+                        runOnUiThread(() -> addLog("❌ [MANUEL] Service indisponible — active d'abord les notifications."));
+                        return;
+                    }
+                    boolean sent = svc.generateAndSendDailyBrief();
+                    runOnUiThread(() -> addLog(sent
+                        ? "✅ [MANUEL] Daily Report envoyé."
+                        : "⚠️ [MANUEL] Daily Report non envoyé (voir logs pour la raison)."));
+                } catch (Exception e) {
+                    Log.e(TAG, "Échec déclenchement manuel Daily Report", e);
+                    runOnUiThread(() -> addLog("❌ [MANUEL] Erreur Daily Report : " + e.getMessage()));
+                }
+            }).start();
+        });
+
+        // 🛡️ Déclenchement manuel du Weekly Report
+        weeklyReportBtn.setOnClickListener(v -> {
+            addLog("📆 [MANUEL] Déclenchement du rapport hebdomadaire...");
+            new Thread(() -> {
+                try {
+                    NotificationService svc = NotificationService.getInstance();
+                    if (svc == null) {
+                        runOnUiThread(() -> addLog("❌ [MANUEL] Service indisponible — active d'abord les notifications."));
+                        return;
+                    }
+                    boolean sent = svc.generateAndSendWeeklyReport();
+                    runOnUiThread(() -> addLog(sent
+                        ? "✅ [MANUEL] Weekly Report envoyé."
+                        : "⚠️ [MANUEL] Weekly Report non envoyé (voir logs pour la raison)."));
+                } catch (Exception e) {
+                    Log.e(TAG, "Échec déclenchement manuel Weekly Report", e);
+                    runOnUiThread(() -> addLog("❌ [MANUEL] Erreur Weekly Report : " + e.getMessage()));
+                }
+            }).start();
+        });
+
+        // 🛡️ Déclenchement manuel du Monthly Report
+        monthlyReportBtn.setOnClickListener(v -> {
+            addLog("📊 [MANUEL] Déclenchement du rapport mensuel...");
+            new Thread(() -> {
+                try {
+                    NotificationService svc = NotificationService.getInstance();
+                    if (svc == null) {
+                        runOnUiThread(() -> addLog("❌ [MANUEL] Service indisponible — active d'abord les notifications."));
+                        return;
+                    }
+                    boolean sent = svc.generateAndPurgeMonthlyReport();
+                    runOnUiThread(() -> addLog(sent
+                        ? "✅ [MANUEL] Monthly Report envoyé."
+                        : "⚠️ [MANUEL] Monthly Report non envoyé (voir logs pour la raison)."));
+                } catch (Exception e) {
+                    Log.e(TAG, "Échec déclenchement manuel Monthly Report", e);
+                    runOnUiThread(() -> addLog("❌ [MANUEL] Erreur Monthly Report : " + e.getMessage()));
+                }
+            }).start();
+        });
 
         botSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
             if (isChecked && !isPermissionGranted()) {
