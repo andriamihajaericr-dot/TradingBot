@@ -2889,10 +2889,17 @@ messages.put(new JSONObject().put("role", "user").put("content",
                     errorResponse.append(line);
                 }
                 Log.e(TAG, "[MONTHLY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.addLog("❌ [MONTHLY] Erreur HTTP " + responseCode + " de Groq : "
+                        + truncateForLog(errorResponse.toString()));
+                }
             }
         }
     } catch (Exception e) { 
         Log.e(TAG, "Erreur Rapport Mensuel", e); 
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog("❌ [MONTHLY] Échec : " + e.getClass().getSimpleName() + " — " + e.getMessage());
+        }
     } finally {
         if (conn != null) conn.disconnect();
     }
