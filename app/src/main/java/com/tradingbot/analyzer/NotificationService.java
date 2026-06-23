@@ -89,6 +89,44 @@ private static final long INERTIA_REMINDER_COOLDOWN_MS = 30 * 60 * 1000L; // 1 r
             this.timestamp = ts;
         }
     }
+
+     // 🛡️ CORRECTIF SURVIVANCE PROCESSUS : crée le canal silencieux dédié et démarre
+    // le service en foreground avec une notification persistante minimale.
+    // ⚠️ Utilise FOREGROUND_SERVICE_TYPE_SPECIAL_USE pour correspondre exactement au
+    // type déjà déclaré dans AndroidManifest.xml (FOREGROUND_SERVICE_SPECIAL_USE +
+    // PROPERTY_SPECIAL_USE_FGS_SUBTYPE) — un mismatch entre le type déclaré au manifest
+    // et celui démarré en code lève une MissingForegroundServiceTypeException sur Android 14+.
+    private void startForegroundServiceNotification() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel fgChannel = new NotificationChannel(
+                FOREGROUND_CHANNEL_ID,
+                "TradingBot — Service actif",
+                NotificationManager.IMPORTANCE_MIN // silencieux, pas d'icône clignotante
+            );
+            fgChannel.setShowBadge(false);
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.createNotificationChannel(fgChannel);
+        }
+
+        Notification fgNotification = new Notification.Builder(this, FOREGROUND_CHANNEL_ID)
+            .setContentTitle("TradingBot actif")
+            .setContentText("Surveillance macro en cours…")
+            .setSmallIcon(android.R.drawable.stat_notify_sync) // ⚠️ remplace par ta propre icône si tu en as une (ex: R.drawable.ic_launcher)
+            .setOngoing(true)
+            .build();
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(FOREGROUND_NOTIFICATION_ID, fgNotification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else {
+                startForeground(FOREGROUND_NOTIFICATION_ID, fgNotification);
+            }
+            Log.d(TAG, "[SERVICE] Foreground démarré — processus protégé contre le kill système.");
+        } catch (Exception e) {
+            Log.e(TAG, "[SERVICE] Échec démarrage foreground — le processus reste vulnérable au kill système.", e);
+        }
+    }
     
     private void checkAndSendMissedWeeklyReport() {
     SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
