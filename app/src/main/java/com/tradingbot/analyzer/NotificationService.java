@@ -2709,12 +2709,20 @@ messages.put(new JSONObject().put("role", "user").put("content",
     checkAndSendMissedMonthlyReport();
     }
 
-private static volatile long lastCalendarBackfillMillis = 0L;
-private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
+    private static volatile long lastCalendarBackfillMillis = 0L;
+    private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
 
-   public boolean generateAndPurgeMonthlyReport() {
-    HttpURLConnection conn = null;
-    try {
+   // 🛡️ Surcharge : la version sans paramètre garde le comportement actuel (purge active),
+// pour ne rien casser chez les appelants existants (scheduler automatique).
+        public boolean generateAndPurgeMonthlyReport() {
+            return generateAndPurgeMonthlyReport(true);
+        }
+        
+        // 🛡️ Nouvelle version avec contrôle de la purge — utilisée par le bouton manuel
+        // (purgeAfterSend = false) pour préserver le registre avant le vrai rapport de fin de mois.
+        public boolean generateAndPurgeMonthlyReport(boolean purgeAfterSend) {
+            HttpURLConnection conn = null;
+            try {
         String apiKey = getGroqApiKey();
         if (apiKey.isEmpty()) return false; // ✅ Type de retour fixé
 
@@ -2822,9 +2830,16 @@ private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
                 if (MainActivity.instance != null) {
                     MainActivity.instance.addLog("✅ [MONTHLY] Rapport mensuel envoyé");
                 }
-                
                 // ✅ Purge sécurisée uniquement si le rapport a été généré et transmis avec succès
-                eventDb.purgeOldEvents(now);
+                // 🛡️ Sautée si appelée manuellement avec purgeAfterSend=false (bouton de test)
+                if (purgeAfterSend) {
+                    eventDb.purgeOldEvents(now);
+                } else {
+                    Log.d(TAG, "[MONTHLY] Purge ignorée (déclenchement manuel/test) — registre préservé.");
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog("ℹ️ [MONTHLY] Purge ignorée (mode test) — registre préservé.");
+                    }
+                }
                 
                 return true; // ✅ Succès total : On retourne true au planificateur !
             } else {
