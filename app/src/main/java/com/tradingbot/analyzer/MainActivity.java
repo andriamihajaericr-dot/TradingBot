@@ -191,7 +191,7 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(() -> addLog("❌ [MANUEL] Service indisponible — active d'abord les notifications."));
                         return;
                     }
-                    boolean sent = svc.generateAndPurgeMonthlyReport();
+                    boolean sent = svc.generateAndPurgeMonthlyReport(false); // false = pas de purge en mode test
                     runOnUiThread(() -> addLog(sent
                         ? "✅ [MANUEL] Monthly Report envoyé."
                         : "⚠️ [MANUEL] Monthly Report non envoyé (voir logs pour la raison)."));
