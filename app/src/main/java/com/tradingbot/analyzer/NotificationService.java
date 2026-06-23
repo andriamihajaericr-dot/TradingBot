@@ -2910,8 +2910,13 @@ public boolean generateAndSendWeeklyReport() {
     HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
-        if (apiKey.isEmpty()) return false; // ✅ Type de retour fixé
-
+        if (apiKey.isEmpty()) {
+            Log.w(TAG, "[WEEKLY] Clé API Groq absente — rapport annulé.");
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("❌ [WEEKLY] Clé API Groq absente — vérifie l'onglet Clés API.");
+            }
+            return false;
+        }
         long now = System.currentTimeMillis() / 1000;
         // Récupère les événements des 7 derniers jours (poids >= 2)
         String weeklyRegistry = eventDb.getWeeklyMacroSummary(now);
