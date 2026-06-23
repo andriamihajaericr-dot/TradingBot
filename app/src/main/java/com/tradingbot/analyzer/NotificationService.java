@@ -2121,7 +2121,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
     }, delay, TimeUnit.MILLISECONDS);
    }
     
-   private boolean generateAndSendDailyBrief() {
+   public boolean generateAndSendDailyBrief() {
     HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
@@ -2712,7 +2712,7 @@ messages.put(new JSONObject().put("role", "user").put("content",
 private static volatile long lastCalendarBackfillMillis = 0L;
 private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
 
-   private boolean generateAndPurgeMonthlyReport() {
+   public boolean generateAndPurgeMonthlyReport() {
     HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
@@ -2852,7 +2852,7 @@ private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
     return false; // ❌ Échec : Renvoie false pour signaler une anomalie et permettre un rattrapage
 }
 
-private boolean generateAndSendWeeklyReport() {
+public boolean generateAndSendWeeklyReport() {
     HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
