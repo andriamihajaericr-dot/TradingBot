@@ -76,7 +76,7 @@ private static final long ALERT_COOLDOWN_MS = 60 * 60 * 1000L; // 1 heure de coo
 // 🛡️ CORRECTIF SPAM INERTIE MACRO : le rappel "Driver déjà actif" partait sans
 // aucune limite de fréquence, donc chaque notification rejetée (même non pertinente,
 // ex: une dépêche nécrologique mal classée) renvoyait le même message Telegram en boucle.
-private final ConcurrentHashMap<String, Long> lastInertiaReminderSent = new ConcurrentHashMap<>();
+//private final ConcurrentHashMap<String, Long> lastInertiaReminderSent = new ConcurrentHashMap<>();
 private static final long INERTIA_REMINDER_COOLDOWN_MS = 30 * 60 * 1000L; // 1 rappel max toutes les 30 min par type de driver
     
     private static class PrevailingDirection {
@@ -1272,17 +1272,16 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                         if (validationResult != null && !validationResult.isConfirmed) {
                         // Cas particulier : inertie macro (driver déjà actif) → on envoie un rappel Telegram
                         if (validationResult.isInertiaBlock) {
-                            // 🛡️ CORRECTIF SPAM : on déduit le type de driver depuis la raison pour
-                            // appliquer un cooldown par type (FED-MONETARY-POLICY, CORE-MACRO, etc.)
-                            // au lieu d'envoyer un rappel à chaque notification filtrée pendant 2h.
-                            String inertiaKey = eventTypeStr;
+                            String inertiaPrefKey = "inertia_reminder_" + eventTypeStr;
                             long nowMs = System.currentTimeMillis();
-                            Long lastSentForType = lastInertiaReminderSent.get(inertiaKey);
-                            if (lastSentForType != null && (nowMs - lastSentForType) < INERTIA_REMINDER_COOLDOWN_MS) {
-                                Log.d(TAG, "[RAPPEL] Driver " + inertiaKey + " déjà rappelé récemment, ignoré (cooldown).");
+                            android.content.SharedPreferences inertiaPrefs =
+                                getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
+                            long lastSentForType = inertiaPrefs.getLong(inertiaPrefKey, 0L);
+                            if (lastSentForType != 0L && (nowMs - lastSentForType) < INERTIA_REMINDER_COOLDOWN_MS) {
+                                Log.d(TAG, "[RAPPEL] Driver " + eventTypeStr + " déjà rappelé récemment, ignoré (cooldown).");
                                 return; // On arrête le traitement normal sans renvoyer Telegram
                             }
-                            lastInertiaReminderSent.put(inertiaKey, nowMs);
+                            inertiaPrefs.edit().putLong(inertiaPrefKey, nowMs).apply();
 
                             String reminderMsg = "⏳ *RAPPEL : DRIVER DÉJÀ ACTIF*\n" +
                                                  "🔹 " + validationResult.reason + "\n\n" +
