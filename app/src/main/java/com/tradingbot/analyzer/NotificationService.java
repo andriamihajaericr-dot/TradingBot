@@ -2140,7 +2140,13 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
     HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
-        if (apiKey.isEmpty()) return false; // ✅ Corrigé
+        if (apiKey.isEmpty()) {
+            Log.w(TAG, "[DAILY] Clé API Groq absente — rapport annulé.");
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("❌ [DAILY] Clé API Groq absente — vérifie l'onglet Clés API.");
+            }
+            return false;
+        }
 
         long nowSec = System.currentTimeMillis() / 1000;
         String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
