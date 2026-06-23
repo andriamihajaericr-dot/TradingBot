@@ -151,17 +151,51 @@
            android:textAllCaps="false"
            android:backgroundTint="#1f2937"
            android:textColor="#E5E7EB" 
-           android:layout_marginBottom="20dp"/>
-    
+           android:layout_marginBottom="8dp"/>
 
         <TextView 
             android:layout_width="match_parent" 
             android:layout_height="wrap_content"
-            android:text="📋 Journaux de bord" 
+            android:text="📨 Rapports manuels (test immédiat)" 
             android:textColor="#f5c842" 
             android:textSize="13sp"
             android:textStyle="bold"
             android:layout_marginBottom="8dp"/>
+
+        <Button
+           android:id="@+id/dailyReportBtn"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="📅 Daily Report Manuel"
+           android:textAllCaps="false"
+           android:backgroundTint="#2d2417"
+           android:textColor="#E5E7EB" 
+           android:layout_marginBottom="8dp"/>
+
+        <Button
+           android:id="@+id/weeklyReportBtn"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="📆 Weekly Report Manuel"
+           android:textAllCaps="false"
+           android:backgroundTint="#2d2417"
+           android:textColor="#E5E7EB" 
+           android:layout_marginBottom="8dp"/>
+
+        <Button
+           android:id="@+id/monthlyReportBtn"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="📊 Monthly Report Manuel (sans purge)"
+           android:textAllCaps="false"
+           android:backgroundTint="#2d2417"
+           android:textColor="#E5E7EB" 
+           android:layout_marginBottom="20dp"/>
+
+        <TextView 
+            android:layout_width="match_parent" 
+            android:layout_height="wrap_content"
+            android:text="📋 Journaux de bord"
 
         <TextView 
             android:id="@+id/logText"
