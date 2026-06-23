@@ -47,6 +47,12 @@ public class NotificationService extends NotificationListenerService {
     }
     //private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>();
     private static final String CHANNEL_ID = "trading_alerts";
+    // 🛡️ CORRECTIF SURVIVANCE PROCESSUS : canal séparé, silencieux, pour la notification
+    // persistante du foreground service. Sans foreground, Android tuait le processus en
+    // arrière-plan et réinitialisait tout l'état en RAM (cooldowns, maps, compteurs) entre
+    // deux notifications — ce qui annulait le correctif anti-spam Inertie Macro.
+    private static final String FOREGROUND_CHANNEL_ID = "trading_bot_service";
+    private static final int FOREGROUND_NOTIFICATION_ID = 1001;
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
