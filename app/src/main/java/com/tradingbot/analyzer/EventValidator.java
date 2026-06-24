@@ -1485,7 +1485,7 @@ private static String parseTimestampToSeconds(String rawTimestamp) {
     }
 
     try {
-        List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(72);
+        List<EconomicCalendarAPI.CalendarEvent> events = EconomicCalendarAPI.fetchUpcomingEvents(168);
         if (events == null || events.isEmpty()) {
             logToMain("⚠️ Calendrier vide ou non disponible.");
             return;
