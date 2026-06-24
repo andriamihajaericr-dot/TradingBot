@@ -1896,9 +1896,11 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 premierActif = false;
                     
                                 String sign = (mData.changePercent >= 0) ? "+" : "";
+                                String emojiVariation = (mData.changePercent > 0) ? "🟢"
+                                    : (mData.changePercent < 0) ? "🔴" : "⚪";
                                 sb.append(entry.getKey())
                                   .append(" => ")
-                                  .append(String.format(Locale.US, "%.4f (%s%.2f%%)", mData.price, sign, mData.changePercent));
+                                  .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)", mData.price, sign, mData.changePercent, emojiVariation));
                             }
                     
                             // Vérification finale au cas où TOUS les actifs auraient été rejetés par le filtre de sécurité
