@@ -677,28 +677,9 @@ public static synchronized boolean tryAcquireBatchSlot() {
 
                 // ✅ Délai entre les sous‑lots (sauf après le dernier sous-lot)
                 // ✅ Délai entre les sous‑lots (sauf après le dernier sous-lot)
+                // ✅ Délai entre les sous‑lots (sauf après le dernier sous-lot)
                 if (i + limit < apiSymbols.size()) {
-                    // 🛡️ CORRECTIF 429 RÉSIDUEL : avant d'envoyer le prochain sous-lot, on
-                    // vérifie si son coût estimé dépasserait le quota de la minute calendaire
-                    // en cours. Si oui, on attend jusqu'au début de la minute suivante au lieu
-                    // d'un simple délai fixe — garantissant que chaque sous-lot tombe dans une
-                    // fenêtre de quota fraîche plutôt que de s'additionner au précédent.
-                    int nextChunkSize = Math.min(limit, apiSymbols.size() - (i + limit));
-                    int estimatedNextCost = nextChunkSize * CREDITS_PER_SYMBOL_ESTIMATE;
-
-                    if (estimatedNextCost > MAX_CREDITS_PER_MINUTE - (chunk.size() * CREDITS_PER_SYMBOL_ESTIMATE)) {
-                        long now = System.currentTimeMillis();
-                        long msUntilNextMinute = 60000L - (now % 60000L) + 200; // +200ms de marge de sécurité
-                        String waitMsg = "⏳ [BATCH] Quota minute estimé dépassé — attente de "
-                                + msUntilNextMinute + "ms jusqu'à la minute suivante avant le sous-lot suivant.";
-                        Log.d(TAG, waitMsg);
-                        if (MainActivity.instance != null) {
-                            MainActivity.instance.addLog(waitMsg);
-                        }
-                        Thread.sleep(msUntilNextMinute);
-                    } else {
-                        Thread.sleep(SUBLOT_DELAY_MS);
-                    }
+                    Thread.sleep(SUBLOT_DELAY_MS);
                 }
 
             } catch (InterruptedException e) {
