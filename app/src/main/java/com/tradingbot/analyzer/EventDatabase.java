@@ -460,9 +460,24 @@ String[] whereArgs = new String[]{
         db.beginTransaction();
         try {
             long fortyEightHoursAgo = currentUnixTime - (2 * 24 * 60 * 60);
-            int softDeleted = db.delete(TABLE_EVENTS, "unix_timestamp < ? AND driver_weight < 5", new String[]{String.valueOf(fortyEightHoursAgo)});
+            // 🛡️ CORRECTIF CALENDRIER : les événements CALENDAR-RESULT (lundi, mardi...)
+            // étaient purgés après seulement 48h comme du simple bruit, alors que le
+            // rapport calendrier hebdomadaire doit pouvoir afficher toute la semaine en
+            // cours (jusqu'à 7 jours). On les exclut explicitement de cette purge rapide
+            // — ils restent soumis à une rétention plus longue, gérée séparément ci-dessous.
+            int softDeleted = db.delete(TABLE_EVENTS,
+                "unix_timestamp < ? AND driver_weight < 5 AND event_type != 'CALENDAR-RESULT'",
+                new String[]{String.valueOf(fortyEightHoursAgo)});
             Log.d("EventDatabase", "Purge Flux/Bruit effectuée : " + softDeleted + " lignes supprimées.");
 
+            // 🛡️ Rétention dédiée au calendrier économique : 9 jours, pour couvrir une
+            // semaine complète (lundi à dimanche) avec une marge de sécurité, même si le
+            // rapport est consulté en début de semaine suivante.
+            long nineDaysAgo = currentUnixTime - (9L * 24 * 60 * 60);
+            int calendarPurged = db.delete(TABLE_EVENTS,
+                "unix_timestamp < ? AND event_type = 'CALENDAR-RESULT'",
+                new String[]{String.valueOf(nineDaysAgo)});
+            Log.d("EventDatabase", "Purge Calendrier (>9j) effectuée : " + calendarPurged + " lignes supprimées.");
             long fortyFiveDaysAgo = currentUnixTime - (45L * 24 * 60 * 60);
             int hardDeleted = db.delete(TABLE_EVENTS, "unix_timestamp < ? AND driver_weight = 5", new String[]{String.valueOf(fortyFiveDaysAgo)});
             Log.d("EventDatabase", "Purge Piliers ancres effectuée : " + hardDeleted + " lignes nettoyées.");
