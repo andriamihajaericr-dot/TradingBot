@@ -1210,9 +1210,12 @@ public void onListenerDisconnected() {
                     MarketDataFetcher.MarketData data = liveDataMap.get(asset);
                     if (data != null && data.price > 0) {
                         String sign = (data.changePercent >= 0) ? "+" : "";
+                        // 🛡️ Emoji vert/rouge selon le signe de la variation, pour une lecture
+                        // visuelle immédiate sur Telegram (qui ne supporte pas la couleur de texte).
+                        String emojiVariation = (data.changePercent > 0) ? "🟢"
+                            : (data.changePercent < 0) ? "🔴" : "⚪";
                         String badgeMarche = String.format(Locale.US,
-                            " (%.4f | %s%.2f%%)", data.price, sign, data.changePercent);
-                        
+                            " (%.4f | %s%.2f%% %s)", data.price, sign, data.changePercent, emojiVariation);
                         // Insertion propre juste avant les deux-points explicatifs
                         int indexColon = ligne.indexOf(":");
                         if (indexColon != -1) {
