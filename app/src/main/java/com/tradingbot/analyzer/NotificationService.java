@@ -2038,7 +2038,11 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             for (String asset : twelveAssets) {
                 MarketDataFetcher.MarketData data = batchPrices.get(asset);
                 if (data != null && data.price > 0) {
-                    String tendance = data.changePercent >= 0 ? "📈" : "📉";
+                    // 🛡️ HARMONISATION : 🟢/🔴/⚪ remplace 📈/📉 pour rester cohérent avec
+                    // les autres points d'affichage de prix (choc macro, snapshot Daily,
+                    // injectLivePrices) — un seul code visuel partout dans le bot.
+                    String tendance = (data.changePercent > 0) ? "🟢"
+                        : (data.changePercent < 0) ? "🔴" : "⚪";
                     String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
                     blocPrix.append(String.format(Locale.US, formatPrix, tendance, asset, data.price, data.changePercent));
                 } else {
