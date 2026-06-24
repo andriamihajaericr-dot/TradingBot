@@ -1767,11 +1767,29 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                         if (validationResult.isInertiaBlock) {
                             String inertiaPrefKey = "inertia_reminder_" + eventTypeStr;
                             long nowMs = System.currentTimeMillis();
+
+                            // 🛡️ Étape 1 : verrou atomique en mémoire — bloque les rafales
+                            // de notifications quasi simultanées (même milliseconde).
+                            // putIfAbsent + merge en une opération atomique : si une autre
+                            // notification vient juste de réserver ce créneau, on sort
+                            // immédiatement sans toucher au SharedPreferences.
+                            Long previousMemory = lastInertiaReminderSentMemory.putIfAbsent(inertiaPrefKey, nowMs);
+                            if (previousMemory != null) {
+                                if ((nowMs - previousMemory) < INERTIA_REMINDER_COOLDOWN_MS) {
+                                    Log.d(TAG, "[RAPPEL] Driver " + eventTypeStr + " déjà rappelé (verrou mémoire), ignoré.");
+                                    return;
+                                }
+                                // Cooldown mémoire expiré : on met à jour la réservation
+                                lastInertiaReminderSentMemory.put(inertiaPrefKey, nowMs);
+                            }
+
+                            // 🛡️ Étape 2 : SharedPreferences — protection de fond contre les
+                            // redémarrages de processus Android (la mémoire seule ne survit pas).
                             android.content.SharedPreferences inertiaPrefs =
                                 getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
                             long lastSentForType = inertiaPrefs.getLong(inertiaPrefKey, 0L);
                             if (lastSentForType != 0L && (nowMs - lastSentForType) < INERTIA_REMINDER_COOLDOWN_MS) {
-                                Log.d(TAG, "[RAPPEL] Driver " + eventTypeStr + " déjà rappelé récemment, ignoré (cooldown).");
+                                Log.d(TAG, "[RAPPEL] Driver " + eventTypeStr + " déjà rappelé récemment (préférences), ignoré.");
                                 return; // On arrête le traitement normal sans renvoyer Telegram
                             }
                             inertiaPrefs.edit().putLong(inertiaPrefKey, nowMs).apply();
