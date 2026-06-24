@@ -134,6 +134,117 @@ private static final long INERTIA_REMINDER_COOLDOWN_MS = 30 * 60 * 1000L; // 1 r
             Log.e(TAG, "[SERVICE] Échec démarrage foreground — le processus reste vulnérable au kill système.", e);
         }
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 🛡️ SÉLECTION DYNAMIQUE DES RÈGLES PERTINENTES (réduction tokens Groq)
+    // ════════════════════════════════════════════════════════════════════
+    // Détecte, via mots-clés, quelles RÈGLES thématiques (2 à 11) sont
+    // réellement concernées par le registre macro du jour, et n'assemble
+    // que celles-ci + le socle fixe (RÈGLE 0/1/12/contraintes). Si aucun
+    // mot-clé n'est détecté pour une règle donnée, elle est simplement omise
+    // — moins de tokens envoyés, sans perte de pertinence puisque la règle
+    // ne s'appliquait pas à la situation du jour de toute façon.
+    // FILET DE SÉCURITÉ : si AUCUNE règle thématique n'est détectée du tout
+    // (cas limite, ex. registre vide ou formulation inhabituelle), on
+    // bascule sur le prompt complet pour ne jamais sous-couvrir un driver
+    // mal capté par les mots-clés.
+    public String construireDailySystemPromptSelectif(String registreDeLaJournee) {
+        String texte = (registreDeLaJournee != null) ? registreDeLaJournee.toLowerCase() : "";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(PROMPT_HEADER_FIXE);
+        sb.append(REGLE_1_HIERARCHIE);
+
+        boolean auMoinsUneRegleDetectee = false;
+
+        if (contientUnDesMots(texte, "fed ", "fomc", "cpi", "pce", "nfp", "powell",
+                "kevin warsh", "ppi", "gdp", "pib", "ism", "michigan", "ventes au détail",
+                "chômage", "unemployment", "retail sales")) {
+            sb.append(REGLE_2_FED);
+            auMoinsUneRegleDetectee = true;
+        }
+
+        if (contientUnDesMots(texte, "bce", "ecb", "lagarde", "boj", "ueda", "boe", "bailey",
+                "rba", "bullock", "boc", "macklem", "banque centrale", "central bank")) {
+            sb.append(REGLE_3_BANQUES_ETRANGERES);
+            auMoinsUneRegleDetectee = true;
+        }
+
+        if (contientUnDesMots(texte, "eia", "opec", "opep", "stocks de brut", "crude oil",
+                "barils", "pipeline", "quotas")) {
+            sb.append(REGLE_4_ENERGIE);
+            auMoinsUneRegleDetectee = true;
+        }
+
+        if (contientUnDesMots(texte, "earnings", "eps", "guidance", "nvda", "nvidia", "aapl",
+                "apple", "msft", "microsoft", "amzn", "amazon", "meta", "tsla", "tesla",
+                "googl", "google", "résultats trimestriels", "profit warning")) {
+            sb.append(REGLE_5_BIG_TECH);
+            auMoinsUneRegleDetectee = true;
+        }
+
+        boolean moyenOrient = contientUnDesMots(texte, "hormuz", "ormuz", "iran", "israel",
+                "hezbollah", "houthi", "frappe militaire", "airstrike", "missile",
+                "drone attack", "riposte", "blocus", "blockade");
+        if (moyenOrient) {
+            sb.append(REGLE_6_MOYEN_ORIENT);
+            auMoinsUneRegleDetectee = true;
+        }
+
+        boolean europeEst = contientUnDesMots(texte, "russie", "russia", "ukraine", "otan",
+                "nato", "poutine", "putin", "zelensky");
+        if (europeEst) {
+            sb.append(REGLE_7_EUROPE_EST);
+            auMoinsUneRegleDetectee = true;
+        }
+
+        if (contientUnDesMots(texte, "tarif", "tariff", "section 301", "section 232",
+                "guerre commerciale", "trade war", "douanier")) {
+            sb.append(REGLE_8_TARIFS);
+            auMoinsUneRegleDetectee = true;
+        }
+
+        if (contientUnDesMots(texte, "chine", "china", "pboc", "pmi chine", "yuan", "renminbi")) {
+            sb.append(REGLE_9_CHINE);
+            auMoinsUneRegleDetectee = true;
+        }
+
+        if (contientUnDesMots(texte, "bitcoin", "btc", "etf bitcoin", "halving", "ibit",
+                "fbtc", "crypto", "stablecoin", "exchange hack")) {
+            sb.append(REGLE_10_CRYPTO);
+            auMoinsUneRegleDetectee = true;
+        }
+
+        if (contientUnDesMots(texte, "ipo", "spac", "merger", "fusion", "acquisition",
+                "rachat")) {
+            sb.append(REGLE_11_IPO);
+            auMoinsUneRegleDetectee = true;
+        }
+
+        // 🛡️ FILET DE SÉCURITÉ : aucune règle thématique détectée -> prompt complet
+        if (!auMoinsUneRegleDetectee) {
+            Log.d(TAG, "[DAILY] Aucun mot-clé de règle détecté — fallback prompt complet (toutes règles).");
+            sb.append(REGLE_2_FED).append(REGLE_3_BANQUES_ETRANGERES).append(REGLE_4_ENERGIE)
+              .append(REGLE_5_BIG_TECH).append(REGLE_6_MOYEN_ORIENT).append(REGLE_7_EUROPE_EST)
+              .append(REGLE_8_TARIFS).append(REGLE_9_CHINE).append(REGLE_10_CRYPTO).append(REGLE_11_IPO);
+        } else {
+            Log.d(TAG, "[DAILY] Prompt sélectif assemblé — règles non pertinentes omises pour économiser des tokens.");
+        }
+
+        sb.append(REGLE_12_ARBITRAGE_FIXE);
+        sb.append(CONTRAINTES_FINALES_FIXE);
+
+        return sb.toString();
+    }
+
+    // 🛡️ Petit utilitaire de détection de mots-clés, insensible à la casse
+    // (le texte d'entrée est déjà passé en minuscules par l'appelant).
+    private boolean contientUnDesMots(String texte, String... mots) {
+        for (String mot : mots) {
+            if (texte.contains(mot)) return true;
+        }
+        return false;
+    }
     
     private void checkAndSendMissedWeeklyReport() {
     SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
