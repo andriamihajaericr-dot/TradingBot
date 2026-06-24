@@ -472,7 +472,16 @@ String[] whereArgs = new String[]{
                 "unix_timestamp < ? AND driver_weight <= 2 AND event_type != 'CALENDAR-RESULT'",
                 new String[]{String.valueOf(fortyEightHoursAgo)});
             Log.d("EventDatabase", "Purge Bruit (poids<=2, >48h) effectuée : " + softDeleted + " lignes supprimées.");
-
+            // Filet de sécurité — toute valeur de poids hors des plages gérées explicitement
+            // ci-dessus (0, négatif, ou >5 par erreur de saisie/calcul) suit la même règle que
+            // le bruit (48h), pour garantir qu'aucune ligne ne puisse s'accumuler indéfiniment
+            // si driver_weight contient un jour une valeur inattendue.
+            int outOfRangeDeleted = db.delete(TABLE_EVENTS,
+                "unix_timestamp < ? AND driver_weight NOT IN (1,2,3,4,5) AND event_type != 'CALENDAR-RESULT'",
+                new String[]{String.valueOf(fortyEightHoursAgo)});
+            if (outOfRangeDeleted > 0) {
+                Log.w("EventDatabase", "Purge filet de sécurité (poids hors plage 1-5, >48h) : " + outOfRangeDeleted + " lignes supprimées.");
+            }
             // Palier 2 — Rang secondaire (poids 3-4) : 8 jours. Couvre un cycle Weekly complet
             // (ex: événement du lundi encore disponible pour le rapport du vendredi suivant).
             long eightDaysAgo = currentUnixTime - (8L * 24 * 60 * 60);
