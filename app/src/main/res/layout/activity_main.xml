@@ -190,9 +190,29 @@
            android:textAllCaps="false"
            android:backgroundTint="#2d2417"
            android:textColor="#E5E7EB" 
+           android:layout_marginBottom="8dp"/>
+
+        <Button
+           android:id="@+id/startDailySchedulerBtn"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="▶️ Démarrer Scheduler Daily"
+           android:textAllCaps="false"
+           android:backgroundTint="#2d2417"
+           android:textColor="#E5E7EB" 
+           android:layout_marginBottom="8dp"/>
+
+        <Button
+           android:id="@+id/startMonthlySchedulerBtn"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="▶️ Démarrer Scheduler Monthly+Weekly"
+           android:textAllCaps="false"
+           android:backgroundTint="#2d2417"
+           android:textColor="#E5E7EB" 
            android:layout_marginBottom="20dp"/>
 
-        <TextView 
+        <TextView
             android:layout_width="match_parent" 
             android:layout_height="wrap_content"
             android:text="📋 Journaux de bord" 
