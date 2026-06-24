@@ -2531,12 +2531,12 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
            upperText.contains("GÉO")          ||
            upperText.contains("GEO");
     }
-    private void startDailyBriefScheduler() {
+    public void startDailyBriefScheduler() {
     TimeZone tz = TimeZone.getTimeZone("Indian/Antananarivo"); // ✅ cohérent partout
     // 🛡️ CORRECTIF DAILY REPORT : les horaires {7,8,9,12,13,16,17} ne correspondaient
     // pas aux horaires prévus pour le bot ({7,12,15,19,22} heure Madagascar), ce qui
     // empêchait l'envoi du rapport aux moments attendus.
-    int[] targetHours = {7, 12, 15, 19, 22};
+    int[] targetHours = {7, 12};
     for (int hour : targetHours) {
         scheduleDailyBriefAt(hour, tz);
     }
@@ -2830,7 +2830,7 @@ messages.put(new JSONObject().put("role", "user").put("content",
        return false ; 
     }
 
-    private void startMonthlyReportScheduler() {
+    public void startMonthlyReportScheduler() {
     // ── Rapport MENSUEL — dernier jour du mois à 23h00 (Mada) ──
     Calendar nextMonthly = Calendar.getInstance(
         TimeZone.getTimeZone("Indian/Antananarivo"));
