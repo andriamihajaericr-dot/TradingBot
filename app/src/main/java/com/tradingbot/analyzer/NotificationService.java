@@ -1371,7 +1371,17 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     }
                 } else {
                     Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
-                    db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
+                    // 🛡️ CORRECTIF : un 429 (rate limit) ou 5xx (erreur serveur passagère)
+                    // est transitoire — marquer "synced" l'excluait définitivement de tout
+                    // retraitement (getUnsyncedEvents), et figeait ce code d'erreur brut comme
+                    // "impact" affiché à chaque rappel d'inertie macro ultérieur sur ce driver.
+                    // On laisse sync_status à "pending" pour ces cas afin qu'un prochain cycle
+                    // de synchronisation retente l'analyse normalement.
+                    if (status == 429 || status >= 500) {
+                        Log.w(TAG, "[GROQ] Statut " + status + " transitoire — événement laissé en attente pour retraitement.");
+                    } else {
+                        db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
