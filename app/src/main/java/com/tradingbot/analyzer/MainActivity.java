@@ -206,6 +206,48 @@ public class MainActivity extends AppCompatActivity {
             }).start();
         });
 
+        // 🛡️ Démarrage manuel du scheduler Daily ({7,12,15,19,22}h Mada). Sans danger
+        // de double-déclenchement même cliqué plusieurs fois : scheduleDailyBriefAt()
+        // vérifie systématiquement PREF_LAST_DAILY_REPORT avant tout envoi.
+        startDailySchedulerBtn.setOnClickListener(v -> {
+            addLog("📅 [MANUEL] Démarrage du scheduler Daily...");
+            new Thread(() -> {
+                try {
+                    NotificationService svc = NotificationService.getInstance();
+                    if (svc == null) {
+                        runOnUiThread(() -> addLog("❌ [MANUEL] Service indisponible — active d'abord les notifications."));
+                        return;
+                    }
+                    svc.startDailyBriefScheduler();
+                    runOnUiThread(() -> addLog("✅ [MANUEL] Scheduler Daily démarré (horaires 7h/12h/15h/19h/22h Mada)."));
+                } catch (Exception e) {
+                    Log.e(TAG, "Échec démarrage manuel du scheduler Daily", e);
+                    runOnUiThread(() -> addLog("❌ [MANUEL] Erreur démarrage scheduler Daily : " + e.getMessage()));
+                }
+            }).start();
+        });
+
+        // 🛡️ Démarrage manuel du scheduler Monthly — démarre AUSSI Weekly et les deux
+        // rattrapages immédiats (Weekly/Monthly manqués), conformément à ce que fait
+        // startMonthlyReportScheduler() en interne.
+        startMonthlySchedulerBtn.setOnClickListener(v -> {
+            addLog("📊 [MANUEL] Démarrage du scheduler Monthly (+ Weekly + rattrapages)...");
+            new Thread(() -> {
+                try {
+                    NotificationService svc = NotificationService.getInstance();
+                    if (svc == null) {
+                        runOnUiThread(() -> addLog("❌ [MANUEL] Service indisponible — active d'abord les notifications."));
+                        return;
+                    }
+                    svc.startMonthlyReportScheduler();
+                    runOnUiThread(() -> addLog("✅ [MANUEL] Scheduler Monthly démarré (+ Weekly + rattrapages déclenchés si manqués)."));
+                } catch (Exception e) {
+                    Log.e(TAG, "Échec démarrage manuel du scheduler Monthly", e);
+                    runOnUiThread(() -> addLog("❌ [MANUEL] Erreur démarrage scheduler Monthly : " + e.getMessage()));
+                }
+            }).start();
+        });
+
         botSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
             if (isChecked && !isPermissionGranted()) {
                 Toast.makeText(this, "Active d'abord la permission notifications !", Toast.LENGTH_LONG).show();
