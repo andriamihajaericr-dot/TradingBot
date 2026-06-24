@@ -46,6 +46,36 @@ public class MarketDataFetcher {
     private static final long SUBLOT_DELAY_MS = 800; // 1,5s entre chaque sous‑lot
     private static final int CREDITS_PER_SYMBOL_ESTIMATE = 2; // observé dans les logs (forex/commodities)
     private static final int MAX_CREDITS_PER_MINUTE = 8; // limite du plan Twelve Data actuel
+
+    // 🛡️ CORRECTIF 429 RÉSIDUEL : tryAcquireBatchSlot() garantit 65s entre APPELS,
+    // mais Twelve Data compte les crédits par MINUTE CALENDAIRE (ex: 20:15:00-20:15:59),
+    // pas par fenêtre glissante. Deux appels distincts (ex: deux chocs macro traités
+    // en parallèle) peuvent chacun passer le cooldown de 65s tout en tombant dans la
+    // même minute calendaire et cumuler plus que MAX_CREDITS_PER_MINUTE. Ce compteur
+    // global, remis à zéro à chaque nouvelle minute, suit la consommation RÉELLE et
+    // partagée entre tous les appels, peu importe leur origine.
+    private static final java.util.concurrent.atomic.AtomicLong currentCreditMinuteWindow =
+        new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis() / 60000L);
+    private static final java.util.concurrent.atomic.AtomicInteger creditsUsedThisMinute =
+        new java.util.concurrent.atomic.AtomicInteger(0);
+
+    // Réserve atomiquement le coût estimé d'un sous-lot. Si la minute calendaire a changé
+    // depuis le dernier appel, le compteur est remis à zéro avant réservation. Retourne
+    // false si la réservation dépasserait le quota — dans ce cas, AUCUN crédit n'est
+    // consommé et l'appelant doit attendre la minute suivante avant de réessayer.
+    private static synchronized boolean tryReserveCredits(int estimatedCost) {
+        long nowMinute = System.currentTimeMillis() / 60000L;
+        if (nowMinute != currentCreditMinuteWindow.get()) {
+            currentCreditMinuteWindow.set(nowMinute);
+            creditsUsedThisMinute.set(0);
+        }
+        int current = creditsUsedThisMinute.get();
+        if (current + estimatedCost > MAX_CREDITS_PER_MINUTE) {
+            return false;
+        }
+        creditsUsedThisMinute.addAndGet(estimatedCost);
+        return true;
+    }
     private static final int TIMEOUT_MS = 7000; 
     // Initialisé à "maintenant - 65s" pour que le premier appel parte sans attente
     // mais les appels simultanés au démarrage soient naturellement espacés
