@@ -2566,15 +2566,24 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             // lancement du service), generateAndSendDailyBrief() échouait silencieusement
             // (ou envoyait juste un message de repli) mais le créneau était quand même
             // marqué "consommé" pour la journée — plus aucune tentative ne suivait.
-            boolean sent = generateAndSendDailyBrief();
-            if (sent) {
-                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                    .edit()
-                    .putString(prefKey, today)
-                    .apply();
-            } else {
-                Log.w(TAG, "[DAILY] Rattrapage " + targetHour + "h non confirmé — nouvelle tentative au prochain cycle");
-            }
+            //
+            // 🛡️ CORRECTIF NetworkOnMainThreadException : cet appel était synchrone,
+            // directement dans le corps de scheduleDailyBriefAt(), donc exécuté sur le
+            // thread appelant (onCreate() = thread principal Android lors du démarrage
+            // du service). generateAndSendDailyBrief() fait du réseau bloquant (HttpURLConnection
+            // vers Groq) — interdit sur le thread principal depuis Android 3.0+. On le
+            // déporte maintenant sur le pool de threads du scheduler.
+            scheduler.execute(() -> {
+                boolean sent = generateAndSendDailyBrief();
+                if (sent) {
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                        .edit()
+                        .putString(prefKey, today)
+                        .apply();
+                } else {
+                    Log.w(TAG, "[DAILY] Rattrapage " + targetHour + "h non confirmé — nouvelle tentative au prochain cycle");
+                }
+            });
         }
         nextRun.add(Calendar.DAY_OF_YEAR, 1);
     }
