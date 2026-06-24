@@ -102,6 +102,10 @@ public class MainActivity extends AppCompatActivity {
         Button dailyReportBtn = findViewById(R.id.dailyReportBtn);
         Button weeklyReportBtn = findViewById(R.id.weeklyReportBtn);
         Button monthlyReportBtn = findViewById(R.id.monthlyReportBtn);
+        // 🛡️ Démarrage manuel des schedulers (Daily désactivé dans onCreate ; Monthly
+        // désactivé dans onCreate, sachant qu'il démarre aussi Weekly + les rattrapages).
+        Button startDailySchedulerBtn = findViewById(R.id.startDailySchedulerBtn);
+        Button startMonthlySchedulerBtn = findViewById(R.id.startMonthlySchedulerBtn);
 
         loadSavedKeys();
         updateStatus();
