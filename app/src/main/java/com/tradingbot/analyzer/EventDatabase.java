@@ -459,34 +459,48 @@ String[] whereArgs = new String[]{
         SQLiteDatabase db = this.getWritableDatabase();
         db.beginTransaction();
         try {
-            long fortyEightHoursAgo = currentUnixTime - (2 * 24 * 60 * 60);
-            // 🛡️ CORRECTIF CALENDRIER : les événements CALENDAR-RESULT (lundi, mardi...)
-            // étaient purgés après seulement 48h comme du simple bruit, alors que le
-            // rapport calendrier hebdomadaire doit pouvoir afficher toute la semaine en
-            // cours (jusqu'à 7 jours). On les exclut explicitement de cette purge rapide
-            // — ils restent soumis à une rétention plus longue, gérée séparément ci-dessous.
-            int softDeleted = db.delete(TABLE_EVENTS,
-                "unix_timestamp < ? AND driver_weight < 5 AND event_type != 'CALENDAR-RESULT'",
-                new String[]{String.valueOf(fortyEightHoursAgo)});
-            Log.d("EventDatabase", "Purge Flux/Bruit effectuée : " + softDeleted + " lignes supprimées.");
+            // 🛡️ RÉTENTION À 4 PALIERS — alignée sur le cycle de vie réel de chaque rapport
+            // (Daily/Weekly/Monthly), au lieu d'une règle binaire 48h/45j qui faisait perdre
+            // les événements de RANG SECONDAIRE (poids 3-4 : BCE/BoJ/RBA/BoC, énergie EIA/OPEC,
+            // Big Tech Earnings) avant même que le Weekly du vendredi ait eu l'occasion de les
+            // résumer.
 
-            // 🛡️ Rétention dédiée au calendrier économique : 9 jours, pour couvrir une
-            // semaine complète (lundi à dimanche) avec une marge de sécurité, même si le
-            // rapport est consulté en début de semaine suivante.
+            // Palier 1 — Bruit véritable (poids 1-2 : rumeurs, doublons, bruit système) : 48h.
+            // Jamais cité individuellement dans Weekly/Monthly, donc aucune perte réelle.
+            long fortyEightHoursAgo = currentUnixTime - (2 * 24 * 60 * 60);
+            int softDeleted = db.delete(TABLE_EVENTS,
+                "unix_timestamp < ? AND driver_weight <= 2 AND event_type != 'CALENDAR-RESULT'",
+                new String[]{String.valueOf(fortyEightHoursAgo)});
+            Log.d("EventDatabase", "Purge Bruit (poids<=2, >48h) effectuée : " + softDeleted + " lignes supprimées.");
+
+            // Palier 2 — Rang secondaire (poids 3-4) : 8 jours. Couvre un cycle Weekly complet
+            // (ex: événement du lundi encore disponible pour le rapport du vendredi suivant).
+            long eightDaysAgo = currentUnixTime - (8L * 24 * 60 * 60);
+            int midDeleted = db.delete(TABLE_EVENTS,
+                "unix_timestamp < ? AND driver_weight IN (3, 4) AND event_type != 'CALENDAR-RESULT'",
+                new String[]{String.valueOf(eightDaysAgo)});
+            Log.d("EventDatabase", "Purge Rang secondaire (poids 3-4, >8j) effectuée : " + midDeleted + " lignes supprimées.");
+
+            // Palier 3 — Rang suprême (poids 5 : CPI, NFP, FOMC) : 45 jours, suffisant pour Monthly.
+            long fortyFiveDaysAgo = currentUnixTime - (45L * 24 * 60 * 60);
+            int hardDeleted = db.delete(TABLE_EVENTS,
+                "unix_timestamp < ? AND driver_weight = 5",
+                new String[]{String.valueOf(fortyFiveDaysAgo)});
+            Log.d("EventDatabase", "Purge Piliers ancrés (poids=5, >45j) effectuée : " + hardDeleted + " lignes nettoyées.");
+
+            // Palier 4 — Calendrier économique (CALENDAR-RESULT) : 9 jours, peu importe le poids
+            // individuel de l'événement — couvre toute la semaine en cours + marge de sécurité.
             long nineDaysAgo = currentUnixTime - (9L * 24 * 60 * 60);
             int calendarPurged = db.delete(TABLE_EVENTS,
                 "unix_timestamp < ? AND event_type = 'CALENDAR-RESULT'",
                 new String[]{String.valueOf(nineDaysAgo)});
             Log.d("EventDatabase", "Purge Calendrier (>9j) effectuée : " + calendarPurged + " lignes supprimées.");
-            long fortyFiveDaysAgo = currentUnixTime - (45L * 24 * 60 * 60);
-            int hardDeleted = db.delete(TABLE_EVENTS, "unix_timestamp < ? AND driver_weight = 5", new String[]{String.valueOf(fortyFiveDaysAgo)});
-            Log.d("EventDatabase", "Purge Piliers ancres effectuée : " + hardDeleted + " lignes nettoyées.");
 
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();
         }
-    }   
+    }
     
     public boolean isDriverActiveRecently(String eventType, long currentUnixTime) {
         if (eventType == null || eventType.isEmpty()) return false;
