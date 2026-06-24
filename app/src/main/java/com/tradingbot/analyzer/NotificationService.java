@@ -2070,8 +2070,8 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
     }).start();
     
         createNotificationChannel();
-        startDailyBriefScheduler();
-        startMonthlyReportScheduler();
+        //startDailyBriefScheduler();
+        //startMonthlyReportScheduler();
         registerNetworkCallback();
         
         // Planification unifiée : purge SQLite + nettoyage RAM + préchargement toutes les 24h à Minuit (Madagascar)
