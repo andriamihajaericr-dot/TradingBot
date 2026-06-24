@@ -630,6 +630,24 @@ public static synchronized boolean tryAcquireBatchSlot() {
             }
             String urlStr = "https://api.twelvedata.com/quote?symbol=" + sbSymbols.toString() + queryParams;
             try {
+                // 🛡️ CORRECTIF 429 RÉSIDUEL : réservation atomique et globale du coût estimé
+                // de CE sous-lot précis, partagée entre TOUS les appels concurrents (peu importe
+                // leur origine — choc macro, daily report, bouton test...). Si le quota de la
+                // minute calendaire en cours est déjà consommé par un autre appel parallèle,
+                // on attend le début de la minute suivante avant de faire la requête réseau.
+                int thisChunkCost = chunk.size() * CREDITS_PER_SYMBOL_ESTIMATE;
+                while (!tryReserveCredits(thisChunkCost)) {
+                    long now = System.currentTimeMillis();
+                    long msUntilNextMinute = 60000L - (now % 60000L) + 200;
+                    String waitMsg = "⏳ [BATCH] Quota minute partagé épuisé par un autre appel — attente de "
+                            + msUntilNextMinute + "ms.";
+                    Log.d(TAG, waitMsg);
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog(waitMsg);
+                    }
+                    Thread.sleep(msUntilNextMinute);
+                }
+
                 String responseBody = executeHttpRequestWithRetry(urlStr);
                 JSONObject json = new JSONObject(responseBody);
 
