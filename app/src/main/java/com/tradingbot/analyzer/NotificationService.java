@@ -2755,9 +2755,11 @@ try {
             MarketDataFetcher.MarketData d = snap.get(asset);
             if (d != null && d.price > 0) {
                 String sign = d.changePercent >= 0 ? "+" : "";
+                String emojiVariation = (d.changePercent > 0) ? "🟢"
+                    : (d.changePercent < 0) ? "🔴" : "⚪";
                 sbM.append(asset).append(" => ")
-                   .append(String.format(Locale.US, "%.4f (%s%.2f%%)",
-                       d.price, sign, d.changePercent))
+                   .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
+                       d.price, sign, d.changePercent, emojiVariation))
                    .append("\n");
                 hasData = true;
             }
