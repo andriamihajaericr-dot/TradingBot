@@ -512,7 +512,15 @@ String[] whereArgs = new String[]{
                 sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
                 String timeStr = sdf.format(new java.util.Date(ts * 1000));
                 String shortContent = content.length() > 200 ? content.substring(0, 200) + "…" : content;
-                return "🕒 " + timeStr + "\n📌 " + title + "\n📝 " + shortContent + "\n⚡ Impact: " + impact;
+                // 🛡️ FILET DE SÉCURITÉ : un événement déjà en base avant le correctif ci-dessus
+                // (ou tout autre code FAILED_*/PROCESSED_OK technique) ne doit jamais s'afficher
+                // tel quel dans un rappel d'inertie — remplacé par un libellé neutre et lisible.
+                String impactAffiche = (impact == null || impact.startsWith("FAILED_") 
+                        || impact.equals("PROCESSED_OK") || impact.equals("LOW_CONVICTION_FILTERED")
+                        || impact.equals("FILTERED_ALL_NEUTRAL"))
+                        ? "Analyse d'impact non disponible pour cet événement."
+                        : impact;
+                return "🕒 " + timeStr + "\n📌 " + title + "\n📝 " + shortContent + "\n⚡ Impact: " + impactAffiche;
             }
         } catch (Exception e) {
             Log.e(TAG, "Erreur getLastEventByType", e);
