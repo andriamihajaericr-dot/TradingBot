@@ -1206,14 +1206,17 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                         if (validationResult != null && !validationResult.isConfirmed) {
                         // Cas particulier : inertie macro (driver déjà actif) → on envoie un rappel Telegram
                         if (validationResult.isInertiaBlock) {
-                            // 🛡️ CORRECTIF : utilise le detectedType réel d'EventValidator (celui qui a
-                            // déclenché isInertiaBlock), pas eventTypeStr recalculé séparément ici — les
-                            // deux pouvaient diverger et contourner systématiquement le cooldown.
-                            String inertiaKeySource = (validationResult.detectedTypeForInertia != null
-                                    && !validationResult.detectedTypeForInertia.isEmpty())
-                                    ? validationResult.detectedTypeForInertia
-                                    : eventTypeStr; // filet de sécurité si jamais vide
-                            String inertiaPrefKey = "inertia_reminder_" + inertiaKeySource;
+                            // Utiliser le type de base de l'événement détecté par EconomicEventDetector,
+// qui est plus stable que celui de EventValidator.
+String inertiaKeySource;
+if (eventTypeStr != null && !eventTypeStr.isEmpty()) {
+    inertiaKeySource = eventTypeStr;
+} else if (validationResult.detectedTypeForInertia != null && !validationResult.detectedTypeForInertia.isEmpty()) {
+    inertiaKeySource = validationResult.detectedTypeForInertia;
+} else {
+    inertiaKeySource = "UNKNOWN";
+}
+                              String inertiaPrefKey = "inertia_reminder_" + inertiaKeySource;
                             long nowMs = System.currentTimeMillis();
 
                             // 🛡️ Étape 1 : verrou atomique en mémoire — bloque les rafales
