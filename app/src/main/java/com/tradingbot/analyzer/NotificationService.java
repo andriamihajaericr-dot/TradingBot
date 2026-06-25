@@ -1372,12 +1372,11 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                         }
                         lastGeoTime = currentTime;
                     }
-    // 🔟 Exécution finale de l'analyse cognitive LLM 
-    // Récupération du snapshot marché juste avant l'appel (variable Map, pas de conflit)
-    // 🔟 Exécution finale de l'analyse cognitive LLM
-    // Réutilise batchSnapshot déjà récupéré ligne 1103 — 0 appel réseau supplémentaire
-    processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, isSupremeRank, batchSnapshot);
-            } catch (Exception e) {
+                    // 🔟 Exécution finale de l'analyse cognitive LLM
+                    // Réutilise batchSnapshot déjà récupéré ligne 1103 — 0 appel réseau supplémentaire
+                    boolean forceSend = isSupremeRank || (validationResult != null && validationResult.isCalendarIntercept);
+                    processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, forceSend, batchSnapshot);
+                    } catch (Exception e) {
                         Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
                     }
                 }
