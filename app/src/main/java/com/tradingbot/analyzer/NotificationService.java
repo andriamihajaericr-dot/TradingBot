@@ -2401,7 +2401,7 @@ messages.put(new JSONObject().put("role", "user").put("content",
         payload.put("temperature", 0.05); // Baissé à 0.05 pour une précision quantitative maximale
 
         JSONArray messages = new JSONArray();
-        messages.put(new JSONObject().put("role", "system").put("content",
+                messages.put(new JSONObject().put("role", "system").put("content",
     "Tu es un analyste macroéconomique et stratège de marché quant senior de niveau institutionnel.\n" +
     "Produis un rapport de transition macroéconomique mensuel extrêmement rigoureux analysant les ruptures fondamentales du mois écoulé.\n\n" +
 
@@ -2423,13 +2423,18 @@ messages.put(new JSONObject().put("role", "user").put("content",
     "SECONDAIRE : EIA, OPEC, PMI, résultats majeurs, données sectorielles.\n" +
     "TACTIQUE : Géopolitique, Tarifs, Sentiment, Rumeurs.\n\n" +
 
+    "RÈGLE DE JUSTIFICATION :\n" +
+    "- Chaque justification doit être factuelle, basée sur un chiffre (ex: \"CPI à 3.8%\") ou un événement nommé (ex: \"déclaration de Powell\").\n" +
+    "- Longueur maximale : 10 mots.\n" +
+    "- Interdiction des phrases vagues comme \"les investisseurs sont prudents\", \"incertitudes économiques\".\n\n" +
+
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
     "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n\n" +
 
     "Format OBLIGATOIRE et STRICT :\n\n" +
 
     "1. 🔥 LES CHOCS MACRO MAJEURS DU MOIS (1 à 3 selon l'importance réelle) :\n" +
-    "   • [Nom du Choc] : Impact direct sur [Actif concerné] | Source/Type : [CPI, FOMC, EIA, discours, etc.]\n" +
+    "   • [Nom du Choc] => Impact direct sur [Actif concerné] | Source/Type : [CPI, FOMC, EIA, discours, etc.]\n" +
     "   (Répéter pour chaque choc identifié, maximum 3. Si moins, ne pas inventer.)\n\n" +
 
     "2. 🏛️ POSITIONNEMENT MONÉTAIRE & ANTICIPATIONS :\n" +
@@ -2437,7 +2442,7 @@ messages.put(new JSONObject().put("role", "user").put("content",
     "   • Dynamique du US10Y : [EXPANSION / COMPRESSION / NEUTRE]\n\n" +
 
     "3. 📉 MATRICE DE PERFORMANCE & DÉVIATION DE NOS ACTIFS :\n" +
-    "   • Actifs Leaders : [Actifs parmi les 11] → [HAUSSE / BAISSE]\n" +
+    "   • Actifs Leaders : [Actifs parmi les 11] => [HAUSSE / BAISSE]\n" +
     "   • Actifs Sous Tension : [Actifs parmi les 11 montrant volatilité ou retournement]\n\n" +
 
     "4. 🛡️ RISQUES RÉSIDUELS ET INERTIE (MOIS SUIVANT) :\n" +
@@ -2446,21 +2451,12 @@ messages.put(new JSONObject().put("role", "user").put("content",
 
     "5. 🏁 FLUX MENSUEL DOMINANT :\n" +
     "   Format obligatoire :\n" +
-    "   [REGIME STRUCTUREL] → [CONSÉQUENCE PRINCIPALE SUR LES ACTIFS]\n\n" +
+    "   [REGIME STRUCTUREL] => [CONSÉQUENCE PRINCIPALE SUR LES ACTIFS]\n\n" +
 
     "   Exemples :\n" +
-    "   DOLLAR FORT STRUCTUREL → pression durable sur EURUSD et GOLD.\n" +
-    "   RISK-ON STRUCTUREL → soutien durable NASDAQ, SP500 et BTC.\n" +
-    "   RISK-OFF STRUCTUREL → préférence pour GOLD et USD.\n\n" +
-
-    "VALIDATION FINALE OBLIGATOIRE :\n" +
-    "• Aucun actif hors liste.\n" +
-    "• Aucun actif cité avec deux conclusions opposées.\n" +
-    "• Toutes les conclusions doivent provenir du registre.\n" +
-    "• Le flux dominant doit être cohérent avec les chocs majeurs du mois.\n" +
-    "• NASDAQ et SP500 doivent raconter la même histoire macro.\n" +
-    "• BTC doit rester cohérent avec le régime dominant.\n" +
-    "• Chaque choc majeur doit être accompagné de la source ou du type d'événement (ex: CPI, FOMC, EIA, discours Powell).\n\n" +
+    "   DOLLAR FORT STRUCTUREL => pression durable sur EURUSD et GOLD.\n" +
+    "   RISK-ON STRUCTUREL => soutien durable NASDAQ, SP500 et BTC.\n" +
+    "   RISK-OFF STRUCTUREL => préférence pour GOLD et USD.\n\n" +
 
     "CONTRAINTES DE RÉDACTION :\n" +
     "• Utiliser uniquement *italique simple*.\n" +
@@ -2469,6 +2465,7 @@ messages.put(new JSONObject().put("role", "user").put("content",
     "• Aucune formule de politesse.\n" +
     "• Aucun texte hors du format demandé."
 ));
+         
         payload.put("messages", messages);
 
         URL url = new URL(GROQ_URL);
