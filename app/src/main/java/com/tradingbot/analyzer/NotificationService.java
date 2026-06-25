@@ -53,8 +53,8 @@ public class NotificationService extends NotificationListenerService {
     // deux notifications — ce qui annulait le correctif anti-spam Inertie Macro.
     private static final String FOREGROUND_CHANNEL_ID = "trading_bot_service";
     private static final int FOREGROUND_NOTIFICATION_ID = 1001;
-    //private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
-    private static final String GROQ_MODEL = "llama-3.1-8b-instant";
+    private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
+    //private static final String GROQ_MODEL = "llama-3.1-8b-instant";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
     private static final String PREF_GROQ_KEY   = "groq_key";
@@ -2718,16 +2718,14 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser");
 
         // PROMPT SYSTEME STRUCTURÉ DU BRIEFING DAILY (S'exécute uniquement si dailyDrivers n'est pas vide)
-        String DAILY_SYSTEM_PROMPT = construireDailySystemPromptSelectif(dailyDrivers);
-        // Traitement de l'enveloppe de prompt (Filtres géopolitiques complexes de votre script)
-        // 1. Récupération de la mémoire d'inertie du marché (SharedPreferences)
-SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
-String lastDominantFlow = prefs.getString("last_daily_flow", "NEUTRE / PRUDENCE RECOMMANDÉE");
+                // Utilisation du prompt compact V3 pour le Daily Report
+        String baseSystemPrompt = DAILY_SYSTEM_PROMPT;
+        // Ajout de la directive de crise géopolitique si nécessaire
+        baseSystemPrompt = construirePromptQuotidienSystem(dailyDrivers, baseSystemPrompt);
 
-// Traitement de l'enveloppe de prompt
-String baseSystemPrompt = construirePromptQuotidienSystem(dailyDrivers, DAILY_SYSTEM_PROMPT);
-
-// Enrichissement avec contexte d'hier
+        // Récupération de la mémoire d'inertie du marché (SharedPreferences)
+        SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
+        String lastDominantFlow = prefs.getString("last_daily_flow", "NEUTRE / PRUDENCE RECOMMANDÉE");
 String systemPromptFinal = "CONTEXTE HIER (INERTIE DE MARCHÉ) : Le flux dominant de la veille était : " + lastDominantFlow + ".\n" +
     "Si les événements actuels ne contredisent pas ce flux de manière écrasante (>70% de conviction), conserve-le pour éviter les faux signaux.\n\n" +
     baseSystemPrompt + "\n\n" +
