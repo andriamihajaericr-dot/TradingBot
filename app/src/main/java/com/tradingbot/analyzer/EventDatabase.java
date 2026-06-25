@@ -385,7 +385,7 @@ String[] whereArgs = new String[]{
                 new String[]{"source", "title", "feed_content", "impact",
                              "event_type", "driver_weight", "target_assets", "unix_timestamp"},
                 selection, whereArgs, null, null,
-                "driver_weight DESC, unix_timestamp ASC"); // Suprêmes en premier
+                "driver_weight DESC, unix_timestamp ASC", "15"); // ← LIMIT 15 // Suprêmes en premier
 
         if (cursor != null && cursor.moveToFirst()) {
 
