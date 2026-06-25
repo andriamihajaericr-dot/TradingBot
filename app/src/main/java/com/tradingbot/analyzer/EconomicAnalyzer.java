@@ -602,28 +602,23 @@ public class EconomicAnalyzer {
     // On retire donc la virgule UNIQUEMENT quand elle sépare des milliers (suivie de 3 chiffres),
     // puis on traite toute virgule restante comme un séparateur décimal (cas FR éventuel).
     String textePrepare = texte.replaceAll("(\\d),(\\d{3})", "$1$2").replace(',', '.');
-
-    // ✅ COHÉRENCE 2 : Ordre du plus spécifique au plus générique avec tolérance Casse/Espace
     String[] actualPatterns = {
-        "(?i)\\bACTUAL[:=\\s]+\\s*([0-9.\\-]+)", // Gère "Actual: 31.2", "ACTUAL 31.2", "Actual=31.2"
-        // ⚠️ ACT/REAL exigent un séparateur ':' ou '=' STRICT (pas un simple espace) : "ACT 5" matchait
-        // n'importe quel mot finissant par "act" suivi d'un nombre (ex: "impact 5", "contact 911").
-        "(?i)\\bACT[:=]\\s*([0-9.\\-]+)",    // Gère "Act:31.2", "ACT=31.2" (PAS "Act 31.2" sans séparateur)
-        "(?i)\\bREAL[:=]\\s*([0-9.\\-]+)"    // Gère "Real:31.2" (PAS "Real 31.2" sans séparateur)
-    };
+    "(?i)\\bACTUAL[:=\\s]+\\s*([-+]?\\d*\\.?\\d+[kK%MB]?)", 
+    "(?i)\\bACT[:=]\\s*([-+]?\\d*\\.?\\d+[kK%MB]?)",
+    "(?i)\\bREAL[:=]\\s*([-+]?\\d*\\.?\\d+[kK%MB]?)"
+};
 
-    String[] forecastPatterns = {
-        "(?i)\\bFORECAST[:=\\s]+\\s*([0-9.\\-]+)", // Gère "Forecast 25.8", "FORECAST:25.8"
-        // ⚠️ Même correctif pour EXP/EST : trop courts pour tolérer un espace comme séparateur
-        "(?i)\\bEXP[:=]\\s*([0-9.\\-]+)",      // Gère "Exp:25.8" (PAS "Exp 25.8")
-        "(?i)\\bEST[:=]\\s*([0-9.\\-]+)",      // Gère "Est:25.8" (PAS "Est 25.8")
-        "(?i)\\bCONSENSUS[:=\\s]+\\s*([0-9.\\-]+)" // Gère "Consensus 25.8"
-    };
+String[] forecastPatterns = {
+    "(?i)\\bFORECAST[:=\\s]+\\s*([-+]?\\d*\\.?\\d+[kK%MB]?)",
+    "(?i)\\bEXP[:=]\\s*([-+]?\\d*\\.?\\d+[kK%MB]?)",
+    "(?i)\\bEST[:=]\\s*([-+]?\\d*\\.?\\d+[kK%MB]?)",
+    "(?i)\\bCONSENSUS[:=\\s]+\\s*([-+]?\\d*\\.?\\d+[kK%MB]?)"
+};
 
-    String[] priorPatterns = {
-        "(?i)\\bPRIOR[:=\\s]+\\s*([0-9.\\-]+)",   // Gère "Prior 26.5"
-        "(?i)\\bPREVIOUS[:=\\s]+\\s*([0-9.\\-]+)" // Gère "Previous 26.5" (Format FinancialJuice)
-    };
+String[] priorPatterns = {
+    "(?i)\\bPRIOR[:=\\s]+\\s*([-+]?\\d*\\.?\\d+[kK%MB]?)",
+    "(?i)\\bPREVIOUS[:=\\s]+\\s*([-+]?\\d*\\.?\\d+[kK%MB]?)"
+};
 
     // ✅ COHÉRENCE 3 : Extraction via votre méthode utilitaire
     for (String p : actualPatterns) {
