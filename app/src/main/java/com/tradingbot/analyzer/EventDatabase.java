@@ -351,7 +351,7 @@ public class EventDatabase extends SQLiteOpenHelper {
 
     public String getDailyMacroSummary(long currentUnixTime) {
     long twentyFourHoursAgo = currentUnixTime - (24 * 60 * 60);
-    long sevenDaysAgo       = currentUnixTime - (7L * 24 * 60 * 60);
+    long sevenDaysAgo       = currentUnixTime - (9L * 24 * 60 * 60);
 
     // Clause 1 : tous événements >= poids 2 des dernières 24h
     // Clause 2 : piliers macro suprêmes (poids 5) sur 7 jours — mémoire inter-sessions
