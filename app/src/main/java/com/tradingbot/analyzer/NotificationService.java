@@ -1221,7 +1221,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                             Long previousMemory = lastInertiaReminderSentMemory.putIfAbsent(inertiaPrefKey, nowMs);
                             if (previousMemory != null) {
                                 if ((nowMs - previousMemory) < INERTIA_REMINDER_COOLDOWN_MS) {
-                                    Log.d(TAG, "[RAPPEL] Driver " + eventTypeStr + " déjà rappelé (verrou mémoire), ignoré.");
+                                    Log.d(TAG, "[RAPPEL] Driver " + inertiaKeySource + " déjà rappelé (verrou mémoire), ignoré.");      
                                     return;
                                 }
                                 // Cooldown mémoire expiré : on met à jour la réservation
@@ -1234,7 +1234,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
                             long lastSentForType = inertiaPrefs.getLong(inertiaPrefKey, 0L);
                             if (lastSentForType != 0L && (nowMs - lastSentForType) < INERTIA_REMINDER_COOLDOWN_MS) {
-                                Log.d(TAG, "[RAPPEL] Driver " + eventTypeStr + " déjà rappelé récemment (préférences), ignoré.");
+                                Log.d(TAG, "[RAPPEL] Driver " + inertiaKeySource + " déjà rappelé récemment (préférences), ignoré.");
                                 return; // On arrête le traitement normal sans renvoyer Telegram
                             }
                             inertiaPrefs.edit().putLong(inertiaPrefKey, nowMs).apply();
