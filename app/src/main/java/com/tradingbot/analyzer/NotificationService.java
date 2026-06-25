@@ -955,6 +955,8 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 sourceName = "TradingEconomics";
             } else if (packageName.contains("forex.portal")) {
                 sourceName = "Myfxbook";
+            } else if (packageName.contains("bloomberg")) {
+                sourceName = "Bloomberg";
             } else if (packageName.contains("twitter") || packageName.contains("periscope")) {
                 sourceName = "X /Twitter";
             } else if (packageName.contains("chrome") || packageName.equals("com.android.chrome")) {
