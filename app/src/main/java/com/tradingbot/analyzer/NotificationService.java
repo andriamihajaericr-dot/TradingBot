@@ -53,7 +53,8 @@ public class NotificationService extends NotificationListenerService {
     // deux notifications — ce qui annulait le correctif anti-spam Inertie Macro.
     private static final String FOREGROUND_CHANNEL_ID = "trading_bot_service";
     private static final int FOREGROUND_NOTIFICATION_ID = 1001;
-    private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
+    //private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
+    private static final String GROQ_MODEL = "llama-3.1-8b-instant";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
     private static final String PREF_GROQ_KEY   = "groq_key";
