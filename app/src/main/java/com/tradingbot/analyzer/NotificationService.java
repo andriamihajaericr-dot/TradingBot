@@ -388,13 +388,13 @@ public void onListenerDisconnected() {
     "HAWKISH US : US10Y↑ USDCAD↑ USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ BTC↓ EURUSD↓ GBPUSD↓ AUDUSD↓ USOIL= | FLUX : DOLLAR FORT\n" +
     "DOVISH US : inverse | FLUX : DOLLAR FAIBLE\n" +
     "GÉO escalade : GOLD↑ USOIL↑ USDJPY↓ NASDAQ↓ SP500↓ BTC↓ EURUSD↓ GBPUSD↓ AUDUSD↓ US10Y↓ | FLUX : CRISE GÉOPOLITIQUE\n" +
-    "GÉO désescalade : GOLD↓ USOIL↓ NASDAQ↑ SP500↑ BTC↑ USDJPY↑ USDCAD↑ AUDUSD↑ (conviction≤45%) | FLUX : RISK-ON\n" +
+    "GÉO désescalade : GOLD↓ USOIL↓ NASDAQ↑ SP500↑ BTC↑ USDJPY↑ AUDUSD↑ (conviction≤45%) | USDCAD↑ SAUF si USOIL reste BULLISH par ailleurs (alors USDCAD=NEUTRE, le préciser) | FLUX : RISK-ON\n" +
     "EIA déficit : USOIL↑ USDCAD↓ | EIA surplus : USOIL↓ USDCAD↑\n" +
     "TARIFS escalade : NASDAQ↓ SP500↓ AUDUSD↓ USOIL↓ USDJPY↓ GOLD↑ BTC↓ | FLUX : RISK-OFF\n" +
     "CHINE forte : AUDUSD↑ USOIL↑ NASDAQ↑ SP500↑ EURUSD↑ BTC↑ USDCAD↓ | FLUX : RISK-ON\n" +
     "SENTIMENT faible : NASDAQ↓ SP500↓ GOLD↑ USOIL↓ BTC↓ | FLUX : RISK-OFF MODÉRÉ\n" +
-    "IPO majeure : NASDAQ↑ SP500↑ BTC↑ GOLD↓ USDJPY↓ EURUSD↑ AUDUSD↑ USDCAD↓ | FLUX : RISK-ON\n\n" +
-
+    "IPO majeure : NASDAQ↑ SP500↑ BTC↑ GOLD↓ USDJPY↓ EURUSD↑ AUDUSD↑ USDCAD↓ | FLUX : RISK-ON\n" +
+    "RÈGLE JUSTIFICATION : la matrice donne la DIRECTION, jamais le TEXTE. Pour chaque actif, déduis et écris le mécanisme causal exact (ex: taux/devise/refuge/corrélation) reliant le driver détecté à cet actif précis — jamais une formule générique répétée.\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "BANQUES CENTRALES ÉTRANGÈRES\n" +
     "══════════════════════════════════════════════════════\n" +
@@ -403,8 +403,7 @@ public void onListenerDisconnected() {
     "BoE dovish → GBPUSD↓ ; BoE hawkish → GBPUSD↑\n" +
     "RBA dovish → AUDUSD↓ ; RBA hawkish → AUDUSD↑\n" +
     "BoC dovish → USDCAD↑ USOIL↓ ; BoC hawkish → USDCAD↓ USOIL↑\n" +
-    "RÈGLE ABSOLUE : US10Y, NASDAQ, SP500, BTC = NEUTRE pour toute news étrangère (sauf choc global explicite).\n\n" +
-
+    "RÈGLE ABSOLUE : US10Y, NASDAQ, SP500, BTC, GOLD, USOIL = NEUTRE pour toute news étrangère (sauf choc global explicite ou driver énergie/géo simultané).\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "CONTRAINTES ABSOLUES\n" +
     "══════════════════════════════════════════════════════\n" +
