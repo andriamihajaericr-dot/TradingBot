@@ -2634,7 +2634,12 @@ public boolean generateAndSendWeeklyReport() {
     "Un événement tactique ne peut normalement pas annuler un événement suprême.\n" +
     "Exception : en cas de choc géopolitique majeur confirmé (guerre ouverte, attaque militaire directe, fermeture d'une route énergétique stratégique, mobilisation militaire massive ou crise systémique), le régime géopolitique devient temporairement dominant et peut supplanter un driver suprême jusqu'à normalisation du marché.\n" +
     "Si un événement géopolitique provoque un mouvement global de fuite vers les actifs refuges (GOLD, USD, JPY) et une baisse simultanée des actifs risqués (NASDAQ, SP500, BTC), alors le régime CRISE GÉOPOLITIQUE devient prioritaire.\n" +
-    "Flux dominant autorisé : CRISE GÉOPOLITIQUE → priorité sur tous les autres régimes (et supplante la règle 15).\n\n" +
+    "Flux dominant autorisé : CRISE GÉOPOLITIQUE => priorité sur tous les autres régimes (et supplante la règle 15).\n\n" +
+
+    "RÈGLE DE JUSTIFICATION :\n" +
+    "- Chaque justification doit être factuelle, basée sur un chiffre (ex: \"CPI à 3.8%\") ou un événement nommé (ex: \"déclaration de Powell\").\n" +
+    "- Longueur maximale : 10 mots.\n" +
+    "- Interdiction des phrases vagues comme \"les investisseurs sont prudents\", \"incertitudes économiques\".\n\n" +
 
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
     "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n\n" +
@@ -2643,33 +2648,33 @@ public boolean generateAndSendWeeklyReport() {
 
     "1. 🏆 ÉVÉNEMENTS CLÉS ET IMPACTS (1 à 3 événements retenus, classés par importance décroissante) :\n" +
     "   • [Nom de l'événement] | Statut: [Confirmé / Surprise] | Impact: [Majeur / Modéré] | Rang: [SUPRÊME / SECONDAIRE / TACTIQUE] | Source/Type: [CPI, FOMC, EIA, discours, etc.]\n" +
-    "     └ Synthèse: [Lien logique et concis avec l'actif touché]\n" +
-    "     └ Si SURPRISE: [Explication de l'écart par rapport au consensus]\n\n" +
+    "     └ Synthèse: [Lien logique et concis avec l'actif touché, ≤10 mots]\n" +
+    "     └ Si SURPRISE: [Explication de l'écart par rapport au consensus, ≤10 mots]\n\n" +
 
     "2. 📊 BILAN DIRECTIONNEL GLOBAL :\n" +
     "   ⚖️ RÉGIME : [RISK-ON / RISK-OFF / DOLLAR FORT / DOLLAR FAIBLE / YEN FORT / EURO FORT / CRISE GÉOPOLITIQUE / NEUTRE]\n" +
-    "   └ Moteur macro: [Explique l'orientation en mentionnant US10Y, FED, ou données macro américaines si DOLLAR FORT/FAIBLE ; ou l'événement géopolitique si CRISE]\n\n" +
+    "   └ Moteur macro: [Une phrase concise, ≤15 mots]\n\n" +
 
     "📊 NIVEAU DE CONFIANCE :\n" +
     "[FAIBLE / MODÉRÉ / ÉLEVÉ]\n" +
     "Méthode :\n" +
-    "• Driver SUPRÊME dominant → ÉLEVÉ\n" +
-    "• Driver SECONDAIRE dominant → MODÉRÉ\n" +
-    "• Driver TACTIQUE dominant → FAIBLE\n" +
-    "• CRISE GÉOPOLITIQUE confirmée → ÉLEVÉ\n" +
-    "• Drivers contradictoires → FAIBLE\n" +
-    "• Données insuffisantes → FAIBLE\n\n" +
+    "• Driver SUPRÊME dominant => ÉLEVÉ\n" +
+    "• Driver SECONDAIRE dominant => MODÉRÉ\n" +
+    "• Driver TACTIQUE dominant => FAIBLE\n" +
+    "• CRISE GÉOPOLITIQUE confirmée => ÉLEVÉ\n" +
+    "• Drivers contradictoires => FAIBLE\n" +
+    "• Données insuffisantes => FAIBLE\n\n" +
 
     "3. 🎯 IMPACTS DIRECTS SUR NOS ACTIFS SPÉCIFIQUES :\n" +
-    "   • 🇺🇸 INDICES (SP500, NASDAQ) : [HAUSSE / BAISSE / NEUTRE] → [Justification macro]\n" +
-    "   • 🪙 REFUGES & MATIÈRES (GOLD, USOIL) : [HAUSSE / BAISSE / NEUTRE] → [Justification macro]\n" +
+    "   • 🇺🇸 INDICES (SP500, NASDAQ) : [HAUSSE / BAISSE / NEUTRE] => [Justification macro, ≤10 mots]\n" +
+    "   • 🪙 REFUGES & MATIÈRES (GOLD, USOIL) : [HAUSSE / BAISSE / NEUTRE] => [Justification macro, ≤10 mots]\n" +
     "   • 💵 FOREX (OBLIGATOIRE : les 5 paires doivent apparaître explicitement) :\n" +
-    "     └ EURUSD : [HAUSSE / BAISSE / NEUTRE] → [Justification]\n" +
-    "     └ USDJPY : [HAUSSE / BAISSE / NEUTRE] → [Justification]\n" +
-    "     └ GBPUSD : [HAUSSE / BAISSE / NEUTRE] → [Justification]\n" +
-    "     └ AUDUSD : [HAUSSE / BAISSE / NEUTRE] → [Justification]\n" +
-    "     └ USDCAD : [HAUSSE / BAISSE / NEUTRE] → [Justification]\n" +
-    "   • ⚡ CRYPTO (BTC) : [HAUSSE / BAISSE / NEUTRE] → [Justification cohérente avec la règle BTC (priorité RISK-ON/OFF, puis DOLLAR)]\n\n" +
+    "     └ EURUSD : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n" +
+    "     └ USDJPY : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n" +
+    "     └ GBPUSD : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n" +
+    "     └ AUDUSD : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n" +
+    "     └ USDCAD : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n" +
+    "   • ⚡ CRYPTO (BTC) : [HAUSSE / BAISSE / NEUTRE] => [Justification cohérente avec la règle BTC, ≤10 mots]\n\n" +
 
     "4. 📅 AGENDA STRATÉGIQUE (Semaine Prochaine) :\n" +
     "   IMPORTANT : Utiliser UNIQUEMENT les événements futurs explicitement présents dans les données brutes fournies.\n" +
@@ -2679,29 +2684,13 @@ public boolean generateAndSendWeeklyReport() {
 
     "5. 🏁 FLUX HEBDO DOMINANT :\n" +
     "   Format obligatoire :\n" +
-    "   [REGIME STRUCTUREL] → [CONSÉQUENCE PRINCIPALE SUR LES ACTIFS]\n" +
+    "   [REGIME STRUCTUREL] => [CONSÉQUENCE PRINCIPALE SUR LES ACTIFS]\n" +
     "   Dérivé exclusivement de l'événement de rang le plus élevé, SAUF si la règle CRISE GÉOPOLITIQUE est activée (dans ce cas, utiliser CRISE GÉOPOLITIQUE).\n\n" +
     "   Exemples :\n" +
-    "   DOLLAR FORT → pression sur EURUSD et GOLD.\n" +
-    "   RISK-ON → soutien NASDAQ, SP500 et BTC.\n" +
-    "   RISK-OFF → préférence pour GOLD et USD.\n" +
-    "   CRISE GÉOPOLITIQUE → fuite vers GOLD, USD, JPY ; baisse des actifs risqués.\n\n" +
-
-    "VALIDATION FINALE OBLIGATOIRE :\n" +
-    "• Aucun actif hors liste.\n" +
-    "• Aucun actif cité avec deux conclusions opposées.\n" +
-    "• Toutes les conclusions doivent provenir du registre.\n" +
-    "• Le flux dominant doit être dérivé de l'événement de rang le plus élevé, sauf si CRISE GÉOPOLITIQUE activée.\n" +
-    "• NASDAQ et SP500 doivent raconter la même histoire macro.\n" +
-    "• BTC doit respecter les priorités de la règle BTC.\n" +
-    "• Chaque événement clé doit être accompagné de son rang (SUPRÊME/SECONDAIRE/TACTIQUE) et de sa source/type.\n" +
-    "• Les 5 paires Forex (EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD) doivent apparaître explicitement.\n" +
-    "• L'agenda stratégique doit provenir uniquement des données fournies.\n" +
-    "• Le régime hebdomadaire doit être cohérent avec le flux dominant final.\n" +
-    "• Le niveau de confiance doit être cohérent avec la méthode de calcul (SUPRÊME → ÉLEVÉ, etc.).\n" +
-    "• Si plusieurs drivers majeurs se contredisent, signaler explicitement la divergence et attribuer un régime NEUTRE avec confiance FAIBLE.\n" +
-    "• Si aucun SUPRÊME, indiquer : \"SEMAINE DOMINÉE PAR DES DRIVERS SECONDAIRES OU TACTIQUES.\"\n" +
-    "• En cas de crise géopolitique confirmée, le régime doit être CRISE GÉOPOLITIQUE (prioritaire sur tout).\n\n" +
+    "   DOLLAR FORT => pression sur EURUSD et GOLD.\n" +
+    "   RISK-ON => soutien NASDAQ, SP500 et BTC.\n" +
+    "   RISK-OFF => préférence pour GOLD et USD.\n" +
+    "   CRISE GÉOPOLITIQUE => fuite vers GOLD, USD, JPY ; baisse des actifs risqués.\n\n" +
 
     "CONTRAINTES DE RÉDACTION :\n" +
     "• Utiliser uniquement *italique simple*.\n" +
@@ -2710,22 +2699,6 @@ public boolean generateAndSendWeeklyReport() {
     "• Aucune formule de politesse.\n" +
     "• Aucun texte hors du format demandé."
 ));
-        messages.put(new JSONObject().put("role", "user").put("content",
-    "CONTEXTE SEMAINE PRÉCÉDENTE : " + lastWeeklyFlow + "\n\n" +
-    "─────────────────────────────\n" +
-    "ÉVÉNEMENTS ENREGISTRÉS DANS LA BASE DE DONNÉES :\n" + weeklyRegistry + "\n" +
-    "─────────────────────────────\n\n" +
-    "Génère le rapport macroéconomique hebdomadaire en respectant scrupuleusement la nomenclature, les 11 actifs spécifiques, " +
-    "et les règles suivantes :\n" +
-    "• Sélectionne uniquement les 3 événements les plus importants (après application de la hiérarchie SUPRÊME > SECONDAIRE > TACTIQUE).\n" +
-    "• Classe-les par importance décroissante.\n" +
-    "• Mentionne explicitement le rang de chaque événement (SUPRÊME/SECONDAIRE/TACTIQUE).\n" +
-    "• Les 5 paires Forex (EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD) doivent apparaître explicitement.\n" +
-    "• L'agenda stratégique doit provenir uniquement des données fournies.\n" +
-    "• Si aucun événement SUPRÊME, indique : \"SEMAINE DOMINÉE PAR DES DRIVERS SECONDAIRES OU TACTIQUES.\"\n" +
-    "• Si le régime est DOLLAR FORT ou FAIBLE, justifie avec US10Y, FED ou données macro américaines.\n" +
-    "• Si plusieurs drivers se contredisent, attribue un régime NEUTRE avec un niveau de confiance FAIBLE.\n\n" +
-    "Génère le rapport en t'appuyant exclusivement sur les événements listés ci-dessus."));
         payload.put("messages", messages);
 
         URL url = new URL(GROQ_URL);
