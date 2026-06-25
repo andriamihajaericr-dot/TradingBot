@@ -609,11 +609,20 @@ String[] whereArgs = new String[]{
                 // 🛡️ FILET DE SÉCURITÉ : un événement déjà en base avant le correctif ci-dessus
                 // (ou tout autre code FAILED_*/PROCESSED_OK technique) ne doit jamais s'afficher
                 // tel quel dans un rappel d'inertie — remplacé par un libellé neutre et lisible.
-                String impactAffiche = (impact == null || impact.startsWith("FAILED_") 
-                        || impact.equals("PROCESSED_OK") || impact.equals("LOW_CONVICTION_FILTERED")
-                        || impact.equals("FILTERED_ALL_NEUTRAL"))
-                        ? "Analyse d'impact non disponible pour cet événement."
-                        : impact;
+                String impactAffiche;
+if (impact == null) {
+    impactAffiche = "Impact non renseigné.";
+} else if (impact.startsWith("FAILED_")) {
+    impactAffiche = "Échec de l'analyse (" + impact + ")";
+} else if (impact.equals("PROCESSED_OK")) {
+    impactAffiche = "Analyse effectuée – OK (impact non détaillé)";
+} else if (impact.equals("LOW_CONVICTION_FILTERED")) {
+    impactAffiche = "Filtré – conviction trop faible";
+} else if (impact.equals("FILTERED_ALL_NEUTRAL")) {
+    impactAffiche = "Filtré – tous les actifs neutres";
+} else {
+    impactAffiche = impact;
+}
                 return "🕒 " + timeStr + "\n📌 " + title + "\n📝 " + shortContent + "\n⚡ Impact: " + impactAffiche;
             }
         } catch (Exception e) {
