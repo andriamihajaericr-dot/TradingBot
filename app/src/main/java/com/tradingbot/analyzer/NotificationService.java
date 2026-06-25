@@ -2881,12 +2881,21 @@ public boolean generateAndSendWeeklyReport() {
     "• Aucun texte hors du format demandé."
 ));
         messages.put(new JSONObject().put("role", "user").put("content",
-            "CONTEXTE SEMAINE PRÉCÉDENTE : " + lastWeeklyFlow + "\n\n" +
-            "─────────────────────────────\n" +
-            "ÉVÉNEMENTS ENREGISTRÉS DANS LA BASE DE DONNÉES :\n" + weeklyRegistry + "\n" +
-            "─────────────────────────────\n\n" +
-            "Génère le rapport macroéconomique professionnel en respectant scrupuleusement la nomenclature et la liste de nos actifs."));
-
+    "CONTEXTE SEMAINE PRÉCÉDENTE : " + lastWeeklyFlow + "\n\n" +
+    "─────────────────────────────\n" +
+    "ÉVÉNEMENTS ENREGISTRÉS DANS LA BASE DE DONNÉES :\n" + weeklyRegistry + "\n" +
+    "─────────────────────────────\n\n" +
+    "Génère le rapport macroéconomique hebdomadaire en respectant scrupuleusement la nomenclature, les 11 actifs spécifiques, " +
+    "et les règles suivantes :\n" +
+    "• Sélectionne uniquement les 3 événements les plus importants (après application de la hiérarchie SUPRÊME > SECONDAIRE > TACTIQUE).\n" +
+    "• Classe-les par importance décroissante.\n" +
+    "• Mentionne explicitement le rang de chaque événement (SUPRÊME/SECONDAIRE/TACTIQUE).\n" +
+    "• Les 5 paires Forex (EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD) doivent apparaître explicitement.\n" +
+    "• L'agenda stratégique doit provenir uniquement des données fournies.\n" +
+    "• Si aucun événement SUPRÊME, indique : \"SEMAINE DOMINÉE PAR DES DRIVERS SECONDAIRES OU TACTIQUES.\"\n" +
+    "• Si le régime est DOLLAR FORT ou FAIBLE, justifie avec US10Y, FED ou données macro américaines.\n" +
+    "• Si plusieurs drivers se contredisent, attribue un régime NEUTRE avec un niveau de confiance FAIBLE.\n\n" +
+    "Génère le rapport en t'appuyant exclusivement sur les événements listés ci-dessus."));
         payload.put("messages", messages);
 
         URL url = new URL(GROQ_URL);
