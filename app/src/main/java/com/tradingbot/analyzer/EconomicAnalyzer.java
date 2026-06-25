@@ -638,15 +638,17 @@ String[] priorPatterns = {
     }
     
     private static double chercherRegex(String texte, String expression) {
-        try {
-            Pattern pattern = Pattern.compile(expression, Pattern.CASE_INSENSITIVE);
-            Matcher matcher = pattern.matcher(texte);
-            if (matcher.find()) {
-                String numStr = matcher.group(1).replace("%", "");
-                return Double.parseDouble(numStr);
-            }
-        } catch (Exception e) { }
-        return Double.NaN;
+    try {
+        Pattern pattern = Pattern.compile(expression, Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(texte);
+        if (matcher.find()) {
+            // Supprime les suffixes (k, K, %, M, B) et les espaces éventuels
+            String numStr = matcher.group(1).replaceAll("[kK%MB]", "").trim();
+            if (numStr.isEmpty()) return Double.NaN;
+            return Double.parseDouble(numStr);
+        }
+    } catch (Exception e) { }
+    return Double.NaN;
     }
 
     /**
