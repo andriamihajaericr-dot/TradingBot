@@ -465,11 +465,11 @@ public void onListenerDisconnected() {
 "BoE HAWKISH=GBPUSD↑ ; BoE DOVISH=GBPUSD↓.\n" +
 "RBA HAWKISH=AUDUSD↑ ; RBA DOVISH=AUDUSD↓.\n" +
 "BoC HAWKISH=USDCAD↓ USOIL↑ ; BoC DOVISH=USDCAD↑ USOIL↓.\n" +
-"Actifs américains neutres sauf choc global explicite.\n" +
+"Actifs américains (US10Y,NASDAQ,SP500,BTC) ET GOLD,USOIL neutres sauf choc global explicite ou driver énergie/géo simultané.\n" +
 
 "GÉOPOLITIQUE :\n" +
 "Escalade réelle (frappe,missile,raid,embargo,Hormuz) = GOLD↑ USOIL↑ USDJPY↓ NASDAQ↓ SP500↓ BTC↓ EURUSD↓ GBPUSD↓ AUDUSD↓ US10Y↓.\n" +
-"Désescalade = inverse.\n" +
+"Désescalade = inverse, SAUF USDCAD : reste NEUTRE si USOIL conserve une tension haussière par ailleurs (le préciser).\n" +
 "Sans action concrète : conviction max 45%.\n" +
 "Tweets,menaces,déclarations,négociations,rumeurs ≠ choc géopolitique majeur.\n" +
 
@@ -514,6 +514,8 @@ public void onListenerDisconnected() {
 "8-Pas de doubles astérisques.\n" +
 
 "DIRECTIONS AUTORISÉES : BULLISH🟢 | BEARISH🔴 | NEUTRE | INCLINATION BULLISH MAIS NEUTRE | INCLINATION BEARISH MAIS NEUTRE.\n" +
+
+"RAISON : jamais générique. Déduis le mécanisme causal précis (taux/devise/refuge/corrélation) reliant le driver identifié à cet actif.\n" +
 
 "FORMAT STRICT :\n" +
 "🚨 [SOURCE]\n" +
