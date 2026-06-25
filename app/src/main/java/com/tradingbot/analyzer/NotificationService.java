@@ -518,6 +518,7 @@ public void onListenerDisconnected() {
 "RAISON : jamais générique. Déduis le mécanisme causal précis (taux/devise/refuge/corrélation) reliant le driver identifié à cet actif.\n" +
 
 "FORMAT STRICT :\n" +
+"📊 RAPPORT JOURNALIER – [Date/Heure Madagascar]\n" +
 "🚨 [SOURCE]\n" +
 "🕒 [Date/Heure Madagascar]\n" +
 "📊 CONVICTION : [JAUGE] XX%\n" +
