@@ -83,16 +83,45 @@ public class EventDatabase extends SQLiteOpenHelper {
     long sevenDaysAgo = currentUnixTime - (7L * 24 * 60 * 60);
     Cursor cursor = null;
     try {
+        // 🛡️ CORRECTIF : colonnes étendues (timestamp, title, target_assets, driver_weight)
+        // pour fournir à Groq exactement ce que WEEKLY_SYSTEM_PROMPT exige par événement
+        // (Rang SUPRÊME/SECONDAIRE/TACTIQUE, Source/Type, lien vers l'actif touché) —
+        // l'ancienne version ne donnait que "[type] source — contenu", sans date, sans
+        // rang explicite et sans actifs ciblés, obligeant Groq à deviner ces informations.
         cursor = db.query(TABLE_EVENTS,
-            new String[]{"feed_content", "impact", "event_type", "source"},
+            new String[]{"feed_content", "impact", "event_type", "source",
+                         "title", "target_assets", "driver_weight", "unix_timestamp"},
             "unix_timestamp >= ? AND driver_weight >= 2",
             new String[]{String.valueOf(sevenDaysAgo)},
-            null, null, "unix_timestamp ASC");
+            null, null, "driver_weight DESC, unix_timestamp ASC"); // Suprêmes en premier, comme Daily
         if (cursor != null && cursor.moveToFirst()) {
+            SimpleDateFormat sdf = new SimpleDateFormat("EEEE dd/MM HH:mm", Locale.FRANCE);
+            sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
             do {
-                sb.append("[").append(cursor.getString(2)).append("] ")
-                  .append(cursor.getString(3)).append(" — ")
-                  .append(cursor.getString(0)).append("\n");
+                String type    = cursor.getString(2);
+                String source  = cursor.getString(3);
+                String title   = cursor.getString(4);
+                String content = cursor.getString(0);
+                String impact  = cursor.getString(1);
+                String assets  = cursor.getString(5);
+                int weight     = cursor.getInt(6);
+                long ts        = cursor.getLong(7);
+
+                String rang = (weight == 5) ? "SUPRÊME" : (weight >= 3) ? "SECONDAIRE" : "TACTIQUE";
+                String jour = sdf.format(new java.util.Date(ts * 1000L));
+
+                sb.append("[").append(type).append(" | Rang: ").append(rang)
+                  .append(" | Poids: ").append(weight).append("/5] ")
+                  .append(jour).append(" — ").append(source);
+                if (title != null && !title.trim().isEmpty()) {
+                    sb.append(" — ").append(title);
+                }
+                sb.append("\n  Contenu: ").append(content != null ? content : "N/A");
+                sb.append("\n  Impact: ").append(impact != null ? impact : "NEUTRE");
+                if (assets != null && !assets.trim().isEmpty()) {
+                    sb.append("\n  Actifs ciblés: ").append(assets);
+                }
+                sb.append("\n\n");
             } while (cursor.moveToNext());
         }
     } catch (Exception e) {
@@ -101,7 +130,7 @@ public class EventDatabase extends SQLiteOpenHelper {
         if (cursor != null) cursor.close();
     }
     return sb.toString();
-    }
+ }
 
     /**
  * Cherche un événement correspondant dans la DB et tente d'en extraire la valeur réelle (Actual)
@@ -439,12 +468,44 @@ String[] whereArgs = new String[]{
 
         Cursor cursor = null;
         try {
-            cursor = db.query(TABLE_EVENTS, new String[]{"feed_content", "impact", "event_type", "unix_timestamp"},
-            "unix_timestamp >= ? AND (driver_weight >= 3 OR impact LIKE '%PIVOT%')",
-            new String[]{String.valueOf(thirtyDaysAgo)}, null, null, "unix_timestamp ASC");
+            // 🛡️ CORRECTIF : colonnes étendues (source, title, target_assets, driver_weight,
+            // timestamp) — l'ancienne version ne donnait que "(impact) contenu", sans date,
+            // source ni actifs, alors que MONTHLY_SYSTEM_PROMPT exige explicitement la
+            // Source/Type de chaque choc majeur et son impact direct sur un actif précis.
+            cursor = db.query(TABLE_EVENTS,
+                new String[]{"feed_content", "impact", "event_type", "unix_timestamp",
+                             "source", "title", "target_assets", "driver_weight"},
+                "unix_timestamp >= ? AND (driver_weight >= 3 OR impact LIKE '%PIVOT%')",
+                new String[]{String.valueOf(thirtyDaysAgo)}, null, null,
+                "driver_weight DESC, unix_timestamp ASC"); // Chocs majeurs en premier
             if (cursor != null && cursor.moveToFirst()) {
+                SimpleDateFormat sdf = new SimpleDateFormat("dd/MM", Locale.FRANCE);
+                sdf.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
                 do {
-                    sb.append("(").append(cursor.getString(1)).append(") ").append(cursor.getString(0)).append("\n");
+                    String content = cursor.getString(0);
+                    String impact  = cursor.getString(1);
+                    String type    = cursor.getString(2);
+                    long ts        = cursor.getLong(3);
+                    String source  = cursor.getString(4);
+                    String title   = cursor.getString(5);
+                    String assets  = cursor.getString(6);
+                    int weight     = cursor.getInt(7);
+
+                    String rang = (weight == 5) ? "SUPRÊME" : (weight >= 3) ? "SECONDAIRE" : "TACTIQUE";
+                    String jour = sdf.format(new java.util.Date(ts * 1000L));
+
+                    sb.append("[").append(jour).append(" | ").append(type)
+                      .append(" | Rang: ").append(rang).append("] ")
+                      .append(source != null ? source : "N/A");
+                    if (title != null && !title.trim().isEmpty()) {
+                        sb.append(" — ").append(title);
+                    }
+                    sb.append("\n  (").append(impact != null ? impact : "NEUTRE").append(") ")
+                      .append(content != null ? content : "N/A");
+                    if (assets != null && !assets.trim().isEmpty()) {
+                        sb.append("\n  Actifs ciblés: ").append(assets);
+                    }
+                    sb.append("\n\n");
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
@@ -461,55 +522,50 @@ String[] whereArgs = new String[]{
         try {
             // 🛡️ RÉTENTION À 4 PALIERS — alignée sur le cycle de vie réel de chaque rapport
             // (Daily/Weekly/Monthly), au lieu d'une règle binaire 48h/45j qui faisait perdre
-            // les événements de RANG SECONDAIRE (poids 3-4 : BCE/BoJ/RBA/BoC, énergie EIA/OPEC,
-            // Big Tech Earnings) avant même que le Weekly du vendredi ait eu l'occasion de les
-            // résumer.
+            // les événements de RANG SECONDAIRE (poids 3-4) avant même que le Weekly du
+            // vendredi ait eu l'occasion de les résumer.
 
-            // Palier 1 — Bruit véritable (poids 1-2 : rumeurs, doublons, bruit système) : 48h.
-            // Jamais cité individuellement dans Weekly/Monthly, donc aucune perte réelle.
+            // Palier 1 — Bruit véritable (poids 1-2) : 48h.
             long fortyEightHoursAgo = currentUnixTime - (2 * 24 * 60 * 60);
             int softDeleted = db.delete(TABLE_EVENTS,
                 "unix_timestamp < ? AND driver_weight <= 2 AND event_type != 'CALENDAR-RESULT'",
                 new String[]{String.valueOf(fortyEightHoursAgo)});
             Log.d("EventDatabase", "Purge Bruit (poids<=2, >48h) effectuée : " + softDeleted + " lignes supprimées.");
-            // Filet de sécurité — toute valeur de poids hors des plages gérées explicitement
-            // ci-dessus (0, négatif, ou >5 par erreur de saisie/calcul) suit la même règle que
-            // le bruit (48h), pour garantir qu'aucune ligne ne puisse s'accumuler indéfiniment
-            // si driver_weight contient un jour une valeur inattendue.
-            int outOfRangeDeleted = db.delete(TABLE_EVENTS,
-                "unix_timestamp < ? AND driver_weight NOT IN (1,2,3,4,5) AND event_type != 'CALENDAR-RESULT'",
-                new String[]{String.valueOf(fortyEightHoursAgo)});
-            if (outOfRangeDeleted > 0) {
-                Log.w("EventDatabase", "Purge filet de sécurité (poids hors plage 1-5, >48h) : " + outOfRangeDeleted + " lignes supprimées.");
-            }
-            // Palier 2 — Rang secondaire (poids 3-4) : 8 jours. Couvre un cycle Weekly complet
-            // (ex: événement du lundi encore disponible pour le rapport du vendredi suivant).
+
+            // Palier 2 — Rang secondaire (poids 3-4) : 8 jours, couvre un cycle Weekly complet.
             long eightDaysAgo = currentUnixTime - (8L * 24 * 60 * 60);
             int midDeleted = db.delete(TABLE_EVENTS,
                 "unix_timestamp < ? AND driver_weight IN (3, 4) AND event_type != 'CALENDAR-RESULT'",
                 new String[]{String.valueOf(eightDaysAgo)});
             Log.d("EventDatabase", "Purge Rang secondaire (poids 3-4, >8j) effectuée : " + midDeleted + " lignes supprimées.");
 
-            // Palier 3 — Rang suprême (poids 5 : CPI, NFP, FOMC) : 45 jours, suffisant pour Monthly.
+            // Palier 3 — Rang suprême (poids 5) : 45 jours, suffisant pour Monthly.
             long fortyFiveDaysAgo = currentUnixTime - (45L * 24 * 60 * 60);
             int hardDeleted = db.delete(TABLE_EVENTS,
                 "unix_timestamp < ? AND driver_weight = 5",
                 new String[]{String.valueOf(fortyFiveDaysAgo)});
             Log.d("EventDatabase", "Purge Piliers ancrés (poids=5, >45j) effectuée : " + hardDeleted + " lignes nettoyées.");
 
-            // Palier 4 — Calendrier économique (CALENDAR-RESULT) : 9 jours, peu importe le poids
-            // individuel de l'événement — couvre toute la semaine en cours + marge de sécurité.
+            // Palier 4 — Calendrier économique : 9 jours, peu importe le poids individuel.
             long nineDaysAgo = currentUnixTime - (9L * 24 * 60 * 60);
             int calendarPurged = db.delete(TABLE_EVENTS,
                 "unix_timestamp < ? AND event_type = 'CALENDAR-RESULT'",
                 new String[]{String.valueOf(nineDaysAgo)});
             Log.d("EventDatabase", "Purge Calendrier (>9j) effectuée : " + calendarPurged + " lignes supprimées.");
 
+            // Filet de sécurité — poids hors plage 1-5 (erreur de saisie) suit la règle du bruit.
+            int outOfRangeDeleted = db.delete(TABLE_EVENTS,
+                "unix_timestamp < ? AND driver_weight NOT IN (1,2,3,4,5) AND event_type != 'CALENDAR-RESULT'",
+                new String[]{String.valueOf(fortyEightHoursAgo)});
+            if (outOfRangeDeleted > 0) {
+                Log.w("EventDatabase", "Purge filet de sécurité (poids hors plage, >48h) : " + outOfRangeDeleted + " lignes supprimées.");
+            }
+
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();
         }
-    }
+   }
     
     public boolean isDriverActiveRecently(String eventType, long currentUnixTime) {
         if (eventType == null || eventType.isEmpty()) return false;
