@@ -187,6 +187,7 @@ public class EventValidator {
         public boolean isInertiaBlock = false;
         public String  lastEventSummary = "";
         public boolean isCalendarIntercept = false; // ✅ Bypass explicite du seuil de poids dans NotificationService
+        public String detectedTypeForInertia = "";
         public ValidationResult() {}
 
         public ValidationResult(boolean isConfirmed, int confidence, String reason) {
@@ -436,6 +437,7 @@ public class EventValidator {
             if (db.isDriverActiveRecently(detectedType, currentSeconds)) {
                 result.isConfirmed = false;
                 result.isInertiaBlock = true;
+                result.detectedTypeForInertia = detectedType; // 🛡️ valeur réelle utilisée pour le blocage
                 result.reason = "Driver déjà actif récemment (Inertie Macro)";
                 result.assetsEnriched = !detectedAssets.isEmpty();
                 result.lastEventSummary = db.getLastEventByType(detectedType);
