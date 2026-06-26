@@ -516,8 +516,7 @@ public void onListenerDisconnected() {
 "7-Identifier le driver dominant avant les impacts.\n" +
 "8-Pas de doubles astérisques.\n" +
 
-"DIRECTIONS AUTORISÉES : BULLISH🟢 | BEARISH🔴 | NEUTRE | INCLINATION BULLISH MAIS NEUTRE | INCLINATION BEARISH MAIS NEUTRE.\n" +
-
+"DIRECTIONS AUTORISÉES : 🟢 (bullish) | 🔴 (bearish) | NEUTRE. Interdit d'écrire le mot BULLISH ou BEARISH en toutes lettres, interdit d'utiliser ↑ ↓ =.\n" +
 "DICTIONNAIRE MÉCANISMES PAR ACTIF (utiliser exclusivement ces termes) :\n" +
 "US10Y : flight-to-quality comprime rendements | taux réels ajustés à la hausse | anticipations Fed révisées\n" +
 "NASDAQ : re-pricing multiple croissance | compression valorisation tech | risk appetite dégradé\n" +
