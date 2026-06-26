@@ -925,11 +925,20 @@ userMsg.put("content", bodyEnrichi);
         }
     }
     // Seuil conviction plus élevé sur fallback — modèle léger moins fiable
-int convFb = extrairePourcentageConviction(fallbackReport);
-if (convFb >= 55 || isSupremeRank) {
+     int convFb = extrairePourcentageConviction(fallbackReport);
+// Vérifier cohérence vecteur/flux — rejeter si contradiction
+boolean vecteurGeo = fallbackReport.contains("VECTEUR CIBLE : GÉO") || fallbackReport.contains("VECTEUR CIBLE : GÉOPOLITIQUE");
+boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
+boolean fluxHawkish = fallbackReport.contains("FLUX DOMINANT : DOLLAR FORT") || fallbackReport.contains("VECTEUR CIBLE : HAWKISH");
+boolean contradiction = (vecteurGeo && fluxHawkish) || (fluxGeo && fluxHawkish);
+if (contradiction) {
+    Log.d(TAG, "[FALLBACK] Contradiction vecteur/flux détectée — rapport rejeté.");
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("⚪ [FALLBACK] Contradiction régime — ignoré.");
+} else if (convFb >= 55 || isSupremeRank) {
     sendTelegramSecure("⚡ *[ANALYSE MACRO FAIBLE]* " + filteredFb.toString().trim(), NotificationService.this);
 } else {
-    Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — rapport fallback ignoré.");
+    Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — ignoré.");
     if (MainActivity.instance != null)
         MainActivity.instance.addLog("⚪ [FALLBACK] Conviction " + convFb + "% insuffisante — ignoré.");
 }
