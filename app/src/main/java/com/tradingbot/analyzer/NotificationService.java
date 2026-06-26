@@ -823,16 +823,14 @@ try {
             + "\n\n";
     }
     // 2. Prix LKV cache
-    Map<String, MarketDataFetcher.MarketData> lkv =
-        MarketDataFetcher.getLastKnownValues();
-    if (lkv != null && !lkv.isEmpty()) {
-        StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
-        for (Map.Entry<String, MarketDataFetcher.MarketData> e : lkv.entrySet()) {
-            prixLkv.append(e.getKey()).append(" : ")
-                   .append(String.format(Locale.US, "%.4f", e.getValue().price))
-                   .append("\n");
-        }
-        contexteFallback += prixLkv.toString() + "\n";
+    if (cachedMarketData != null && !cachedMarketData.isEmpty()) {
+    StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
+    for (Map.Entry<String, MarketDataFetcher.MarketData> e : cachedMarketData.entrySet()) {
+        prixLkv.append(e.getKey()).append(" : ")
+               .append(String.format(Locale.US, "%.4f", e.getValue().price))
+               .append("\n");
+    }
+    contexteFallback += prixLkv.toString() + "\n";
     }
  // 3. Flux dominant sauvegardé
     String dernierFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
