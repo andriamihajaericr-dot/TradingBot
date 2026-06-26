@@ -2745,11 +2745,11 @@ public boolean generateAndSendWeeklyReport() {
     "Exception : en cas de choc géopolitique majeur confirmé (guerre ouverte, attaque militaire directe, fermeture d'une route énergétique stratégique, mobilisation militaire massive ou crise systémique), le régime géopolitique devient temporairement dominant et peut supplanter un driver suprême jusqu'à normalisation du marché.\n" +
     "Si un événement géopolitique provoque un mouvement global de fuite vers les actifs refuges (GOLD, USD, JPY) et une baisse simultanée des actifs risqués (NASDAQ, SP500, BTC), alors le régime CRISE GÉOPOLITIQUE devient prioritaire.\n" +
     "Flux dominant autorisé : CRISE GÉOPOLITIQUE => priorité sur tous les autres régimes (et supplante la règle 15).\n\n" +
-
-    "RÈGLE DE JUSTIFICATION :\n" +
-    "- Chaque justification doit être factuelle, basée sur un chiffre (ex: \"CPI à 3.8%\") ou un événement nommé (ex: \"déclaration de Powell\").\n" +
-    "- Longueur maximale : 10 mots.\n" +
-    "- Interdiction des phrases vagues comme \"les investisseurs sont prudents\", \"incertitudes économiques\".\n\n" +
+     "RÈGLE DE JUSTIFICATION :\n" +
+"- Chaque justification doit être factuelle : chiffre observé (ex: 'NFP +250k vs +185k attendu') ou événement nommé (ex: 'minutes FOMC hawkish').\n" +
+"- Longueur maximale : 10 mots.\n" +
+"- Style institutionnel obligatoire : 'surprise haussière NFP renforce dollar', 'flight-to-quality vers JPY et GOLD', 'prime géopolitique activée sur USOIL'.\n" +
+"- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'sentiment dégradé', toute généralité sans chiffre ni source.\n\n" +                        
 
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
     "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n\n" +
