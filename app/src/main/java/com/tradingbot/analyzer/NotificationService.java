@@ -412,7 +412,9 @@ public void onListenerDisconnected() {
     "3. Un seul 📢 dans toute la réponse.\n" +
     "4. USDJPY BEARISH → flux ne dit pas DOLLAR FORT.\n" +
     "5. USDJPY BULLISH → flux ne dit pas YEN FORT.\n" +
-    "6. Chaque actif : direction + mécanisme causal précis ≤8 mots. INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour'. Chaque justification doit être unique et factuelle.\n" +
+    "6. Chaque actif : direction + justification en ≤10 mots style analyste institutionnel. " +
+    "Exemples acceptés : 'Fuite vers refuges pèse sur rendements réels' | 'Dollar refuge comprime les paires risk' | 'Offre Hormuz sous pression, prime géopolitique activée' | 'Corrélation risk-off amplifie la baisse tech' | 'Yen refuge absorbe les flux de désengagement'. " +
+    "INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour', 'en cas de', phrases génériques copiées-collées.\n" +
     "7. Pas de doubles astérisques (**) – utiliser *simple*.\n" +
     "8. VECTEUR CIBLE autorisé : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
     "9. En cas de crise géopolitique, appliquer l'exception et mentionner \"Régime Safe-Haven\".\n\n" +
