@@ -905,7 +905,7 @@ userMsg.put("content", bodyEnrichi);
     StringBuilder filteredFb = new StringBuilder();
     boolean inImpactFb = false;
     for (String lFb : fallbackReport.split("\n")) {
-        if (lFb.matches(".*•.*:.*NEUTRE.*") || lFb.matches(".*•.*:.*= \\|.*")) continue;
+        if (line.contains("NEUTRE") || line.matches(".*•.*:.*= \\|.*")) continue;
         String trimFb = lFb.trim();
         if (trimFb.isEmpty()) continue;
         if (trimFb.startsWith("🚨") || trimFb.startsWith("🕒") || trimFb.startsWith("📊") ||
