@@ -517,7 +517,20 @@ public void onListenerDisconnected() {
 
 "DIRECTIONS AUTORISÉES : BULLISH🟢 | BEARISH🔴 | NEUTRE | INCLINATION BULLISH MAIS NEUTRE | INCLINATION BEARISH MAIS NEUTRE.\n" +
 
-"RAISON : jamais générique. Mécanisme causal précis en ≤8 mots (taux/devise/refuge/corrélation). Interdit : phrases longues, répétitions, 'comme pour', 'même que'.\n" +
+"DICTIONNAIRE MÉCANISMES PAR ACTIF (utiliser exclusivement ces termes) :\n" +
+"US10Y : flight-to-quality comprime rendements | taux réels ajustés à la hausse | anticipations Fed révisées\n" +
+"NASDAQ : re-pricing multiple croissance | compression valorisation tech | risk appetite dégradé\n" +
+"SP500 : prime de risque equity élargie | flux risk-off vers obligations | révision bénéfices à la baisse\n" +
+"GOLD : demande refuge banques centrales | taux réels négatifs soutiennent | prime géopolitique activée\n" +
+"USOIL : prime offre Hormuz activée | stocks EIA inférieurs attentes | demande Chine révisée\n" +
+"EURUSD : différentiel taux BCE-Fed comprime | flux capitaux vers dollar refuge | risk appetite pèse sur euro\n" +
+"USDJPY : désengagement carry trade JPY | flux refuge compressent le cross | différentiel BoJ-Fed déterminant\n" +
+"USDCAD : corrélation pétrole CAD dégradée | différentiel BoC-Fed élargi | risk appetite pèse sur CAD\n" +
+"GBPUSD : contexte macro UK détériore GBP | BoE diverge de la Fed | risk-off comprime les paires risquées\n" +
+"AUDUSD : exposition Chine fragilise AUD | RBA dovish pèse sur AUD | matières premières sous pression\n" +
+"BITCOIN : amplificateur NASDAQ x2-3 | liquidité crypto suit risk-off | corrélation actions renforcée\n" +
+"RÈGLE ABSOLUE : chaque justification ≤8 mots, unique par actif, issue du dictionnaire ci-dessus.\n" +
+"INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour', phrases répétées entre actifs.\n" +
 "FORMAT STRICT :\n" +
 "📊 RAPPORT JOURNALIER – [Date/Heure Madagascar]\n" +
 "🚨 [SOURCE]\n" +
