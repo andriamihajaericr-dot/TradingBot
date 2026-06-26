@@ -834,6 +834,14 @@ try {
         }
         contexteFallback += prixLkv.toString() + "\n";
     }
+ // 3. Flux dominant sauvegardé
+    String dernierFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+        .getString("last_dominant_flow", null);
+    if (dernierFlux != null && !dernierFlux.isEmpty()) {
+        contexteFallback += "FLUX DOMINANT PRÉCÉDENT : " + dernierFlux + "\n"
+            + "RÈGLE : si le nouveau driver est cohérent, maintiens ce flux. "
+            + "Si contradictoire, justifie explicitement le changement de régime.\n\n";
+    }
 } catch (Exception eCtx) {
     Log.w(TAG, "[FALLBACK] Enrichissement contexte échoué : " + eCtx.getMessage());
 }
