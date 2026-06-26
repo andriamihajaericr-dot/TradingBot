@@ -623,8 +623,8 @@ if (impact == null) {
 } else {
     impactAffiche = impact;
 }
-                return "🕒 " + timeStr + "\n📌 " + title + "\n📝 " + shortContent + "\n⚡ Impact: " + impactAffiche;
-            }
+        return "🕒 " + timeStr + "\n📌 " + title + "\n📝 " + shortContent + "\n⚡ " + impactAffiche;
+  }
         } catch (Exception e) {
             Log.e(TAG, "Erreur getLastEventByType", e);
         } finally {
