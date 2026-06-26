@@ -2746,10 +2746,47 @@ if (responseCode == 429) {
                     errorResponse.append(line);
                 }
                 Log.e(TAG, "[MONTHLY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("❌ [MONTHLY] Erreur HTTP " + responseCode + " de Groq : "
-                        + truncateForLog(errorResponse.toString()));
-                }
+if (responseCode == 429) {
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("⚠️ [MONTHLY] 429 TPD — bascule sur modèle léger.");
+    try {
+        payload.put("model", GROQ_MODEL_FALLBACK);
+        payload.put("max_tokens", 1500);
+        conn.disconnect();
+        URL urlFbM = new URL(GROQ_URL);
+        HttpURLConnection connFbM = (HttpURLConnection) urlFbM.openConnection();
+        connFbM.setRequestMethod("POST");
+        connFbM.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        connFbM.setRequestProperty("Authorization", "Bearer " + apiKey);
+        connFbM.setConnectTimeout(15000);
+        connFbM.setReadTimeout(20000);
+        connFbM.setDoOutput(true);
+        try (OutputStream osFbM = connFbM.getOutputStream()) {
+            osFbM.write(payload.toString().getBytes(StandardCharsets.UTF_8));
+        }
+        if (connFbM.getResponseCode() == HttpURLConnection.HTTP_OK) {
+            StringBuilder rFbM = new StringBuilder();
+            try (BufferedReader brFbM = new BufferedReader(new InputStreamReader(connFbM.getInputStream(), StandardCharsets.UTF_8))) {
+                String lineFbM;
+                while ((lineFbM = brFbM.readLine()) != null) rFbM.append(lineFbM);
+            }
+            String reportFbM = new JSONObject(rFbM.toString())
+                .getJSONArray("choices").getJSONObject(0)
+                .getJSONObject("message").getString("content");
+            if (reportFbM != null && reportFbM.length() > 50) {
+                sendTelegramSecure("📊 *[MONTHLY - FALLBACK]* " + reportFbM, NotificationService.this);
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("✅ [MONTHLY] Rapport envoyé via modèle léger.");
+            }
+        }
+        connFbM.disconnect();
+    } catch (Exception eFbM) {
+        Log.e(TAG, "[MONTHLY] Fallback échoué", eFbM);
+    }
+} else if (MainActivity.instance != null) {
+    MainActivity.instance.addLog("❌ [MONTHLY] Erreur HTTP " + responseCode + " de Groq : "
+        + truncateForLog(errorResponse.toString()));
+}
             }
         }
     } catch (Exception e) { 
