@@ -2224,6 +2224,8 @@ messages.put(new JSONObject().put("role", "user").put("content",
     "Tu dois impérativement fournir dans le rapport le nombre d'événements en faveur de RISK-OFF et RISK-ON.\n" +
     "Si plus de 60% du poids penche vers RISK-OFF, le FLUX DOMINANT doit refléter cette majorité écrasante."));
         payload.put("messages", messages);
+        payload.put("temperature", 0.02);
+        payload.put("max_tokens", 1500);
         URL url = new URL(GROQ_URL);
         conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
