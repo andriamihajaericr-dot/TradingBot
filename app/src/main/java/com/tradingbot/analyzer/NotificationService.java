@@ -2532,10 +2532,11 @@ messages.put(new JSONObject().put("role", "user").put("content",
     "TACTIQUE : Géopolitique, Tarifs, Sentiment, Rumeurs.\n\n" +
 
     "RÈGLE DE JUSTIFICATION :\n" +
-    "- Chaque justification doit être factuelle, basée sur un chiffre (ex: \"CPI à 3.8%\") ou un événement nommé (ex: \"déclaration de Powell\").\n" +
-    "- Longueur maximale : 10 mots.\n" +
-    "- Interdiction des phrases vagues comme \"les investisseurs sont prudents\", \"incertitudes économiques\".\n\n" +
-
+"- Chaque justification doit être factuelle : chiffre observé (ex: 'CPI 3.8% vs 3.5% attendu') ou événement nommé (ex: 'Powell hawkish FOMC mai').\n" +
+"- Longueur maximale : 10 mots.\n" +
+"- Style institutionnel obligatoire : 'prime de risque élargie', 'flight-to-quality activé', 'différentiel de taux déterminant', 'révision bénéfices à la baisse'.\n" +
+"- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'contexte difficile', toute phrase sans ancrage factuel.\n\n" +
+                                                                        
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
     "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n\n" +
 
