@@ -811,7 +811,37 @@ jsonPayload.put("temperature", 0.0); // Zéro créativité sur modèle léger �
     conn.disconnect();
     try {
         jsonPayload.put("model", GROQ_MODEL_FALLBACK);
-        jsonPayload.put("max_tokens", 600);
+jsonPayload.put("max_tokens", 600);
+// Enrichir le contexte fallback avec LKV + historique DB
+String contexteFallback = "";
+try {
+    // 1. Derniers événements DB
+    List<String> historiqueDb = db.obtenirTexteEvenementsRecents();
+    if (historiqueDb != null && !historiqueDb.isEmpty()) {
+        contexteFallback += "CONTEXTE RÉCENT (derniers événements) :\n"
+            + String.join("\n", historiqueDb.subList(0, Math.min(3, historiqueDb.size())))
+            + "\n\n";
+    }
+    // 2. Prix LKV cache
+    Map<String, MarketDataFetcher.MarketData> lkv =
+        MarketDataFetcher.getLastKnownValues();
+    if (lkv != null && !lkv.isEmpty()) {
+        StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
+        for (Map.Entry<String, MarketDataFetcher.MarketData> e : lkv.entrySet()) {
+            prixLkv.append(e.getKey()).append(" : ")
+                   .append(String.format(Locale.US, "%.4f", e.getValue().price))
+                   .append("\n");
+        }
+        contexteFallback += prixLkv.toString() + "\n";
+    }
+} catch (Exception eCtx) {
+    Log.w(TAG, "[FALLBACK] Enrichissement contexte échoué : " + eCtx.getMessage());
+}
+// Injecter dans le message user existant
+JSONArray msgsFallback = jsonPayload.getJSONArray("messages");
+JSONObject userMsg = msgsFallback.getJSONObject(msgsFallback.length() - 1);
+String bodyEnrichi = contexteFallback + userMsg.getString("content");
+userMsg.put("content", bodyEnrichi);
         java.net.URL urlFallback = new java.net.URL(GROQ_URL);
         java.net.HttpURLConnection connFallback = (java.net.HttpURLConnection) urlFallback.openConnection();
         connFallback.setRequestMethod("POST");
