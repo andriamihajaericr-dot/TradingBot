@@ -808,7 +808,20 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                             );
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport;
                             sendTelegramSecure(finalPayload, NotificationService.this);
-                            db.markEventAsSynced(fingerprint, "PROCESSED_OK");
+// Extraire résumé directionnel pour affichage rappel inertie
+StringBuilder impactResume = new StringBuilder();
+for (String l : aiReport.split("\n")) {
+    if (l.matches(".*•.*:.*[🟢🔴].*")) {
+        String[] parts = l.split("\\|");
+        if (parts.length > 0) impactResume.append(parts[0].trim()).append(" ");
+    }
+}
+String impactFinal = impactResume.length() > 0
+    ? impactResume.toString().trim()
+    : aiReport.contains("FLUX DOMINANT") ?
+      "Flux: " + aiReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim() : "N/A";
+db.markEventAsSynced(fingerprint, impactFinal.length() > 200
+    ? impactFinal.substring(0, 200) : impactFinal);
                         } else {
                             Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
                             db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
