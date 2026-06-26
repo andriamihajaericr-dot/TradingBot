@@ -901,7 +901,30 @@ userMsg.put("content", bodyEnrichi);
             String fallbackReport = jsonFb.getJSONArray("choices")
                     .getJSONObject(0).getJSONObject("message").getString("content");
             if (fallbackReport != null && fallbackReport.length() >= 50) {
-    sendTelegramSecure("⚡ *[FALLBACK]* " + fallbackReport, NotificationService.this);
+    // Filtrer NEUTRE avant envoi — même logique que modèle principal
+    StringBuilder filteredFb = new StringBuilder();
+    boolean inImpactFb = false;
+    for (String lFb : fallbackReport.split("\n")) {
+        if (lFb.matches(".*•.*:.*NEUTRE.*") || lFb.matches(".*•.*:.*= \\|.*")) continue;
+        String trimFb = lFb.trim();
+        if (trimFb.isEmpty()) continue;
+        if (trimFb.startsWith("🚨") || trimFb.startsWith("🕒") || trimFb.startsWith("📊") ||
+            trimFb.startsWith("🎯") || trimFb.startsWith("📢") || trimFb.startsWith("🏁") ||
+            trimFb.startsWith("--- IMPACTS")) {
+            filteredFb.append(lFb).append("\n");
+            if (trimFb.startsWith("--- IMPACTS")) inImpactFb = true;
+            continue;
+        }
+        if (inImpactFb && trimFb.startsWith("•")) {
+            String upperFb = lFb.toUpperCase(Locale.ROOT);
+            if (!upperFb.contains("MAIS NEUTRE") &&
+                (upperFb.contains("BULLISH") || upperFb.contains("BEARISH") ||
+                 lFb.contains("🟢") || lFb.contains("🔴"))) {
+                filteredFb.append(lFb).append("\n");
+            }
+        }
+    }
+    sendTelegramSecure("⚡ *[FALLBACK]* " + filteredFb.toString().trim(), NotificationService.this);
     StringBuilder impactFb = new StringBuilder();
 for (String l : fallbackReport.split("\n")) {
     if (l.matches(".*•.*:.*[🟢🔴].*")) {
