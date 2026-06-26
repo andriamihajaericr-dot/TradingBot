@@ -515,8 +515,7 @@ public void onListenerDisconnected() {
 
 "DIRECTIONS AUTORISÉES : BULLISH🟢 | BEARISH🔴 | NEUTRE | INCLINATION BULLISH MAIS NEUTRE | INCLINATION BEARISH MAIS NEUTRE.\n" +
 
-"RAISON : jamais générique. Déduis le mécanisme causal précis (taux/devise/refuge/corrélation) reliant le driver identifié à cet actif.\n" +
-
+"RAISON : jamais générique. Mécanisme causal précis en ≤8 mots (taux/devise/refuge/corrélation). Interdit : phrases longues, répétitions, 'comme pour', 'même que'.\n" +
 "FORMAT STRICT :\n" +
 "📊 RAPPORT JOURNALIER – [Date/Heure Madagascar]\n" +
 "🚨 [SOURCE]\n" +
@@ -525,19 +524,20 @@ public void onListenerDisconnected() {
 "🎯 VECTEUR CIBLE : [HAWKISH/DOVISH/GÉO/TARIFS/CHINE/LIQUIDITÉ]\n" +
 "📢 [FAIT MARQUANT : identifier clairement le driver dominant et l'arbitrage éventuel]\n" +
 "--- IMPACTS ACQUISITION ---\n" +
-"• 📈 US10Y : [direction] | [raison]\n" +
-"• 💻 NASDAQ : [direction] | [raison]\n" +
-"• 📊 SP500 : [direction] | [raison]\n" +
-"• 🏆 GOLD : [direction] | [raison]\n" +
-"• 🛢️ USOIL : [direction] | [raison]\n" +
-"• 🇪🇺 EURUSD : [direction] | [raison]\n" +
-"• 🇯🇵 USDJPY : [direction] | [raison]\n" +
-"• 🇨🇦 USDCAD : [direction] | [raison]\n" +
-"• 🇬🇧 GBPUSD : [direction] | [raison]\n" +
-"• 🇦🇺 AUDUSD : [direction] | [raison]\n" +
-"• ₿ BITCOIN : [direction] | [raison]\n" +
-"🏁 FLUX DOMINANT : [DOLLAR FORT/DOLLAR FAIBLE/RISK-ON/RISK-OFF/YEN FORT/EURO FORT/OR FORT/CRISE GÉOPOLITIQUE]";
-       
+"• 📈 US10Y : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"• 💻 NASDAQ : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"• 📊 SP500 : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"• 🏆 GOLD : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"• 🛢️ USOIL : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"• 🇪🇺 EURUSD : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"• 🇯🇵 USDJPY : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"• 🇨🇦 USDCAD : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"• 🇬🇧 GBPUSD : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"• 🇦🇺 AUDUSD : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"• ₿ BITCOIN : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
+"🏁 FLUX DOMINANT : [DOLLAR FORT/DOLLAR FAIBLE/RISK-ON/RISK-OFF/YEN FORT/EURO FORT/OR FORT/CRISE GÉOPOLITIQUE]\n" +
+"INTERDIT ABSOLU : tout texte après 🏁 FLUX DOMINANT. Aucun paragraphe de synthèse, aucun comptage d'événements, aucune justification supplémentaire. Le rapport s'arrête obligatoirement à 🏁 FLUX DOMINANT.";
+    
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
     }
