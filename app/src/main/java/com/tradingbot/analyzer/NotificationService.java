@@ -699,6 +699,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 JSONObject jsonPayload = new JSONObject();
                 jsonPayload.put("model", GROQ_MODEL);
                 jsonPayload.put("temperature", 0.02);
+                jsonPayload.put("max_tokens", 600);
     
                 JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content", promptFinal));
