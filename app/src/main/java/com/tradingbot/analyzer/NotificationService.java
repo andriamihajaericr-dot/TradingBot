@@ -773,6 +773,8 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     boolean inImpactSection = false;
     
                     for (String line : lines) {
+                    // Masquer les actifs NEUTRE — inutiles pour le trading
+                    if (line.matches(".*•.*:.*NEUTRE.*") || line.matches(".*•.*:.*= \\|.*")) continue;
                         String trimmed = line.trim();
                         if (trimmed.isEmpty()) continue;
                         if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
