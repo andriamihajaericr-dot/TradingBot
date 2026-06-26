@@ -951,10 +951,29 @@ if (db != null) db.markEventAsSynced(fingerprint, impactFinalFb.length() > 200
         Pattern fluxPattern = Pattern.compile("FLUX DOMINANT\\s*:\\s*(.+)");
         Matcher fluxMatcher = fluxPattern.matcher(fallbackReport);
         if (fluxMatcher.find()) {
-            getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-                .edit()
-                .putString("last_dominant_flow", fluxMatcher.group(1).trim())
-                .apply();
+            String nouveauFlux = fluxMatcher.group(1).trim();
+String ancienFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+    .getString("last_dominant_flow", null);
+getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+    .edit()
+    .putString("last_dominant_flow", nouveauFlux)
+    .apply();
+// 🚨 Alerte changement de régime
+if (ancienFlux != null && !ancienFlux.isEmpty()
+        && !ancienFlux.equalsIgnoreCase(nouveauFlux)) {
+    String alerteChangement =
+        "🔄 *CHANGEMENT DE RÉGIME DÉTECTÉ*\n" +
+        "━━━━━━━━━━━━━━━━━━━━\n" +
+        "📤 Ancien flux : *" + ancienFlux + "*\n" +
+        "📥 Nouveau flux : *" + nouveauFlux + "*\n" +
+        "⚡ Source : " + sourceName + "\n" +
+        "🕒 " + new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss",
+            java.util.Locale.FRANCE)
+            .format(new java.util.Date());
+    sendTelegramSecure(alerteChangement, NotificationService.this);
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("🔄 [RÉGIME] " + ancienFlux + " → " + nouveauFlux);
+}
         }
     } catch (Exception eFlux) {
         Log.w(TAG, "[FALLBACK] Sauvegarde flux dominant échouée : " + eFlux.getMessage());
