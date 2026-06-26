@@ -834,7 +834,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             String fallbackReport = jsonFb.getJSONArray("choices")
                     .getJSONObject(0).getJSONObject("message").getString("content");
             if (fallbackReport != null && fallbackReport.length() >= 50) {
-                sendTelegramSecure("⚡ *[FALLBACK]* " + fallbackReport, context);
+                sendTelegramSecure("⚡ *[FALLBACK]* " + fallbackReport, NotificationService.this);
                 if (db != null) db.markEventAsSynced(fingerprint, "SYNCED_FALLBACK_MODEL");
             } else {
                 db.markEventAsSynced(fingerprint, "FAILED_FALLBACK_EMPTY");
