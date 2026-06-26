@@ -2395,8 +2395,12 @@ try {
 } catch (Exception e) {
     Log.w(TAG, "[DAILY] Snapshot marché indisponible : " + e.getMessage());
 }
+String currentFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+    .getString("last_dominant_flow", "INDÉTERMINÉ");
 messages.put(new JSONObject().put("role", "user").put("content",
     "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n\n" +
+    "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlow + "\n" +
+    "─────────────────────────────\n" +
     dailyMarketSnapshot + "\n" +
     "─────────────────────────────\n" +
     "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers + "\n" +
