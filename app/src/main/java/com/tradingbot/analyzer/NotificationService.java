@@ -56,7 +56,6 @@ public class NotificationService extends NotificationListenerService {
     private static final String GROQ_MODEL = "llama-3.3-70b-versatile";
     private static final String GROQ_MODEL_FALLBACK = "llama-3.1-8b-instant";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-
     private static final String PREF_GROQ_KEY   = "groq_key";
     private static final String PREF_TG_TOKEN   = "tg_token";
     private static final String PREF_TG_CHAT_ID = "tg_chat_id";
