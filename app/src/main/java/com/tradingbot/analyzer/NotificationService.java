@@ -2446,10 +2446,47 @@ messages.put(new JSONObject().put("role", "user").put("content",
                     errorResponse.append(line);
                 }
                 Log.e(TAG, "[DAILY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("❌ [DAILY] Erreur HTTP " + responseCode + " de Groq : "
-                        + truncateForLog(errorResponse.toString()));
-                }
+if (responseCode == 429) {
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("⚠️ [DAILY] 429 TPD — bascule sur modèle léger.");
+    try {
+        payload.put("model", GROQ_MODEL_FALLBACK);
+        payload.put("max_tokens", 1500);
+        conn.disconnect();
+        URL urlFbD = new URL(GROQ_URL);
+        HttpURLConnection connFbD = (HttpURLConnection) urlFbD.openConnection();
+        connFbD.setRequestMethod("POST");
+        connFbD.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        connFbD.setRequestProperty("Authorization", "Bearer " + apiKey);
+        connFbD.setConnectTimeout(15000);
+        connFbD.setReadTimeout(20000);
+        connFbD.setDoOutput(true);
+        try (OutputStream osFbD = connFbD.getOutputStream()) {
+            osFbD.write(payload.toString().getBytes(StandardCharsets.UTF_8));
+        }
+        if (connFbD.getResponseCode() == HttpURLConnection.HTTP_OK) {
+            StringBuilder rFbD = new StringBuilder();
+            try (BufferedReader brFbD = new BufferedReader(new InputStreamReader(connFbD.getInputStream(), StandardCharsets.UTF_8))) {
+                String lineFbD;
+                while ((lineFbD = brFbD.readLine()) != null) rFbD.append(lineFbD);
+            }
+            String reportFbD = new JSONObject(rFbD.toString())
+                .getJSONArray("choices").getJSONObject(0)
+                .getJSONObject("message").getString("content");
+            if (reportFbD != null && reportFbD.length() > 50) {
+                sendTelegramSecure("📅 *[DAILY - FALLBACK]* " + reportFbD, NotificationService.this);
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("✅ [DAILY] Rapport envoyé via modèle léger.");
+            }
+        }
+        connFbD.disconnect();
+    } catch (Exception eFbD) {
+        Log.e(TAG, "[DAILY] Fallback échoué", eFbD);
+    }
+} else if (MainActivity.instance != null) {
+    MainActivity.instance.addLog("❌ [DAILY] Erreur HTTP " + responseCode + " de Groq : "
+        + truncateForLog(errorResponse.toString()));
+}
                     }
                 }
             } catch (Exception e) {
