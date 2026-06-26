@@ -875,8 +875,21 @@ userMsg.put("content", bodyEnrichi);
             String fallbackReport = jsonFb.getJSONArray("choices")
                     .getJSONObject(0).getJSONObject("message").getString("content");
             if (fallbackReport != null && fallbackReport.length() >= 50) {
-                sendTelegramSecure("⚡ *[FALLBACK]* " + fallbackReport, NotificationService.this);
-                if (db != null) db.markEventAsSynced(fingerprint, "SYNCED_FALLBACK_MODEL");
+    sendTelegramSecure("⚡ *[FALLBACK]* " + fallbackReport, NotificationService.this);
+    if (db != null) db.markEventAsSynced(fingerprint, "SYNCED_FALLBACK_MODEL");
+    // Sauvegarder le flux dominant pour contexte fallback suivant
+    try {
+        Pattern fluxPattern = Pattern.compile("FLUX DOMINANT\\s*:\\s*(.+)");
+        Matcher fluxMatcher = fluxPattern.matcher(fallbackReport);
+        if (fluxMatcher.find()) {
+            getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                .edit()
+                .putString("last_dominant_flow", fluxMatcher.group(1).trim())
+                .apply();
+        }
+    } catch (Exception eFlux) {
+        Log.w(TAG, "[FALLBACK] Sauvegarde flux dominant échouée : " + eFlux.getMessage());
+    }
             } else {
                 db.markEventAsSynced(fingerprint, "FAILED_FALLBACK_EMPTY");
             }
