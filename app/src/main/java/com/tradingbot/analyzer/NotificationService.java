@@ -2470,7 +2470,8 @@ messages.put(new JSONObject().put("role", "user").put("content",
 ));
          
         payload.put("messages", messages);
-
+        payload.put("temperature", 0.05);
+        payload.put("max_tokens", 1500);
         URL url = new URL(GROQ_URL);
         conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
