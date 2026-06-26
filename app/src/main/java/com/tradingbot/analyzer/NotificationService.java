@@ -924,7 +924,15 @@ userMsg.put("content", bodyEnrichi);
             }
         }
     }
-    sendTelegramSecure("⚡ *[FALLBACK]* " + filteredFb.toString().trim(), NotificationService.this);
+    // Seuil conviction plus élevé sur fallback — modèle léger moins fiable
+int convFb = extrairePourcentageConviction(fallbackReport);
+if (convFb >= 55 || isSupremeRank) {
+    sendTelegramSecure("⚡ *[ÉVÈNEMENTS PEU PERTINENT]* " + filteredFb.toString().trim(), NotificationService.this);
+} else {
+    Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — rapport fallback ignoré.");
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("⚪ [FALLBACK] Conviction " + convFb + "% insuffisante — ignoré.");
+}
     StringBuilder impactFb = new StringBuilder();
 for (String l : fallbackReport.split("\n")) {
     if (l.matches(".*•.*:.*[🟢🔴].*")) {
