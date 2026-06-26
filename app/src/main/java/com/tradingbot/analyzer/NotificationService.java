@@ -125,7 +125,7 @@ private final ConcurrentHashMap<String, Long> lastInertiaReminderSentMemory = ne
     SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
     long lastWeeklySentMs = prefs.getLong("last_weekly_sent_ms", 0L);
 
-    // Trouver le dernier vendredi à 22h00 (Mada)
+    // Trouver le dernier vendredi à 22h00 (Mada) 
     Calendar lastFriday = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
     lastFriday.set(Calendar.HOUR_OF_DAY, 22);
     lastFriday.set(Calendar.MINUTE, 0);
