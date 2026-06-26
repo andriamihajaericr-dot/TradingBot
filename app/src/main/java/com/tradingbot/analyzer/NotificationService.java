@@ -2694,6 +2694,11 @@ String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
     "• Aucun texte hors du format demandé."
 ));
          
+        messages.put(new JSONObject().put("role", "user").put("content",
+            "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlowM + "\n" +
+            "📊 FLUX MENSUEL PRÉCÉDENT : " + lastMonthlyFlow + "\n" +
+            "─────────────────────────────\n" +
+            "REGISTRE MACRO DU MOIS :\n" + monthlyRegistry));
         payload.put("messages", messages);
         payload.put("temperature", 0.05);
         payload.put("max_tokens", 1500);
@@ -2965,8 +2970,13 @@ String currentFlowW = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
     "• Aucune formule de politesse.\n" +
     "• Aucun texte hors du format demandé."
 ));
+        messages.put(new JSONObject().put("role", "user").put("content",
+            "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlowW + "\n" +
+            "📅 FLUX HEBDO PRÉCÉDENT : " + lastWeeklyFlow + "\n" +
+            "─────────────────────────────\n" +
+            "REGISTRE MACRO DE LA SEMAINE :\n" + weeklyRegistry));
         payload.put("messages", messages);
-         payload.put("temperature", 0.05);
+        payload.put("temperature", 0.05);
         payload.put("max_tokens", 1500);
         URL url = new URL(GROQ_URL);
         conn = (HttpURLConnection) url.openConnection();
