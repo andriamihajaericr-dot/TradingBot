@@ -2730,7 +2730,6 @@ if (responseCode == 429) {
                         MainActivity.instance.addLog("ℹ️ [MONTHLY] Purge ignorée (mode test) — registre préservé.");
                     }
                 }
-                
                 return true; // ✅ Succès total : On retourne true au planificateur !
             } else {
                 Log.w(TAG, "[MONTHLY] Groq réponse vide ou insuffisante — purge annulée");
