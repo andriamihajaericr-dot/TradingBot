@@ -412,7 +412,7 @@ public void onListenerDisconnected() {
     "3. Un seul 📢 dans toute la réponse.\n" +
     "4. USDJPY BEARISH → flux ne dit pas DOLLAR FORT.\n" +
     "5. USDJPY BULLISH → flux ne dit pas YEN FORT.\n" +
-    "6. Chaque actif : direction + justification factuelle (≤10 mots).\n" +
+    "6. Chaque actif : direction + mécanisme causal précis ≤8 mots. INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour'. Chaque justification doit être unique et factuelle.\n" +
     "7. Pas de doubles astérisques (**) – utiliser *simple*.\n" +
     "8. VECTEUR CIBLE autorisé : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
     "9. En cas de crise géopolitique, appliquer l'exception et mentionner \"Régime Safe-Haven\".\n\n" +
@@ -802,8 +802,9 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 } else {
                     Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
                     if (status == 429) {
-    Log.w(TAG, "[GROQ] 429 TPD — Bascule automatique vers " + GROQ_MODEL_FALLBACK);
-    if (MainActivity.instance != null)
+                        Log.w(TAG, "[GROQ] 429 TPD — Bascule automatique vers " + GROQ_MODEL_FALLBACK);
+jsonPayload.put("temperature", 0.0); // Zéro créativité sur modèle léger — force l'application stricte des matrices
+      if (MainActivity.instance != null)
         MainActivity.instance.addLog("⚠️ [GROQ] Quota épuisé — fallback sur modèle léger.");
     conn.disconnect();
     try {
