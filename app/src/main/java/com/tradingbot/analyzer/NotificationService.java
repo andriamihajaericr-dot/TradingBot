@@ -801,16 +801,56 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     }
                 } else {
                     Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
-                    // 🛡️ CORRECTIF : un 429 (rate limit) ou 5xx (erreur serveur passagère)
-                    // est transitoire — marquer "synced" l'excluait définitivement de tout
-                    // retraitement (getUnsyncedEvents), et figeait ce code d'erreur brut comme
-                    // "impact" affiché à chaque rappel d'inertie macro ultérieur sur ce driver.
-                    // On laisse sync_status à "pending" pour ces cas afin qu'un prochain cycle
-                    // de synchronisation retente l'analyse normalement.
-                    if (status == 429 || status >= 500) {
-                        Log.w(TAG, "[GROQ] Statut " + status + " transitoire — événement laissé en attente pour retraitement.");
-                    } else {
-                        db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
+                    if (status == 429) {
+    Log.w(TAG, "[GROQ] 429 TPD — Bascule automatique vers " + GROQ_MODEL_FALLBACK);
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("⚠️ [GROQ] Quota épuisé — fallback sur modèle léger.");
+    conn.disconnect();
+    try {
+        jsonPayload.put("model", GROQ_MODEL_FALLBACK);
+        jsonPayload.put("max_tokens", 600);
+        java.net.URL urlFallback = new java.net.URL(GROQ_URL);
+        java.net.HttpURLConnection connFallback = (java.net.HttpURLConnection) urlFallback.openConnection();
+        connFallback.setRequestMethod("POST");
+        connFallback.setDoOutput(true);
+        connFallback.setRequestProperty("Authorization", "Bearer " + apiKey);
+        connFallback.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        connFallback.setConnectTimeout(15000);
+        connFallback.setReadTimeout(15000);
+        try (java.io.OutputStream osFb = connFallback.getOutputStream()) {
+            byte[] inputFb = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            osFb.write(inputFb, 0, inputFb.length);
+            osFb.flush();
+        }
+        int statusFb = connFallback.getResponseCode();
+        if (statusFb == java.net.HttpURLConnection.HTTP_OK) {
+            StringBuilder fbResp = new StringBuilder();
+            try (java.io.BufferedReader brFb = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(connFallback.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                String lineFb;
+                while ((lineFb = brFb.readLine()) != null) fbResp.append(lineFb);
+            }
+            JSONObject jsonFb = new JSONObject(fbResp.toString());
+            String fallbackReport = jsonFb.getJSONArray("choices")
+                    .getJSONObject(0).getJSONObject("message").getString("content");
+            if (fallbackReport != null && fallbackReport.length() >= 50) {
+                sendTelegramSecure("⚡ *[FALLBACK]* " + fallbackReport, appContext);
+                if (db != null) db.markEventAsSynced(fingerprint, "SYNCED_FALLBACK_MODEL");
+            } else {
+                db.markEventAsSynced(fingerprint, "FAILED_FALLBACK_EMPTY");
+            }
+        } else {
+            db.markEventAsSynced(fingerprint, "FAILED_FALLBACK_HTTP_" + statusFb);
+        }
+        connFallback.disconnect();
+    } catch (Exception eFb) {
+        Log.e(TAG, "[GROQ] Erreur lors du fallback modèle léger", eFb);
+        db.markEventAsSynced(fingerprint, "FAILED_FALLBACK_EXCEPTION");
+    }
+} else if (status >= 500) {
+    Log.w(TAG, "[GROQ] Statut " + status + " serveur transitoire — événement laissé en attente.");
+} else {
+    db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
                     }
                 }
             } catch (Exception e) {
