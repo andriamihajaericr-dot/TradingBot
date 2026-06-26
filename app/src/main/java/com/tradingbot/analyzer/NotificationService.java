@@ -902,7 +902,19 @@ userMsg.put("content", bodyEnrichi);
                     .getJSONObject(0).getJSONObject("message").getString("content");
             if (fallbackReport != null && fallbackReport.length() >= 50) {
     sendTelegramSecure("⚡ *[FALLBACK]* " + fallbackReport, NotificationService.this);
-    if (db != null) db.markEventAsSynced(fingerprint, "SYNCED_FALLBACK_MODEL");
+    StringBuilder impactFb = new StringBuilder();
+for (String l : fallbackReport.split("\n")) {
+    if (l.matches(".*•.*:.*[🟢🔴].*")) {
+        String[] parts = l.split("\\|");
+        if (parts.length > 0) impactFb.append(parts[0].trim()).append(" ");
+    }
+}
+String impactFinalFb = impactFb.length() > 0
+    ? impactFb.toString().trim()
+    : "Flux: " + (fallbackReport.contains("FLUX DOMINANT") ?
+      fallbackReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim() : "N/A");
+if (db != null) db.markEventAsSynced(fingerprint, impactFinalFb.length() > 200
+    ? impactFinalFb.substring(0, 200) : impactFinalFb);
     // Sauvegarder le flux dominant pour contexte fallback suivant
     try {
         Pattern fluxPattern = Pattern.compile("FLUX DOMINANT\\s*:\\s*(.+)");
