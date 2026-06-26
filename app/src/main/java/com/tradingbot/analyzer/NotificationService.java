@@ -2965,10 +2965,47 @@ public boolean generateAndSendWeeklyReport() {
                     errorResponse.append(line);
                 }
                 Log.e(TAG, "[WEEKLY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("❌ [WEEKLY] Erreur HTTP " + responseCode + " de Groq : "
-                        + truncateForLog(errorResponse.toString()));
-                }
+if (responseCode == 429) {
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("⚠️ [WEEKLY] 429 TPD — bascule sur modèle léger.");
+    try {
+        payload.put("model", GROQ_MODEL_FALLBACK);
+        payload.put("max_tokens", 1500);
+        conn.disconnect();
+        URL urlFbW = new URL(GROQ_URL);
+        HttpURLConnection connFbW = (HttpURLConnection) urlFbW.openConnection();
+        connFbW.setRequestMethod("POST");
+        connFbW.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        connFbW.setRequestProperty("Authorization", "Bearer " + apiKey);
+        connFbW.setConnectTimeout(15000);
+        connFbW.setReadTimeout(20000);
+        connFbW.setDoOutput(true);
+        try (OutputStream osFbW = connFbW.getOutputStream()) {
+            osFbW.write(payload.toString().getBytes(StandardCharsets.UTF_8));
+        }
+        if (connFbW.getResponseCode() == HttpURLConnection.HTTP_OK) {
+            StringBuilder rFbW = new StringBuilder();
+            try (BufferedReader brFbW = new BufferedReader(new InputStreamReader(connFbW.getInputStream(), StandardCharsets.UTF_8))) {
+                String lineFbW;
+                while ((lineFbW = brFbW.readLine()) != null) rFbW.append(lineFbW);
+            }
+            String reportFbW = new JSONObject(rFbW.toString())
+                .getJSONArray("choices").getJSONObject(0)
+                .getJSONObject("message").getString("content");
+            if (reportFbW != null && reportFbW.length() > 50) {
+                sendTelegramSecure("📆 *[WEEKLY - FALLBACK]* " + reportFbW, NotificationService.this);
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("✅ [WEEKLY] Rapport envoyé via modèle léger.");
+            }
+        }
+        connFbW.disconnect();
+    } catch (Exception eFbW) {
+        Log.e(TAG, "[WEEKLY] Fallback échoué", eFbW);
+    }
+} else if (MainActivity.instance != null) {
+    MainActivity.instance.addLog("❌ [WEEKLY] Erreur HTTP " + responseCode + " de Groq : "
+        + truncateForLog(errorResponse.toString()));
+                                 }
             }
         }
     } catch (Exception e) {
