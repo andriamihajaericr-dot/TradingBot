@@ -2620,8 +2620,9 @@ if (responseCode == 429) {
 
         // Mémoire d'inertie mensuelle — contexte du mois précédent
         String lastMonthlyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-            .getString("last_monthly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
-
+    .getString("last_monthly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
+String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+    .getString("last_dominant_flow", "INDÉTERMINÉ");
         JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
         payload.put("temperature", 0.05); // Baissé à 0.05 pour une précision quantitative maximale
@@ -2852,8 +2853,9 @@ public boolean generateAndSendWeeklyReport() {
         }
 
         String lastWeeklyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-            .getString("last_weekly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
-
+    .getString("last_weekly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
+String currentFlowW = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+    .getString("last_dominant_flow", "INDÉTERMINÉ");
         JSONObject payload = new JSONObject();
         payload.put("model", GROQ_MODEL);
         payload.put("temperature", 0.05);
