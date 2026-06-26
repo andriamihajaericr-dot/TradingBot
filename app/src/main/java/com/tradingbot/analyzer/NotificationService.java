@@ -905,7 +905,7 @@ userMsg.put("content", bodyEnrichi);
     StringBuilder filteredFb = new StringBuilder();
     boolean inImpactFb = false;
     for (String lFb : fallbackReport.split("\n")) {
-        if (line.contains("NEUTRE") || line.matches(".*•.*:.*= \\|.*")) continue;
+        if (lFb.contains("NEUTRE") || lFb.matches(".*•.*:.*= \\|.*")) continue;
         String trimFb = lFb.trim();
         if (trimFb.isEmpty()) continue;
         if (trimFb.startsWith("🚨") || trimFb.startsWith("🕒") || trimFb.startsWith("📊") ||
@@ -927,7 +927,7 @@ userMsg.put("content", bodyEnrichi);
     // Seuil conviction plus élevé sur fallback — modèle léger moins fiable
 int convFb = extrairePourcentageConviction(fallbackReport);
 if (convFb >= 55 || isSupremeRank) {
-    sendTelegramSecure("⚡ *[ÉVÈNEMENTS PEU PERTINENT]* " + filteredFb.toString().trim(), NotificationService.this);
+    sendTelegramSecure("⚡ *[ANALYSE MACRO FAIBLE]* " + filteredFb.toString().trim(), NotificationService.this);
 } else {
     Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — rapport fallback ignoré.");
     if (MainActivity.instance != null)
