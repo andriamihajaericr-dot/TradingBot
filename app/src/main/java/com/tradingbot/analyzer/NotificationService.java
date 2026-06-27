@@ -524,9 +524,9 @@ public void onListenerDisconnected() {
 "USOIL : prime offre Hormuz activée | stocks EIA inférieurs attentes | demande Chine révisée\n" +
 "EURUSD : différentiel taux BCE-Fed comprime | flux capitaux vers dollar refuge | risk appetite pèse sur euro\n" +
 "USDJPY : désengagement carry trade JPY | flux refuge compressent le cross | différentiel BoJ-Fed déterminant\n" +
-"USDCAD : corrélation pétrole CAD dégradée | différentiel BoC-Fed élargi | risk appetite pèse sur CAD\n" +
+"USDCAD : crise Hormuz = CAD profite pétrole haussier (BEARISH USDCAD) | différentiel BoC-Fed élargi | risk appetite pèse sur CAD\n" +
 "GBPUSD : contexte macro UK détériore GBP | BoE diverge de la Fed | risk-off comprime les paires risquées\n" +
-"AUDUSD : exposition Chine fragilise AUD | RBA dovish pèse sur AUD | matières premières sous pression\n" +
+"AUDUSD : crise GÉO = AUD profite matières premières (BULLISH) | exposition Chine fragilise AUD | RBA dovish pèse sur AUD\n" +
 "BITCOIN : amplificateur NASDAQ x2-3 | liquidité crypto suit risk-off | corrélation actions renforcée\n" +
 "RÈGLE ABSOLUE : chaque justification ≤8 mots, unique par actif, issue du dictionnaire ci-dessus.\n" +
 "INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour', phrases répétées entre actifs.\n" +
