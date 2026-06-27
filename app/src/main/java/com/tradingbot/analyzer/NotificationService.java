@@ -935,7 +935,7 @@ if (contradiction) {
     if (MainActivity.instance != null)
         MainActivity.instance.addLog("⚪ [FALLBACK] Contradiction régime — ignoré.");
 } else if (convFb >= 55 || isSupremeRank) {
-    sendTelegramSecure("⚡ *[ANALYSE MACRO FAIBLE]* " + filteredFb.toString().trim(), NotificationService.this);
+    sendTelegramSecure("⚡ *[ANALYSE FONDAMENTALE ]* " + filteredFb.toString().trim(), NotificationService.this);
 } else {
     Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — ignoré.");
     if (MainActivity.instance != null)
@@ -967,8 +967,10 @@ getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
     .putString("last_dominant_flow", nouveauFlux)
     .apply();
 // 🚨 Alerte changement de régime
-if (ancienFlux != null && !ancienFlux.isEmpty()
-        && !ancienFlux.equalsIgnoreCase(nouveauFlux)) {
+  String ancienFluxNorm = ancienFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
+  String nouveauFluxNorm = nouveauFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
+   if (ancienFlux != null && !ancienFlux.isEmpty()
+        && !ancienFluxNorm.equals(nouveauFluxNorm)) {
     String alerteChangement =
         "🔄 *CHANGEMENT DE RÉGIME DÉTECTÉ*\n" +
         "━━━━━━━━━━━━━━━━━━━━\n" +
