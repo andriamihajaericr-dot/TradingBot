@@ -216,8 +216,6 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
 
                     // Demande série daily pour MA200 — avec plage de dates
                     // from = maintenant - 300 jours, to = maintenant (en secondes)
-                    long nowSec = System.currentTimeMillis() / 1000;
-                    long fromSec = nowSec - (300 * 24 * 60 * 60); // 300 jours
                     send(msg("resolve_symbol", new String[]{chartSession, "sds_sym_1", "=" + resolve}));
                     // create_series: [sessionId, seriesId, seriesName, symbolId, resolution, from, to]
                     // TradingView attend : [chartSession, seriesId, seriesName, symbolId, resolution, barCount]
@@ -329,7 +327,7 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
 
         ws.connect();
 
-        // Attendre max 20 secondes
+        // Attendre max 25 secondes
         synchronized (lock) {
             if (!done[0]) {
                 lock.wait(25000);
@@ -372,9 +370,9 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
         // Pour l'instant, on renvoie 0 car cela nécessite une méthode supplémentaire
         // Vous pouvez implémenter un appel à l'API Twelve Data /sma
         try {
-    String apiKey = android.preference.PreferenceManager
-        .getDefaultSharedPreferences(appContext)
-        .getString("twelve_data_key", "");
+    String apiKey = appContext
+    .getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+    .getString("twelve_data_key", "");
     if (apiKey.isEmpty()) return 0;
     String url = "https://api.twelvedata.com/sma?symbol=" + twelveSymbol
         + "&interval=1day&time_period=200&apikey=" + apiKey;
