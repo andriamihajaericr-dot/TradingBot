@@ -36,6 +36,7 @@ import android.net.Uri;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import java.io.InputStream;
+import com.tradingbot.analyzer.TradingViewFetcher;
 
 public class MainActivity extends AppCompatActivity {
 
