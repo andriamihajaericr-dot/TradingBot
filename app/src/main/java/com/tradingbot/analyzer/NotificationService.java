@@ -395,6 +395,9 @@ public void onListenerDisconnected() {
     "SENTIMENT faible : NASDAQ↓ SP500↓ GOLD↑ USOIL↓ BTC↓ | FLUX : RISK-OFF MODÉRÉ\n" +
     "IPO majeure : NASDAQ↑ SP500↑ BTC↑ GOLD↓ USDJPY↓ EURUSD↑ AUDUSD↑ USDCAD↓ | FLUX : RISK-ON\n" +
     "RÈGLE JUSTIFICATION : la matrice donne la DIRECTION, jamais le TEXTE. Pour chaque actif, déduis et écris le mécanisme causal exact (ex: taux/devise/refuge/corrélation) reliant le driver détecté à cet actif précis — jamais une formule générique répétée.\n\n" +
+    "CORRÉLATION EURUSD/GBPUSD : ils bougent dans le même sens à 90% (même dénominateur USD). " +
+    "Divergence autorisée UNIQUEMENT si : news BoE seul, crise UK spécifique, Brexit. " +
+    "Hors ces cas, direction EURUSD = direction GBPUSD obligatoirement.\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "BANQUES CENTRALES ÉTRANGÈRES\n" +
     "══════════════════════════════════════════════════════\n" +
