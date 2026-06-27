@@ -2675,6 +2675,7 @@ String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
 "- Chaque justification doit être factuelle : chiffre observé (ex: 'CPI 3.8% vs 3.5% attendu') ou événement nommé (ex: 'Powell hawkish FOMC mai').\n" +
 "- Longueur maximale : 10 mots.\n" +
 "- Style institutionnel obligatoire : 'prime de risque élargie', 'flight-to-quality activé', 'différentiel de taux déterminant', 'révision bénéfices à la baisse'.\n" +
+"- NUANCE GÉO OBLIGATOIRE : crise GÉO sans riposte USA = GOLD haussier refuge. Crise GÉO avec riposte militaire USA = dollar dominant, GOLD comprimé court terme. Ne jamais appliquer GÉO = GOLD haussier de manière systématique.\n" +
 "- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'contexte difficile', toute phrase sans ancrage factuel.\n\n" +
                                                                         
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
