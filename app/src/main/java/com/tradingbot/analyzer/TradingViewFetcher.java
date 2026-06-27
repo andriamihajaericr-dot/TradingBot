@@ -132,7 +132,16 @@ public class TradingViewFetcher {
             String tvSym = entry.getValue();
             pool.submit(() -> {
                 try {
-                    TVMarketData data = fetchSymbol(key, tvSym);
+                    TVMarketData data = null;
+for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
+    try {
+        data = fetchSymbol(key, tvSym);
+    } catch (Exception e) {
+        Log.w(TAG, "[TV] Tentative " + attempt + "/2 échouée pour " + key
+            + " : " + e.getMessage());
+        if (attempt < 2) Thread.sleep(3000);
+    }
+}
                     if (data != null) {
                         results.put(key, data);
                         cache.put(key, data);
