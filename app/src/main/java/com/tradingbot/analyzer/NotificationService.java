@@ -390,7 +390,7 @@ public void onListenerDisconnected() {
     "GOLD en crise GÉO : si riposte militaire USA → dollar domine → GOLD↓ court terme. Si crise régionale sans USA → GOLD↑ refuge. Analyser le rôle du dollar avant de conclure.\n" +
     "GÉO désescalade : GOLD↓ USOIL↓ NASDAQ↑ SP500↑ BTC↑ USDJPY↑ AUDUSD↑ (conviction≤45%) | USDCAD↑ SAUF si USOIL reste BULLISH par ailleurs (alors USDCAD=NEUTRE, le préciser) | FLUX : RISK-ON\n" +
     "EIA déficit : USOIL↑ USDCAD↓ | EIA surplus : USOIL↓ USDCAD↑\n" +
-    "TARIFS escalade : NASDAQ↓ SP500↓ AUDUSD↓ USOIL↓ USDJPY↓ GOLD↑ BTC↓ | FLUX : RISK-OFF\n" +
+    "TARIFS escalade : NASDAQ↓ SP500↓ AUDUSD↓ USOIL↓ USDJPY↓ GOLD↑ BTC↓ EURUSD↓ GBPUSD↓ | FLUX : RISK-OFF\n" +
     "CHINE forte : AUDUSD↑ USOIL↑ NASDAQ↑ SP500↑ EURUSD↑ BTC↑ USDCAD↓ | FLUX : RISK-ON\n" +
     "SENTIMENT faible : NASDAQ↓ SP500↓ GOLD↑ USOIL↓ BTC↓ | FLUX : RISK-OFF MODÉRÉ\n" +
     "IPO majeure : NASDAQ↑ SP500↑ BTC↑ GOLD↓ USDJPY↓ EURUSD↑ AUDUSD↑ USDCAD↓ | FLUX : RISK-ON\n" +
@@ -410,7 +410,7 @@ public void onListenerDisconnected() {
     "══════════════════════════════════════════════════════\n" +
     "CONTRAINTES ABSOLUES\n" +
     "══════════════════════════════════════════════════════\n" +
-    "1. EXACTEMENT 11 actifs (même NEUTRE).\n" +
+    "1. Analyser uniquement les actifs impactés par le driver. Omettre les actifs NEUTRE — ne pas les lister.\n" +
     "2. NASDAQ = SP500 (même direction).\n" +
     "3. Un seul 📢 dans toute la réponse.\n" +
     "4. USDJPY BEARISH → flux ne dit pas DOLLAR FORT.\n" +
