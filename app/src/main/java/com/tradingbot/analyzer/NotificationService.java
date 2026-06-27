@@ -182,7 +182,7 @@ private final ConcurrentHashMap<String, Long> lastInertiaReminderSentMemory = ne
 }
     
     public static final List<String> TWELVE_DATA_ASSETS = Arrays.asList(
-    "SP500", "NASDAQ", "GOLD", "GBPUSD", "USDJPY", "USOIL");
+    "NASDAQ", "GOLD", "USDJPY", "USOIL"); // 4 actifs = 1 seul batch → 1 appel réseau
 @Override
 public void onListenerConnected() {
     super.onListenerConnected();
@@ -1526,7 +1526,9 @@ sendTelegramSecure(reminderMsg, NotificationService.this);
                         // Filtrer uniquement les 6 actifs Twelve Data parmi enrichedAssets
                         List<String> twelveFiltered = new ArrayList<>();
                         for (String a : enrichedAssets) {
+                            // Limiter aux 4 actifs core — évite les batches supplémentaires sur événements riches
                             if (TWELVE_DATA_ASSETS.contains(a)) twelveFiltered.add(a);
+                            if (twelveFiltered.size() >= 4) break; // Cap strict à 4 actifs = 1 batch max
                         }
                         // tryAcquireBatchSlot — évite les appels simultanés
                         if (!twelveFiltered.isEmpty() && MarketDataFetcher.tryAcquireBatchSlot()) {
