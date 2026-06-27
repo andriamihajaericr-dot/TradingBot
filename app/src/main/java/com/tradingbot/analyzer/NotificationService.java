@@ -1024,7 +1024,7 @@ if (contradiction) {
     Log.d(TAG, "[FALLBACK] Contradiction vecteur/flux détectée — rapport rejeté.");
     if (MainActivity.instance != null)
         MainActivity.instance.addLog("⚪ [FALLBACK] Contradiction régime — ignoré.");
-} else if (convFb >= 55 || isSupremeRank) {
+} else if (convFb >= 55 || (isSupremeRank && convFb >= 45)) {
     sendTelegramSecure("⚡ *[ANALYSE FONDAMENTALE]* " + filteredFb.toString().trim(), NotificationService.this);
 } else {
     Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — ignoré.");
