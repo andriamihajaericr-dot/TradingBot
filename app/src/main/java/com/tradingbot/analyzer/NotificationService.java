@@ -515,7 +515,7 @@ public void onListenerDisconnected() {
 "2-BTC cohérent avec NASDAQ.\n" +
 "3-USDJPY cohérent avec le flux dominant.\n" +
 "4-Un seul 📢.\n" +
-"5-Les 11 actifs doivent apparaître.\n" +
+"5. Lister uniquement les actifs impactés. Omettre les NEUTRE — ne pas les afficher.\n" +
 "6-Aucune direction contradictoire.\n" +
 "7-Identifier le driver dominant avant les impacts.\n" +
 "8-Pas de doubles astérisques.\n" +
