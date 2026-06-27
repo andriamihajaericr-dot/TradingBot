@@ -239,10 +239,10 @@ public static synchronized boolean tryAcquireBatchSlot() {
         ASSET_CONFIGS.add(new AssetConfig("NASDAQ",  "QQQ",      false, 1.5, 0.8));
         ASSET_CONFIGS.add(new AssetConfig("GOLD",    "XAU/USD",  false, 1.5, 0.7));
         //ASSET_CONFIGS.add(new AssetConfig("BITCOIN", "BTC/USD",  false, 3.0, 1.5));
-        //ASSET_CONFIGS.add(new AssetConfig("EURUSD",  "EUR/USD",  false, 0.5, 0.25));
-        ASSET_CONFIGS.add(new AssetConfig("GBPUSD",  "GBP/USD",  false, 0.5, 0.25));
+        ASSET_CONFIGS.add(new AssetConfig("EURUSD",  "EUR/USD",  false, 0.5, 0.25));
+        //ASSET_CONFIGS.add(new AssetConfig("GBPUSD",  "GBP/USD",  false, 0.5, 0.25));
         //ASSET_CONFIGS.add(new AssetConfig("AUDUSD",  "AUD/USD",  false, 0.5, 0.25));
-        ASSET_CONFIGS.add(new AssetConfig("USDJPY",  "USD/JPY",  false, 0.5, 0.25));
+        //ASSET_CONFIGS.add(new AssetConfig("USDJPY",  "USD/JPY",  false, 0.5, 0.25));
         //ASSET_CONFIGS.add(new AssetConfig("USDCAD",  "USD/CAD",  false, 0.5, 0.25));
         ASSET_CONFIGS.add(new AssetConfig("USOIL",   "WTI",      false, 2.0, 1.0));
         //ASSET_CONFIGS.add(new AssetConfig("US10Y",   "TLT",      false, 1.8, 1.0));
