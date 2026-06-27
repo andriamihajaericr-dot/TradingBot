@@ -215,15 +215,13 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
                     send(msg("quote_set_fields",     new String[]{wsSession,
                         "ch", "chp", "lp", "open_price", "high_price", "low_price", "volume"}));
 
-                    // Demande série daily pour MA200 — avec plage de dates
-                    // from = maintenant - 300 jours, to = maintenant (en secondes)
-                    send(msg("resolve_symbol", new String[]{chartSession, "sds_sym_1", "=" + resolve}));
-                    // create_series: [sessionId, seriesId, seriesName, symbolId, resolution, from, to]
-                    // TradingView attend : [chartSession, seriesId, seriesName, symbolId, resolution, barCount]
-                    // from/to ne sont PAS des paramètres valides — utiliser le nombre de bougies
-                    send(msg("create_series", new String[]{
-                       chartSession, "sds_1", "s1", "sds_sym_1", "1D", "250", ""
-                    }));
+                    
+                   send(msg("resolve_symbol", new String[]{chartSession, "sds_sym_1", "=" + resolve}));
+                   // Petit délai pour laisser le temps au serveur de résoudre le symbole
+                   try { Thread.sleep(150); } catch (InterruptedException ignored) {}
+                   send(msg("create_series", new String[]{
+                   chartSession, "sds_1", "s1", "sds_sym_1", "D", "200"
+                   }));
                     seriesRequested = true;
                     Log.d(TAG, "[TV WS] create_series envoyé pour " + tvSymbol);
 
