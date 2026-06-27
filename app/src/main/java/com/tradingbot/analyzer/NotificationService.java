@@ -393,7 +393,10 @@ public void onListenerDisconnected() {
     "HAWKISH US : US10Y↑ USDCAD↑ USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ BTC↓ EURUSD↓ GBPUSD↓ AUDUSD↓ USOIL= | FLUX : DOLLAR FORT\n" +
     "DOVISH US : inverse | FLUX : DOLLAR FAIBLE\n" +
     "GÉO escalade : USOIL↑ USDJPY↓ NASDAQ↓ SP500↓ BTC↓ EURUSD↓ GBPUSD↓ AUDUSD↑ USDCAD↓ US10Y↓ | FLUX : CRISE GÉOPOLITIQUE\n" +
-    "GOLD en crise GÉO : si riposte militaire USA → dollar domine → GOLD↓ court terme. Si crise régionale sans USA → GOLD↑ refuge. Analyser le rôle du dollar avant de conclure.\n" +
+    "GOLD en crise GÉO Iran/Hormuz :\n" +
+    "- Attaque tanker/drone/tension SANS riposte USA confirmée → GOLD🟢 immédiat (historique : +0.8% à +1.5%)\n" +
+    "- Riposte militaire USA confirmée (frappe/bombardement/Pentagon/airstrike) → GOLD🔴 30-60min puis rebond\n" +
+    "- RÈGLE PAR DÉFAUT : si texte ne contient pas 'riposte/strike/Pentagon/airstrike/bombardement' → GOLD🟢 obligatoirement\n" +
     "GÉO désescalade : GOLD↓ USOIL↓ NASDAQ↑ SP500↑ BTC↑ USDJPY↑ AUDUSD↑ (conviction≤45%) | USDCAD↑ SAUF si USOIL reste BULLISH par ailleurs (alors USDCAD=NEUTRE, le préciser) | FLUX : RISK-ON\n" +
     "EIA déficit : USOIL↑ USDCAD↓ | EIA surplus : USOIL↓ USDCAD↑\n" +
     "TARIFS escalade : NASDAQ↓ SP500↓ AUDUSD↓ USOIL↓ USDJPY↓ GOLD↑ BTC↓ EURUSD↓ GBPUSD↓ | FLUX : RISK-OFF\n" +
