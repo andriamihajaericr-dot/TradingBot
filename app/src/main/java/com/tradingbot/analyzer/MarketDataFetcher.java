@@ -27,7 +27,7 @@ import java.util.Arrays;
 public class MarketDataFetcher {
     private static final String TAG = "MarketDataFetcher";
 
-    private static volatile String twelveDataKey = "32370e1ef17645eb86690e3aee0d0660";
+    private static volatile String twelveDataKey = "";
     
     // 🧵 Pools de Threads isolés pour éliminer tout risque de Deadlock ou de ralentissement Android
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
