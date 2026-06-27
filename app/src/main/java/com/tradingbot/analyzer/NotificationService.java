@@ -415,15 +415,16 @@ public void onListenerDisconnected() {
     "3. Un seul 📢 dans toute la réponse.\n" +
     "4. USDJPY BEARISH → flux ne dit pas DOLLAR FORT.\n" +
     "5. USDJPY BULLISH → flux ne dit pas YEN FORT.\n" +
-    "6. Chaque actif : direction + mécanisme causal précis ≤8 mots.\n" +
-    "DICTIONNAIRE PAR ACTIF : US10Y=flight-to-quality/taux réels/Fed | NASDAQ=re-pricing/risk-off/taux | SP500=prime risque/risk-off | GOLD=refuge/taux réels/dollar inverse | USOIL=offre Hormuz/demande Chine/EIA | EURUSD=différentiel BCE-Fed/risk | USDJPY=carry trade/refuge JPY/BoJ-Fed | USDCAD=pétrole CAD/BoC | GBPUSD=BoE/risk | AUDUSD=matières premières/Chine/RBA | BTC=NASDAQ x2-3.\n" +
-    "DIRECTION OBLIGATOIRE : utiliser exclusivement 🟢 pour BULLISH, 🔴 pour BEARISH, NEUTRE pour neutre. Interdit d'écrire 'BULLISH', 'BEARISH', '↑', '↓', '='.\n" +
-    "Exemples acceptés : 'Fuite vers refuges pèse sur rendements réels' | 'Dollar refuge comprime les paires risk' | 'Offre Hormuz sous pression, prime géopolitique activée' | 'Corrélation risk-off amplifie la baisse tech' | 'Yen refuge absorbe les flux de désengagement'. " +
-    "INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour', 'en cas de', phrases génériques copiées-collées.\n" +
-    "7. Pas de doubles astérisques (**) – utiliser *simple*.\n" +
+    "6. CORRÉLATION USDJPY/GBPUSD :\n" +
+    "   - Régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires : USDJPY↑ = GBPUSD↓ et inversement.\n" +
+    "   - Régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire : les deux baissent en risk-off, les deux montent en risk-on.\n" +
+    "   - Divergence autorisée UNIQUEMENT si BoJ seul (GBPUSD neutre) ou BoE seul (USDJPY neutre).\n" +
+    "7. CORRÉLATION EURUSD/GBPUSD : même direction obligatoire dans 90% des cas.\n" +
+    "   - Divergence autorisée UNIQUEMENT si news BoE seul, crise UK spécifique ou Brexit.\n" +
     "8. VECTEUR CIBLE autorisé : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
-    "9. En cas de crise géopolitique, appliquer l'exception et mentionner \"Régime Safe-Haven\".\n\n" +
-
+    "9. Pas de doubles astérisques (**) – utiliser *simple*.\n" +
+    "10. VECTEUR CIBLE autorisé : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
+    "11. En cas de crise géopolitique, appliquer l'exception et mentionner \"Régime Safe-Haven\".\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "FORMAT DE SORTIE OBLIGATOIRE\n" +
     "══════════════════════════════════════════════════════\n" +
