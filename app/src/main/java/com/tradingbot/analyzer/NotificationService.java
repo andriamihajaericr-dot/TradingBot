@@ -980,10 +980,12 @@ getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
     .putString("last_dominant_flow", nouveauFlux)
     .apply();
 // 🚨 Alerte changement de régime
-  String ancienFluxNorm = ancienFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
-  String nouveauFluxNorm = nouveauFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
-   if (ancienFlux != null && !ancienFlux.isEmpty()
-        && !ancienFluxNorm.equals(nouveauFluxNorm)) {
+ String ancienFluxNorm = ancienFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
+String nouveauFluxNorm = nouveauFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
+// Envoyer UNIQUEMENT si le régime change réellement
+if (ancienFlux != null && !ancienFlux.isEmpty()
+        && !ancienFluxNorm.equals(nouveauFluxNorm)
+        && !nouveauFluxNorm.isEmpty()) {
     String alerteChangement =
         "🔄 *CHANGEMENT DE RÉGIME DÉTECTÉ*\n" +
         "━━━━━━━━━━━━━━━━━━━━\n" +
