@@ -887,10 +887,10 @@ String impactFinal = impactResume.length() > 0
     ? impactResume.toString().trim()
     : aiReport.contains("FLUX DOMINANT") ?
       "Flux: " + aiReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim() : "N/A";
-db.markEventAsSynced(fingerprint, impactFinal.length() > 200
+      db.markEventAsSynced(fingerprint, impactFinal.length() > 200
     ? impactFinal.substring(0, 200) : impactFinal);
-                        } else {
-                            Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
+                            } else {
+                                Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
                             db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
                         }
                     } else {
@@ -898,19 +898,17 @@ db.markEventAsSynced(fingerprint, impactFinal.length() > 200
                     }
                 } else {
                     Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
-                    if (status == 429) {
-                        Log.w(TAG, "[GROQ] 429 TPD — Bascule automatique vers " + GROQ_MODEL_FALLBACK);
-jsonPayload.put("temperature", 0.0); // Zéro créativité sur modèle léger — force l'application stricte des matrices
-      if (MainActivity.instance != null)
+                if (status == 429) {
+    Log.w(TAG, "[GROQ] 429 TPD — Bascule automatique vers " + GROQ_MODEL_FALLBACK);
+    if (MainActivity.instance != null)
         MainActivity.instance.addLog("⚠️ [GROQ] Quota épuisé — fallback sur modèle léger.");
     conn.disconnect();
     try {
         jsonPayload.put("model", GROQ_MODEL_FALLBACK);
-jsonPayload.put("max_tokens", 600);
-// Enrichir le contexte fallback avec LKV + historique DB
-String contexteFallback = "";
-try {
-    // 1. Derniers événements DB
+        jsonPayload.put("temperature", 0.0);
+        jsonPayload.put("max_tokens", 600);
+        String contexteFallback = "";
+        try {
     List<String> historiqueDb = db.obtenirTexteEvenementsRecents();
     if (historiqueDb != null && !historiqueDb.isEmpty()) {
         contexteFallback += "CONTEXTE RÉCENT (derniers événements) :\n"
