@@ -344,10 +344,10 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
             // Si MA200 est toujours 0, on peut essayer de la récupérer via Twelve Data en fallback
             if (result[2] == 0) {
     Log.w(TAG, "[TV] MA200 WebSocket=0 pour " + key + " (" + tvSymbol + ") — " +
-        candles.size() + " bougies reçues — tentative fallback TwelveData.");
+        candlesCount[0] + " bougies reçues — tentative fallback TwelveData.");
     if (MainActivity.instance != null)
         MainActivity.instance.addLog("⚠️ [TV MA200] " + key + " : WebSocket échoué (" +
-            candles.size() + " bougies) → TwelveData fallback...");
+            candlesCount[0] + " bougies) → TwelveData fallback...");
     double ma200Fallback = fetchMA200FromTwelveData(key);
     if (ma200Fallback > 0) {
         result[2] = ma200Fallback;
