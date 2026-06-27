@@ -486,7 +486,7 @@ public void onListenerDisconnected() {
 "Autres actifs neutres.\n" +
 
 "TARIFS DOUANIERS :\n" +
-"Escalade=NASDAQ↓ SP500↓ AUDUSD↓ USOIL↓ USDJPY↓ GOLD↑ BTC↓.\n" +
+"Escalade=NASDAQ↓ SP500↓ AUDUSD↓ USOIL↓ USDJPY↓ GOLD↑ BTC↓ EURUSD↓ GBPUSD↓.\n" +
 "Désescalade=inverse.\n" +
 
 "CHINE :\n" +
@@ -2702,8 +2702,9 @@ String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
 "- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'contexte difficile', toute phrase sans ancrage factuel.\n\n" +
                                                                         
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
-    "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n\n" +
-
+"US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n" +
+"CORRÉLATION EURUSD/GBPUSD : même direction obligatoire sauf news BoE seul ou crise UK spécifique.\n" +
+"Lister uniquement les actifs avec impact réel — omettre les NEUTRE.\n\n" +
     "Format OBLIGATOIRE et STRICT :\n\n" +
 
     "1. 🔥 LES CHOCS MACRO MAJEURS DU MOIS (1 à 3 selon l'importance réelle) :\n" +
