@@ -3079,7 +3079,9 @@ payload.put("temperature", 0.05);
 "- Chaque justification doit être factuelle : chiffre observé (ex: 'NFP +250k vs +185k attendu') ou événement nommé (ex: 'minutes FOMC hawkish').\n" +
 "- Longueur maximale : 10 mots.\n" +
 "- Style institutionnel obligatoire : 'surprise haussière NFP renforce dollar', 'flight-to-quality vers JPY et GOLD', 'prime géopolitique activée sur USOIL'.\n" +
-"- NUANCE GÉO : distinguer crise GÉO régionale (GOLD refuge 🟢) vs crise GÉO avec riposte USA (dollar dominant, GOLD comprimé 🔴 court terme). Analyser le rôle du dollar avant de conclure sur GOLD.\n" +
+"- NUANCE GÉO : défaut crise GÉO Iran/Hormuz → GOLD🟢 refuge immédiat. " +
+"Exception riposte USA confirmée → GOLD🔴 court terme. " +
+"Sans mot-clé militaire explicite dans le texte → GOLD🟢 par défaut.\n" +
 "- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'sentiment dégradé', toute généralité sans chiffre ni source.\n\n" +                        
 
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
