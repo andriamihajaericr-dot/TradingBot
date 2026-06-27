@@ -64,6 +64,11 @@ public class NotificationService extends NotificationListenerService {
     private static final long GEO_THROTTLE_MS   = 12 * 60 * 1000L;  // 12 minutes pour géo
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
+    // 🛡️ Compteur tokens Groq — protection quota TPD 100k/jour
+    private static final int TOKEN_BUDGET_DAILY = 90000; // marge 10k de sécurité
+    private static final int TOKEN_ESTIMATE_PER_CALL = 1500; // estimation moyenne input+output
+    private static final AtomicInteger dailyTokensUsed = new AtomicInteger(0);
+    private static long tokenResetTime = 0L; // minuit UTC du jour courant
     // Seuil minimal de prix pour considérer la donnée comme valide
     private static final double MIN_VALID_PRICE = 0.0;
     // Seuil de divergence (0.5% est plus sûr pour éviter le bruit sur le Forex)
