@@ -1636,17 +1636,22 @@ private static String parseTimestampToSeconds(String rawTimestamp) {
         // 🟢 MODIFICATION : On injecte l'horloge APRÈS le calcul du hash pour l'affichage visuel
         report.append("🕒 *Mis à jour :* ").append(getMadaTimeNow()).append(" (Mada)");
         String reportStr = report.toString();
+        boolean hasNewResults = !newlyPublished.isEmpty();
 
-        if (!newHash.equals(lastCalendarHash)) {
-            lastCalendarHash = newHash;
-            sendCalendarToTelegram(reportStr);
-            logToMain("📤 [CALENDRIER] Rapport envoyé — contenu modifié");
-        } else {
-            logToMain("⏭️ [CALENDRIER] Rapport inchangé — envoi ignoré");
-        }
+if (!newHash.equals(lastCalendarHash) || hasNewResults) {
+    lastCalendarHash = newHash;
+    sendCalendarToTelegram(reportStr);
+    if (hasNewResults) {
+        logToMain("📤 [CALENDRIER] Rapport envoyé — nouveaux résultats publiés ("
+            + newlyPublished.size() + ")");
+    } else {
+        logToMain("📤 [CALENDRIER] Rapport envoyé — contenu modifié");
+    }
+} else {
+    logToMain("⏭️ [CALENDRIER] Rapport inchangé — envoi ignoré");
+}
 
-        // ✅ Traitement final du Watcher (Notification instantanée des résultats)
-        for (EconomicCalendarAPI.CalendarEvent event : newlyPublished) {
+for (EconomicCalendarAPI.CalendarEvent event : newlyPublished) {
             analyzeAndSendCalendarResult(event);
         }
         
