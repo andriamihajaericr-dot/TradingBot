@@ -115,7 +115,8 @@ public class MainActivity extends AppCompatActivity {
             addLog("[SYSTEM] Redirection vers les autorisations Android.");
             startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
         });
-                testBtn.setOnClickListener(v -> {
+
+        testBtn.setOnClickListener(v -> {
     addLog("🧪 [TEST] Déclenchement du diagnostic complet...");
     new Thread(() -> {
         try {
@@ -127,12 +128,47 @@ public class MainActivity extends AppCompatActivity {
                 "📡 Flux : Liaison montante et descendante OK.",
                 this
             );
-                               // === TEST MARKET DATA ===
-                    runOnUiThread(() -> addLog("📡 [TEST] Lancement MarketDataFetcher..."));
-                    MarketDataFetcher.testRealTimeFreshness();
-                    runOnUiThread(() -> addLog("✅ [TEST] MarketDataFetcher terminé - Voir les messages 🔴 ci-dessus pour le détail des erreurs"));
+            // === TEST MARKET DATA (Twelve Data) ===
+            runOnUiThread(() -> addLog("📡 [TEST] Lancement MarketDataFetcher..."));
+            MarketDataFetcher.testRealTimeFreshness();
+            runOnUiThread(() -> addLog("✅ [TEST] MarketDataFetcher terminé - Voir les messages 🔴 ci-dessus pour le détail des erreurs"));
 
-            // ... autres tests existants (régime, calendrier, etc.) ...
+            // === TEST TRADINGVIEW FETCHER ===
+            runOnUiThread(() -> addLog("📊 [TEST] Lancement TradingViewFetcher..."));
+            // Démarrer le fetcher si pas déjà fait (il gère les appels répétés)
+            TradingViewFetcher.start(getApplicationContext());
+            // Récupérer les données une fois
+            TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
+                @Override
+                public void onDataReady(Map<String, TradingViewFetcher.TVMarketData> data) {
+                    runOnUiThread(() -> {
+                        addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
+                        StringBuilder sb = new StringBuilder();
+                        for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : data.entrySet()) {
+                            TradingViewFetcher.TVMarketData d = entry.getValue();
+                            sb.append("• *").append(entry.getKey()).append("* : ")
+                              .append(String.format(Locale.US, "%.4f", d.price))
+                              .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
+                              .append(" | MA200=").append(String.format(Locale.US, "%.4f", d.ma200))
+                              .append(d.aboveMA200 ? " [🟢 AU-DESSUS]" : " [🔴 EN-DESSOUS]")
+                              .append("\n");
+                        }
+                        addLog("📊 Données TV :\n" + sb.toString());
+                        // Envoyer à Telegram pour vérification
+                        NotificationService.sendTelegramSecure(
+                            "📊 *DONNÉES TRADINGVIEW (TEST)*\n" + sb.toString(),
+                            getApplicationContext()
+                        );
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    runOnUiThread(() -> addLog("❌ [TV] Erreur : " + error));
+                }
+            });
+
+            // ... autres tests (régime, calendrier, etc.) si vous en avez ...
         } catch (Exception e) {
             Log.e(TAG, "Échec test complet", e);
             runOnUiThread(() -> addLog("❌ [TEST] Erreur : " + e.getMessage()));
