@@ -2727,9 +2727,15 @@ if (responseCode == 429) {
 String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
     .getString("last_dominant_flow", "INDÉTERMINÉ");
         JSONObject payload = new JSONObject();
-        payload.put("model", GROQ_MODEL);
-        payload.put("temperature", 0.05); // Baissé à 0.05 pour une précision quantitative maximale
-
+int usedM = dailyTokensUsed.addAndGet(2000);
+getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+    .putInt("daily_tokens_used", usedM)
+    .putLong("token_reset_time", tokenResetTime)
+    .apply();
+payload.put("model", usedM > TOKEN_BUDGET_DAILY ? GROQ_MODEL_FALLBACK : GROQ_MODEL);
+if (usedM > TOKEN_BUDGET_DAILY && MainActivity.instance != null)
+    MainActivity.instance.addLog("⚠️ [MONTHLY] Budget token atteint — modèle léger.");
+payload.put("temperature", 0.05);
         JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content",
     "Tu es un analyste macroéconomique et stratège de marché quant senior de niveau institutionnel.\n" +
@@ -2971,8 +2977,15 @@ public boolean generateAndSendWeeklyReport() {
 String currentFlowW = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
     .getString("last_dominant_flow", "INDÉTERMINÉ");
         JSONObject payload = new JSONObject();
-        payload.put("model", GROQ_MODEL);
-        payload.put("temperature", 0.05);
+int usedW = dailyTokensUsed.addAndGet(2000);
+getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+    .putInt("daily_tokens_used", usedW)
+    .putLong("token_reset_time", tokenResetTime)
+    .apply();
+payload.put("model", usedW > TOKEN_BUDGET_DAILY ? GROQ_MODEL_FALLBACK : GROQ_MODEL);
+if (usedW > TOKEN_BUDGET_DAILY && MainActivity.instance != null)
+    MainActivity.instance.addLog("⚠️ [WEEKLY] Budget token atteint — modèle léger.");
+payload.put("temperature", 0.05);
 
         JSONArray messages = new JSONArray();
         messages.put(new JSONObject().put("role", "system").put("content",
