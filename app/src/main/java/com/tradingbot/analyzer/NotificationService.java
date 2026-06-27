@@ -537,7 +537,7 @@ public void onListenerDisconnected() {
 "US10Y : flight-to-quality comprime rendements | taux réels ajustés à la hausse | anticipations Fed révisées\n" +
 "NASDAQ : re-pricing multiple croissance | compression valorisation tech | risk appetite dégradé\n" +
 "SP500 : prime de risque equity élargie | flux risk-off vers obligations | révision bénéfices à la baisse\n" +
-"GOLD : crise GÉO sans USA = refuge haussier | crise GÉO avec riposte USA = dollar domine, GOLD comprimé | taux réels négatifs soutiennent\n" +
+"GOLD : défaut GÉO Iran/Hormuz = GOLD🟢 refuge | riposte USA confirmée = GOLD🔴 court terme | taux réels négatifs soutiennent | BCE hawkish = GOLD neutre\n" +
 "USOIL : prime offre Hormuz activée | stocks EIA inférieurs attentes | demande Chine révisée\n" +
 "EURUSD : différentiel taux BCE-Fed comprime | flux capitaux vers dollar refuge | risk appetite pèse sur euro\n" +
 "USDJPY : désengagement carry trade JPY | flux refuge compressent le cross | différentiel BoJ-Fed déterminant\n" + "CORRÉLATION USDJPY/GBPUSD : " +
