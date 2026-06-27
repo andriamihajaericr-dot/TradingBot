@@ -738,7 +738,11 @@ if (nowUtc >= tokenResetTime) {
         MainActivity.instance.addLog("🔄 [TOKEN] Compteur TPD réinitialisé (minuit UTC).");
 }
 // Vérifier budget restant
-int used = dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+    int used = dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+    .putInt("daily_tokens_used", used)
+    .putLong("token_reset_time", tokenResetTime)
+    .apply();
 if (used > TOKEN_BUDGET_DAILY) {
     Log.w(TAG, "[TOKEN] Budget TPD épuisé (" + used + ") — bascule directe fallback.");
     if (MainActivity.instance != null)
