@@ -625,11 +625,11 @@ public class EventValidator {
             if (upperText.contains("HORMUZ") || upperText.contains("ORMUZ")) {
                 geo.contextLabel = "Détroit d'Hormuz - Menace sur l'offre pétrole";
                 score += 40;
-                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN", "EURUSD", "US10Y"));
+                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN", "EURUSD", "GBPUSD", "USDCAD", "AUDUSD", "US10Y"));
             } else if (hasFactualAction) {
                 geo.contextLabel = "Moyen-Orient - Action Militaire";
                 score += 35;
-                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN", "EURUSD", "AUDUSD", "US10Y"));
+                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN", "EURUSD", "GBPUSD", "USDCAD", "AUDUSD", "US10Y"));
             } else if (isTrumpIran) {
                 geo.contextLabel = "Moyen-Orient - Déclaration Trump/Iran";
                 score += 18;   
