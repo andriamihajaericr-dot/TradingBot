@@ -375,7 +375,13 @@ getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
     .apply();
 
         GROQ_API_KEY   = k;
-        MACRO_API_KEY  = m;
+MACRO_API_KEY  = m;
+// Propager la clé TwelveData immédiatement
+MarketDataFetcher.setApiKey(m);
+// Synchroniser dans TradingBotPrefs pour TradingViewFetcher
+getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+    .putString("twelve_data_key", m)
+    .apply();
         TELEGRAM_TOKEN = t;
         TELEGRAM_CHAT_ID = c;
 
@@ -397,6 +403,13 @@ getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
     SharedPreferences p = getPrefs();
     GROQ_API_KEY     = p.getString("groq_key", "");
     MACRO_API_KEY    = p.getString("macro_api_key", "");
+// Initialiser MarketDataFetcher et TradingBotPrefs au démarrage
+if (!MACRO_API_KEY.isEmpty()) {
+    MarketDataFetcher.setApiKey(MACRO_API_KEY);
+    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+        .putString("twelve_data_key", MACRO_API_KEY)
+        .apply();
+}
     TELEGRAM_TOKEN   = p.getString("tg_token", "");
     TELEGRAM_CHAT_ID = p.getString("tg_chat_id", "");
     // Synchroniser twelve_data_key au démarrage
