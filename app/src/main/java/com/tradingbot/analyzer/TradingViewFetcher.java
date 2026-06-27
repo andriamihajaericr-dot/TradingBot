@@ -498,14 +498,33 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
         // ── GOLD ──
         TVMarketData gold = cache.get("GOLD");
         if (gold != null) {
-            sb.append("🏆 GOLD : ")
-              .append(String.format(Locale.US, "%.2f", gold.price))
-              .append(gold.changePercent > 0 ? " ↗️" : " ↘️")
-              .append(String.format(Locale.US, " (%+.2f%%)", gold.changePercent))
-              .append(" | MA200=").append(String.format(Locale.US, "%.2f", gold.ma200))
-              .append(gold.aboveMA200 ? " [TENDANCE HAUSSIÈRE]" : " [TENDANCE BAISSIÈRE]")
-              .append("\n");
+            double goldDistMA = gold.ma200 > 0 ?
+    ((gold.price - gold.ma200) / gold.ma200 * 100) : 0;
+String goldSignal = gold.aboveMA200 ?
+    String.format(Locale.US, "[+%.1f%% AU-DESSUS MA200 — refuge confirmé]", goldDistMA) :
+    String.format(Locale.US, "[%.1f%% SOUS MA200 — réduire conviction GÉO haussier 15%%]", goldDistMA);
+sb.append("🏆 GOLD : ")
+  .append(String.format(Locale.US, "%.2f", gold.price))
+  .append(gold.changePercent > 0 ? " ↗️" : " ↘️")
+  .append(String.format(Locale.US, " (%+.2f%%)", gold.changePercent))
+  .append(" | MA200=").append(String.format(Locale.US, "%.2f", gold.ma200))
+  .append(" ").append(goldSignal).append("\n");
         }
+        // ── USOIL ──
+TVMarketData usoil = cache.get("USOIL");
+if (usoil != null) {
+    double distMA = usoil.ma200 > 0 ?
+        ((usoil.price - usoil.ma200) / usoil.ma200 * 100) : 0;
+    String maSignal = usoil.aboveMA200 ?
+        String.format(Locale.US, "[+%.1f%% AU-DESSUS MA200 — prime GÉO déjà pricée]", distMA) :
+        String.format(Locale.US, "[%.1f%% SOUS MA200 — potentiel limité]", distMA);
+    sb.append("🛢️ USOIL : ")
+      .append(String.format(Locale.US, "%.2f", usoil.price))
+      .append(usoil.changePercent > 0 ? " ↗️" : " ↘️")
+      .append(String.format(Locale.US, " (%+.2f%%)", usoil.changePercent))
+      .append(" | MA200=").append(String.format(Locale.US, "%.2f", usoil.ma200))
+      .append(" ").append(maSignal).append("\n");
+ }
 
         // ── Régime Fed ──
         String regimeFed = ctx.getSharedPreferences("TradingBotPrefs",
