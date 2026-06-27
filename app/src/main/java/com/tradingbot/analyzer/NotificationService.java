@@ -520,7 +520,7 @@ public void onListenerDisconnected() {
 "US10Y : flight-to-quality comprime rendements | taux réels ajustés à la hausse | anticipations Fed révisées\n" +
 "NASDAQ : re-pricing multiple croissance | compression valorisation tech | risk appetite dégradé\n" +
 "SP500 : prime de risque equity élargie | flux risk-off vers obligations | révision bénéfices à la baisse\n" +
-"GOLD : demande refuge banques centrales | taux réels négatifs soutiennent | prime géopolitique activée\n" +
+"GOLD : crise GÉO sans USA = refuge haussier | crise GÉO avec riposte USA = dollar domine, GOLD comprimé | taux réels négatifs soutiennent\n" +
 "USOIL : prime offre Hormuz activée | stocks EIA inférieurs attentes | demande Chine révisée\n" +
 "EURUSD : différentiel taux BCE-Fed comprime | flux capitaux vers dollar refuge | risk appetite pèse sur euro\n" +
 "USDJPY : désengagement carry trade JPY | flux refuge compressent le cross | différentiel BoJ-Fed déterminant\n" +
@@ -929,7 +929,7 @@ userMsg.put("content", bodyEnrichi);
 boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
 if (fluxGeo) {
     String fb = filteredFb.toString();
-    if (fb.contains("GOLD : 🔴"))   fb = fb.replace("• 🏆 GOLD : 🔴",   "• 🏆 GOLD : 🟢");
+    //if (fb.contains("GOLD : 🔴"))   fb = fb.replace("• 🏆 GOLD : 🔴",   "• 🏆 GOLD : 🟢");
     if (fb.contains("USOIL : 🔴"))  fb = fb.replace("• 🛢️ USOIL : 🔴",  "• 🛢️ USOIL : 🟢");
     if (fb.contains("USDCAD : 🔴")) fb = fb.replace("• 🇨🇦 USDCAD : 🔴", "• 🇨🇦 USDCAD : 🟢");
     if (fb.contains("AUDUSD : 🔴")) fb = fb.replace("• 🇦🇺 AUDUSD : 🔴", "• 🇦🇺 AUDUSD : 🟢");
