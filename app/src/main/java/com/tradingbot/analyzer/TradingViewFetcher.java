@@ -44,7 +44,8 @@ public class TradingViewFetcher {
         put("EURUSD", "FX:EURUSD");
         put("US500",  "OANDA:SPX500USD");
         put("NASDAQ", "NASDAQ:QQQ");
-        put("GOLD",   "OANDA:XAUUSD");   // ← Ajout de l'or
+        put("GOLD",   "TVC:GOLD");    // Source TVC plus fiable
+        put("USOIL",  "TVC:USOIL");  // Pétrole WTI
     }};
 
     // ── Données récupérées ──
