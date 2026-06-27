@@ -535,6 +535,8 @@ public void onListenerDisconnected() {
 "BITCOIN : amplificateur NASDAQ x2-3 | liquidité crypto suit risk-off | corrélation actions renforcée\n" +
 "RÈGLE ABSOLUE : chaque justification ≤8 mots, unique par actif, issue du dictionnaire ci-dessus.\n" +
 "INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour', phrases répétées entre actifs.\n" +
+"CORRÉLATION EURUSD/GBPUSD : même direction obligatoire dans 90% des cas (même dénominateur USD). " +
+"Divergence autorisée UNIQUEMENT si news BoE seul, crise UK spécifique ou Brexit. Hors ces cas, EURUSD et GBPUSD doivent avoir la même direction.\n" +
 "FORMAT STRICT :\n" +
 "📊 RAPPORT JOURNALIER – [Date/Heure Madagascar]\n" +
 "🚨 [SOURCE]\n" +
