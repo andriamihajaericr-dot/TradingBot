@@ -528,7 +528,10 @@ public void onListenerDisconnected() {
 "GOLD : crise GÉO sans USA = refuge haussier | crise GÉO avec riposte USA = dollar domine, GOLD comprimé | taux réels négatifs soutiennent\n" +
 "USOIL : prime offre Hormuz activée | stocks EIA inférieurs attentes | demande Chine révisée\n" +
 "EURUSD : différentiel taux BCE-Fed comprime | flux capitaux vers dollar refuge | risk appetite pèse sur euro\n" +
-"USDJPY : désengagement carry trade JPY | flux refuge compressent le cross | différentiel BoJ-Fed déterminant\n" +
+"USDJPY : désengagement carry trade JPY | flux refuge compressent le cross | différentiel BoJ-Fed déterminant\n" + "CORRÉLATION USDJPY/GBPUSD : " +
+"En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
+"En régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire (les deux baissent en risk-off, les deux montent en risk-on). " +
+"Divergence possible UNIQUEMENT si BoJ seul (neutre GBPUSD) ou BoE seul (neutre USDJPY).\n" +
 "USDCAD : crise Hormuz = CAD profite pétrole haussier (BEARISH USDCAD) | différentiel BoC-Fed élargi | risk appetite pèse sur CAD\n" +
 "GBPUSD : contexte macro UK détériore GBP | BoE diverge de la Fed | risk-off comprime les paires risquées\n" +
 "AUDUSD : crise GÉO = AUD profite matières premières (BULLISH) | exposition Chine fragilise AUD | RBA dovish pèse sur AUD\n" +
@@ -2703,6 +2706,10 @@ String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
                                                                         
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
 "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n" +
+"CORRÉLATION USDJPY/GBPUSD : " +
+"En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
+"En régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire (les deux baissent en risk-off, les deux montent en risk-on). " +
+"Divergence possible UNIQUEMENT si BoJ seul (neutre GBPUSD) ou BoE seul (neutre USDJPY).\n" +                                                           
 "CORRÉLATION EURUSD/GBPUSD : même direction obligatoire sauf news BoE seul ou crise UK spécifique.\n" +
 "Lister uniquement les actifs avec impact réel — omettre les NEUTRE.\n\n" +
     "Format OBLIGATOIRE et STRICT :\n\n" +
@@ -2961,6 +2968,10 @@ String currentFlowW = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
 
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
     "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n" +
+    "CORRÉLATION USDJPY/GBPUSD : " +
+"En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
+"En régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire (les deux baissent en risk-off, les deux montent en risk-on). " +
+"Divergence possible UNIQUEMENT si BoJ seul (neutre GBPUSD) ou BoE seul (neutre USDJPY).\n" +
     "CORRÉLATION EURUSD/GBPUSD : même direction obligatoire sauf news BoE seul ou crise UK spécifique.\n" +
     "Lister uniquement les actifs avec impact réel — omettre les NEUTRE.\n\n" +
     "Format OBLIGATOIRE et STRICT :\n\n" +
