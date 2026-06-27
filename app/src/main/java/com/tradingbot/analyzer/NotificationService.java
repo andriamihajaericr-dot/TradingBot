@@ -728,8 +728,32 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             try {
                 List<String> historique = db.obtenirTexteEvenementsRecents();
                 String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
-                JSONObject jsonPayload = new JSONObject();
-                jsonPayload.put("model", GROQ_MODEL);
+                // Vérifier et réinitialiser le compteur à minuit UTC
+long nowUtc = System.currentTimeMillis();
+long midnightUtc = (nowUtc / 86400000L + 1) * 86400000L;
+if (nowUtc >= tokenResetTime) {
+    dailyTokensUsed.set(0);
+    tokenResetTime = midnightUtc;
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("🔄 [TOKEN] Compteur TPD réinitialisé (minuit UTC).");
+}
+// Vérifier budget restant
+int used = dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+if (used > TOKEN_BUDGET_DAILY) {
+    Log.w(TAG, "[TOKEN] Budget TPD épuisé (" + used + ") — bascule directe fallback.");
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("⚠️ [TOKEN] Budget 90k atteint — fallback préventif.");
+    // Forcer directement le modèle fallback sans attendre le 429
+    jsonPayload = new JSONObject();
+    jsonPayload.put("model", GROQ_MODEL_FALLBACK);
+    jsonPayload.put("temperature", 0.0);
+    jsonPayload.put("max_tokens", 600);
+} else {
+    jsonPayload = new JSONObject();
+    jsonPayload.put("model", GROQ_MODEL);
+    jsonPayload.put("temperature", 0.02);
+    jsonPayload.put("max_tokens", 600);
+}
                 jsonPayload.put("temperature", 0.02);
                 jsonPayload.put("max_tokens", 600);
     
