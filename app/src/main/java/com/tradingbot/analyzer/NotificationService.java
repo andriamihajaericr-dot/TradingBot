@@ -729,7 +729,6 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             try {
                 List<String> historique = db.obtenirTexteEvenementsRecents();
                 String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
-JSONObject jsonPayload;
                 // Vérifier et réinitialiser le compteur à minuit UTC
 long nowUtc = System.currentTimeMillis();
 long midnightUtc = (nowUtc / 86400000L + 1) * 86400000L;
@@ -745,6 +744,8 @@ getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
     .putInt("daily_tokens_used", used)
     .putLong("token_reset_time", tokenResetTime)
     .apply();
+
+JSONObject jsonPayload;
 if (used > TOKEN_BUDGET_DAILY) {
     Log.w(TAG, "[TOKEN] Budget TPD épuisé (" + used + ") — bascule directe fallback.");
     if (MainActivity.instance != null)
