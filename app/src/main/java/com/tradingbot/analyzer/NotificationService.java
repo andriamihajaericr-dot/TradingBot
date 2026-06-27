@@ -411,6 +411,8 @@ public void onListenerDisconnected() {
     "BANQUES CENTRALES ÉTRANGÈRES\n" +
     "══════════════════════════════════════════════════════\n" +
     "BCE dovish → EURUSD↓ ; BCE hawkish → EURUSD↑\n" +
+"ERREUR FRÉQUENTE INTERDITE : BCE hawkish ≠ EURUSD🔴. " +
+"Schnabel/Lagarde hawkish = différentiel BCE-Fed réduit = EURUSD🟢 OBLIGATOIREMENT.\n" +
     "BoJ dovish → USDJPY↑ ; BoJ hawkish → USDJPY↓\n" +
     "BoE dovish → GBPUSD↓ ; BoE hawkish → GBPUSD↑\n" +
     "RBA dovish → AUDUSD↓ ; RBA hawkish → AUDUSD↑\n" +
@@ -479,7 +481,8 @@ public void onListenerDisconnected() {
 "DOVISH = US10Y↓ USDCAD↓ USDJPY↓ GOLD↑ NASDAQ↑ SP500↑ BTC↑ EURUSD↑ GBPUSD↑ AUDUSD↑ USOIL=\n" +
 
 "BANQUES CENTRALES ÉTRANGÈRES :\n" +
-"BCE HAWKISH=EURUSD↑ ; BCE DOVISH=EURUSD↓.\n" +
+"BCE HAWKISH=EURUSD↑🟢 OBLIGATOIRE ; BCE DOVISH=EURUSD↓🔴. " +
+"INTERDIT : mettre EURUSD🔴 sur discours Schnabel/Lagarde hawkish.\n" +
 "BoJ HAWKISH=USDJPY↓ ; BoJ DOVISH=USDJPY↑.\n" +
 "BoE HAWKISH=GBPUSD↑ ; BoE DOVISH=GBPUSD↓.\n" +
 "RBA HAWKISH=AUDUSD↑ ; RBA DOVISH=AUDUSD↓.\n" +
