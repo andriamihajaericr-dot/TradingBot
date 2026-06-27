@@ -72,7 +72,7 @@ public class NotificationService extends NotificationListenerService {
 // Protection anti-spam : évite de scanner en boucle si le marché est instable
 private final ConcurrentHashMap<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
 private static final long ALERT_COOLDOWN_MS = 60 * 60 * 1000L; // 1 heure de cooldown par actif
-private static final long INERTIA_REMINDER_COOLDOWN_MS = 30 * 60 * 1000L; // 1 rappel max toutes les 30 min par type de driver
+private static final long INERTIA_REMINDER_COOLDOWN_MS = 60 * 60 * 1000L; // 1 rappel max toutes les 30 min par type de driver
 
 private final ConcurrentHashMap<String, Long> lastInertiaReminderSentMemory = new ConcurrentHashMap<>();
     private static class PrevailingDirection {
