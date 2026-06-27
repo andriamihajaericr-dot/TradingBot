@@ -422,8 +422,8 @@ public static synchronized boolean tryAcquireBatchSlot() {
                 case "NASDAQ": return h ? "Risk-on → flux acheteur" : "Risk-off → liquidation boursière";
                 case "GOLD": return h ? "Fuite vers la sécurité → tensions macro/géo" : "Détente macro";
                 //case "BITCOIN": return h ? "Spéculation haussière" : "Aversion au risque → capitulation";
-                case "GBPUSD": return h ? "Affaiblissement du Dollar US" : "Dollar dominant";
-                case "USDJPY": return h ? "Dollar fort" : "Dollar faible";
+                case "EURUSD": return h ? "Affaiblissement du Dollar US" : "Dollar dominant";
+                //case "USDJPY": return h ? "Dollar fort" : "Dollar faible";
                 case "USOIL": return h ? "Tensions sur l'offre / Risque géopolitique" : "Ralentissement global";
                 //case "US10Y": return h ? "Obligations ↑ → Taux ↓ (dovish)" : "Obligations ↓ → Taux ↑ (hawkish)";
                 default: return "";
