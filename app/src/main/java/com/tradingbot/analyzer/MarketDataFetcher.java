@@ -136,7 +136,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
         return;
     }
 
-    List<String> testAssets = Arrays.asList("SP500", "NASDAQ", "GOLD", "GBPUSD", "USOIL", "USDJPY");
+    List<String> testAssets = Arrays.asList("NASDAQ", "GOLD", "EURUSD", "USOIL");
     
     long start = System.currentTimeMillis();
     
