@@ -729,6 +729,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             try {
                 List<String> historique = db.obtenirTexteEvenementsRecents();
                 String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
+JSONObject jsonPayload;
                 // Vérifier et réinitialiser le compteur à minuit UTC
 long nowUtc = System.currentTimeMillis();
 long midnightUtc = (nowUtc / 86400000L + 1) * 86400000L;
