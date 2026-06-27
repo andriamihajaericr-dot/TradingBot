@@ -183,8 +183,9 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
 
     private static TVMarketData fetchSymbol(String key, String tvSymbol) throws Exception {
         final Object lock = new Object();
-        final double[] result = {-1, 0, 0}; // [price, changePercent, ma200]
-        final boolean[] done  = {false};
+        final double[] result    = {-1, 0, 0};
+        final boolean[] done     = {false};
+        final int[] candlesCount = {0}; // Pour log diagnostic
 
         String wsSession    = "qs_" + randomString(12);
         String chartSession = "cs_" + randomString(12);
@@ -279,7 +280,10 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
                                         for (int i = 0; i < s.length(); i++) {
                                             JSONArray v = s.getJSONObject(i).getJSONArray("v");
                                             double close = v.optDouble(4, 0);
-                                            if (close > 0) candles.add(new double[]{close});
+                                            if (close > 0) {
+                                             candles.add(new double[]{close});
+                                             candlesCount[0] = candles.size();
+                                              }
                                         }
                                         if (!candles.isEmpty()) {
                                             result[2] = calculateMA(candles, 200);
