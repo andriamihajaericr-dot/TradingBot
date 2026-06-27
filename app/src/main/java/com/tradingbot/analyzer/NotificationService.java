@@ -752,6 +752,15 @@ if (used > TOKEN_BUDGET_DAILY) {
     jsonPayload.put("model", GROQ_MODEL_FALLBACK);
     jsonPayload.put("temperature", 0.0);
     jsonPayload.put("max_tokens", 600);
+// Injecter rappel format strict dans le system prompt du fallback
+JSONArray msgsFb = jsonPayload.getJSONArray("messages");
+JSONObject sysMsgFb = msgsFb.getJSONObject(0);
+String sysContentFb = sysMsgFb.getString("content");
+sysMsgFb.put("content", sysContentFb +
+    "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
+    "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
+    "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n" +
+    "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'");
 } else {
     jsonPayload = new JSONObject();
     jsonPayload.put("model", GROQ_MODEL);
