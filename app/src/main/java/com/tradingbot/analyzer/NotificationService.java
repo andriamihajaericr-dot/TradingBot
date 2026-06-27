@@ -2809,10 +2809,11 @@ payload.put("temperature", 0.05);
 "- Chaque justification doit être factuelle : chiffre observé (ex: 'CPI 3.8% vs 3.5% attendu') ou événement nommé (ex: 'Powell hawkish FOMC mai').\n" +
 "- Longueur maximale : 10 mots.\n" +
 "- Style institutionnel obligatoire : 'prime de risque élargie', 'flight-to-quality activé', 'différentiel de taux déterminant', 'révision bénéfices à la baisse'.\n" +
-"- NUANCE GÉO OBLIGATOIRE : crise GÉO sans riposte USA = GOLD haussier refuge. Crise GÉO avec riposte militaire USA = dollar dominant, GOLD comprimé court terme. Ne jamais appliquer GÉO = GOLD haussier de manière systématique.\n" +
-"- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'contexte difficile', toute phrase sans ancrage factuel.\n\n" +
-                                                                        
-    "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
+"- NUANCE GÉO OBLIGATOIRE : défaut crise GÉO Iran/Hormuz = GOLD🟢 refuge (historique +0.8% à +1.5%). " +
+"Riposte militaire USA confirmée uniquement = GOLD🔴 court terme. " +
+"RÈGLE PAR DÉFAUT : sans 'riposte/strike/Pentagon' dans le texte → GOLD🟢.\n" +
+"- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'contexte difficile', toute phrase sans ancrage factuel.\n\n" +                                                                    
+"Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
 "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n" +
 "CORRÉLATION USDJPY/GBPUSD : " +
 "En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
