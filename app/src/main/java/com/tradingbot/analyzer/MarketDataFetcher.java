@@ -545,7 +545,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
         try {
             // 🔥 Timeout aligné sur le budget réseau réel (connect 3s + 1 retry + marge) pour
             // laisser le temps à executeHttpRequestWithRetry() de répondre avant abandon
-            Map<String, MarketData> freshData = future.get(7000, TimeUnit.MILLISECONDS);
+            Map<String, MarketData> freshData = future.get(75000, TimeUnit.MILLISECONDS); // 75s — couvre attente quota + réseau
             if (freshData != null && !freshData.isEmpty()) {
                 long now = System.currentTimeMillis();
                 // Remplissage dynamique du cache enveloppé de son horodatage (TTL)
