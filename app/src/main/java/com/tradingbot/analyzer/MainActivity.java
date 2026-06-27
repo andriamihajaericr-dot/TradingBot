@@ -362,12 +362,17 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        getPrefs().edit()
-            .putString("groq_key", k)
-            .putString("macro_api_key", m)
-            .putString("tg_token", t)
-            .putString("tg_chat_id", c)
-            .apply();
+    getPrefs().edit()
+    .putString("groq_key", k)
+    .putString("macro_api_key", m)
+    .putString("tg_token", t)
+    .putString("tg_chat_id", c)
+    .apply();
+
+// Synchroniser aussi dans TradingBotPrefs pour TradingViewFetcher et MarketDataFetcher
+getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+    .putString("twelve_data_key", m)
+    .apply();
 
         GROQ_API_KEY   = k;
         MACRO_API_KEY  = m;
