@@ -235,7 +235,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
 
     private static final List<AssetConfig> ASSET_CONFIGS = new ArrayList<>();
     static {
-        ASSET_CONFIGS.add(new AssetConfig("SP500",   "SPY",      false, 1.5, 0.8));
+        //ASSET_CONFIGS.add(new AssetConfig("SP500",   "SPY",      false, 1.5, 0.8));
         ASSET_CONFIGS.add(new AssetConfig("NASDAQ",  "QQQ",      false, 1.5, 0.8));
         ASSET_CONFIGS.add(new AssetConfig("GOLD",    "XAU/USD",  false, 1.5, 0.7));
         //ASSET_CONFIGS.add(new AssetConfig("BITCOIN", "BTC/USD",  false, 3.0, 1.5));
@@ -419,7 +419,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
         private static String interpreterMouvement(String nom, double change) {
             boolean h = change > 0;
             switch (nom) {
-                case "SP500": case "NASDAQ": return h ? "Risk-on → flux acheteur" : "Risk-off → liquidation boursière";
+                case "NASDAQ": return h ? "Risk-on → flux acheteur" : "Risk-off → liquidation boursière";
                 case "GOLD": return h ? "Fuite vers la sécurité → tensions macro/géo" : "Détente macro";
                 //case "BITCOIN": return h ? "Spéculation haussière" : "Aversion au risque → capitulation";
                 case "GBPUSD": return h ? "Affaiblissement du Dollar US" : "Dollar dominant";
