@@ -471,8 +471,8 @@ public static synchronized boolean tryAcquireBatchSlot() {
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 
-                conn.setConnectTimeout(3000);
-                conn.setReadTimeout(3000);
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(8000);
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 429 || responseCode >= 500) {
@@ -560,7 +560,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
                 MainActivity.instance.addLog("⚠️ [BATCH] Réponse réseau vide pour " + assets + " — voir messages 🔴 ci-dessus pour la cause exacte.");
             }
         } catch (TimeoutException e) {
-            String msg = "⚡ [TIMEOUT] API Prix saturée (>7000ms) lors du flux macro. Recours immédiat au cache LKV.";
+            String msg = "⚡ [TIMEOUT] API Prix saturée (>7500ms) lors du flux macro. Recours immédiat au cache LKV.";
             Log.e(TAG, msg);
             if (MainActivity.instance != null) {
                 MainActivity.instance.addLog(msg);
