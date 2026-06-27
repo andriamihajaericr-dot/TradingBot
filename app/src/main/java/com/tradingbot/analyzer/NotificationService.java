@@ -1784,7 +1784,21 @@ sendTelegramSecure(reminderMsg, NotificationService.this);
         // ── Liaison du contexte pour l'extraction de la clé macro_api_key ──
         EconomicCalendarAPI.init(this);
         EventValidator.setAppContext(this); 
-        serviceInstance = this;                 // ✅ Assure la survie de l'instance pour l'IA
+        serviceInstance = this;
+// 🛡️ Restaurer compteur tokens depuis SharedPreferences
+SharedPreferences tokenPrefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
+long savedResetTime = tokenPrefs.getLong("token_reset_time", 0L);
+int savedTokens = tokenPrefs.getInt("daily_tokens_used", 0);
+long nowInit = System.currentTimeMillis();
+if (nowInit < savedResetTime) {
+    dailyTokensUsed.set(savedTokens);
+    tokenResetTime = savedResetTime;
+    Log.i(TAG, "[TOKEN] Compteur restauré : " + savedTokens + " tokens utilisés.");
+} else {
+    dailyTokensUsed.set(0);
+    tokenResetTime = (nowInit / 86400000L + 1) * 86400000L;
+    Log.i(TAG, "[TOKEN] Nouveau jour — compteur remis à zéro.");
+}                 // ✅ Assure la survie de l'instance pour l'IA
         
         // ── Déportation du préchargement réseau dans un thread d'arrière-plan ──
     new Thread(new Runnable() {
