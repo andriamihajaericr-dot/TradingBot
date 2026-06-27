@@ -971,16 +971,40 @@ userMsg.put("content", bodyEnrichi);
     }
     // Seuil conviction plus élevé sur fallback — modèle léger moins fiable
     
-                // Corrections matrice GÉO — modèle léger ne respecte pas toujours les refuges
 boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
 if (fluxGeo) {
     String fb = filteredFb.toString();
-    //if (fb.contains("GOLD : 🔴"))   fb = fb.replace("• 🏆 GOLD : 🔴",   "• 🏆 GOLD : 🟢");
+    String fbLower = fallbackReport.toLowerCase();
+    // Détection riposte militaire USA — bilingue
+    boolean ripposteUSA =
+        fbLower.contains("riposte")
+        || fbLower.contains("frappe américaine")
+        || fbLower.contains("frappe militaire")
+        || fbLower.contains("trump ordonne")
+        || fbLower.contains("offensive américaine")
+        || fbLower.contains("bombardement")
+        || fbLower.contains("us strike")
+        || fbLower.contains("us attack")
+        || fbLower.contains("military response")
+        || fbLower.contains("pentagon")
+        || fbLower.contains("airstrike")
+        || fbLower.contains("air strike")
+        || fbLower.contains("missile strike")
+        || fbLower.contains("trump orders")
+        || fbLower.contains("retaliati")
+        || fbLower.contains("u.s. military")
+        || fbLower.contains("us military")
+        || fbLower.contains("american forces")
+        || fbLower.contains("armed response");
+    // GOLD : refuge sauf si riposte USA active (dollar domine)
+    if (!ripposteUSA)
+        fb = fb.replaceAll("(• 🏆 GOLD\\s*:\\s*)🔴", "$1🟢");
+    // USOIL/USDCAD/AUDUSD : toujours haussiers en crise GÉO
     if (fb.contains("USOIL : 🔴"))  fb = fb.replace("• 🛢️ USOIL : 🔴",  "• 🛢️ USOIL : 🟢");
     if (fb.contains("USDCAD : 🔴")) fb = fb.replace("• 🇨🇦 USDCAD : 🔴", "• 🇨🇦 USDCAD : 🟢");
     if (fb.contains("AUDUSD : 🔴")) fb = fb.replace("• 🇦🇺 AUDUSD : 🔴", "• 🇦🇺 AUDUSD : 🟢");
     filteredFb = new StringBuilder(fb);
-}
+ }
 int convFb = extrairePourcentageConviction(fallbackReport);
 // Vérifier cohérence vecteur/flux — rejeter si contradiction
 boolean vecteurGeo = fallbackReport.contains("VECTEUR CIBLE : GÉO") || fallbackReport.contains("VECTEUR CIBLE : GÉOPOLITIQUE");
