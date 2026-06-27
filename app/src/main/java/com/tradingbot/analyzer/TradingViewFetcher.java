@@ -8,7 +8,7 @@ import org.java_websocket.handshake.ServerHandshake;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
+import java.util.Iterator;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -236,25 +236,25 @@ public class TradingViewFetcher {
                                 }
                             }
 
-                        } else if ("timescale_update".equals(m)) {
-                            // Série daily — on cherche la clé "s" dans la réponse
-                            JSONArray p = json.getJSONArray("p");
-                            // La structure peut être: [sessionId, dataObject]
-                            if (p.length() > 1) {
-                                JSONObject dataObj = p.getJSONObject(1);
-                                // Essayer d'abord avec l'identifiant "sds_1"
-                                JSONObject series = dataObj.optJSONObject("sds_1");
-                                if (series == null) {
-                                    // Fallback: chercher n'importe quelle clé contenant "s"
-                                    for (String key : dataObj.keySet()) {
-                                        if (key.startsWith("s")) {
-                                            series = dataObj.optJSONObject(key);
-                                            if (series != null) break;
-                                        }
-                                    }
-                                }
-                                if (series != null) {
-                                    JSONArray s = series.optJSONArray("s");
+                        
+} else if ("timescale_update".equals(m)) {
+    JSONArray p = json.getJSONArray("p");
+    if (p.length() > 1) {
+        JSONObject dataObj = p.getJSONObject(1);
+        JSONObject series = dataObj.optJSONObject("sds_1");
+        if (series == null) {
+            // Fallback: chercher n'importe quelle clé contenant "s"
+            Iterator<String> keys = dataObj.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                if (key.startsWith("s")) {
+                    series = dataObj.optJSONObject(key);
+                    if (series != null) break;
+                }
+            }
+        }
+        if (series != null) {
+            JSONArray s = series.optJSONArray("s");
                                     if (s != null) {
                                         for (int i = 0; i < s.length(); i++) {
                                             JSONArray v = s.getJSONObject(i).getJSONArray("v");
