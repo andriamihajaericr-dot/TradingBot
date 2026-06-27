@@ -257,6 +257,7 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
 
                         
 } else if ("timescale_update".equals(m)) {
+    Log.d(TAG, "[TV WS] timescale_update reçu : " + json.toString());
     JSONArray p = json.getJSONArray("p");
     if (p.length() > 1) {
         JSONObject dataObj = p.getJSONObject(1);
