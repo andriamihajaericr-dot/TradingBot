@@ -421,7 +421,9 @@ public void onListenerDisconnected() {
     "   - Divergence autorisée UNIQUEMENT si BoJ seul (GBPUSD neutre) ou BoE seul (USDJPY neutre).\n" +
     "7. CORRÉLATION EURUSD/GBPUSD : même direction obligatoire dans 90% des cas.\n" +
     "   - Divergence autorisée UNIQUEMENT si news BoE seul, crise UK spécifique ou Brexit.\n" +
-    "8. VECTEUR CIBLE autorisé : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
+    "8. Chaque actif : direction + mécanisme causal précis ≤8 mots. INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour'.\n" +
+    "DIRECTION OBLIGATOIRE : utiliser exclusivement 🟢 pour BULLISH, 🔴 pour BEARISH, NEUTRE pour neutre. Interdit d'écrire 'BULLISH', 'BEARISH', '↑', '↓', '='.\n" +
+    "Lister uniquement les actifs impactés — omettre les NEUTRE.\n" +
     "9. Pas de doubles astérisques (**) – utiliser *simple*.\n" +
     "10. VECTEUR CIBLE autorisé : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
     "11. En cas de crise géopolitique, appliquer l'exception et mentionner \"Régime Safe-Haven\".\n\n" +
