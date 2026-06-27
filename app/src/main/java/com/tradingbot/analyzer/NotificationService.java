@@ -2960,8 +2960,9 @@ String currentFlowW = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
 "- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'sentiment dégradé', toute généralité sans chiffre ni source.\n\n" +                        
 
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
-    "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n\n" +
-
+    "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n" +
+    "CORRÉLATION EURUSD/GBPUSD : même direction obligatoire sauf news BoE seul ou crise UK spécifique.\n" +
+    "Lister uniquement les actifs avec impact réel — omettre les NEUTRE.\n\n" +
     "Format OBLIGATOIRE et STRICT :\n\n" +
 
     "1. 🏆 ÉVÉNEMENTS CLÉS ET IMPACTS (1 à 3 événements retenus, classés par importance décroissante) :\n" +
