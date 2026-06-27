@@ -31,6 +31,7 @@ import java.util.concurrent.*;
 import android.content.SharedPreferences;
 import java.util.regex.*;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class NotificationService extends NotificationListenerService {
 
@@ -767,8 +768,6 @@ sysMsgFb.put("content", sysContentFb +
     jsonPayload.put("temperature", 0.02);
     jsonPayload.put("max_tokens", 600);
 }
-                jsonPayload.put("temperature", 0.02);
-                jsonPayload.put("max_tokens", 600);
     
                 JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content", promptFinal));
