@@ -396,8 +396,15 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
     // ─────────────────────────────────────────────────────────────────────────
 
     public static String buildContexteMacroGlobal(Context ctx) {
-        if (cache.isEmpty()) return "";
-
+    if (cache.isEmpty()) return "";
+    // Vérifier que le cache a moins de 30 minutes
+    long now = System.currentTimeMillis();
+    boolean cacheStale = cache.values().stream()
+        .allMatch(d -> (now - d.timestamp) > 30 * 60 * 1000L);
+    if (cacheStale) {
+        Log.w(TAG, "[TV] Cache périmé (>30min) — contexte macro non injecté.");
+        return ""; // Ne pas injecter des données périmées
+    }
         StringBuilder sb = new StringBuilder();
         sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
 
