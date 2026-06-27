@@ -833,34 +833,34 @@ sysMsgFb.put("content", sysContentFb +
                     int activeSignalsCount = 0;
                     boolean inImpactSection = false;
     
-                    for (String line : lines) {
-                    // Masquer les actifs NEUTRE — inutiles pour le trading
                     java.util.Set<String> actifsDejaSeen = new java.util.HashSet<>();
-                    for (String line : lines) {
-                   // Masquer les actifs NEUTRE — inutiles pour le trading
-                   if (line.contains("NEUTRE") || line.matches(".*•.*:.*= \\|.*")) continue;
-                   // Masquer les doublons d'actifs (ex: EURUSD affiché 2 fois)
-                   if (line.trim().startsWith("•")) {
-                     String actifKey = line.trim().length() > 15 ? line.trim().substring(0, 15) : line.trim();
-                     if (!actifsDejaSeen.add(actifKey)) continue;
-                   }
-                        if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
-                            trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
-                            filteredMessage.append(line).append("\n");
-                            if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
-                            continue;
-                        }
-                        if (inImpactSection && trimmed.startsWith("•")) {
-                            String upperLine = line.toUpperCase(Locale.ROOT);
-                            boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
-                            boolean isSignificant = !isInclinationNeutral &&
-                             (upperLine.contains("BULLISH") || upperLine.contains("BEARISH"));
-                                if (isSignificant) {
-                                    filteredMessage.append(line).append("\n");
-                                    activeSignalsCount++;
-                                }
-                        }
-                    }
+for (String line : lines) {
+    // Masquer les actifs NEUTRE — inutiles pour le trading
+    if (line.contains("NEUTRE") || line.matches(".*•.*:.*= \\|.*")) continue;
+    // Masquer les doublons d'actifs (ex: EURUSD affiché 2 fois)
+    if (line.trim().startsWith("•")) {
+        String actifKey = line.trim().length() > 15 ? line.trim().substring(0, 15) : line.trim();
+        if (!actifsDejaSeen.add(actifKey)) continue;
+    }
+    String trimmed = line.trim();
+    if (trimmed.isEmpty()) continue;
+    if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
+        trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
+        filteredMessage.append(line).append("\n");
+        if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
+        continue;
+    }
+    if (inImpactSection && trimmed.startsWith("•")) {
+        String upperLine = line.toUpperCase(Locale.ROOT);
+        boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
+        boolean isSignificant = !isInclinationNeutral &&
+            (upperLine.contains("BULLISH") || upperLine.contains("BEARISH"));
+        if (isSignificant) {
+            filteredMessage.append(line).append("\n");
+            activeSignalsCount++;
+        }
+    }
+}
     
                     // ✅ Application du filtre conviction
                     // APRÈS
