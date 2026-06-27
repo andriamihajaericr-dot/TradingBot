@@ -339,10 +339,24 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
         if (result[0] > 0) {
             // Si MA200 est toujours 0, on peut essayer de la récupérer via Twelve Data en fallback
             if (result[2] == 0) {
-                Log.w(TAG, "[TV] MA200 non obtenue pour " + key + " — tentative fallback Twelve Data.");
-                double ma200Fallback = fetchMA200FromTwelveData(key);
-                if (ma200Fallback > 0) result[2] = ma200Fallback;
-            }
+    Log.w(TAG, "[TV] MA200 WebSocket=0 pour " + key + " (" + tvSymbol + ") — " +
+        candles.size() + " bougies reçues — tentative fallback TwelveData.");
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("⚠️ [TV MA200] " + key + " : WebSocket échoué (" +
+            candles.size() + " bougies) → TwelveData fallback...");
+    double ma200Fallback = fetchMA200FromTwelveData(key);
+    if (ma200Fallback > 0) {
+        result[2] = ma200Fallback;
+        Log.i(TAG, "[TV MA200] " + key + " fallback TwelveData OK : " + ma200Fallback);
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("✅ [TV MA200] " + key + " via TwelveData : " +
+                String.format(Locale.US, "%.4f", ma200Fallback));
+    } else {
+        Log.e(TAG, "[TV MA200] " + key + " — TwelveData aussi échoué. MA200=0.");
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("❌ [TV MA200] " + key + " : TwelveData aussi échoué — MA200=0");
+    }
+}
             return new TVMarketData(key, result[0], result[1], result[2],
                 System.currentTimeMillis());
         }
