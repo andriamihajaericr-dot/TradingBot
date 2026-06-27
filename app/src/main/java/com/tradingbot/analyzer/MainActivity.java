@@ -393,12 +393,18 @@ getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
         }).start();
     }
 
-    private void loadSavedKeys() {
-        SharedPreferences p = getPrefs();
-        GROQ_API_KEY     = p.getString("groq_key", "");
-        MACRO_API_KEY    = p.getString("macro_api_key", "");
-        TELEGRAM_TOKEN   = p.getString("tg_token", "");
-        TELEGRAM_CHAT_ID = p.getString("tg_chat_id", "");
+  private void loadSavedKeys() {
+    SharedPreferences p = getPrefs();
+    GROQ_API_KEY     = p.getString("groq_key", "");
+    MACRO_API_KEY    = p.getString("macro_api_key", "");
+    TELEGRAM_TOKEN   = p.getString("tg_token", "");
+    TELEGRAM_CHAT_ID = p.getString("tg_chat_id", "");
+    // Synchroniser twelve_data_key au démarrage
+    if (!MACRO_API_KEY.isEmpty()) {
+        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+            .putString("twelve_data_key", MACRO_API_KEY)
+            .apply();
+    }
 
         apiKeyInput.setText(GROQ_API_KEY);
         macroApiKeyInput.setText(MACRO_API_KEY);
