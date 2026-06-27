@@ -384,41 +384,53 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
             case "GOLD":   twelveSymbol = "GOLD"; break;
         }
         if (twelveSymbol == null) return 0;
-        // Utiliser MarketDataFetcher pour obtenir la SMA200
-        // Pour l'instant, on renvoie 0 car cela nécessite une méthode supplémentaire
-        // Vous pouvez implémenter un appel à l'API Twelve Data /sma
         try {
-    // Lire d'abord TradingBotPrefs (synchronisé par MainActivity)
-// Fallback sur MainActivity.MACRO_API_KEY si disponible
-String apiKey = appContext
-    .getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
-    .getString("twelve_data_key", "");
-if (apiKey.isEmpty() && MainActivity.instance != null) {
-    apiKey = MainActivity.MACRO_API_KEY;
-}
-    if (apiKey.isEmpty()) return 0;
+    String apiKey = appContext
+        .getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+        .getString("twelve_data_key", "");
+    if (apiKey.isEmpty()) {
+        Log.w(TAG, "[TV MA200 Fallback] Clé TwelveData absente — MA200 impossible pour " + key);
+        return 0;
+    }
     String url = "https://api.twelvedata.com/sma?symbol=" + twelveSymbol
         + "&interval=1day&time_period=200&apikey=" + apiKey;
+    Log.d(TAG, "[TV MA200 Fallback] Appel TwelveData SMA : " + url.replace(apiKey, "***"));
     java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
         new java.net.URL(url).openConnection();
     conn.setConnectTimeout(8000);
     conn.setReadTimeout(8000);
-    if (conn.getResponseCode() == 200) {
+    int httpCode = conn.getResponseCode();
+    Log.d(TAG, "[TV MA200 Fallback] HTTP " + httpCode + " pour " + twelveSymbol);
+    if (httpCode == 200) {
         java.io.BufferedReader br = new java.io.BufferedReader(
             new java.io.InputStreamReader(conn.getInputStream()));
         StringBuilder resp = new StringBuilder();
         String line;
         while ((line = br.readLine()) != null) resp.append(line);
-        JSONObject json = new JSONObject(resp.toString());
-        JSONObject values = json.optJSONArray("values") != null ?
-            json.getJSONArray("values").getJSONObject(0) : null;
-        if (values != null) {
-            return values.optDouble("sma", 0);
+        String rawResp = resp.toString();
+        Log.d(TAG, "[TV MA200 Fallback] Réponse brute : " + rawResp.substring(0, Math.min(200, rawResp.length())));
+        JSONObject json = new JSONObject(rawResp);
+        // Vérifier erreur API TwelveData
+        if (json.has("code") && json.optInt("code") != 200) {
+            Log.e(TAG, "[TV MA200 Fallback] Erreur API TwelveData : " + json.optString("message"));
+            conn.disconnect();
+            return 0;
         }
+        JSONArray valuesArr = json.optJSONArray("values");
+        if (valuesArr != null && valuesArr.length() > 0) {
+            double sma = valuesArr.getJSONObject(0).optDouble("sma", 0);
+            Log.i(TAG, "[TV MA200 Fallback] SMA200 " + twelveSymbol + " = " + sma);
+            conn.disconnect();
+            return sma;
+        } else {
+            Log.w(TAG, "[TV MA200 Fallback] Aucune valeur SMA dans la réponse pour " + twelveSymbol);
+        }
+    } else {
+        Log.e(TAG, "[TV MA200 Fallback] HTTP " + httpCode + " pour " + twelveSymbol);
     }
     conn.disconnect();
 } catch (Exception e) {
-    Log.e(TAG, "[TV MA200 Fallback] Erreur TwelveData SMA : " + e.getMessage());
+    Log.e(TAG, "[TV MA200 Fallback] Exception pour " + key + " : " + e.getMessage());
 }
 return 0;
     }
