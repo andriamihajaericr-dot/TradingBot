@@ -371,7 +371,35 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
         // Utiliser MarketDataFetcher pour obtenir la SMA200
         // Pour l'instant, on renvoie 0 car cela nécessite une méthode supplémentaire
         // Vous pouvez implémenter un appel à l'API Twelve Data /sma
-        return 0;
+        try {
+    String apiKey = android.preference.PreferenceManager
+        .getDefaultSharedPreferences(appContext)
+        .getString("twelve_data_key", "");
+    if (apiKey.isEmpty()) return 0;
+    String url = "https://api.twelvedata.com/sma?symbol=" + twelveSymbol
+        + "&interval=1day&time_period=200&apikey=" + apiKey;
+    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+        new java.net.URL(url).openConnection();
+    conn.setConnectTimeout(8000);
+    conn.setReadTimeout(8000);
+    if (conn.getResponseCode() == 200) {
+        java.io.BufferedReader br = new java.io.BufferedReader(
+            new java.io.InputStreamReader(conn.getInputStream()));
+        StringBuilder resp = new StringBuilder();
+        String line;
+        while ((line = br.readLine()) != null) resp.append(line);
+        JSONObject json = new JSONObject(resp.toString());
+        JSONObject values = json.optJSONArray("values") != null ?
+            json.getJSONArray("values").getJSONObject(0) : null;
+        if (values != null) {
+            return values.optDouble("sma", 0);
+        }
+    }
+    conn.disconnect();
+} catch (Exception e) {
+    Log.e(TAG, "[TV MA200 Fallback] Erreur TwelveData SMA : " + e.getMessage());
+}
+return 0;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -399,8 +427,10 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
     if (cache.isEmpty()) return "";
     // Vérifier que le cache a moins de 30 minutes
     long now = System.currentTimeMillis();
-    boolean cacheStale = cache.values().stream()
-        .allMatch(d -> (now - d.timestamp) > 30 * 60 * 1000L);
+    boolean cacheStale = true;
+for (TVMarketData d : cache.values()) {
+    if ((now - d.timestamp) <= 30 * 60 * 1000L) { cacheStale = false; break; }
+}
     if (cacheStale) {
         Log.w(TAG, "[TV] Cache périmé (>30min) — contexte macro non injecté.");
         return ""; // Ne pas injecter des données périmées
