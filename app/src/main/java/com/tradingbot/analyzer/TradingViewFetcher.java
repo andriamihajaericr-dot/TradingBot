@@ -118,31 +118,42 @@ public class TradingViewFetcher {
     // ─────────────────────────────────────────────────────────────────────────
 
     public static void fetchAll(OnDataReadyListener listener) {
-        new Thread(() -> {
-            Log.d(TAG, "[TV] Début fetchAll — " + SYMBOL_MAP.size() + " symboles.");
-            Map<String, TVMarketData> results = new HashMap<>();
+    new Thread(() -> {
+        // Paralléliser — max 4 threads simultanés pour éviter le flood TradingView
+        java.util.concurrent.ExecutorService pool =
+            Executors.newFixedThreadPool(4);
+        ConcurrentHashMap<String, TVMarketData> results = new ConcurrentHashMap<>();
+        java.util.concurrent.CountDownLatch latch =
+            new java.util.concurrent.CountDownLatch(SYMBOL_MAP.size());
 
-            for (Map.Entry<String, String> entry : SYMBOL_MAP.entrySet()) {
-                String key    = entry.getKey();
-                String tvSym  = entry.getValue();
+        for (Map.Entry<String, String> entry : SYMBOL_MAP.entrySet()) {
+            String key   = entry.getKey();
+            String tvSym = entry.getValue();
+            pool.submit(() -> {
                 try {
                     TVMarketData data = fetchSymbol(key, tvSym);
                     if (data != null) {
                         results.put(key, data);
                         cache.put(key, data);
-                        Log.i(TAG, "[TV] " + key + " → " + 
+                        Log.i(TAG, "[TV] " + key + " → " +
                             String.format(Locale.US, "%.4f", data.price) +
-                            " (" + String.format(Locale.US, "%+.2f", data.changePercent) + "%)" +
                             " MA200=" + String.format(Locale.US, "%.4f", data.ma200) +
                             (data.aboveMA200 ? " ↗️ ABOVE" : " ↘️ BELOW"));
                     }
-                    // Pause entre symboles pour éviter le flood
-                    Thread.sleep(2000);
                 } catch (Exception e) {
                     Log.e(TAG, "[TV] Erreur fetch " + key + " : " + e.getMessage());
+                } finally {
+                    latch.countDown();
                 }
-            }
-
+            });
+        }
+        try {
+            // Attendre max 45 secondes pour tous les symboles
+            latch.await(45, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Log.w(TAG, "[TV] fetchAll interrompu.");
+        }
+        pool.shutdownNow();
             if (listener != null) {
                 if (!results.isEmpty()) {
                     listener.onDataReady(results);
@@ -199,9 +210,10 @@ public class TradingViewFetcher {
                     long fromSec = nowSec - (300 * 24 * 60 * 60); // 300 jours
                     send(msg("resolve_symbol", new String[]{chartSession, "sds_sym_1", "=" + resolve}));
                     // create_series: [sessionId, seriesId, seriesName, symbolId, resolution, from, to]
+                    // TradingView attend : [chartSession, seriesId, seriesName, symbolId, resolution, barCount]
+                    // from/to ne sont PAS des paramètres valides — utiliser le nombre de bougies
                     send(msg("create_series", new String[]{
-                        chartSession, "sds_1", "s1", "sds_sym_1", "1D",
-                        String.valueOf(fromSec), String.valueOf(nowSec)
+                       chartSession, "sds_1", "s1", "sds_sym_1", "1D", "250", ""
                     }));
                     seriesRequested = true;
                     Log.d(TAG, "[TV WS] create_series envoyé pour " + tvSymbol);
@@ -310,7 +322,7 @@ public class TradingViewFetcher {
         // Attendre max 20 secondes
         synchronized (lock) {
             if (!done[0]) {
-                lock.wait(20000);
+                lock.wait(25000);
             }
         }
 
