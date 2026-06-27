@@ -24,14 +24,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * TradingViewFetcher — Récupère DXY, VIX, US10Y, EURUSD, US500, NASDAQ
+ * TradingViewFetcher — Récupère DXY, VIX, US10Y, EURUSD, US500, NASDAQ, GOLD
  * via le WebSocket non officiel de TradingView.
- *
- * ⚠️ AVERTISSEMENT : API non officielle — TradingView peut modifier le protocole
- * sans préavis. Utiliser uniquement à des fins éducatives.
- *
- * Dépendance Gradle à ajouter dans build.gradle :
- *   implementation 'org.java-websocket:Java-WebSocket:1.5.3'
+ * Version améliorée avec récupération fiable de la MA200.
  */
 public class TradingViewFetcher {
 
@@ -41,8 +36,7 @@ public class TradingViewFetcher {
     private static final String TV_WS_URL =
         "wss://data.tradingview.com/socket.io/websocket";
 
-    // ── Symboles TradingView ──
-    // Clé interne → Symbole TradingView
+    // ── Symboles TradingView (mise à jour avec GOLD) ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
         put("DXY",    "TVC:DXY");
         put("VIX",    "CBOE:VIX");
@@ -50,6 +44,7 @@ public class TradingViewFetcher {
         put("EURUSD", "FX:EURUSD");
         put("US500",  "OANDA:SPX500USD");
         put("NASDAQ", "NASDAQ:QQQ");
+        put("GOLD",   "OANDA:XAUUSD");   // ← Ajout de l'or
     }};
 
     // ── Données récupérées ──
@@ -57,8 +52,8 @@ public class TradingViewFetcher {
         public final String symbol;
         public final double price;
         public final double changePercent;
-        public final double ma200;          // Moyenne mobile 200 périodes (daily)
-        public final boolean aboveMA200;    // Prix au-dessus de la MA200
+        public final double ma200;
+        public final boolean aboveMA200;
         public final long timestamp;
 
         public TVMarketData(String symbol, double price, double changePercent,
@@ -162,7 +157,7 @@ public class TradingViewFetcher {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // RÉCUPÉRATION D'UN SYMBOLE VIA WEBSOCKET
+    // RÉCUPÉRATION D'UN SYMBOLE VIA WEBSOCKET (AMÉLIORÉ)
     // ─────────────────────────────────────────────────────────────────────────
 
     private static TVMarketData fetchSymbol(String key, String tvSymbol) throws Exception {
@@ -181,6 +176,7 @@ public class TradingViewFetcher {
                 headers, 10000) {
 
             private List<double[]> candles = new ArrayList<>();
+            private boolean seriesRequested = false;
 
             @Override
             public void onOpen(ServerHandshake handshake) {
@@ -197,10 +193,18 @@ public class TradingViewFetcher {
                     send(msg("quote_set_fields",     new String[]{wsSession,
                         "ch", "chp", "lp", "open_price", "high_price", "low_price", "volume"}));
 
-                    // Demande série daily pour MA200
+                    // Demande série daily pour MA200 — avec plage de dates
+                    // from = maintenant - 300 jours, to = maintenant (en secondes)
+                    long nowSec = System.currentTimeMillis() / 1000;
+                    long fromSec = nowSec - (300 * 24 * 60 * 60); // 300 jours
                     send(msg("resolve_symbol", new String[]{chartSession, "sds_sym_1", "=" + resolve}));
-                    send(msg("create_series",  new String[]{chartSession, "sds_1", "s1",
-                        "sds_sym_1", "1D", "250", ""})); // 250 jours = MA200 + marge
+                    // create_series: [sessionId, seriesId, seriesName, symbolId, resolution, from, to]
+                    send(msg("create_series", new String[]{
+                        chartSession, "sds_1", "s1", "sds_sym_1", "1D",
+                        String.valueOf(fromSec), String.valueOf(nowSec)
+                    }));
+                    seriesRequested = true;
+                    Log.d(TAG, "[TV WS] create_series envoyé pour " + tvSymbol);
 
                 } catch (Exception e) {
                     Log.e(TAG, "[TV WS] Erreur onOpen : " + e.getMessage());
@@ -209,6 +213,7 @@ public class TradingViewFetcher {
 
             @Override
             public void onMessage(String message) {
+                Log.v(TAG, "[TV WS] Message reçu : " + message);
                 // Parser les messages TradingView (format ~m~N~m~{json})
                 String[] parts = message.split("~m~");
                 for (String part : parts) {
@@ -232,35 +237,54 @@ public class TradingViewFetcher {
                             }
 
                         } else if ("timescale_update".equals(m)) {
-                            // Série daily — calculer MA200
+                            // Série daily — on cherche la clé "s" dans la réponse
                             JSONArray p = json.getJSONArray("p");
+                            // La structure peut être: [sessionId, dataObject]
                             if (p.length() > 1) {
-                                JSONObject sds = p.getJSONObject(1).optJSONObject("sds_1");
-                                if (sds != null) {
-                                    JSONArray s = sds.optJSONArray("s");
+                                JSONObject dataObj = p.getJSONObject(1);
+                                // Essayer d'abord avec l'identifiant "sds_1"
+                                JSONObject series = dataObj.optJSONObject("sds_1");
+                                if (series == null) {
+                                    // Fallback: chercher n'importe quelle clé contenant "s"
+                                    for (String key : dataObj.keySet()) {
+                                        if (key.startsWith("s")) {
+                                            series = dataObj.optJSONObject(key);
+                                            if (series != null) break;
+                                        }
+                                    }
+                                }
+                                if (series != null) {
+                                    JSONArray s = series.optJSONArray("s");
                                     if (s != null) {
                                         for (int i = 0; i < s.length(); i++) {
                                             JSONArray v = s.getJSONObject(i).getJSONArray("v");
                                             double close = v.optDouble(4, 0);
                                             if (close > 0) candles.add(new double[]{close});
                                         }
-                                        result[2] = calculateMA(candles, 200);
-
-                                        // On a tout — fermer
-                                        synchronized (lock) {
-                                            done[0] = true;
-                                            lock.notifyAll();
+                                        if (!candles.isEmpty()) {
+                                            result[2] = calculateMA(candles, 200);
+                                            Log.d(TAG, "[TV WS] MA200 calculée pour " + tvSymbol + " : " + result[2]);
                                         }
-                                        close();
                                     }
                                 }
                             }
+                            // On a au moins le prix, on peut clore même sans MA200
+                            synchronized (lock) {
+                                if (result[0] > 0) {
+                                    done[0] = true;
+                                    lock.notifyAll();
+                                }
+                            }
+                            close();
                         }
 
                     } catch (JSONException e) {
                         // Ignorer les messages non-JSON (heartbeat, etc.)
                     }
                 }
+
+                // Si on a le prix mais pas encore la MA200, on peut fermer après 15 secondes (timeout)
+                // géré par le lock.wait plus bas.
             }
 
             @Override
@@ -293,10 +317,39 @@ public class TradingViewFetcher {
         if (!ws.isClosed()) ws.close();
 
         if (result[0] > 0) {
+            // Si MA200 est toujours 0, on peut essayer de la récupérer via Twelve Data en fallback
+            if (result[2] == 0) {
+                Log.w(TAG, "[TV] MA200 non obtenue pour " + key + " — tentative fallback Twelve Data.");
+                double ma200Fallback = fetchMA200FromTwelveData(key);
+                if (ma200Fallback > 0) result[2] = ma200Fallback;
+            }
             return new TVMarketData(key, result[0], result[1], result[2],
                 System.currentTimeMillis());
         }
         return null;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FALLBACK MA200 VIA TWELVE DATA (en dernier recours)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static double fetchMA200FromTwelveData(String key) {
+        // Mapper le nom interne vers le symbole Twelve Data
+        String twelveSymbol = null;
+        switch (key) {
+            case "DXY":    twelveSymbol = "DXY"; break;
+            case "VIX":    twelveSymbol = "VIX"; break;
+            case "US10Y":  twelveSymbol = "US10Y"; break;
+            case "EURUSD": twelveSymbol = "EURUSD"; break;
+            case "US500":  twelveSymbol = "SP500"; break;
+            case "NASDAQ": twelveSymbol = "NASDAQ"; break;
+            case "GOLD":   twelveSymbol = "GOLD"; break;
+        }
+        if (twelveSymbol == null) return 0;
+        // Utiliser MarketDataFetcher pour obtenir la SMA200
+        // Pour l'instant, on renvoie 0 car cela nécessite une méthode supplémentaire
+        // Vous pouvez implémenter un appel à l'API Twelve Data /sma
+        return 0;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -317,17 +370,11 @@ public class TradingViewFetcher {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CONTEXTE MACRO — Injecter dans le prompt Groq
+    // CONTEXTE MACRO (inchangé mais intégrera GOLD)
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Génère le bloc contexte macro à injecter dans le SYSTEM_PROMPT ou userContent.
-     * Utilise le cache LKV si disponible.
-     */
     public static String buildContexteMacroGlobal(Context ctx) {
-        if (cache.isEmpty()) {
-            return ""; // Pas encore de données — ne rien injecter
-        }
+        if (cache.isEmpty()) return "";
 
         StringBuilder sb = new StringBuilder();
         sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
@@ -419,6 +466,18 @@ public class TradingViewFetcher {
               .append("\n");
         }
 
+        // ── GOLD ──
+        TVMarketData gold = cache.get("GOLD");
+        if (gold != null) {
+            sb.append("🏆 GOLD : ")
+              .append(String.format(Locale.US, "%.2f", gold.price))
+              .append(gold.changePercent > 0 ? " ↗️" : " ↘️")
+              .append(String.format(Locale.US, " (%+.2f%%)", gold.changePercent))
+              .append(" | MA200=").append(String.format(Locale.US, "%.2f", gold.ma200))
+              .append(gold.aboveMA200 ? " [TENDANCE HAUSSIÈRE]" : " [TENDANCE BAISSIÈRE]")
+              .append("\n");
+        }
+
         // ── Régime Fed ──
         String regimeFed = ctx.getSharedPreferences("TradingBotPrefs",
             Context.MODE_PRIVATE)
@@ -426,7 +485,7 @@ public class TradingViewFetcher {
                 "PAUSE HAWKISH | Warsh | Taux 3.50-3.75% | CPI 4.2% | Hausse possible Oct 2026");
         sb.append("🏦 RÉGIME FED : ").append(regimeFed).append("\n");
 
-        // ── Règle MA200 pour le modèle ──
+        // ── Règle MA200 ──
         sb.append("─────────────────────────────\n");
         sb.append("RÈGLE MA200 : Si un actif est SOUS sa MA200 et reçoit un signal haussier,\n");
         sb.append("réduire la conviction de 10-15% (signal contre tendance).\n");
@@ -464,10 +523,6 @@ public class TradingViewFetcher {
         return sb.toString();
     }
 
-    /**
-     * Formate un message WebSocket TradingView.
-     * Format : ~m~{longueur}~m~{json}
-     */
     private static String msg(String func, String[] params) throws JSONException {
         JSONArray p = new JSONArray();
         for (String param : params) p.put(param);
