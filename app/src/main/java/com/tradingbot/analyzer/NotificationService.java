@@ -182,7 +182,7 @@ private final ConcurrentHashMap<String, Long> lastInertiaReminderSentMemory = ne
 }
     
     public static final List<String> TWELVE_DATA_ASSETS = Arrays.asList(
-    "NASDAQ", "GOLD", "USDJPY", "USOIL"); // 4 actifs = 1 seul batch → 1 appel réseau
+    "NASDAQ", "GOLD", "EURUSD", "USOIL"); // 4 actifs = 1 seul batch → 1 appel réseau
 @Override
 public void onListenerConnected() {
     super.onListenerConnected();
