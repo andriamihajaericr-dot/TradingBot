@@ -386,7 +386,8 @@ public void onListenerDisconnected() {
     "══════════════════════════════════════════════════════\n" +
     "HAWKISH US : US10Y↑ USDCAD↑ USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ BTC↓ EURUSD↓ GBPUSD↓ AUDUSD↓ USOIL= | FLUX : DOLLAR FORT\n" +
     "DOVISH US : inverse | FLUX : DOLLAR FAIBLE\n" +
-    "GÉO escalade : GOLD↑ USOIL↑ USDJPY↓ NASDAQ↓ SP500↓ BTC↓ EURUSD↓ GBPUSD↓ AUDUSD↓ US10Y↓ | FLUX : CRISE GÉOPOLITIQUE\n" +
+    "GÉO escalade : USOIL↑ USDJPY↓ NASDAQ↓ SP500↓ BTC↓ EURUSD↓ GBPUSD↓ AUDUSD↑ USDCAD↓ US10Y↓ | FLUX : CRISE GÉOPOLITIQUE\n" +
+    "GOLD en crise GÉO : si riposte militaire USA → dollar domine → GOLD↓ court terme. Si crise régionale sans USA → GOLD↑ refuge. Analyser le rôle du dollar avant de conclure.\n" +
     "GÉO désescalade : GOLD↓ USOIL↓ NASDAQ↑ SP500↑ BTC↑ USDJPY↑ AUDUSD↑ (conviction≤45%) | USDCAD↑ SAUF si USOIL reste BULLISH par ailleurs (alors USDCAD=NEUTRE, le préciser) | FLUX : RISK-ON\n" +
     "EIA déficit : USOIL↑ USDCAD↓ | EIA surplus : USOIL↓ USDCAD↑\n" +
     "TARIFS escalade : NASDAQ↓ SP500↓ AUDUSD↓ USOIL↓ USDJPY↓ GOLD↑ BTC↓ | FLUX : RISK-OFF\n" +
@@ -411,7 +412,8 @@ public void onListenerDisconnected() {
     "3. Un seul 📢 dans toute la réponse.\n" +
     "4. USDJPY BEARISH → flux ne dit pas DOLLAR FORT.\n" +
     "5. USDJPY BULLISH → flux ne dit pas YEN FORT.\n" +
-    "6. Chaque actif : direction + mécanisme causal précis ≤8 mots. INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour'. Chaque justification doit être unique et factuelle.\n" +
+    "6. Chaque actif : direction + mécanisme causal précis ≤8 mots.\n" +
+    "DICTIONNAIRE PAR ACTIF : US10Y=flight-to-quality/taux réels/Fed | NASDAQ=re-pricing/risk-off/taux | SP500=prime risque/risk-off | GOLD=refuge/taux réels/dollar inverse | USOIL=offre Hormuz/demande Chine/EIA | EURUSD=différentiel BCE-Fed/risk | USDJPY=carry trade/refuge JPY/BoJ-Fed | USDCAD=pétrole CAD/BoC | GBPUSD=BoE/risk | AUDUSD=matières premières/Chine/RBA | BTC=NASDAQ x2-3.\n" +
     "DIRECTION OBLIGATOIRE : utiliser exclusivement 🟢 pour BULLISH, 🔴 pour BEARISH, NEUTRE pour neutre. Interdit d'écrire 'BULLISH', 'BEARISH', '↑', '↓', '='.\n" +
     "Exemples acceptés : 'Fuite vers refuges pèse sur rendements réels' | 'Dollar refuge comprime les paires risk' | 'Offre Hormuz sous pression, prime géopolitique activée' | 'Corrélation risk-off amplifie la baisse tech' | 'Yen refuge absorbe les flux de désengagement'. " +
     "INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour', 'en cas de', phrases génériques copiées-collées.\n" +
