@@ -1451,11 +1451,23 @@ if (eventTypeStr != null && !eventTypeStr.isEmpty()) {
                             }
                             inertiaPrefs.edit().putLong(inertiaPrefKey, nowMs).apply();
 
-                            String reminderMsg = "⏳ *RAPPEL : DRIVER DÉJÀ ACTIF*\n" +
-                                                 "🔹 " + validationResult.reason + "\n\n" +
-                                                 "📋 *Dernier événement similaire :*\n" +
-                                                 validationResult.lastEventSummary;
-                            sendTelegramSecure(reminderMsg, NotificationService.this);
+                            // Ne pas envoyer le rappel si l'impact précédent est vide, neutre ou insignifiant
+String lastImpact = validationResult.lastEventSummary;
+boolean impactInsignifiant = lastImpact == null
+    || lastImpact.isEmpty()
+    || lastImpact.contains("Filtré – tous les actifs neutres")
+    || lastImpact.contains("Filtré – conviction trop faible")
+    || lastImpact.contains("FAILED_FALLBACK")
+    || lastImpact.contains("Historique — impact non disponible");
+if (impactInsignifiant) {
+    Log.d(TAG, "[RAPPEL] Impact précédent insignifiant — rappel ignoré.");
+    return;
+}
+String reminderMsg = "⏳ *RAPPEL : DRIVER DÉJÀ ACTIF*\n" +
+                     "🔹 " + validationResult.reason + "\n\n" +
+                     "📋 *Dernier événement similaire :*\n" +
+                     lastImpact;
+sendTelegramSecure(reminderMsg, NotificationService.this);
                             Log.d(TAG, "[RAPPEL] Driver actif : rappel envoyé.");
                             return; // On arrête le traitement normal
                         }
