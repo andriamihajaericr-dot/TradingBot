@@ -924,10 +924,21 @@ userMsg.put("content", bodyEnrichi);
         }
     }
     // Seuil conviction plus élevé sur fallback — modèle léger moins fiable
-     int convFb = extrairePourcentageConviction(fallbackReport);
+    // int convFb = extrairePourcentageConviction(fallbackReport);
+                // Corrections matrice GÉO — modèle léger ne respecte pas toujours les refuges
+boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
+if (fluxGeo) {
+    String fb = filteredFb.toString();
+    if (fb.contains("GOLD : 🔴"))   fb = fb.replace("• 🏆 GOLD : 🔴",   "• 🏆 GOLD : 🟢");
+    if (fb.contains("USOIL : 🔴"))  fb = fb.replace("• 🛢️ USOIL : 🔴",  "• 🛢️ USOIL : 🟢");
+    if (fb.contains("USDCAD : 🔴")) fb = fb.replace("• 🇨🇦 USDCAD : 🔴", "• 🇨🇦 USDCAD : 🟢");
+    if (fb.contains("AUDUSD : 🔴")) fb = fb.replace("• 🇦🇺 AUDUSD : 🔴", "• 🇦🇺 AUDUSD : 🟢");
+    filteredFb = new StringBuilder(fb);
+}
+int convFb = extrairePourcentageConviction(fallbackReport);
 // Vérifier cohérence vecteur/flux — rejeter si contradiction
 boolean vecteurGeo = fallbackReport.contains("VECTEUR CIBLE : GÉO") || fallbackReport.contains("VECTEUR CIBLE : GÉOPOLITIQUE");
-boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
+//boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
 boolean fluxHawkish = fallbackReport.contains("FLUX DOMINANT : DOLLAR FORT") || fallbackReport.contains("VECTEUR CIBLE : HAWKISH");
 boolean contradiction = (vecteurGeo && fluxHawkish) || (fluxGeo && fluxHawkish);
 if (contradiction) {
