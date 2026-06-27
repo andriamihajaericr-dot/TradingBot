@@ -2447,9 +2447,15 @@ String systemPromptFinal = "CONTEXTE HIER (INERTIE DE MARCHÉ) : Le flux dominan
     baseSystemPrompt + "\n\n" +
     "Tu es un expert en macroéconomie. Tu dois rédiger ton rapport en terminant obligatoirement par la ligne suivante formatée de cette exacte façon :\n" +
     "🏁 FLUX DOMINANT : [Insère ici le flux sélectionné]";
-
-JSONObject payload = new JSONObject();
-payload.put("model", GROQ_MODEL);
+        JSONObject payload = new JSONObject();
+int usedD = dailyTokensUsed.addAndGet(2000);
+getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+    .putInt("daily_tokens_used", usedD)
+    .putLong("token_reset_time", tokenResetTime)
+    .apply();
+payload.put("model", usedD > TOKEN_BUDGET_DAILY ? GROQ_MODEL_FALLBACK : GROQ_MODEL);
+if (usedD > TOKEN_BUDGET_DAILY && MainActivity.instance != null)
+    MainActivity.instance.addLog("⚠️ [DAILY] Budget token atteint — modèle léger.");
 payload.put("temperature", 0.02);
 
 JSONArray messages = new JSONArray();
