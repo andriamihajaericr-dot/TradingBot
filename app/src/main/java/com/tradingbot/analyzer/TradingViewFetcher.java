@@ -385,8 +385,13 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
     if (twelveSymbol == null) return 0;
     try {
         // Récupérer la clé macro_api_key (identique à celle utilisée par MarketDataFetcher)
-        String apiKey = appContext.getSharedPreferences("TradingBot", Context.MODE_PRIVATE)
-            .getString("macro_api_key", "");
+        String apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+          .getString("macro_api_key", "");
+         if (apiKey.isEmpty()) {
+           // Fallback sur twelve_data_key
+          apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+           .getString("twelve_data_key", "");
+         }
         if (apiKey.isEmpty()) {
             Log.w(TAG, "[TV MA200 Fallback] Clé macro_api_key absente pour " + key);
             return 0;
