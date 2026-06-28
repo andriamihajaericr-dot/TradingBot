@@ -373,14 +373,14 @@ for (int attempt = 1; attempt <= 2 && data == null; attempt++) {
     if (appContext == null) return 0;
     String twelveSymbol = null;
     switch (key) {
+        case "US500":  twelveSymbol = "SPX"; break;      // S&P500 index
+        case "NASDAQ": twelveSymbol = "NDX"; break;       // NASDAQ 100 index
+        case "USOIL":  twelveSymbol = "WTI/USD"; break;  // WTI correct
+        case "GOLD":   twelveSymbol = "XAU/USD"; break;  // Gold correct
+        case "EURUSD": twelveSymbol = "EUR/USD"; break;  // Forex avec slash
         case "DXY":    twelveSymbol = "DXY"; break;
         case "VIX":    twelveSymbol = "VIX"; break;
-        case "US10Y":  twelveSymbol = "US10Y"; break;
-        case "EURUSD": twelveSymbol = "EURUSD"; break;
-        case "US500":  twelveSymbol = "SP500"; break;
-        case "NASDAQ": twelveSymbol = "NASDAQ"; break;
-        case "GOLD":   twelveSymbol = "GOLD"; break;
-        case "USOIL":  twelveSymbol = "USOIL"; break;
+        case "US10Y":  twelveSymbol = "TNX"; break;      // US 10Y yield
     }
     if (twelveSymbol == null) return 0;
     try {
