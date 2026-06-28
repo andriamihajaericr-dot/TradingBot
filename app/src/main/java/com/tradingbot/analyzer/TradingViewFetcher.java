@@ -189,9 +189,8 @@ public class TradingViewFetcher {
                     sendMessage(ws, "create_series", new String[]{chartSessionId, seriesId, "s1", "sym_" + seriesId, "1D", "300"});
 
                     // Abonnement aux quotes avec flags force_permission
-                    JSONObject flags = new JSONObject();
-                    flags.put("flags", new JSONArray().put("force_permission"));
-                    sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker, flags.toString()});
+                    // Abonnement aux quotes avec flags force_permission sous forme de chaîne JSON brute
+                     sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker, "{\"flags\":[\"force_permission\"]}"});
                 }
                 logToUI("📥 [TV WS] " + SYMBOL_MAP.size() + " symboles demandés.");
                 Log.i(TAG, "[TV WS] " + SYMBOL_MAP.size() + " symboles demandés.");
