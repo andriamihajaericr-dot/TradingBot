@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * via le WebSocket non officiel de TradingView.
  * Version améliorée avec récupération fiable de la MA200.
  */
-public class TradingViewFetcher {
+public class TradingViewFetcher1 {
 
     private static final String TAG = "TradingViewFetcher";
 
