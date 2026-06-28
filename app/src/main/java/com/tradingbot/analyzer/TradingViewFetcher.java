@@ -54,13 +54,20 @@ public class TradingViewFetcher {
         public final double variance;           // 2. Variance sur 20 ticks (volatilité intraday)
         public final double volatilityPercent;  // 3. Amplitude daily (High-Low) en %
         public final double dailyRangePercent;  // 4. Position dans la fourchette du jour (0=Low, 100=High)
-        public final boolean isNearHigh;        // true si price >= 95% du High
-        public final boolean isNearLow;         // true si price <= 5% du Low
-        public final long timestamp;
+        public final boolean isNearHigh;
+public final boolean isNearLow;
+public final double weeklyHigh;   // H semaine précédente
+public final double weeklyLow;    // L semaine précédente
+public final boolean isAboveWeeklyHigh;
+public final boolean isBelowWeeklyLow;
+public final boolean isNearWeeklyHigh;  // dans les 0.5%
+public final boolean isNearWeeklyLow;   // dans les 0.5%
+public final long timestamp;
 
-        public TVMarketData(String symbol, double price, double changePercent,
-                            double high, double low, double open, double prevClose,
-                            double variance, long timestamp) {
+public TVMarketData(String symbol, double price, double changePercent,
+                    double high, double low, double open, double prevClose,
+                    double variance, double weeklyHigh, double weeklyLow,
+                    long timestamp) {
             this.symbol        = symbol;
             this.price         = price;
             this.changePercent = changePercent;
