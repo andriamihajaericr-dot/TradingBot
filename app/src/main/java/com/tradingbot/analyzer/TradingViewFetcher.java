@@ -84,6 +84,13 @@ public TVMarketData(String symbol, double price, double changePercent,
             this.isNearHigh = this.dailyRangePercent >= 95.0;
             this.isNearLow  = this.dailyRangePercent <= 5.0;
             this.timestamp  = timestamp;
+    
+            this.weeklyHigh = weeklyHigh;
+            this.weeklyLow  = weeklyLow;
+            this.isAboveWeeklyHigh = weeklyHigh > 0 && price > weeklyHigh;
+            this.isBelowWeeklyLow  = weeklyLow  > 0 && price < weeklyLow;
+            this.isNearWeeklyHigh  = weeklyHigh > 0 && price >= weeklyHigh * 0.995 && !isAboveWeeklyHigh;
+            this.isNearWeeklyLow   = weeklyLow  > 0 && price <= weeklyLow  * 1.005 && !isBelowWeeklyLow;
         }
     }
 
