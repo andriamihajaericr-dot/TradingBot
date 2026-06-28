@@ -24,27 +24,34 @@ import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 
 /**
- * TradingViewFetcher — Récupère DXY, VIX, US10Y, EURUSD, US500, NASDAQ, GOLD, USOIL
- * via le WebSocket de TradingView.
- * Version autonome corrigée et sécurisée pour la production.
+ * TradingViewFetcher — Récupère l'intégralité de la matrice macro et des actifs
+ * via le protocole WebSocket de TradingView.
  */
 public class TradingViewFetcher {
 
     private static final String TAG = "TradingViewFetcher";
 
-    // ── Mapping clé interne → ticker TradingView ──
+    // ── Matrice complète des 11 actifs + 2 Indicateurs Ancres ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
-        put("DXY",    "TVC:DXY");
-        put("VIX",    "CBOE:VIX");
-        put("US10Y",  "TVC:US10Y");
-        put("EURUSD", "FX:EURUSD");
-        put("US500",  "OANDA:SPX500USD");
-        put("NASDAQ", "NASDAQ:QQQ");
-        put("GOLD",   "OANDA:XAUUSD");
-        put("USOIL",  "TVC:USOIL");
+        // Ancres Macro
+        put("DXY",     "TVC:DXY");
+        put("VIX",     "CBOE:VIX");
+        // Taux & Indices
+        put("US10Y",   "TVC:US10Y");
+        put("US500",   "OANDA:SPX500USD");
+        put("NASDAQ",  "NASDAQ:QQQ");
+        // Matières Premières
+        put("GOLD",    "OANDA:XAUUSD");
+        put("USOIL",   "TVC:USOIL");
+        // Forex & Crypto
+        put("EURUSD",  "FX:EURUSD");
+        put("USDJPY",  "FX:USDJPY");
+        put("GBPUSD",  "FX:GBPUSD");
+        put("AUDUSD",  "FX:AUDUSD");
+        put("USDCAD",  "FX:USDCAD");
+        put("BITCOIN", "BINANCE:BTCUSDT");
     }};
 
-    // ── Données de marché ──
     public static class TVMarketData {
         public final String symbol;
         public final double price;
@@ -64,32 +71,31 @@ public class TradingViewFetcher {
         }
     }
 
-    // ── Cache et variables d'état synchronisés ──
     private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
     private static final AtomicBoolean isRunning = new AtomicBoolean(false);
+    private static final AtomicBoolean isConnecting = new AtomicBoolean(false);
+    private static final AtomicBoolean connected = new AtomicBoolean(false);
+    
     private static Context appContext;
     private static OkHttpClient client;
     private static WebSocket webSocket;
-    private static volatile boolean connected = false;
 
-    // ── Gestion thread-safe des sessions dynamiques du WS ──
     private static final ConcurrentHashMap<String, String> seriesIdToKey = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, MovingAverage200Calculator> calculators = new ConcurrentHashMap<>();
     private static int seriesCounter = 0;
 
-    // ── Interface callback ──
     public interface OnDataReadyListener {
         void onDataReady(Map<String, TVMarketData> data);
         void onError(String error);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // DÉMARRAGE / ARRÊT
+    // GESTION DU CYCLE DE VIE
     // ─────────────────────────────────────────────────────────────────────────
 
     public static void start(Context context) {
         if (isRunning.getAndSet(true)) {
-            Log.d(TAG, "[TV] Déjà en cours.");
+            Log.d(TAG, "[TV] Déjà en cours d'exécution.");
             return;
         }
         appContext = context.getApplicationContext();
@@ -97,31 +103,34 @@ public class TradingViewFetcher {
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(15, TimeUnit.SECONDS)
                 .build();
-        Log.i(TAG, "[TV] Démarrage du fetcher TradingView (OkHttp).");
+        Log.i(TAG, "[TV] Initialisation du pipeline TradingView.");
         connectWebSocket();
     }
 
     public static void stop() {
         isRunning.set(false);
+        isConnecting.set(false);
+        connected.set(false);
         if (webSocket != null) {
             try {
-                webSocket.close(1000, "Arrêt normal");
+                webSocket.close(1000, "Arrêt normal demandé");
             } catch (Exception ignored) {}
             webSocket = null;
         }
         client = null;
-        connected = false;
         seriesIdToKey.clear();
         seriesCounter = 0;
-        Log.i(TAG, "[TV] Fetcher arrêté proprement.");
+        Log.i(TAG, "[TV] Pipeline arrêté proprement.");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CONNEXION ET GESTION DU PROTOCOLE WEBSOCKET
+    // CONNEXION ET PROTOCOLE DE COMMANDE
     // ─────────────────────────────────────────────────────────────────────────
 
     private static synchronized void connectWebSocket() {
-        if (!isRunning.get()) return;
+        if (!isRunning.get() || connected.get() || isConnecting.getAndSet(true)) {
+            return;
+        }
 
         Request request = new Request.Builder()
                 .url("wss://data.tradingview.com/socket.io/websocket")
@@ -134,25 +143,21 @@ public class TradingViewFetcher {
 
             @Override
             public void onOpen(WebSocket ws, Response response) {
-                Log.d(TAG, "[TV WS] Connecté au serveur.");
-                connected = true;
+                Log.d(TAG, "[TV WS] Canal réseau ouvert.");
+                connected.set(true);
+                isConnecting.set(false);
 
-                // Réinitialisation critique des compteurs à chaque nouvelle connexion
                 seriesCounter = 0;
                 seriesIdToKey.clear();
 
                 chartSessionId = "cs_" + UUID.randomUUID().toString().substring(0, 12);
                 quoteSessionId = "qs_" + UUID.randomUUID().toString().substring(0, 12);
 
-                // 1. Authentification anonyme requise par TV
                 sendMessage(ws, "set_auth_token", new String[]{"unauthorized_user_token"});
-
-                // 2. Initialisation des DEUX sessions (Graphique pour l'historique MA200 & Quotes pour le temps réel)
                 sendMessage(ws, "chart_create_session", new String[]{chartSessionId, ""});
                 sendMessage(ws, "quote_create_session", new String[]{quoteSessionId});
                 sendMessage(ws, "quote_set_fields", new String[]{quoteSessionId, "lp", "chp", "ch"});
 
-                // 3. Enregistrement des flux pour chaque actif défini
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
                     seriesCounter++;
@@ -161,29 +166,19 @@ public class TradingViewFetcher {
                     seriesIdToKey.put(seriesId, key);
                     calculators.putIfAbsent(key, new MovingAverage200Calculator());
 
-                    // Configuration du flux historique journalier (300 bougies pour la MA200)
                     String resolvePayload = "{\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}";
                     sendMessage(ws, "resolve_symbol", new String[]{chartSessionId, "sym_" + seriesId, resolvePayload});
                     sendMessage(ws, "create_series", new String[]{chartSessionId, seriesId, "s1", "sym_" + seriesId, "1D", "300"});
 
-                    // Inscription obligatoire au flux Temps Réel "qsd"
                     sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker});
-
-                    Log.d(TAG, "[TV WS] Inscription validée pour " + key + " (" + ticker + ") ID: " + seriesId);
                 }
+                Log.i(TAG, "[TV WS] Enregistrement de la matrice terminé (" + SYMBOL_MAP.size() + " flux).");
             }
 
             @Override
             public void onMessage(WebSocket ws, String text) {
                 if (text == null || text.isEmpty()) return;
 
-                // Gestion immédiate du Heartbeat (Doit renvoyer la trame brute à l'identique)
-                if (text.contains("~h~")) {
-                    ws.send(text);
-                    return;
-                }
-
-                // Découpage robuste du protocole applicatif de TradingView (~m~[longueur]~m~[payload])
                 int index = 0;
                 while (index < text.length()) {
                     int firstM = text.indexOf("~m~", index);
@@ -202,10 +197,18 @@ public class TradingViewFetcher {
 
                     int startPayload = secondM + 3;
                     int endPayload = startPayload + length;
-                    if (endPayload > text.length()) break;
+                    if (length <= 0 || endPayload > text.length()) {
+                        break;
+                    }
 
                     String payload = text.substring(startPayload, endPayload);
-                    processJsonPayload(payload);
+                    
+                    // Sécurisation stricte du traitement du Heartbeat
+                    if (payload.startsWith("~h~")) {
+                        ws.send(text); 
+                    } else {
+                        processJsonPayload(payload);
+                    }
 
                     index = endPayload;
                 }
@@ -217,7 +220,6 @@ public class TradingViewFetcher {
                     JSONObject json = new JSONObject(payload);
                     String method = json.optString("m");
 
-                    // Traitement de l'historique daily (Calcul de la MA200)
                     if ("timescale_update".equals(method)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
@@ -249,16 +251,13 @@ public class TradingViewFetcher {
                                             TVMarketData existing = cache.get(key);
                                             double change = (existing != null) ? existing.changePercent : 0.0;
                                             
-                                            TVMarketData data = new TVMarketData(key, lastPrice, change, ma, System.currentTimeMillis());
-                                            cache.put(key, data);
-                                            Log.i(TAG, "[TV MA200] " + key + " initialisée avec succès. MA200 = " + ma);
+                                            cache.put(key, new TVMarketData(key, lastPrice, change, ma, System.currentTimeMillis()));
                                         }
                                     }
                                 }
                             }
                         }
                     } 
-                    // Traitement des variations et prix TICK PAR TICK en temps réel
                     else if ("qsd".equals(method)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
@@ -272,14 +271,13 @@ public class TradingViewFetcher {
                                         String key = entry.getKey();
                                         TVMarketData existing = cache.get(key);
 
-                                        // Extraction résiliente des champs (TradingView n'envoie que les deltas modifiés)
-                                        double price = v.has("lp") ? v.getDouble("lp") : (existing != null ? existing.price : 0.0);
-                                        double change = v.has("chp") ? v.getDouble("chp") : (existing != null ? existing.changePercent : 0.0);
+                                        // Extraction résiliente par delta typique de TradingView
+                                        double price = v.has("lp") ? v.optDouble("lp", 0.0) : (existing != null ? existing.price : 0.0);
+                                        double change = v.has("chp") ? v.optDouble("chp", 0.0) : (existing != null ? existing.changePercent : 0.0);
                                         double ma = (existing != null) ? existing.ma200 : 0.0;
 
                                         if (price > 0 || change != 0) {
-                                            TVMarketData updated = new TVMarketData(key, price, change, ma, System.currentTimeMillis());
-                                            cache.put(key, updated);
+                                            cache.put(key, new TVMarketData(key, price, change, ma, System.currentTimeMillis()));
                                         }
                                         break;
                                     }
@@ -288,30 +286,28 @@ public class TradingViewFetcher {
                         }
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "[TV WS] Erreur lors du parsing du payload", e);
+                    Log.e(TAG, "[TV WS] Erreur lors de l'analyse structurelle du JSON", e);
                 }
             }
 
             @Override
             public void onFailure(WebSocket ws, Throwable t, Response response) {
-                Log.e(TAG, "[TV WS] Connexion perdue ou en échec.", t);
-                connected = false;
-                scheduleReconnection();
+                handleDisconnection();
             }
 
             @Override
             public void onClosed(WebSocket ws, int code, String reason) {
-                Log.d(TAG, "[TV WS] Socket fermé (" + code + ") : " + reason);
-                connected = false;
-                scheduleReconnection();
+                handleDisconnection();
             }
 
-            private void scheduleReconnection() {
+            private void handleDisconnection() {
+                connected.set(false);
+                isConnecting.set(false);
                 if (isRunning.get()) {
                     new Thread(() -> {
                         try {
                             TimeUnit.SECONDS.sleep(5);
-                            Log.i(TAG, "[TV WS] Tentative de reconnexion en cours...");
+                            Log.w(TAG, "[TV WS] Reconnexion automatique lancée...");
                             connectWebSocket();
                         } catch (InterruptedException ignored) {}
                     }).start();
@@ -328,14 +324,14 @@ public class TradingViewFetcher {
                     String payload = msg.toString();
                     ws.send("~m~" + payload.length() + "~m~" + payload);
                 } catch (Exception e) {
-                    Log.e(TAG, "[TV WS] Erreur lors de l'encapsulation du message", e);
+                    Log.e(TAG, "[TV WS] Échec de l'encapsulation du message frame", e);
                 }
             }
         });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // METHODES D'ACCÈS PUBLIC ET ETAT DU CACHE
+    // ACCÈS DONNÉES CACHE
     // ─────────────────────────────────────────────────────────────────────────
 
     public static Map<String, TVMarketData> getCache() {
@@ -353,7 +349,6 @@ public class TradingViewFetcher {
     public static void fetchAll(OnDataReadyListener listener) {
         new Thread(() -> {
             long start = System.currentTimeMillis();
-            // Attend jusqu'à 15 secondes que tous les actifs soient mappés dans le cache
             while (cache.size() < SYMBOL_MAP.size() && (System.currentTimeMillis() - start < 15000)) {
                 try { TimeUnit.MILLISECONDS.sleep(500); } catch (InterruptedException ignored) {}
             }
@@ -361,14 +356,14 @@ public class TradingViewFetcher {
                 if (!cache.isEmpty()) {
                     listener.onDataReady(cache);
                 } else {
-                    listener.onError("Aucune donnée reçue après 15 secondes d'attente.");
+                    listener.onError("Matrice incomplète après expiration du délai d'acquisition.");
                 }
             }
         }).start();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CONTEXTE MACRO GLOBAL (VERSION INTACTE ET SÉCURISÉE LOGIC-WISE)
+    // COMPILATEUR CONTEXTE MACRO (MATRICE SYNCHRONISÉE)
     // ─────────────────────────────────────────────────────────────────────────
 
     public static String buildContexteMacroGlobal(Context ctx) {
@@ -377,133 +372,120 @@ public class TradingViewFetcher {
         StringBuilder sb = new StringBuilder();
         sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
 
+        // 1. ANCRES DIRECTRICES
         TVMarketData dxy = cache.get("DXY");
         if (dxy != null) {
-            String trend = dxy.changePercent > 0.3 ? "↗️ FORT" :
-                    dxy.changePercent < -0.3 ? "↘️ FAIBLE" : "➡️ STABLE";
-            String impact = dxy.changePercent > 0.3 ?
-                    "→ Dollar fort : pression baissière GOLD, EURUSD, GBPUSD, AUDUSD" :
-                    dxy.changePercent < -0.3 ?
-                            "→ Dollar faible : soutien haussier GOLD, EURUSD, GBPUSD, AUDUSD" :
-                            "→ Dollar stable : corrélations normales";
-            sb.append("💵 DXY : ").append(String.format(Locale.US, "%.2f", dxy.price))
-                    .append(" ").append(trend)
-                    .append(" | MA200=").append(String.format(Locale.US, "%.2f", dxy.ma200))
-                    .append(dxy.aboveMA200 ? " [TENDANCE HAUSSIÈRE]" : " [TENDANCE BAISSIÈRE]")
-                    .append("\n   ").append(impact).append("\n");
+            String trend = dxy.changePercent > 0.3 ? "↗️ FORT" : dxy.changePercent < -0.3 ? "↘️ FAIBLE" : "➡️ STABLE";
+            String impact = dxy.changePercent > 0.3 ? "→ Dollar fort : pression baissière GOLD, EURUSD, GBPUSD, AUDUSD" :
+                            dxy.changePercent < -0.3 ? "→ Dollar faible : soutien haussier GOLD, EURUSD, GBPUSD, AUDUSD" : "→ Corrélations normales";
+            sb.append("💵 DXY : ").append(String.format(Locale.US, "%.2f", dxy.price)).append(" ").append(trend)
+              .append(" | MA200=").append(String.format(Locale.US, "%.2f", dxy.ma200))
+              .append(dxy.aboveMA200 ? " [HAUSSIER]" : " [BAISSIER]").append("\n   ").append(impact).append("\n");
         }
 
         TVMarketData vix = cache.get("VIX");
         if (vix != null) {
-            String regime, impact;
-            if (vix.price > 30) {
-                regime = "🔴 PANIQUE";
-                impact = "→ Corrélations instables — GOLD peut baisser avec actions, BTC décorrèle";
-            } else if (vix.price > 20) {
-                regime = "🟠 STRESS";
-                impact = "→ Risk-off dominant — pondérer signaux haussiers avec prudence";
-            } else {
-                regime = "🟢 CALME";
-                impact = "→ Corrélations stables — signaux macro fiables";
-            }
-            sb.append("📊 VIX : ").append(String.format(Locale.US, "%.1f", vix.price))
-                    .append(" ").append(regime).append("\n   ").append(impact).append("\n");
+            String regime = vix.price > 30 ? "🔴 PANIQUE" : vix.price > 20 ? "🟠 STRESS" : "🟢 CALME";
+            String impact = vix.price > 30 ? "→ Corrélations instables — Risque de débouclage généralisé" :
+                            vix.price > 20 ? "→ Risk-off dominant — filtrage des signaux haussiers requis" : "→ Signaux macro hautement fiables";
+            sb.append("📊 VIX : ").append(String.format(Locale.US, "%.1f", vix.price)).append(" ").append(regime)
+              .append("\n   ").append(impact).append("\n");
         }
 
         TVMarketData us10y = cache.get("US10Y");
         if (us10y != null) {
-            String trend = us10y.changePercent > 0.5 ? "↗️ HAUSSE" :
-                    us10y.changePercent < -0.5 ? "↘️ BAISSE" : "➡️ STABLE";
-            String impact = us10y.price > 4.5 ?
-                    "→ Taux élevés : pression sur GOLD, NASDAQ, BTC" :
-                    us10y.price < 3.5 ?
-                            "→ Taux bas : soutien GOLD, NASDAQ, BTC" :
-                            "→ Taux neutres";
-            sb.append("📈 US10Y : ").append(String.format(Locale.US, "%.3f", us10y.price))
-                    .append("% ").append(trend)
-                    .append(" | MA200=").append(String.format(Locale.US, "%.3f", us10y.ma200))
-                    .append("%").append("\n   ").append(impact).append("\n");
+            String impact = us10y.price > 4.5 ? "→ Taux élevés : pression severe sur GOLD, NASDAQ, BTC" :
+                            us10y.price < 3.5 ? "→ Taux bas : soutien GOLD, NASDAQ, BTC" : "→ Taux neutres";
+            sb.append("📈 US10Y : ").append(String.format(Locale.US, "%.3f", us10y.price)).append("%")
+              .append(" | MA200=").append(String.format(Locale.US, "%.3f", us10y.ma200)).append("%\n   ").append(impact).append("\n");
         }
 
-        TVMarketData eurusd = cache.get("EURUSD");
-        if (eurusd != null) {
-            sb.append("🇪🇺 EURUSD : ")
-                    .append(String.format(Locale.US, "%.4f", eurusd.price))
-                    .append(eurusd.changePercent > 0 ? " ↗️" : " ↘️")
-                    .append(String.format(Locale.US, " (%+.2f%%)", eurusd.changePercent))
-                    .append(" | MA200=").append(String.format(Locale.US, "%.4f", eurusd.ma200))
-                    .append(eurusd.aboveMA200 ? " [EURO FORT]" : " [EURO FAIBLE]")
-                    .append("\n");
-        }
+        sb.append("─── ACTIFS & CORRÉLATIONS DYNAMIQUES ───\n");
 
+        // 2. MATRICE DE SUIVI ACTIONS / INDICES
         TVMarketData us500 = cache.get("US500");
         if (us500 != null) {
-            sb.append("📊 SP500 : ")
-                    .append(String.format(Locale.US, "%.1f", us500.price))
-                    .append(us500.changePercent > 0 ? " ↗️" : " ↘️")
-                    .append(String.format(Locale.US, " (%+.2f%%)", us500.changePercent))
-                    .append(" | MA200=").append(String.format(Locale.US, "%.1f", us500.ma200))
-                    .append(us500.aboveMA200 ? " [BULL]" : " [BEAR — risk-off amplifié]")
-                    .append("\n");
+            sb.append("🇺🇸 SP500 : ").append(String.format(Locale.US, "%.1f", us500.price))
+              .append(String.format(Locale.US, " (%+.2f%%)", us500.changePercent))
+              .append(us500.aboveMA200 ? " [BULL]" : " [BEAR — Risk-Off renforcé]").append("\n");
         }
 
         TVMarketData nasdaq = cache.get("NASDAQ");
         if (nasdaq != null) {
-            sb.append("💻 NASDAQ : ")
-                    .append(String.format(Locale.US, "%.2f", nasdaq.price))
-                    .append(nasdaq.changePercent > 0 ? " ↗️" : " ↘️")
-                    .append(String.format(Locale.US, " (%+.2f%%)", nasdaq.changePercent))
-                    .append(" | MA200=").append(String.format(Locale.US, "%.2f", nasdaq.ma200))
-                    .append(nasdaq.aboveMA200 ? " [MOMENTUM HAUSSIER]" : " [SOUS MA200 — signal baissier renforcé]")
-                    .append("\n");
+            sb.append("💻 NASDAQ : ").append(String.format(Locale.US, "%.2f", nasdaq.price))
+              .append(String.format(Locale.US, " (%+.2f%%)", nasdaq.changePercent))
+              .append(nasdaq.aboveMA200 ? " [MOMENTUM OK]" : " [SOUS MA200 — Risque technologique]").append("\n");
         }
 
+        // 3. REFUGE & ÉNERGIE
         TVMarketData gold = cache.get("GOLD");
         if (gold != null) {
-            double goldDistMA = gold.ma200 > 0 ?
-                    ((gold.price - gold.ma200) / gold.ma200 * 100) : 0;
-            String goldSignal = gold.aboveMA200 ?
-                    String.format(Locale.US, "[+%.1f%% AU-DESSUS MA200 — refuge confirmé]", goldDistMA) :
-                    String.format(Locale.US, "[%.1f%% SOUS MA200 — réduire conviction GÉO haussier 15%%]", goldDistMA);
-            sb.append("🏆 GOLD : ")
-                    .append(String.format(Locale.US, "%.2f", gold.price))
-                    .append(gold.changePercent > 0 ? " ↗️" : " ↘️")
-                    .append(String.format(Locale.US, " (%+.2f%%)", gold.changePercent))
-                    .append(" | MA200=").append(String.format(Locale.US, "%.2f", gold.ma200))
-                    .append(" ").append(goldSignal).append("\n");
+            double dist = gold.ma200 > 0 ? ((gold.price - gold.ma200) / gold.ma200 * 100) : 0;
+            String status = gold.aboveMA200 ? String.format(Locale.US, "[+%.1f%% au-dessus MA200 — Refuge validé]", dist) :
+                                              String.format(Locale.US, "[%.1f%% sous MA200 — Réduire conviction haussière]", dist);
+            sb.append("🏆 GOLD : ").append(String.format(Locale.US, "%.2f", gold.price))
+              .append(String.format(Locale.US, " (%+.2f%%)", gold.changePercent)).append(" ").append(status).append("\n");
         }
 
         TVMarketData usoil = cache.get("USOIL");
         if (usoil != null) {
-            double distMA = usoil.ma200 > 0 ?
-                    ((usoil.price - usoil.ma200) / usoil.ma200 * 100) : 0;
-            String maSignal = usoil.aboveMA200 ?
-                    String.format(Locale.US, "[+%.1f%% AU-DESSUS MA200 — prime GÉO déjà pricée]", distMA) :
-                    String.format(Locale.US, "[%.1f%% SOUS MA200 — potentiel limité]", distMA);
-            sb.append("🛢️ USOIL : ")
-                    .append(String.format(Locale.US, "%.2f", usoil.price))
-                    .append(usoil.changePercent > 0 ? " ↗️" : " ↘️")
-                    .append(String.format(Locale.US, " (%+.2f%%)", usoil.changePercent))
-                    .append(" | MA200=").append(String.format(Locale.US, "%.2f", usoil.ma200))
-                    .append(" ").append(maSignal).append("\n");
+            sb.append("🛢️ USOIL : ").append(String.format(Locale.US, "%.2f", usoil.price))
+              .append(String.format(Locale.US, " (%+.2f%%)", usoil.changePercent))
+              .append(usoil.aboveMA200 ? " [Structure Haussière]" : " [Structure Baissière]").append("\n");
         }
 
-        // Récupération dynamique du régime de la FED depuis les SharedPreferences
+        // 4. PANIER FOREX SPECIFIQUE & CRYPTO
+        TVMarketData eurusd = cache.get("EURUSD");
+        if (eurusd != null) {
+            sb.append("🇪🇺 EURUSD : ").append(String.format(Locale.US, "%.4f", eurusd.price))
+              .append(String.format(Locale.US, " (%+.2f%%)", eurusd.changePercent)).append("\n");
+        }
+
+        TVMarketData usdjpy = cache.get("USDJPY");
+        if (usdjpy != null) {
+            sb.append("🇯🇵 USDJPY : ").append(String.format(Locale.US, "%.2f", usdjpy.price))
+              .append(String.format(Locale.US, " (%+.2f%%)", usdjpy.changePercent)).append("\n");
+        }
+
+        TVMarketData gbpusd = cache.get("GBPUSD");
+        if (gbpusd != null) {
+            sb.append("🇬🇧 GBPUSD : ").append(String.format(Locale.US, "%.4f", gbpusd.price))
+              .append(String.format(Locale.US, " (%+.2f%%)", gbpusd.changePercent)).append("\n");
+        }
+
+        TVMarketData audusd = cache.get("AUDUSD");
+        if (audusd != null) {
+            sb.append("🇦🇺 AUDUSD : ").append(String.format(Locale.US, "%.4f", audusd.price))
+              .append(String.format(Locale.US, " (%+.2f%%)", audusd.changePercent)).append("\n");
+        }
+
+        TVMarketData usdcad = cache.get("USDCAD");
+        if (usdcad != null) {
+            sb.append("🇨🇦 USDCAD : ").append(String.format(Locale.US, "%.4f", usdcad.price))
+              .append(String.format(Locale.US, " (%+.2f%%)", usdcad.changePercent)).append("\n");
+        }
+
+        TVMarketData btc = cache.get("BITCOIN");
+        if (btc != null) {
+            sb.append("🪙 BITCOIN : ").append(String.format(Locale.US, "%.0f", btc.price))
+              .append(String.format(Locale.US, " (%+.2f%%)", btc.changePercent)).append("\n");
+        }
+
+        // 5. BLOC INSTITUTIONNEL ANCRE
         String regimeFed = ctx.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
-                .getString("fed_regime", "PAUSE HAWKISH | Warsh | Taux 3.50-3.75% | CPI 4.2% | Hausse possible Oct 2026");
+                .getString("fed_regime", "PAUSE HAWKISH | Warsh | Taux 3.50-3.75% | CPI 4.2%");
         sb.append("🏦 RÉGIME FED : ").append(regimeFed).append("\n");
 
         sb.append("─────────────────────────────\n");
-        sb.append("RÈGLE MA200 : Si un actif est SOUS sa MA200 et reçoit un signal haussier,\n");
-        sb.append("réduire la conviction de 10-15% (signal contre tendance).\n");
-        sb.append("Si actif AU-DESSUS MA200 et signal haussier, maintenir ou renforcer.\n");
+        sb.append("REGULATION FLUX : Si un actif évolue sous sa MA200,\n");
+        sb.append("réduire d'office la conviction de 10-15% sur les signaux d'achats.\n");
         sb.append("═══════════════════════════════════════\n");
 
         return sb.toString();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CLASSE INTERNE : CALCULATEUR SYNC DE LA MA200
+    // CALCULATEUR SYNCHRONISÉ DE TENDANCE FOND
     // ─────────────────────────────────────────────────────────────────────────
 
     private static class MovingAverage200Calculator {
@@ -514,7 +496,6 @@ public class TradingViewFetcher {
 
         public synchronized void initializeWithHistory(List<Double> historicalCloses) {
             if (historicalCloses == null || historicalCloses.size() < PERIOD) {
-                Log.w(TAG, "[MA200] Données historiques insuffisantes pour l'initialisation.");
                 return;
             }
             currentSum = 0.0;
