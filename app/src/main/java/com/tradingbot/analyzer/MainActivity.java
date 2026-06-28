@@ -147,13 +147,15 @@ public class MainActivity extends AppCompatActivity {
                         addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
                         StringBuilder sb = new StringBuilder();
                         for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : data.entrySet()) {
-                            TradingViewFetcher.TVMarketData d = entry.getValue();
-                            sb.append("• *").append(entry.getKey()).append("* : ")
-                              .append(String.format(Locale.US, "%.4f", d.price))
-                              .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
-                              .append(" | MA200=").append(String.format(Locale.US, "%.4f", d.ma200))
-                              .append(d.aboveMA200 ? " [🟢 AU-DESSUS]" : " [🔴 EN-DESSOUS]")
-                              .append("\n");
+                        TradingViewFetcher.TVMarketData d = entry.getValue();
+                        sb.append("• *").append(entry.getKey()).append("* : ")
+                        .append(String.format(Locale.US, "%.4f", d.price))
+                        .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
+                        .append(" | H: ").append(String.format(Locale.US, "%.4f", d.high))
+                        .append(" | L: ").append(String.format(Locale.US, "%.4f", d.low))
+                        .append(" | Var: ").append(String.format(Locale.US, "%.4f", d.variance))
+                        .append("\n");
+
                         }
                         addLog("📊 Données TV :\n" + sb.toString());
                         // Envoyer à Telegram pour vérification
