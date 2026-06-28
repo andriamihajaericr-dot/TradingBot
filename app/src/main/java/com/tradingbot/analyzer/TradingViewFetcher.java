@@ -25,24 +25,23 @@ public class TradingViewFetcher {
 
     private static final String TAG = "TradingViewFetcher";
 
-    // ── Matrice complète des 13 actifs (tickers TradingView) ──
+    // ── Tickers TradingView (mode anonyme) ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
         put("DXY",     "TVC:DXY");
         put("VIX",     "CBOE:VIX");
         put("US10Y",   "TVC:US10Y");
         put("US500",   "OANDA:SPX500USD");
-        put("NASDAQ",  "NASDAQ:QQQ");
-        put("GOLD",    "TVC:GOLD");
+        put("NASDAQ",  "QQQ");
+        put("GOLD",    "OANDA:XAUUSD");
         put("USOIL",   "TVC:USOIL");
-        put("EURUSD",  "FX_IDC:EURUSD");
-        put("USDJPY",  "FX_IDC:USDJPY");
-        put("GBPUSD",  "FX_IDC:GBPUSD");
-        put("AUDUSD",  "FX_IDC:AUDUSD");
-        put("USDCAD",  "FX_IDC:USDCAD");
+        put("EURUSD",  "FX:EURUSD");
+        put("USDJPY",  "FX:USDJPY");
+        put("GBPUSD",  "FX:GBPUSD");
+        put("AUDUSD",  "FX:AUDUSD");
+        put("USDCAD",  "FX:USDCAD");
         put("BITCOIN", "BINANCE:BTCUSDT");
     }};
 
-    // ── Données de marché enrichies ──
     public static class TVMarketData {
         public final String symbol;
         public final double price;
@@ -51,7 +50,7 @@ public class TradingViewFetcher {
         public final double low;
         public final double open;
         public final double prevClose;
-        public final double variance;      // variance sur 20 derniers prix
+        public final double variance;
         public final long timestamp;
 
         public TVMarketData(String symbol, double price, double changePercent,
@@ -69,14 +68,11 @@ public class TradingViewFetcher {
         }
     }
 
-    // ── Caches et calculateurs ──
     private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, VarianceCalculator> varianceCalculators = new ConcurrentHashMap<>();
     private static final AtomicBoolean isRunning = new AtomicBoolean(false);
     private static final AtomicBoolean isConnecting = new AtomicBoolean(false);
     private static final AtomicBoolean connected = new AtomicBoolean(false);
-    private static final ConcurrentHashMap<String, String> seriesIdToKey = new ConcurrentHashMap<>();
-    private static int seriesCounter = 0;
     private static Context appContext;
     private static OkHttpClient client;
     private static WebSocket webSocket;
@@ -113,9 +109,8 @@ public class TradingViewFetcher {
             webSocket = null;
         }
         client = null;
-        seriesIdToKey.clear();
-        seriesCounter = 0;
         cache.clear();
+        varianceCalculators.clear();
         logToUI("🛑 [TV] Fetcher arrêté.");
         Log.i(TAG, "[TV] Arrêté.");
     }
@@ -135,7 +130,6 @@ public class TradingViewFetcher {
                 .build();
 
         webSocket = client.newWebSocket(request, new WebSocketListener() {
-            private String chartSessionId;
             private String quoteSessionId;
 
             @Override
@@ -144,31 +138,24 @@ public class TradingViewFetcher {
                 Log.d(TAG, "[TV WS] Ouvert.");
                 connected.set(true);
                 isConnecting.set(false);
-                seriesCounter = 0;
-                seriesIdToKey.clear();
                 cache.clear();
 
-                chartSessionId = "cs_" + UUID.randomUUID().toString().substring(0, 12);
                 quoteSessionId = "qs_" + UUID.randomUUID().toString().substring(0, 12);
 
                 sendMessage(ws, "set_auth_token", new String[]{"unauthorized_user_token"});
-                sendMessage(ws, "chart_create_session", new String[]{chartSessionId, ""});
                 sendMessage(ws, "quote_create_session", new String[]{quoteSessionId});
-                // Demander tous les champs utiles : prix, high/low, open, close précédent
                 sendMessage(ws, "quote_set_fields", new String[]{
                         quoteSessionId,
                         "lp", "chp", "ch", "high_price", "low_price",
                         "open_price", "prev_close_price"
                 });
 
-                // On n'utilise plus l'historique (pas de create_series)
-                // On s'abonne simplement aux quotes avec flags
+                // Abonnement à tous les symboles
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
-                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(20)); // 20 périodes pour variance
-                    sendMessage(ws, "quote_add_symbols", new String[]{
-                            quoteSessionId, ticker, "{\"flags\":[\"force_permission\"]}"
-                    });
+                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(20));
+                    sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker});
+                    logToUI("📥 [TV] Abonnement demandé pour " + key + " (" + ticker + ")");
                 }
                 logToUI("📥 [TV WS] " + SYMBOL_MAP.size() + " symboles abonnés.");
                 Log.i(TAG, "[TV WS] " + SYMBOL_MAP.size() + " symboles abonnés.");
@@ -176,7 +163,19 @@ public class TradingViewFetcher {
 
             @Override
             public void onMessage(WebSocket ws, String text) {
+                // Log des messages bruts pour diagnostiquer
+                String preview = text.length() > 50 ? text.substring(0, 50) + "..." : text;
+                Log.d(TAG, "[TV WS] Message brut: " + preview);
+                logToUI("📨 [TV WS] Reçu: " + preview);
+
                 if (text == null) return;
+                // Heartbeat
+                if (text.contains("~h~")) {
+                    ws.send(text);
+                    return;
+                }
+
+                // Parser les messages au format ~m~length~m~payload
                 int idx = 0;
                 while (idx < text.length()) {
                     int first = text.indexOf("~m~", idx);
@@ -190,11 +189,7 @@ public class TradingViewFetcher {
                     int endPayload = startPayload + length;
                     if (endPayload > text.length()) break;
                     String payload = text.substring(startPayload, endPayload);
-                    if (payload.startsWith("~h~")) {
-                        ws.send(text);
-                    } else {
-                        processJsonPayload(payload);
-                    }
+                    processJsonPayload(payload);
                     idx = endPayload;
                 }
             }
@@ -219,7 +214,6 @@ public class TradingViewFetcher {
                                 double open = v.optDouble("open_price", price);
                                 double prevClose = v.optDouble("prev_close_price", price);
 
-                                // Mettre à jour la variance
                                 String key = getKeyFromTicker(ticker);
                                 if (key != null) {
                                     VarianceCalculator calc = varianceCalculators.get(key);
@@ -227,10 +221,16 @@ public class TradingViewFetcher {
                                         calc.addPrice(price);
                                         double variance = calc.getVariance();
                                         updateCache(key, price, change, high, low, open, prevClose, variance);
+                                        logToUI("📊 [TV] " + key + " prix=" + price);
                                     }
+                                } else {
+                                    logToUI("⚠️ [TV] Ticker non reconnu: " + ticker);
                                 }
                             }
                         }
+                    } else {
+                        // Autres types de messages (protocol, etc.)
+                        Log.d(TAG, "[TV WS] Autre message m=" + m + " : " + payload);
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "[TV WS] Erreur parse JSON", e);
@@ -295,7 +295,7 @@ public class TradingViewFetcher {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CALCULATEUR DE VARIANCE (sur 20 derniers prix)
+    // CALCULATEUR DE VARIANCE
     // ─────────────────────────────────────────────────────────────────────────
 
     private static class VarianceCalculator {
@@ -352,7 +352,7 @@ public class TradingViewFetcher {
     public static void fetchAll(OnDataReadyListener listener) {
         new Thread(() -> {
             long start = System.currentTimeMillis();
-            while (cache.size() < SYMBOL_MAP.size() && (System.currentTimeMillis() - start < 15000)) {
+            while (cache.isEmpty() && (System.currentTimeMillis() - start < 15000)) {
                 try { TimeUnit.MILLISECONDS.sleep(500); } catch (InterruptedException ignored) {}
             }
             if (listener != null) {
@@ -366,7 +366,7 @@ public class TradingViewFetcher {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CONTEXTE MACRO (affichage des High/Low et Variance)
+    // CONTEXTE MACRO
     // ─────────────────────────────────────────────────────────────────────────
 
     public static String buildContexteMacroGlobal(Context ctx) {
