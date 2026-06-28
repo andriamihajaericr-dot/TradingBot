@@ -369,24 +369,83 @@ private static double getWeeklyLow(String key) {
                 long now = System.currentTimeMillis();
                 Long last = lastAlertTime.get(key);
                 if (last != null && (now - last) < ALERT_COOLDOWN_MS) return;
+                 // ── Alertes daily ──
+if (data.isNearHigh) {
+    String msg = "📊 *" + key + "* 🔺 Approche du *plus haut du jour*\n" +
+        "Prix actuel : `" + String.format(Locale.US, "%.4f", data.price) + "`\n" +
+        "Résistance daily : `" + String.format(Locale.US, "%.4f", data.high) + "`\n" +
+        "Position : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "% de la fourchette\n" +
+        "💡 *Signal* : Risque de rejet si volume faible. Surveiller le momentum.";
+    NotificationService.sendTelegramSecure(msg, appContext);
+    lastAlertTime.put(key + "_daily_high", now);
+    logToUI("🔔 [ALERTE DAILY HIGH] " + key);
 
-                if (data.isNearHigh) {
-                    String msg = "⚠️ *" + key + "* 🔺 **près du plus haut du jour**\n" +
-                            "Prix : " + String.format(Locale.US, "%.4f", data.price) + "\n" +
-                            "Haut : " + String.format(Locale.US, "%.4f", data.high) + "\n" +
-                            "Range : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "%";
-                    NotificationService.sendTelegramSecure(msg, appContext);
-                    lastAlertTime.put(key, now);
-                    logToUI("🔔 [ALERTE] " + key + " touche le haut du jour.");
-                } else if (data.isNearLow) {
-                    String msg = "⚠️ *" + key + "* 🔻 **près du plus bas du jour**\n" +
-                            "Prix : " + String.format(Locale.US, "%.4f", data.price) + "\n" +
-                            "Bas : " + String.format(Locale.US, "%.4f", data.low) + "\n" +
-                            "Range : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "%";
-                    NotificationService.sendTelegramSecure(msg, appContext);
-                    lastAlertTime.put(key, now);
-                    logToUI("🔔 [ALERTE] " + key + " touche le bas du jour.");
-                }
+} else if (data.isNearLow) {
+    String msg = "📊 *" + key + "* 🔻 Approche du *plus bas du jour*\n" +
+        "Prix actuel : `" + String.format(Locale.US, "%.4f", data.price) + "`\n" +
+        "Support daily : `" + String.format(Locale.US, "%.4f", data.low) + "`\n" +
+        "Position : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "% de la fourchette\n" +
+        "💡 *Signal* : Support testé. Rebond possible si acheteurs présents.";
+    NotificationService.sendTelegramSecure(msg, appContext);
+    lastAlertTime.put(key + "_daily_low", now);
+    logToUI("🔔 [ALERTE DAILY LOW] " + key);
+}
+
+// ── Alertes weekly ──
+if (data.weeklyHigh > 0) {
+    Long lastW = lastAlertTime.get(key + "_weekly_high");
+    if (lastW == null || (now - lastW) > ALERT_COOLDOWN_MS) {
+        if (data.isAboveWeeklyHigh) {
+            String msg = "🚀 *" + key + "* ✅ *BREAKOUT au-dessus du high de la semaine précédente !*\n" +
+                "Prix actuel : `" + String.format(Locale.US, "%.4f", data.price) + "`\n" +
+                "High semaine préc. : `" + String.format(Locale.US, "%.4f", data.weeklyHigh) + "`\n" +
+                "💡 *Signal fort* : Breakout weekly confirmé — momentum haussier institutionnel.\n" +
+                "📈 Surveiller la clôture au-dessus pour confirmation.";
+            NotificationService.sendTelegramSecure(msg, appContext);
+            lastAlertTime.put(key + "_weekly_high", now);
+            logToUI("🚀 [BREAKOUT WEEKLY HIGH] " + key);
+
+        } else if (data.isNearWeeklyHigh) {
+            String msg = "⚡ *" + key + "* 🔺 Test du *high semaine précédente*\n" +
+                "Prix actuel : `" + String.format(Locale.US, "%.4f", data.price) + "`\n" +
+                "Résistance weekly : `" + String.format(Locale.US, "%.4f", data.weeklyHigh) + "`\n" +
+                "Distance : " + String.format(Locale.US, "%.2f",
+                    ((data.weeklyHigh - data.price) / data.weeklyHigh * 100)) + "% en dessous\n" +
+                "💡 *Signal* : Zone de résistance clé. Breakout = signal fort. Rejet = retournement.";
+            NotificationService.sendTelegramSecure(msg, appContext);
+            lastAlertTime.put(key + "_weekly_high", now);
+            logToUI("⚡ [ALERTE WEEKLY HIGH] " + key);
+        }
+    }
+}
+
+if (data.weeklyLow > 0) {
+    Long lastW = lastAlertTime.get(key + "_weekly_low");
+    if (lastW == null || (now - lastW) > ALERT_COOLDOWN_MS) {
+        if (data.isBelowWeeklyLow) {
+            String msg = "🔥 *" + key + "* 🔴 *BREAKDOWN sous le low de la semaine précédente !*\n" +
+                "Prix actuel : `" + String.format(Locale.US, "%.4f", data.price) + "`\n" +
+                "Low semaine préc. : `" + String.format(Locale.US, "%.4f", data.weeklyLow) + "`\n" +
+                "💡 *Signal fort* : Breakdown weekly — pression vendeuse institutionnelle.\n" +
+                "📉 Surveiller la clôture en dessous pour confirmation.";
+            NotificationService.sendTelegramSecure(msg, appContext);
+            lastAlertTime.put(key + "_weekly_low", now);
+            logToUI("🔥 [BREAKDOWN WEEKLY LOW] " + key);
+
+        } else if (data.isNearWeeklyLow) {
+            String msg = "⚡ *" + key + "* 🔻 Test du *low semaine précédente*\n" +
+                "Prix actuel : `" + String.format(Locale.US, "%.4f", data.price) + "`\n" +
+                "Support weekly : `" + String.format(Locale.US, "%.4f", data.weeklyLow) + "`\n" +
+                "Distance : " + String.format(Locale.US, "%.2f",
+                    ((data.price - data.weeklyLow) / data.weeklyLow * 100)) + "% au-dessus\n" +
+                "💡 *Signal* : Zone de support clé. Rebond = signal fort. Cassure = signal baissier.";
+            NotificationService.sendTelegramSecure(msg, appContext);
+            lastAlertTime.put(key + "_weekly_low", now);
+            logToUI("⚡ [ALERTE WEEKLY LOW] " + key);
+        }
+    }
+}
+                
             }
 
             @Override
