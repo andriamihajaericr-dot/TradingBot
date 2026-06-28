@@ -99,6 +99,7 @@ private static final String PREF_WEEKLY_UPDATED = "weekly_levels_updated";
 
 public static void fetchWeeklyLevels() {
     // Fetch 1x par semaine seulement — le lundi
+    if (appContext == null) return;
     SharedPreferences prefs = appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE);
     long lastUpdate = prefs.getLong(PREF_WEEKLY_UPDATED, 0);
     long now = System.currentTimeMillis();
