@@ -337,8 +337,11 @@ private static double getWeeklyLow(String key) {
                                     }
                                     // Mise à jour du cache
                                     TVMarketData newData = new TVMarketData(key, price, change,
-                                            high, low, open, prevClose,
-                                            variance, System.currentTimeMillis());
+                                    high, low, open, prevClose,
+                                    variance,
+                                    getWeeklyHigh(key),
+                                    getWeeklyLow(key),
+                                    System.currentTimeMillis());
                                     cache.put(key, newData);
 
                                     // Vérification des extrémités et envoi d'alerte
