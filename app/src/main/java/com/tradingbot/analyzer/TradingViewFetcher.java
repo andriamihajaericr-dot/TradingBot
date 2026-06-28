@@ -1,20 +1,13 @@
 package com.tradingbot.analyzer;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -32,14 +25,14 @@ public class TradingViewFetcher {
 
     private static final String TAG = "TradingViewFetcher";
 
-    // ── Matrice complète (13 actifs) – tickers TradingView ──
+    // ── Matrice complète des 13 actifs (tickers TradingView) ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
         put("DXY",     "TVC:DXY");
         put("VIX",     "CBOE:VIX");
         put("US10Y",   "TVC:US10Y");
         put("US500",   "OANDA:SPX500USD");
         put("NASDAQ",  "NASDAQ:QQQ");
-        put("GOLD",    "OANDA:XAUUSD");
+        put("GOLD",    "TVC:GOLD");
         put("USOIL",   "TVC:USOIL");
         put("EURUSD",  "FX_IDC:EURUSD");
         put("USDJPY",  "FX_IDC:USDJPY");
@@ -49,51 +42,44 @@ public class TradingViewFetcher {
         put("BITCOIN", "BINANCE:BTCUSDT");
     }};
 
-    // ── Fallback TwelveData (pour SMA200) ──
-    private static final Map<String, String> TWELVE_SYMBOL_MAP = new HashMap<String, String>() {{
-        put("US500",   "SPY");
-        put("NASDAQ",  "QQQ");
-        put("GOLD",    "XAU/USD");
-        put("USOIL",   "WTI");
-        put("EURUSD",  "EUR/USD");
-        put("USDJPY",  "USD/JPY");
-        put("GBPUSD",  "GBP/USD");
-        put("AUDUSD",  "AUD/USD");
-        put("USDCAD",  "USD/CAD");
-        put("BITCOIN", "BTC/USD");
-        // DXY, VIX, US10Y ne sont pas disponibles en SMA sur TwelveData
-    }};
-
+    // ── Données de marché enrichies ──
     public static class TVMarketData {
         public final String symbol;
         public final double price;
         public final double changePercent;
-        public final double ma200;
-        public final boolean aboveMA200;
+        public final double high;
+        public final double low;
+        public final double open;
+        public final double prevClose;
+        public final double variance;      // variance sur 20 derniers prix
         public final long timestamp;
 
         public TVMarketData(String symbol, double price, double changePercent,
-                            double ma200, long timestamp) {
+                            double high, double low, double open, double prevClose,
+                            double variance, long timestamp) {
             this.symbol        = symbol;
             this.price         = price;
             this.changePercent = changePercent;
-            this.ma200         = ma200;
-            this.aboveMA200   = (ma200 > 0) && (price > ma200);
-            this.timestamp    = timestamp;
+            this.high          = high;
+            this.low           = low;
+            this.open          = open;
+            this.prevClose     = prevClose;
+            this.variance      = variance;
+            this.timestamp     = timestamp;
         }
     }
 
+    // ── Caches et calculateurs ──
     private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, VarianceCalculator> varianceCalculators = new ConcurrentHashMap<>();
     private static final AtomicBoolean isRunning = new AtomicBoolean(false);
     private static final AtomicBoolean isConnecting = new AtomicBoolean(false);
     private static final AtomicBoolean connected = new AtomicBoolean(false);
     private static final ConcurrentHashMap<String, String> seriesIdToKey = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<String, MovingAverage200Calculator> calculators = new ConcurrentHashMap<>();
     private static int seriesCounter = 0;
     private static Context appContext;
     private static OkHttpClient client;
     private static WebSocket webSocket;
-    private static String twelveDataKey = "";
 
     public interface OnDataReadyListener {
         void onDataReady(Map<String, TVMarketData> data);
@@ -110,12 +96,6 @@ public class TradingViewFetcher {
             return;
         }
         appContext = context.getApplicationContext();
-        SharedPreferences prefs = appContext.getSharedPreferences("TradingBot", Context.MODE_PRIVATE);
-        twelveDataKey = prefs.getString("macro_api_key", "");
-        if (twelveDataKey.isEmpty()) {
-            logToUI("⚠️ [TV] Clé TwelveData absente – fallback SMA désactivé.");
-        }
-
         client = new OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(15, TimeUnit.SECONDS)
@@ -174,26 +154,24 @@ public class TradingViewFetcher {
                 sendMessage(ws, "set_auth_token", new String[]{"unauthorized_user_token"});
                 sendMessage(ws, "chart_create_session", new String[]{chartSessionId, ""});
                 sendMessage(ws, "quote_create_session", new String[]{quoteSessionId});
-                sendMessage(ws, "quote_set_fields", new String[]{quoteSessionId, "lp", "chp", "ch"});
+                // Demander tous les champs utiles : prix, high/low, open, close précédent
+                sendMessage(ws, "quote_set_fields", new String[]{
+                        quoteSessionId,
+                        "lp", "chp", "ch", "high_price", "low_price",
+                        "open_price", "prev_close_price"
+                });
 
+                // On n'utilise plus l'historique (pas de create_series)
+                // On s'abonne simplement aux quotes avec flags
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
-                    seriesCounter++;
-                    String seriesId = "s" + seriesCounter;
-                    seriesIdToKey.put(seriesId, key);
-                    calculators.putIfAbsent(key, new MovingAverage200Calculator());
-
-                    String resolvePayload = "{\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}";
-                    sendMessage(ws, "resolve_symbol", new String[]{chartSessionId, "sym_" + seriesId, resolvePayload});
-                    try { Thread.sleep(150); } catch (InterruptedException ignored) {}
-                    sendMessage(ws, "create_series", new String[]{chartSessionId, seriesId, "s1", "sym_" + seriesId, "1D", "300"});
-
-                    // Abonnement aux quotes avec flags force_permission
-                    // Abonnement aux quotes avec flags force_permission sous forme de chaîne JSON brute
-                     sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker, "{\"flags\":[\"force_permission\"]}"});
+                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(20)); // 20 périodes pour variance
+                    sendMessage(ws, "quote_add_symbols", new String[]{
+                            quoteSessionId, ticker, "{\"flags\":[\"force_permission\"]}"
+                    });
                 }
-                logToUI("📥 [TV WS] " + SYMBOL_MAP.size() + " symboles demandés.");
-                Log.i(TAG, "[TV WS] " + SYMBOL_MAP.size() + " symboles demandés.");
+                logToUI("📥 [TV WS] " + SYMBOL_MAP.size() + " symboles abonnés.");
+                Log.i(TAG, "[TV WS] " + SYMBOL_MAP.size() + " symboles abonnés.");
             }
 
             @Override
@@ -227,51 +205,7 @@ public class TradingViewFetcher {
                     JSONObject json = new JSONObject(payload);
                     String m = json.optString("m");
 
-                    if ("timescale_update".equals(m)) {
-                        JSONArray p = json.getJSONArray("p");
-                        if (p.length() < 2) return;
-                        JSONObject dataObj = p.getJSONObject(1);
-                        for (Map.Entry<String, String> entry : seriesIdToKey.entrySet()) {
-                            String sid = entry.getKey();
-                            if (dataObj.has(sid)) {
-                                JSONObject series = dataObj.getJSONObject(sid);
-                                String key = entry.getValue();
-                                MovingAverage200Calculator calc = calculators.get(key);
-                                if (calc == null) continue;
-                                if (series.has("s")) {
-                                    JSONArray candles = series.getJSONArray("s");
-                                    List<Double> closes = new ArrayList<>();
-                                    for (int i = 0; i < candles.length(); i++) {
-                                        JSONObject candle = candles.getJSONObject(i);
-                                        JSONArray v = candle.getJSONArray("v");
-                                        double close = v.optDouble(4, 0);
-                                        if (close > 0) closes.add(close);
-                                    }
-                                    if (closes.size() >= 200) {
-                                        calc.initializeWithHistory(closes);
-                                        double ma = calc.getCurrentMA();
-                                        double lastPrice = closes.get(closes.size() - 1);
-                                        TVMarketData existing = cache.get(key);
-                                        double change = (existing != null) ? existing.changePercent : 0.0;
-                                        updateCache(key, lastPrice, change, ma);
-                                        logToUI("📊 [TV MA200] " + key + " MA200 = " + String.format(Locale.US, "%.2f", ma));
-                                    } else {
-                                        logToUI("⚠️ [TV MA200] " + key + " bougies insuffisantes (" + closes.size() + "), fallback SMA.");
-                                        double maFallback = fetchMA200FromTwelveData(key);
-                                        if (maFallback > 0) {
-                                            double lastPrice = closes.isEmpty() ? 0 : closes.get(closes.size() - 1);
-                                            if (lastPrice > 0) {
-                                                TVMarketData existing = cache.get(key);
-                                                double change = (existing != null) ? existing.changePercent : 0.0;
-                                                updateCache(key, lastPrice, change, maFallback);
-                                                logToUI("✅ [TV MA200 Fallback] " + key + " SMA = " + String.format(Locale.US, "%.2f", maFallback));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else if ("qsd".equals(m)) {
+                    if ("qsd".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
                             JSONObject quote = p.getJSONObject(1);
@@ -280,14 +214,19 @@ public class TradingViewFetcher {
                             if (v != null && v.has("lp")) {
                                 double price = v.optDouble("lp", 0);
                                 double change = v.optDouble("chp", 0);
-                                // Trouver la clé correspondante
-                                for (Map.Entry<String, String> entry : SYMBOL_MAP.entrySet()) {
-                                    if (ticker.equals(entry.getValue()) || ticker.endsWith(entry.getValue())) {
-                                        String key = entry.getKey();
-                                        TVMarketData existing = cache.get(key);
-                                        double ma = (existing != null) ? existing.ma200 : 0.0;
-                                        updateCache(key, price, change, ma);
-                                        break;
+                                double high = v.optDouble("high_price", price);
+                                double low = v.optDouble("low_price", price);
+                                double open = v.optDouble("open_price", price);
+                                double prevClose = v.optDouble("prev_close_price", price);
+
+                                // Mettre à jour la variance
+                                String key = getKeyFromTicker(ticker);
+                                if (key != null) {
+                                    VarianceCalculator calc = varianceCalculators.get(key);
+                                    if (calc != null) {
+                                        calc.addPrice(price);
+                                        double variance = calc.getVariance();
+                                        updateCache(key, price, change, high, low, open, prevClose, variance);
                                     }
                                 }
                             }
@@ -298,9 +237,21 @@ public class TradingViewFetcher {
                 }
             }
 
-            // Méthode unique pour mettre à jour le cache
-            private void updateCache(String key, double price, double change, double ma) {
-                cache.put(key, new TVMarketData(key, price, change, ma, System.currentTimeMillis()));
+            private String getKeyFromTicker(String ticker) {
+                for (Map.Entry<String, String> entry : SYMBOL_MAP.entrySet()) {
+                    if (ticker.equals(entry.getValue())) {
+                        return entry.getKey();
+                    }
+                }
+                return null;
+            }
+
+            private void updateCache(String key, double price, double change,
+                                     double high, double low, double open,
+                                     double prevClose, double variance) {
+                cache.put(key, new TVMarketData(key, price, change,
+                        high, low, open, prevClose,
+                        variance, System.currentTimeMillis()));
             }
 
             @Override
@@ -344,37 +295,46 @@ public class TradingViewFetcher {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // FALLBACK SMA200 VIA TWELVE DATA
+    // CALCULATEUR DE VARIANCE (sur 20 derniers prix)
     // ─────────────────────────────────────────────────────────────────────────
 
-    private static double fetchMA200FromTwelveData(String key) {
-        if (twelveDataKey.isEmpty()) return 0;
-        String twelveSymbol = TWELVE_SYMBOL_MAP.get(key);
-        if (twelveSymbol == null) return 0;
-        try {
-            String urlStr = "https://api.twelvedata.com/sma?symbol=" + twelveSymbol
-                    + "&interval=1day&time_period=200&apikey=" + twelveDataKey;
-            HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
-            if (conn.getResponseCode() == 200) {
-                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = br.readLine()) != null) sb.append(line);
-                br.close();
-                JSONObject json = new JSONObject(sb.toString());
-                JSONArray values = json.optJSONArray("values");
-                if (values != null && values.length() > 0) {
-                    double sma = values.getJSONObject(0).optDouble("sma", 0);
-                    if (sma > 0) return sma;
-                }
-            }
-            conn.disconnect();
-        } catch (Exception e) {
-            Log.e(TAG, "[TV MA200 Fallback] Erreur pour " + key + " : " + e.getMessage());
+    private static class VarianceCalculator {
+        private final int period;
+        private final double[] window;
+        private int index = 0;
+        private int count = 0;
+        private double sum = 0;
+        private double sumSq = 0;
+        private boolean initialized = false;
+
+        public VarianceCalculator(int period) {
+            this.period = period;
+            this.window = new double[period];
         }
-        return 0;
+
+        public synchronized void addPrice(double price) {
+            if (count < period) {
+                window[count] = price;
+                sum += price;
+                sumSq += price * price;
+                count++;
+                if (count == period) initialized = true;
+            } else {
+                double old = window[index];
+                sum -= old;
+                sumSq -= old * old;
+                window[index] = price;
+                sum += price;
+                sumSq += price * price;
+                index = (index + 1) % period;
+            }
+        }
+
+        public synchronized double getVariance() {
+            if (!initialized) return 0;
+            double mean = sum / period;
+            return (sumSq / period) - (mean * mean);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -383,10 +343,6 @@ public class TradingViewFetcher {
 
     public static Map<String, TVMarketData> getCache() {
         return Collections.unmodifiableMap(cache);
-    }
-
-    public static boolean isCacheReady() {
-        return cache.size() >= SYMBOL_MAP.size();
     }
 
     public static TVMarketData get(String symbol) {
@@ -410,7 +366,7 @@ public class TradingViewFetcher {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CONTEXTE MACRO (inchangé)
+    // CONTEXTE MACRO (affichage des High/Low et Variance)
     // ─────────────────────────────────────────────────────────────────────────
 
     public static String buildContexteMacroGlobal(Context ctx) {
@@ -418,75 +374,24 @@ public class TradingViewFetcher {
         StringBuilder sb = new StringBuilder();
         sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
 
-        TVMarketData dxy = cache.get("DXY");
-        if (dxy != null) {
-            sb.append("💵 DXY : ").append(String.format(Locale.US, "%.2f", dxy.price))
-                    .append(" (").append(String.format(Locale.US, "%+.2f", dxy.changePercent)).append("%)")
-                    .append(" | MA200=").append(String.format(Locale.US, "%.2f", dxy.ma200))
-                    .append(dxy.aboveMA200 ? " [HAUSSIER]" : " [BAISSIER]").append("\n");
-        }
-
-        TVMarketData vix = cache.get("VIX");
-        if (vix != null) {
-            String regime = vix.price > 30 ? "🔴 PANIQUE" : vix.price > 20 ? "🟠 STRESS" : "🟢 CALME";
-            sb.append("📊 VIX : ").append(String.format(Locale.US, "%.1f", vix.price)).append(" ").append(regime).append("\n");
-        }
-
-        TVMarketData us10y = cache.get("US10Y");
-        if (us10y != null) {
-            sb.append("📈 US10Y : ").append(String.format(Locale.US, "%.3f", us10y.price)).append("%")
-                    .append(" | MA200=").append(String.format(Locale.US, "%.3f", us10y.ma200)).append("%")
-                    .append(us10y.aboveMA200 ? " [HAUSSE]" : " [BAISSE]").append("\n");
-        }
-
-        TVMarketData us500 = cache.get("US500");
-        if (us500 != null) {
-            sb.append("📊 SP500 : ").append(String.format(Locale.US, "%.1f", us500.price))
-                    .append(String.format(Locale.US, " (%+.2f%%)", us500.changePercent))
-                    .append(us500.aboveMA200 ? " [BULL]" : " [BEAR]").append("\n");
-        }
-
-        TVMarketData nasdaq = cache.get("NASDAQ");
-        if (nasdaq != null) {
-            sb.append("💻 NASDAQ : ").append(String.format(Locale.US, "%.2f", nasdaq.price))
-                    .append(String.format(Locale.US, " (%+.2f%%)", nasdaq.changePercent))
-                    .append(nasdaq.aboveMA200 ? " [HAUSSIER]" : " [BAISSIER]").append("\n");
-        }
-
-        TVMarketData gold = cache.get("GOLD");
-        if (gold != null) {
-            sb.append("🏆 GOLD : ").append(String.format(Locale.US, "%.2f", gold.price))
-                    .append(String.format(Locale.US, " (%+.2f%%)", gold.changePercent))
-                    .append(" | MA200=").append(String.format(Locale.US, "%.2f", gold.ma200))
-                    .append(gold.aboveMA200 ? " [AU-DESSUS]" : " [EN-DESSOUS]").append("\n");
-        }
-
-        TVMarketData usoil = cache.get("USOIL");
-        if (usoil != null) {
-            sb.append("🛢️ USOIL : ").append(String.format(Locale.US, "%.2f", usoil.price))
-                    .append(String.format(Locale.US, " (%+.2f%%)", usoil.changePercent))
-                    .append(usoil.aboveMA200 ? " [HAUSSIER]" : " [BAISSIER]").append("\n");
-        }
-
-        for (String pair : new String[]{"EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "USDCAD"}) {
-            TVMarketData p = cache.get(pair);
-            if (p != null) {
-                sb.append(pair).append(" : ").append(String.format(Locale.US, "%.4f", p.price))
-                        .append(String.format(Locale.US, " (%+.2f%%)", p.changePercent)).append("\n");
+        for (String key : SYMBOL_MAP.keySet()) {
+            TVMarketData d = cache.get(key);
+            if (d != null) {
+                sb.append(key).append(" : ")
+                        .append(String.format(Locale.US, "%.4f", d.price))
+                        .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
+                        .append(" | H: ").append(String.format(Locale.US, "%.4f", d.high))
+                        .append(" | L: ").append(String.format(Locale.US, "%.4f", d.low))
+                        .append(" | Var: ").append(String.format(Locale.US, "%.4f", d.variance))
+                        .append("\n");
             }
-        }
-
-        TVMarketData btc = cache.get("BITCOIN");
-        if (btc != null) {
-            sb.append("₿ BITCOIN : ").append(String.format(Locale.US, "%.0f", btc.price))
-                    .append(String.format(Locale.US, " (%+.2f%%)", btc.changePercent)).append("\n");
         }
 
         String regimeFed = ctx.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
                 .getString("fed_regime", "PAUSE HAWKISH | Warsh | Taux 3.50-3.75% | CPI 4.2%");
         sb.append("🏦 RÉGIME FED : ").append(regimeFed).append("\n");
         sb.append("─────────────────────────────\n");
-        sb.append("RÈGLE MA200 : Si actif sous MA200, réduire conviction de 10-15%.\n");
+        sb.append("INDICATEURS : Variance = volatilité intraday (écart-type sur 20 ticks).\n");
         return sb.toString();
     }
 
@@ -497,31 +402,6 @@ public class TradingViewFetcher {
     private static void logToUI(String msg) {
         if (MainActivity.instance != null) {
             MainActivity.instance.addLog(msg);
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // CALCULATEUR MA200
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private static class MovingAverage200Calculator {
-        private static final int PERIOD = 200;
-        private final double[] window = new double[PERIOD];
-        private double currentSum = 0.0;
-        private boolean initialized = false;
-
-        public synchronized void initializeWithHistory(List<Double> historicalCloses) {
-            if (historicalCloses == null || historicalCloses.size() < PERIOD) return;
-            currentSum = 0.0;
-            for (int i = 0; i < PERIOD; i++) {
-                window[i] = historicalCloses.get(historicalCloses.size() - PERIOD + i);
-                currentSum += window[i];
-            }
-            initialized = true;
-        }
-
-        public synchronized double getCurrentMA() {
-            return initialized ? currentSum / PERIOD : 0.0;
         }
     }
 }
