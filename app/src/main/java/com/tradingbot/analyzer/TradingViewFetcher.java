@@ -42,15 +42,20 @@ public class TradingViewFetcher {
         put("BITCOIN", "BINANCE:BTCUSDT");
     }};
 
+    // ── Structure de données avec 4 indicateurs ──
     public static class TVMarketData {
         public final String symbol;
         public final double price;
-        public final double changePercent;
+        public final double changePercent;      // 1. Variation depuis clôture précédente
         public final double high;
         public final double low;
         public final double open;
         public final double prevClose;
-        public final double variance;
+        public final double variance;           // 2. Variance sur 20 ticks (volatilité intraday)
+        public final double volatilityPercent;  // 3. Amplitude daily (High-Low) en %
+        public final double dailyRangePercent;  // 4. Position dans la fourchette du jour (0=Low, 100=High)
+        public final boolean isNearHigh;        // true si price >= 95% du High
+        public final boolean isNearLow;         // true si price <= 5% du Low
         public final long timestamp;
 
         public TVMarketData(String symbol, double price, double changePercent,
@@ -64,12 +69,23 @@ public class TradingViewFetcher {
             this.open          = open;
             this.prevClose     = prevClose;
             this.variance      = variance;
-            this.timestamp     = timestamp;
+            this.volatilityPercent = (high > 0 && low > 0 && high != low)
+                    ? (high - low) / ((high + low) / 2) * 100
+                    : 0.0;
+            double range = high - low;
+            this.dailyRangePercent = (range > 0) ? ((price - low) / range) * 100 : 50.0;
+            this.isNearHigh = this.dailyRangePercent >= 95.0;
+            this.isNearLow  = this.dailyRangePercent <= 5.0;
+            this.timestamp  = timestamp;
         }
     }
 
+    // ── Caches et gestionnaires ──
     private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, VarianceCalculator> varianceCalculators = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Long> lastAlertTime = new ConcurrentHashMap<>(); // anti-spam
+    private static final long ALERT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
     private static final AtomicBoolean isRunning = new AtomicBoolean(false);
     private static final AtomicBoolean isConnecting = new AtomicBoolean(false);
     private static final AtomicBoolean connected = new AtomicBoolean(false);
@@ -111,6 +127,7 @@ public class TradingViewFetcher {
         client = null;
         cache.clear();
         varianceCalculators.clear();
+        lastAlertTime.clear();
         logToUI("🛑 [TV] Fetcher arrêté.");
         Log.i(TAG, "[TV] Arrêté.");
     }
@@ -150,12 +167,10 @@ public class TradingViewFetcher {
                         "open_price", "prev_close_price"
                 });
 
-                // Abonnement à tous les symboles
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
                     varianceCalculators.putIfAbsent(key, new VarianceCalculator(20));
                     sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker});
-                    logToUI("📥 [TV] Abonnement demandé pour " + key + " (" + ticker + ")");
                 }
                 logToUI("📥 [TV WS] " + SYMBOL_MAP.size() + " symboles abonnés.");
                 Log.i(TAG, "[TV WS] " + SYMBOL_MAP.size() + " symboles abonnés.");
@@ -163,11 +178,6 @@ public class TradingViewFetcher {
 
             @Override
             public void onMessage(WebSocket ws, String text) {
-                // Log des messages bruts pour diagnostiquer
-                String preview = text.length() > 50 ? text.substring(0, 50) + "..." : text;
-                Log.d(TAG, "[TV WS] Message brut: " + preview);
-                logToUI("📨 [TV WS] Reçu: " + preview);
-
                 if (text == null) return;
                 // Heartbeat
                 if (text.contains("~h~")) {
@@ -175,7 +185,6 @@ public class TradingViewFetcher {
                     return;
                 }
 
-                // Parser les messages au format ~m~length~m~payload
                 int idx = 0;
                 while (idx < text.length()) {
                     int first = text.indexOf("~m~", idx);
@@ -217,20 +226,22 @@ public class TradingViewFetcher {
                                 String key = getKeyFromTicker(ticker);
                                 if (key != null) {
                                     VarianceCalculator calc = varianceCalculators.get(key);
+                                    double variance = 0.0;
                                     if (calc != null) {
                                         calc.addPrice(price);
-                                        double variance = calc.getVariance();
-                                        updateCache(key, price, change, high, low, open, prevClose, variance);
-                                        logToUI("📊 [TV] " + key + " prix=" + price);
+                                        variance = calc.getVariance();
                                     }
-                                } else {
-                                    logToUI("⚠️ [TV] Ticker non reconnu: " + ticker);
+                                    // Mise à jour du cache
+                                    TVMarketData newData = new TVMarketData(key, price, change,
+                                            high, low, open, prevClose,
+                                            variance, System.currentTimeMillis());
+                                    cache.put(key, newData);
+
+                                    // Vérification des extrémités et envoi d'alerte
+                                    checkAndAlert(key, newData);
                                 }
                             }
                         }
-                    } else {
-                        // Autres types de messages (protocol, etc.)
-                        Log.d(TAG, "[TV WS] Autre message m=" + m + " : " + payload);
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "[TV WS] Erreur parse JSON", e);
@@ -246,12 +257,29 @@ public class TradingViewFetcher {
                 return null;
             }
 
-            private void updateCache(String key, double price, double change,
-                                     double high, double low, double open,
-                                     double prevClose, double variance) {
-                cache.put(key, new TVMarketData(key, price, change,
-                        high, low, open, prevClose,
-                        variance, System.currentTimeMillis()));
+            private void checkAndAlert(String key, TVMarketData data) {
+                if (appContext == null) return;
+                long now = System.currentTimeMillis();
+                Long last = lastAlertTime.get(key);
+                if (last != null && (now - last) < ALERT_COOLDOWN_MS) return;
+
+                if (data.isNearHigh) {
+                    String msg = "⚠️ *" + key + "* 🔺 **près du plus haut du jour**\n" +
+                            "Prix : " + String.format(Locale.US, "%.4f", data.price) + "\n" +
+                            "Haut : " + String.format(Locale.US, "%.4f", data.high) + "\n" +
+                            "Range : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "%";
+                    NotificationService.sendTelegramSecure(msg, appContext);
+                    lastAlertTime.put(key, now);
+                    logToUI("🔔 [ALERTE] " + key + " touche le haut du jour.");
+                } else if (data.isNearLow) {
+                    String msg = "⚠️ *" + key + "* 🔻 **près du plus bas du jour**\n" +
+                            "Prix : " + String.format(Locale.US, "%.4f", data.price) + "\n" +
+                            "Bas : " + String.format(Locale.US, "%.4f", data.low) + "\n" +
+                            "Range : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "%";
+                    NotificationService.sendTelegramSecure(msg, appContext);
+                    lastAlertTime.put(key, now);
+                    logToUI("🔔 [ALERTE] " + key + " touche le bas du jour.");
+                }
             }
 
             @Override
@@ -295,7 +323,7 @@ public class TradingViewFetcher {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CALCULATEUR DE VARIANCE
+    // CALCULATEUR DE VARIANCE SUR TICKS
     // ─────────────────────────────────────────────────────────────────────────
 
     private static class VarianceCalculator {
@@ -366,7 +394,7 @@ public class TradingViewFetcher {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CONTEXTE MACRO
+    // CONTEXTE MACRO AVEC 4 INDICATEURS
     // ─────────────────────────────────────────────────────────────────────────
 
     public static String buildContexteMacroGlobal(Context ctx) {
@@ -378,12 +406,15 @@ public class TradingViewFetcher {
             TVMarketData d = cache.get(key);
             if (d != null) {
                 sb.append(key).append(" : ")
-                        .append(String.format(Locale.US, "%.4f", d.price))
-                        .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
-                        .append(" | H: ").append(String.format(Locale.US, "%.4f", d.high))
-                        .append(" | L: ").append(String.format(Locale.US, "%.4f", d.low))
-                        .append(" | Var: ").append(String.format(Locale.US, "%.4f", d.variance))
-                        .append("\n");
+                  .append(String.format(Locale.US, "%.4f", d.price))
+                  .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
+                  .append(" | H: ").append(String.format(Locale.US, "%.4f", d.high))
+                  .append(" | L: ").append(String.format(Locale.US, "%.4f", d.low))
+                  .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
+                  .append(" | Range pos: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
+                  .append(d.isNearHigh ? " 🔺 près haut" : d.isNearLow ? " 🔻 près bas" : "")
+                  .append(d.variance > 0.001 ? " | Var tick: " + String.format(Locale.US, "%.4f", d.variance) : "")
+                  .append("\n");
             }
         }
 
@@ -391,7 +422,12 @@ public class TradingViewFetcher {
                 .getString("fed_regime", "PAUSE HAWKISH | Warsh | Taux 3.50-3.75% | CPI 4.2%");
         sb.append("🏦 RÉGIME FED : ").append(regimeFed).append("\n");
         sb.append("─────────────────────────────\n");
-        sb.append("INDICATEURS : Variance = volatilité intraday (écart-type sur 20 ticks).\n");
+        sb.append("📊 INDICATEURS :\n");
+        sb.append("• Variation (%) = tendance depuis clôture précédente\n");
+        sb.append("• Amplitude (%) = volatilité daily (High-Low)\n");
+        sb.append("• Range pos (%) = position du prix dans la fourchette du jour (0% = Low, 100% = High)\n");
+        sb.append("• Var tick = volatilité intraday (sur 20 ticks)\n");
+        sb.append("🔔 Des alertes Telegram sont envoyées lorsque le prix approche les extrêmes (>95% haut ou <5% bas).");
         return sb.toString();
     }
 
