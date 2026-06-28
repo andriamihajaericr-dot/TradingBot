@@ -6,6 +6,10 @@ import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,32 +28,50 @@ import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 
 /**
- * TradingViewFetcher — Récupère l'intégralité de la matrice macro et des actifs
- * via le protocole WebSocket de TradingView.
+ * TradingViewFetcher — Récupère en temps réel les 13 actifs macro + indices + forex + crypto
+ * via le WebSocket de TradingView, avec calcul de la MA200 et fallback TwelveData.
  */
 public class TradingViewFetcher {
 
     private static final String TAG = "TradingViewFetcher";
 
-    // ── Matrice complète des 11 actifs + 2 Indicateurs Ancres ──
+    // ── Matrice complète des 13 actifs ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
-        // Ancres Macro
+        // Ancres macro
         put("DXY",     "TVC:DXY");
         put("VIX",     "CBOE:VIX");
-        // Taux & Indices
+        // Taux & indices
         put("US10Y",   "TVC:US10Y");
         put("US500",   "OANDA:SPX500USD");
         put("NASDAQ",  "NASDAQ:QQQ");
-        // Matières Premières
+        // Matières premières
         put("GOLD",    "OANDA:XAUUSD");
         put("USOIL",   "TVC:USOIL");
-        // Forex & Crypto
-        put("EURUSD",  "FX:EURUSD");
-        put("USDJPY",  "FX:USDJPY");
-        put("GBPUSD",  "FX:GBPUSD");
-        put("AUDUSD",  "FX:AUDUSD");
-        put("USDCAD",  "FX:USDCAD");
+        // Forex (FX_IDC pour les paires de devises)
+        put("EURUSD",  "FX_IDC:EURUSD");
+        put("USDJPY",  "FX_IDC:USDJPY");
+        put("GBPUSD",  "FX_IDC:GBPUSD");
+        put("AUDUSD",  "FX_IDC:AUDUSD");
+        put("USDCAD",  "FX_IDC:USDCAD");
+        // Crypto
         put("BITCOIN", "BINANCE:BTCUSDT");
+    }};
+
+    // ── Mapping pour le fallback TwelveData (SMA200) ──
+    private static final Map<String, String> TWELVE_SYMBOL_MAP = new HashMap<String, String>() {{
+        put("DXY",    "DXY");
+        put("VIX",    "VIX");
+        put("US10Y",  "US10Y");
+        put("US500",  "SP500");
+        put("NASDAQ", "QQQ");
+        put("GOLD",   "XAU/USD");
+        put("USOIL",  "WTI");
+        put("EURUSD", "EUR/USD");
+        put("USDJPY", "USD/JPY");
+        put("GBPUSD", "GBP/USD");
+        put("AUDUSD", "AUD/USD");
+        put("USDCAD", "USD/CAD");
+        put("BITCOIN","BTC/USD");
     }};
 
     public static class TVMarketData {
@@ -75,14 +97,15 @@ public class TradingViewFetcher {
     private static final AtomicBoolean isRunning = new AtomicBoolean(false);
     private static final AtomicBoolean isConnecting = new AtomicBoolean(false);
     private static final AtomicBoolean connected = new AtomicBoolean(false);
-    
+    private static final ConcurrentHashMap<String, String> seriesIdToKey = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, MovingAverage200Calculator> calculators = new ConcurrentHashMap<>();
+    private static int seriesCounter = 0;
     private static Context appContext;
     private static OkHttpClient client;
     private static WebSocket webSocket;
 
-    private static final ConcurrentHashMap<String, String> seriesIdToKey = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<String, MovingAverage200Calculator> calculators = new ConcurrentHashMap<>();
-    private static int seriesCounter = 0;
+    // ── Clé TwelveData (à personnaliser ou récupérer depuis SharedPreferences) ──
+    private static final String TWELVE_DATA_KEY = "32370e1ef17645eb86690e3aee0d0660"; // à remplacer par votre clé si nécessaire
 
     public interface OnDataReadyListener {
         void onDataReady(Map<String, TVMarketData> data);
@@ -90,12 +113,12 @@ public class TradingViewFetcher {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // GESTION DU CYCLE DE VIE
+    // CYCLE DE VIE
     // ─────────────────────────────────────────────────────────────────────────
 
     public static void start(Context context) {
         if (isRunning.getAndSet(true)) {
-            Log.d(TAG, "[TV] Déjà en cours d'exécution.");
+            Log.d(TAG, "[TV] Déjà en cours.");
             return;
         }
         appContext = context.getApplicationContext();
@@ -103,7 +126,7 @@ public class TradingViewFetcher {
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(15, TimeUnit.SECONDS)
                 .build();
-        Log.i(TAG, "[TV] Initialisation du pipeline TradingView.");
+        logToUI("📡 [TV] Démarrage du pipeline TradingView (WebSocket).");
         connectWebSocket();
     }
 
@@ -112,19 +135,19 @@ public class TradingViewFetcher {
         isConnecting.set(false);
         connected.set(false);
         if (webSocket != null) {
-            try {
-                webSocket.close(1000, "Arrêt normal demandé");
-            } catch (Exception ignored) {}
+            webSocket.close(1000, "Arrêt demandé");
             webSocket = null;
         }
         client = null;
         seriesIdToKey.clear();
         seriesCounter = 0;
-        Log.i(TAG, "[TV] Pipeline arrêté proprement.");
+        cache.clear();
+        logToUI("🛑 [TV] Fetcher arrêté.");
+        Log.i(TAG, "[TV] Arrêté.");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CONNEXION ET PROTOCOLE DE COMMANDE
+    // CONNEXION WEBSOCKET
     // ─────────────────────────────────────────────────────────────────────────
 
     private static synchronized void connectWebSocket() {
@@ -143,12 +166,13 @@ public class TradingViewFetcher {
 
             @Override
             public void onOpen(WebSocket ws, Response response) {
-                Log.d(TAG, "[TV WS] Canal réseau ouvert.");
+                logToUI("✅ [TV WS] Canal ouvert.");
+                Log.d(TAG, "[TV WS] Ouvert.");
                 connected.set(true);
                 isConnecting.set(false);
-
                 seriesCounter = 0;
                 seriesIdToKey.clear();
+                cache.clear();
 
                 chartSessionId = "cs_" + UUID.randomUUID().toString().substring(0, 12);
                 quoteSessionId = "qs_" + UUID.randomUUID().toString().substring(0, 12);
@@ -158,127 +182,123 @@ public class TradingViewFetcher {
                 sendMessage(ws, "quote_create_session", new String[]{quoteSessionId});
                 sendMessage(ws, "quote_set_fields", new String[]{quoteSessionId, "lp", "chp", "ch"});
 
+                // Abonnement à tous les symboles
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
                     seriesCounter++;
                     String seriesId = "s" + seriesCounter;
-
                     seriesIdToKey.put(seriesId, key);
                     calculators.putIfAbsent(key, new MovingAverage200Calculator());
 
                     String resolvePayload = "{\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}";
                     sendMessage(ws, "resolve_symbol", new String[]{chartSessionId, "sym_" + seriesId, resolvePayload});
+                    // Délai pour laisser le temps à la résolution
+                    try { Thread.sleep(150); } catch (InterruptedException ignored) {}
                     sendMessage(ws, "create_series", new String[]{chartSessionId, seriesId, "s1", "sym_" + seriesId, "1D", "300"});
-
                     sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker});
                 }
-                Log.i(TAG, "[TV WS] Enregistrement de la matrice terminé (" + SYMBOL_MAP.size() + " flux).");
+                logToUI("📥 [TV WS] " + SYMBOL_MAP.size() + " symboles demandés.");
+                Log.i(TAG, "[TV WS] " + SYMBOL_MAP.size() + " symboles demandés.");
             }
 
             @Override
             public void onMessage(WebSocket ws, String text) {
-                if (text == null || text.isEmpty()) return;
-
-                int index = 0;
-                while (index < text.length()) {
-                    int firstM = text.indexOf("~m~", index);
-                    if (firstM == -1) break;
-
-                    int secondM = text.indexOf("~m~", firstM + 3);
-                    if (secondM == -1) break;
-
-                    String lenStr = text.substring(firstM + 3, secondM);
+                if (text == null) return;
+                // Découpage des messages au format ~m~length~m~payload
+                int idx = 0;
+                while (idx < text.length()) {
+                    int first = text.indexOf("~m~", idx);
+                    if (first == -1) break;
+                    int second = text.indexOf("~m~", first + 3);
+                    if (second == -1) break;
+                    String lenStr = text.substring(first + 3, second);
                     int length;
-                    try {
-                        length = Integer.parseInt(lenStr);
-                    } catch (NumberFormatException e) {
-                        break;
-                    }
-
-                    int startPayload = secondM + 3;
+                    try { length = Integer.parseInt(lenStr); } catch (NumberFormatException e) { break; }
+                    int startPayload = second + 3;
                     int endPayload = startPayload + length;
-                    if (length <= 0 || endPayload > text.length()) {
-                        break;
-                    }
-
+                    if (endPayload > text.length()) break;
                     String payload = text.substring(startPayload, endPayload);
-                    
-                    // Sécurisation stricte du traitement du Heartbeat
+                    // Gestion du heartbeat
                     if (payload.startsWith("~h~")) {
-                        ws.send(text); 
+                        ws.send(text);
                     } else {
                         processJsonPayload(payload);
                     }
-
-                    index = endPayload;
+                    idx = endPayload;
                 }
             }
 
             private void processJsonPayload(String payload) {
-                if (!payload.startsWith("{")) return;
                 try {
+                    if (!payload.startsWith("{")) return;
                     JSONObject json = new JSONObject(payload);
-                    String method = json.optString("m");
+                    String m = json.optString("m");
 
-                    if ("timescale_update".equals(method)) {
+                    if ("timescale_update".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
-                        if (p.length() > 1) {
-                            JSONObject dataObj = p.getJSONObject(1);
-                            
-                            for (Map.Entry<String, String> entry : seriesIdToKey.entrySet()) {
-                                String sid = entry.getKey();
-                                if (dataObj.has(sid)) {
-                                    JSONObject series = dataObj.getJSONObject(sid);
-                                    String key = entry.getValue();
-                                    MovingAverage200Calculator calc = calculators.get(key);
-                                    if (calc == null) continue;
+                        if (p.length() < 2) return;
+                        JSONObject dataObj = p.getJSONObject(1);
+                        // Parcourir toutes les séries
+                        for (Map.Entry<String, String> entry : seriesIdToKey.entrySet()) {
+                            String sid = entry.getKey();
+                            if (dataObj.has(sid)) {
+                                JSONObject series = dataObj.getJSONObject(sid);
+                                String key = entry.getValue();
+                                MovingAverage200Calculator calc = calculators.get(key);
+                                if (calc == null) continue;
 
-                                    if (series.has("s")) {
-                                        JSONArray candles = series.getJSONArray("s");
-                                        List<Double> closes = new ArrayList<>();
-                                        for (int c = 0; c < candles.length(); c++) {
-                                            JSONObject candle = candles.getJSONObject(c);
-                                            JSONArray v = candle.getJSONArray("v");
-                                            double close = v.optDouble(4, 0);
-                                            if (close > 0) closes.add(close);
-                                        }
-
-                                        if (closes.size() >= 200) {
-                                            calc.initializeWithHistory(closes);
-                                            double ma = calc.getCurrentMA();
-                                            double lastPrice = closes.get(closes.size() - 1);
-
-                                            TVMarketData existing = cache.get(key);
-                                            double change = (existing != null) ? existing.changePercent : 0.0;
-                                            
-                                            cache.put(key, new TVMarketData(key, lastPrice, change, ma, System.currentTimeMillis()));
+                                if (series.has("s")) {
+                                    JSONArray candles = series.getJSONArray("s");
+                                    List<Double> closes = new ArrayList<>();
+                                    for (int i = 0; i < candles.length(); i++) {
+                                        JSONObject candle = candles.getJSONObject(i);
+                                        JSONArray v = candle.getJSONArray("v");
+                                        double close = v.optDouble(4, 0);
+                                        if (close > 0) closes.add(close);
+                                    }
+                                    if (closes.size() >= 200) {
+                                        calc.initializeWithHistory(closes);
+                                        double ma = calc.getCurrentMA();
+                                        double lastPrice = closes.get(closes.size() - 1);
+                                        TVMarketData existing = cache.get(key);
+                                        double change = (existing != null) ? existing.changePercent : 0.0;
+                                        cache.put(key, new TVMarketData(key, lastPrice, change, ma, System.currentTimeMillis()));
+                                        logToUI("📊 [TV MA200] " + key + " MA200 = " + String.format(Locale.US, "%.2f", ma));
+                                        Log.d(TAG, "[TV MA200] " + key + " MA200=" + ma);
+                                    } else {
+                                        Log.w(TAG, "[TV MA200] " + key + " bougies insuffisantes: " + closes.size());
+                                        // Fallback TwelveData
+                                        double maFallback = fetchMA200FromTwelveData(key);
+                                        if (maFallback > 0) {
+                                            double lastPrice = closes.isEmpty() ? 0 : closes.get(closes.size() - 1);
+                                            if (lastPrice > 0) {
+                                                TVMarketData existing = cache.get(key);
+                                                double change = (existing != null) ? existing.changePercent : 0.0;
+                                                cache.put(key, new TVMarketData(key, lastPrice, change, maFallback, System.currentTimeMillis()));
+                                                logToUI("📊 [TV MA200 Fallback] " + key + " MA200 = " + String.format(Locale.US, "%.2f", maFallback));
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    } 
-                    else if ("qsd".equals(method)) {
+                    } else if ("qsd".equals(m)) {
+                        // Mise à jour du prix en temps réel
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
                             JSONObject quote = p.getJSONObject(1);
                             String ticker = quote.optString("n");
                             JSONObject v = quote.optJSONObject("v");
-
-                            if (v != null) {
+                            if (v != null && v.has("lp")) {
+                                double price = v.optDouble("lp", 0);
+                                double change = v.optDouble("chp", 0);
+                                // Trouver la clé correspondante
                                 for (Map.Entry<String, String> entry : SYMBOL_MAP.entrySet()) {
                                     if (entry.getValue().equals(ticker)) {
                                         String key = entry.getKey();
                                         TVMarketData existing = cache.get(key);
-
-                                        // Extraction résiliente par delta typique de TradingView
-                                        double price = v.has("lp") ? v.optDouble("lp", 0.0) : (existing != null ? existing.price : 0.0);
-                                        double change = v.has("chp") ? v.optDouble("chp", 0.0) : (existing != null ? existing.changePercent : 0.0);
-                                        double ma = (existing != null) ? existing.ma200 : 0.0;
-
-                                        if (price > 0 || change != 0) {
-                                            cache.put(key, new TVMarketData(key, price, change, ma, System.currentTimeMillis()));
-                                        }
+                                        double ma = (existing != null) ? existing.ma200 : 0;
+                                        cache.put(key, new TVMarketData(key, price, change, ma, System.currentTimeMillis()));
                                         break;
                                     }
                                 }
@@ -286,7 +306,7 @@ public class TradingViewFetcher {
                         }
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "[TV WS] Erreur lors de l'analyse structurelle du JSON", e);
+                    Log.e(TAG, "[TV WS] Erreur parse JSON", e);
                 }
             }
 
@@ -303,13 +323,13 @@ public class TradingViewFetcher {
             private void handleDisconnection() {
                 connected.set(false);
                 isConnecting.set(false);
+                cache.clear();
+                logToUI("🔴 [TV WS] Déconnecté. Reconnexion dans 5s...");
                 if (isRunning.get()) {
                     new Thread(() -> {
-                        try {
-                            TimeUnit.SECONDS.sleep(5);
-                            Log.w(TAG, "[TV WS] Reconnexion automatique lancée...");
-                            connectWebSocket();
-                        } catch (InterruptedException ignored) {}
+                        try { TimeUnit.SECONDS.sleep(5); } catch (InterruptedException ignored) {}
+                        logToUI("🔄 [TV WS] Tentative de reconnexion...");
+                        connectWebSocket();
                     }).start();
                 }
             }
@@ -324,14 +344,47 @@ public class TradingViewFetcher {
                     String payload = msg.toString();
                     ws.send("~m~" + payload.length() + "~m~" + payload);
                 } catch (Exception e) {
-                    Log.e(TAG, "[TV WS] Échec de l'encapsulation du message frame", e);
+                    Log.e(TAG, "[TV WS] Erreur envoi message", e);
                 }
             }
         });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ACCÈS DONNÉES CACHE
+    // FALLBACK MA200 VIA TWELVE DATA
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static double fetchMA200FromTwelveData(String key) {
+        String twelveSymbol = TWELVE_SYMBOL_MAP.get(key);
+        if (twelveSymbol == null) return 0;
+        try {
+            String urlStr = "https://api.twelvedata.com/sma?symbol=" + twelveSymbol
+                    + "&interval=1day&time_period=200&apikey=" + TWELVE_DATA_KEY;
+            HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
+            if (conn.getResponseCode() == 200) {
+                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line);
+                br.close();
+                JSONObject json = new JSONObject(sb.toString());
+                JSONArray values = json.optJSONArray("values");
+                if (values != null && values.length() > 0) {
+                    double sma = values.getJSONObject(0).optDouble("sma", 0);
+                    if (sma > 0) return sma;
+                }
+            }
+            conn.disconnect();
+        } catch (Exception e) {
+            Log.e(TAG, "[TV MA200 Fallback] Erreur pour " + key + " : " + e.getMessage());
+        }
+        return 0;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ACCÈS PUBLIC
     // ─────────────────────────────────────────────────────────────────────────
 
     public static Map<String, TVMarketData> getCache() {
@@ -356,136 +409,105 @@ public class TradingViewFetcher {
                 if (!cache.isEmpty()) {
                     listener.onDataReady(cache);
                 } else {
-                    listener.onError("Matrice incomplète après expiration du délai d'acquisition.");
+                    listener.onError("Aucune donnée reçue après 15s.");
                 }
             }
         }).start();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // COMPILATEUR CONTEXTE MACRO (MATRICE SYNCHRONISÉE)
+    // CONTEXTE MACRO (pour injection dans les prompts)
     // ─────────────────────────────────────────────────────────────────────────
 
     public static String buildContexteMacroGlobal(Context ctx) {
         if (cache.isEmpty()) return "";
-
         StringBuilder sb = new StringBuilder();
         sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
 
-        // 1. ANCRES DIRECTRICES
         TVMarketData dxy = cache.get("DXY");
         if (dxy != null) {
-            String trend = dxy.changePercent > 0.3 ? "↗️ FORT" : dxy.changePercent < -0.3 ? "↘️ FAIBLE" : "➡️ STABLE";
-            String impact = dxy.changePercent > 0.3 ? "→ Dollar fort : pression baissière GOLD, EURUSD, GBPUSD, AUDUSD" :
-                            dxy.changePercent < -0.3 ? "→ Dollar faible : soutien haussier GOLD, EURUSD, GBPUSD, AUDUSD" : "→ Corrélations normales";
-            sb.append("💵 DXY : ").append(String.format(Locale.US, "%.2f", dxy.price)).append(" ").append(trend)
-              .append(" | MA200=").append(String.format(Locale.US, "%.2f", dxy.ma200))
-              .append(dxy.aboveMA200 ? " [HAUSSIER]" : " [BAISSIER]").append("\n   ").append(impact).append("\n");
+            sb.append("💵 DXY : ").append(String.format(Locale.US, "%.2f", dxy.price))
+                    .append(" (").append(String.format(Locale.US, "%+.2f", dxy.changePercent)).append("%)")
+                    .append(" | MA200=").append(String.format(Locale.US, "%.2f", dxy.ma200))
+                    .append(dxy.aboveMA200 ? " [HAUSSIER]" : " [BAISSIER]").append("\n");
         }
 
         TVMarketData vix = cache.get("VIX");
         if (vix != null) {
             String regime = vix.price > 30 ? "🔴 PANIQUE" : vix.price > 20 ? "🟠 STRESS" : "🟢 CALME";
-            String impact = vix.price > 30 ? "→ Corrélations instables — Risque de débouclage généralisé" :
-                            vix.price > 20 ? "→ Risk-off dominant — filtrage des signaux haussiers requis" : "→ Signaux macro hautement fiables";
-            sb.append("📊 VIX : ").append(String.format(Locale.US, "%.1f", vix.price)).append(" ").append(regime)
-              .append("\n   ").append(impact).append("\n");
+            sb.append("📊 VIX : ").append(String.format(Locale.US, "%.1f", vix.price)).append(" ").append(regime).append("\n");
         }
 
         TVMarketData us10y = cache.get("US10Y");
         if (us10y != null) {
-            String impact = us10y.price > 4.5 ? "→ Taux élevés : pression severe sur GOLD, NASDAQ, BTC" :
-                            us10y.price < 3.5 ? "→ Taux bas : soutien GOLD, NASDAQ, BTC" : "→ Taux neutres";
             sb.append("📈 US10Y : ").append(String.format(Locale.US, "%.3f", us10y.price)).append("%")
-              .append(" | MA200=").append(String.format(Locale.US, "%.3f", us10y.ma200)).append("%\n   ").append(impact).append("\n");
+                    .append(" | MA200=").append(String.format(Locale.US, "%.3f", us10y.ma200)).append("%")
+                    .append(us10y.aboveMA200 ? " [HAUSSE]" : " [BAISSE]").append("\n");
         }
 
-        sb.append("─── ACTIFS & CORRÉLATIONS DYNAMIQUES ───\n");
-
-        // 2. MATRICE DE SUIVI ACTIONS / INDICES
         TVMarketData us500 = cache.get("US500");
         if (us500 != null) {
-            sb.append("🇺🇸 SP500 : ").append(String.format(Locale.US, "%.1f", us500.price))
-              .append(String.format(Locale.US, " (%+.2f%%)", us500.changePercent))
-              .append(us500.aboveMA200 ? " [BULL]" : " [BEAR — Risk-Off renforcé]").append("\n");
+            sb.append("📊 SP500 : ").append(String.format(Locale.US, "%.1f", us500.price))
+                    .append(String.format(Locale.US, " (%+.2f%%)", us500.changePercent))
+                    .append(us500.aboveMA200 ? " [BULL]" : " [BEAR]").append("\n");
         }
 
         TVMarketData nasdaq = cache.get("NASDAQ");
         if (nasdaq != null) {
             sb.append("💻 NASDAQ : ").append(String.format(Locale.US, "%.2f", nasdaq.price))
-              .append(String.format(Locale.US, " (%+.2f%%)", nasdaq.changePercent))
-              .append(nasdaq.aboveMA200 ? " [MOMENTUM OK]" : " [SOUS MA200 — Risque technologique]").append("\n");
+                    .append(String.format(Locale.US, " (%+.2f%%)", nasdaq.changePercent))
+                    .append(nasdaq.aboveMA200 ? " [HAUSSIER]" : " [BAISSIER]").append("\n");
         }
 
-        // 3. REFUGE & ÉNERGIE
         TVMarketData gold = cache.get("GOLD");
         if (gold != null) {
-            double dist = gold.ma200 > 0 ? ((gold.price - gold.ma200) / gold.ma200 * 100) : 0;
-            String status = gold.aboveMA200 ? String.format(Locale.US, "[+%.1f%% au-dessus MA200 — Refuge validé]", dist) :
-                                              String.format(Locale.US, "[%.1f%% sous MA200 — Réduire conviction haussière]", dist);
             sb.append("🏆 GOLD : ").append(String.format(Locale.US, "%.2f", gold.price))
-              .append(String.format(Locale.US, " (%+.2f%%)", gold.changePercent)).append(" ").append(status).append("\n");
+                    .append(String.format(Locale.US, " (%+.2f%%)", gold.changePercent))
+                    .append(" | MA200=").append(String.format(Locale.US, "%.2f", gold.ma200))
+                    .append(gold.aboveMA200 ? " [AU-DESSUS]" : " [EN-DESSOUS]").append("\n");
         }
 
         TVMarketData usoil = cache.get("USOIL");
         if (usoil != null) {
             sb.append("🛢️ USOIL : ").append(String.format(Locale.US, "%.2f", usoil.price))
-              .append(String.format(Locale.US, " (%+.2f%%)", usoil.changePercent))
-              .append(usoil.aboveMA200 ? " [Structure Haussière]" : " [Structure Baissière]").append("\n");
+                    .append(String.format(Locale.US, " (%+.2f%%)", usoil.changePercent))
+                    .append(usoil.aboveMA200 ? " [HAUSSIER]" : " [BAISSIER]").append("\n");
         }
 
-        // 4. PANIER FOREX SPECIFIQUE & CRYPTO
-        TVMarketData eurusd = cache.get("EURUSD");
-        if (eurusd != null) {
-            sb.append("🇪🇺 EURUSD : ").append(String.format(Locale.US, "%.4f", eurusd.price))
-              .append(String.format(Locale.US, " (%+.2f%%)", eurusd.changePercent)).append("\n");
-        }
-
-        TVMarketData usdjpy = cache.get("USDJPY");
-        if (usdjpy != null) {
-            sb.append("🇯🇵 USDJPY : ").append(String.format(Locale.US, "%.2f", usdjpy.price))
-              .append(String.format(Locale.US, " (%+.2f%%)", usdjpy.changePercent)).append("\n");
-        }
-
-        TVMarketData gbpusd = cache.get("GBPUSD");
-        if (gbpusd != null) {
-            sb.append("🇬🇧 GBPUSD : ").append(String.format(Locale.US, "%.4f", gbpusd.price))
-              .append(String.format(Locale.US, " (%+.2f%%)", gbpusd.changePercent)).append("\n");
-        }
-
-        TVMarketData audusd = cache.get("AUDUSD");
-        if (audusd != null) {
-            sb.append("🇦🇺 AUDUSD : ").append(String.format(Locale.US, "%.4f", audusd.price))
-              .append(String.format(Locale.US, " (%+.2f%%)", audusd.changePercent)).append("\n");
-        }
-
-        TVMarketData usdcad = cache.get("USDCAD");
-        if (usdcad != null) {
-            sb.append("🇨🇦 USDCAD : ").append(String.format(Locale.US, "%.4f", usdcad.price))
-              .append(String.format(Locale.US, " (%+.2f%%)", usdcad.changePercent)).append("\n");
+        for (String pair : new String[]{"EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "USDCAD"}) {
+            TVMarketData p = cache.get(pair);
+            if (p != null) {
+                sb.append(pair).append(" : ").append(String.format(Locale.US, "%.4f", p.price))
+                        .append(String.format(Locale.US, " (%+.2f%%)", p.changePercent)).append("\n");
+            }
         }
 
         TVMarketData btc = cache.get("BITCOIN");
         if (btc != null) {
-            sb.append("🪙 BITCOIN : ").append(String.format(Locale.US, "%.0f", btc.price))
-              .append(String.format(Locale.US, " (%+.2f%%)", btc.changePercent)).append("\n");
+            sb.append("₿ BITCOIN : ").append(String.format(Locale.US, "%.0f", btc.price))
+                    .append(String.format(Locale.US, " (%+.2f%%)", btc.changePercent)).append("\n");
         }
 
-        // 5. BLOC INSTITUTIONNEL ANCRE
         String regimeFed = ctx.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
                 .getString("fed_regime", "PAUSE HAWKISH | Warsh | Taux 3.50-3.75% | CPI 4.2%");
         sb.append("🏦 RÉGIME FED : ").append(regimeFed).append("\n");
-
         sb.append("─────────────────────────────\n");
-        sb.append("REGULATION FLUX : Si un actif évolue sous sa MA200,\n");
-        sb.append("réduire d'office la conviction de 10-15% sur les signaux d'achats.\n");
-        sb.append("═══════════════════════════════════════\n");
-
+        sb.append("RÈGLE MA200 : Si actif sous MA200, réduire conviction de 10-15%.\n");
         return sb.toString();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CALCULATEUR SYNCHRONISÉ DE TENDANCE FOND
+    // UTILITAIRE POUR LOGS UI
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static void logToUI(String msg) {
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog(msg);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CALCULATEUR MA200
     // ─────────────────────────────────────────────────────────────────────────
 
     private static class MovingAverage200Calculator {
@@ -495,9 +517,7 @@ public class TradingViewFetcher {
         private boolean initialized = false;
 
         public synchronized void initializeWithHistory(List<Double> historicalCloses) {
-            if (historicalCloses == null || historicalCloses.size() < PERIOD) {
-                return;
-            }
+            if (historicalCloses == null || historicalCloses.size() < PERIOD) return;
             currentSum = 0.0;
             for (int i = 0; i < PERIOD; i++) {
                 window[i] = historicalCloses.get(historicalCloses.size() - PERIOD + i);
