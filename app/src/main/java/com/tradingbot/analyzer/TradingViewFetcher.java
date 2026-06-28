@@ -42,8 +42,8 @@ public class TradingViewFetcher {
         put("VIX",    "CBOE:VIX");
         put("US10Y",  "TVC:US10Y");
         put("EURUSD", "FX:EURUSD");
-        put("US500",  "OANDA:SPX500USD");
-        put("NASDAQ", "NASDAQ:QQQ");
+        put("US500",  "SP:SPX");
+        put("NASDAQ", "NASDAQ:NDX");
         put("GOLD",   "TVC:GOLD");    // Source TVC plus fiable
         put("USOIL",  "TVC:USOIL");  // Pétrole WTI
     }};
