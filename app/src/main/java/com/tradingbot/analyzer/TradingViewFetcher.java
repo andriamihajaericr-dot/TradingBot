@@ -218,6 +218,7 @@ private static double getWeeklyLow(String key) {
                 .build();
         logToUI("📡 [TV] Démarrage du pipeline TradingView (WebSocket).");
         connectWebSocket();
+        fetchWeeklyLevels(); // Charge les niveaux weekly au démarrage
     }
 
     public static void stop() {
