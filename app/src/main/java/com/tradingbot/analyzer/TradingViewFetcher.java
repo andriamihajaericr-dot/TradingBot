@@ -49,43 +49,78 @@ public class TradingViewFetcher {
 
     // ── Structure de données avec 4 indicateurs ──
     public static class TVMarketData {
-        public final String symbol;
-        public final double price;
-        public final double changePercent;
-        public final double ma200;
-        public final boolean aboveMA200;
-        // ── Previous Day High/Low ──
-        public final double pdh; // Previous Day High
-        public final double pdl; // Previous Day Low
-        public final boolean brokeAbovePDH; // prix > PDH
-        public final boolean brokeBelowPDL; // prix < PDL
-        // ── Previous Week High/Low ──
-        public final double pwh; // Previous Week High
-        public final double pwl; // Previous Week Low
-        public final boolean brokeAbovePWH; // prix > PWH
-        public final boolean brokeBelowPWL; // prix < PWL
-        public final long timestamp;
+    public final String symbol;
+    public final double price;
+    
+    // ── LES 4 INDICATEURS MACRO ──
+    public final double changePercent;      // 1. Tendance depuis clôture précédente
+    public final double variance;           // 2. Volatilité intraday (sur 20 ticks)
+    public final double volatilityPercent;  // 3. Amplitude daily (High-Low) en %
+    public final double dailyRangePercent;  // 4. Position dans la fourchette du jour (0=Low, 100=High)
+    
+    // Extrémités daily en cours
+    public final double high;
+    public final double low;
+    public final double open;
+    public final double prevClose;
+    public final boolean isNearHigh;
+    public final boolean isNearLow;
 
-        public TVMarketData(String symbol, double price, double changePercent,
-                            double ma200, double pdh, double pdl,
-                            double pwh, double pwl, long timestamp) {
-            this.symbol        = symbol;
-            this.price         = price;
-            this.changePercent = changePercent;
-            this.ma200         = ma200;
-            this.aboveMA200    = (ma200 > 0) && (price > ma200);
-            this.pdh           = pdh;
-            this.pdl           = pdl;
-            this.brokeAbovePDH = (pdh > 0) && (price > pdh);
-            this.brokeBelowPDL = (pdl > 0) && (price < pdl);
-            this.pwh           = pwh;
-            this.pwl           = pwl;
-            this.brokeAbovePWH = (pwh > 0) && (price > pwh);
-            this.brokeBelowPWL = (pwl > 0) && (price < pwl);
-            this.timestamp     = timestamp;
-        }
+    // ── AJOUTS STRATÉGIQUES MANQUANTS ──
+    public final double ma200;
+    public final boolean aboveMA200;
+    
+    // Previous Day Levels (TwelveData)
+    public final double pdh;
+    public final double pdl;
+    public final boolean brokeAbovePDH;
+    public final boolean brokeBelowPDL;
+    
+    // Previous Week Levels (TwelveData)
+    public final double pwh;
+    public final double pwl;
+    public final boolean brokeAbovePWH;
+    public final boolean brokeBelowPWL;
+    
+    public final long timestamp;
+
+    // Constructeur complet qui accepte TOUT sans rien décaler
+    public TVMarketData(String symbol, double price, double changePercent,
+                        double high, double low, double open, double prevClose,
+                        double variance, double ma200, double pdh, double pdl,
+                        double pwh, double pwl, long timestamp) {
+        this.symbol        = symbol;
+        this.price         = price;
+        this.changePercent = changePercent;
+        this.high          = high;
+        this.low           = low;
+        this.open          = open;
+        this.prevClose     = prevClose;
+        this.variance      = variance;
+        
+        // Calcul des indicateurs 3 et 4
+        this.volatilityPercent = (high > 0 && low > 0 && high != low)
+                ? (high - low) / ((high + low) / 2) * 100 : 0.0;
+        double range = high - low;
+        this.dailyRangePercent = (range > 0) ? ((price - low) / range) * 100 : 50.0;
+        this.isNearHigh = this.dailyRangePercent >= 95.0;
+        this.isNearLow  = this.dailyRangePercent <= 5.0;
+        
+        // Calcul des indicateurs de cassure institutionnels
+        this.ma200         = ma200;
+        this.aboveMA200    = (ma200 > 0) && (price > ma200);
+        this.pdh           = pdh;
+        this.pdl           = pdl;
+        this.brokeAbovePDH = (pdh > 0) && (price > pdh);
+        this.brokeBelowPDL = (pdl > 0) && (price < pdl);
+        this.pwh           = pwh;
+        this.pwl           = pwl;
+        this.brokeAbovePWH = (pwh > 0) && (price > pwh);
+        this.brokeBelowPWL = (pwl > 0) && (price < pwl);
+        
+        this.timestamp     = timestamp;
     }
-
+        }
     private static String twelveDataKey = "";
     // Clés SharedPreferences pour weekly levels
     private static final String PREFS_WEEKLY = "TradingBotPrefs";
