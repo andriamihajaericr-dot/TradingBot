@@ -331,22 +331,29 @@ public class TradingViewFetcher {
                 long now = System.currentTimeMillis();
 
                 // Alertes extrêmes intraday (Anti-spam 5 min)
+                // Alertes extrêmes intraday (Anti-spam 5 min)
                 Long last = lastAlertTime.get(key);
                 if (last == null || (now - last) > ALERT_COOLDOWN_MS) {
                     if (data.isNearHigh) {
                         String msg = "📊 *" + key + "* 🔺 Approche du *plus haut du jour*\n" +
                                 "Prix actuel : `" + String.format(Locale.US, "%.4f", data.price) + "`\n" +
-                                "Position : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "% du range.";
+                                "Position : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "% du range.\n" +
+                                (data.pdh > 0 ? "• PDH: `" + String.format(Locale.US, "%.4f", data.pdh) + "` | PDL: `" + String.format(Locale.US, "%.4f", data.pdl) + "`\n" : "") +
+                                (data.pwh > 0 ? "• PWH: `" + String.format(Locale.US, "%.4f", data.pwh) + "` | PWL: `" + String.format(Locale.US, "%.4f", data.pwl) + "`\n" : "");
+                        
                         NotificationService.sendTelegramSecure(msg, appContext);
                         lastAlertTime.put(key, now);
                     } else if (data.isNearLow) {
                         String msg = "📊 *" + key + "* 🔻 Approche du *plus bas du jour*\n" +
                                 "Prix actuel : `" + String.format(Locale.US, "%.4f", data.price) + "`\n" +
-                                "Position : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "% du range.";
+                                "Position : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "% du range.\n" +
+                                (data.pdh > 0 ? "• PDH: `" + String.format(Locale.US, "%.4f", data.pdh) + "` | PDL: `" + String.format(Locale.US, "%.4f", data.pdl) + "`\n" : "") +
+                                (data.pwh > 0 ? "• PWH: `" + String.format(Locale.US, "%.4f", data.pwh) + "` | PWL: `" + String.format(Locale.US, "%.4f", data.pwl) + "`\n" : "");
+                        
                         NotificationService.sendTelegramSecure(msg, appContext);
                         lastAlertTime.put(key, now);
                     }
-                }
+                                                                                                                                       }
 
                 // Alertes de cassures Institutionnelles (1 seule fois par session)
                 if (data.brokeAbovePDH && !Boolean.TRUE.equals(alertFiredPDH.get(key))) {
