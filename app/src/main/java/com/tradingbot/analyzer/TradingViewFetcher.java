@@ -298,18 +298,22 @@ public class TradingViewFetcher {
 
                         // Alignement strict avec les 9 paramètres du constructeur
                         TVMarketData newData = new TVMarketData(
-                            key,                        // 1. symbol
-                            price,                      // 2. price
-                            change,                     // 3. changePercent
-                            0.0,                        // 4. ma200 (valeur par défaut)
-                            pdh,                        // 5. pdh
-                            pdl,                        // 6. pdl
-                            pwh,                        // 7. pwh
-                            pwl,                        // 8. pwl
-                            System.currentTimeMillis()  // 9. timestamp
-                        );
-
-                        cache.put(key, newData);
+    key,                        // 1. symbol
+    price,                      // 2. price
+    change,                     // 3. changePercent
+    high,                       // 4. high (du jour)
+    low,                        // 5. low (du jour)
+    open,                       // 6. open
+    prevClose,                  // 7. prevClose
+    variance,                   // 8. variance (calculée sur 20 ticks)
+    0.0,                        // 9. ma200 (par défaut pour l'instant)
+    pdhCache.getOrDefault(key, 0.0), // 10. pdh (veille)
+    pdlCache.getOrDefault(key, 0.0), // 11. pdl (veille)
+    pwhCache.getOrDefault(key, 0.0), // 12. pwh (semaine précédente)
+    pwlCache.getOrDefault(key, 0.0), // 13. pwl (semaine précédente)
+    System.currentTimeMillis()  // 14. timestamp
+);
+cache.put(key, newData);
 
                         // Vérification cassures PDH/PDL/PWH/PWL
                         checkAndAlert(key, newData);
