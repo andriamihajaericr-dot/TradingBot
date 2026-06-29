@@ -147,14 +147,18 @@ public class MainActivity extends AppCompatActivity {
                         addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
                         StringBuilder sb = new StringBuilder();
                         for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : data.entrySet()) {
-                        TradingViewFetcher.TVMarketData d = entry.getValue();
-                        sb.append("• *").append(entry.getKey()).append("* : ")
-                        .append(String.format(Locale.US, "%.4f", d.price))
-                        .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
-                        .append(" | H: ").append(String.format(Locale.US, "%.4f", d.high))
-                        .append(" | L: ").append(String.format(Locale.US, "%.4f", d.low))
-                        .append(" | Var: ").append(String.format(Locale.US, "%.4f", d.variance))
-                        .append("\n");
+                                    TradingViewFetcher.TVMarketData d = entry.getValue();
+                                    sb.append("• *").append(entry.getKey()).append("* : ")
+                                    .append(String.format(Locale.US, "%.4f", d.price))
+                                    .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
+                                    .append(d.aboveMA200 ? " ↗️ MA200" : " ↘️ MA200")
+                                    .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, "%.4f", d.pdh) : "")
+                                    .append(d.pdl > 0 ? " PDL=" + String.format(Locale.US, "%.4f", d.pdl) : "")
+                                    .append(d.brokeAbovePDH ? " 🔺PDH" : d.brokeBelowPDL ? " 🔻PDL" : "")
+                                    .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, "%.4f", d.pwh) : "")
+                                    .append(d.pwl > 0 ? " PWL=" + String.format(Locale.US, "%.4f", d.pwl) : "")
+                                    .append(d.brokeAbovePWH ? " 🚀PWH" : d.brokeBelowPWL ? " 🔥PWL" : "")
+                                    .append("\n");
 
                         }
                         addLog("📊 Données TV :\n" + sb.toString());
