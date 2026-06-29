@@ -237,47 +237,55 @@ public class TradingViewFetcher {
                 }
             }
 
-            private void processJsonPayload(String payload) {
-                try {
-                    if (!payload.startsWith("{")) return;
-                    JSONObject json = new JSONObject(payload);
-                    String m = json.optString("m");
+  private void processJsonPayload(String payload) {
+    try {
+        if (!payload.startsWith("{")) return;
+        JSONObject json = new JSONObject(payload);
+        String m = json.optString("m");
 
-                    if ("qsd".equals(m)) {
-                        JSONArray p = json.getJSONArray("p");
-                        if (p.length() > 1) {
-                            JSONObject quote = p.getJSONObject(1);
-                            String ticker = quote.optString("n");
-                            JSONObject v = quote.optJSONObject("v");
-                            if (v != null && v.has("lp")) {
-                                double price = v.optDouble("lp", 0);
-                                double change = v.optDouble("chp", 0);
+        if ("qsd".equals(m)) {
+            JSONArray p = json.getJSONArray("p");
+            if (p.length() > 1) {
+                JSONObject quote = p.getJSONObject(1);
+                String ticker = quote.optString("n");
+                JSONObject v = quote.optJSONObject("v");
+                if (v != null && v.has("lp")) {
+                    double price = v.optDouble("lp", 0);
+                    double change = v.optDouble("chp", 0);
 
-                                String key = getKeyFromTicker(ticker);
-                                if (key != null) {
-                                    // Mise à jour du cache
-                                    double pdh = pdhCache.getOrDefault(key, 0.0);
-                                    double pdl = pdlCache.getOrDefault(key, 0.0);
-                                    double pwh = pwhCache.getOrDefault(key, 0.0);
-                                    double pwl = pwlCache.getOrDefault(key, 0.0);
-                                    
-                                    // Replaced old arguments with 0.0 fallback for ma200 to match the constructor parameters
-                                    TVMarketData newData = new TVMarketData(key, price, change,
-                                            0.0, pdh, pdl, pwh, pwl,
-                                            System.currentTimeMillis());
-                                    cache.put(key, newData);
+                    String key = getKeyFromTicker(ticker);
+                    if (key != null) {
+                        // Récupération des niveaux stockés dans les caches TwelveData
+                        double pdh = pdhCache.getOrDefault(key, 0.0);
+                        double pdl = pdlCache.getOrDefault(key, 0.0);
+                        double pwh = pwhCache.getOrDefault(key, 0.0);
+                        double pwl = pwlCache.getOrDefault(key, 0.0);
 
-                                    // Vérification cassures PDH/PDL/PWH/PWL
-                                    checkAndAlert(key, newData);
-                                }
-                            }
-                        }
+                        // Alignement strict avec les 9 paramètres du constructeur
+                        TVMarketData newData = new TVMarketData(
+                            key,                        // 1. symbol
+                            price,                      // 2. price
+                            change,                     // 3. changePercent
+                            0.0,                        // 4. ma200 (valeur par défaut)
+                            pdh,                        // 5. pdh
+                            pdl,                        // 6. pdl
+                            pwh,                        // 7. pwh
+                            pwl,                        // 8. pwl
+                            System.currentTimeMillis()  // 9. timestamp
+                        );
+
+                        cache.put(key, newData);
+
+                        // Vérification cassures PDH/PDL/PWH/PWL
+                        checkAndAlert(key, newData);
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "[TV WS] Erreur parse JSON", e);
                 }
             }
-
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "[TV WS] Erreur parse JSON", e);
+    }
+}
             private String getKeyFromTicker(String ticker) {
                 for (Map.Entry<String, String> entry : SYMBOL_MAP.entrySet()) {
                     if (ticker.equals(entry.getValue())) {
