@@ -486,7 +486,7 @@ public class TradingViewFetcher {
         StringBuilder sb = new StringBuilder();
         sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
 
-        for (String key : SYMBOL_MAP.keySet()) {
+         for (String key : SYMBOL_MAP.keySet()) {
             TVMarketData d = cache.get(key);
             if (d != null) {
                 sb.append(key).append(" : ")
@@ -496,12 +496,17 @@ public class TradingViewFetcher {
                   .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
                   .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
                   .append(d.variance > 0.001 ? " | Var: " + String.format(Locale.US, "%.4f", d.variance) : "")
+                  
+                  // ── AJOUT DES VALEURS NUMÉRIQUES DES NIVEAUX PIVOTS ──
+                  .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, "%.4f", d.pdh) : "")
+                  .append(d.pdl > 0 ? " PDL=" + String.format(Locale.US, "%.4f", d.pdl) : "")
                   .append(d.brokeAbovePDH ? " 🔺PDH" : d.brokeBelowPDL ? " 🔻PDL" : "")
+                  .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, "%.4f", d.pwh) : "")
+                  .append(d.pwl > 0 ? " PWL=" + String.format(Locale.US, "%.4f", d.pwl) : "")
                   .append(d.brokeAbovePWH ? " 🚀PWH" : d.brokeBelowPWL ? " 🔥PWL" : "")
                   .append("\n");
             }
-        }
-
+         }
         String regimeFed = ctx.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
                 .getString("fed_regime", "PAUSE HAWKISH | Warsh | Taux 3.50-3.75% | CPI 4.2%");
         sb.append("🏦 RÉGIME FED : ").append(regimeFed).append("\n");
