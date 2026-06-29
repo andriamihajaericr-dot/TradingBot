@@ -141,8 +141,8 @@ public class MainActivity extends AppCompatActivity {
             TradingViewFetcher.start(getApplicationContext());
             // Récupérer les données une fois
             TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
-                @Override
-                public void onDataReady(Map<String, TradingViewFetcher.TVMarketData> data) {
+    @Override
+    public void onDataReady(Map<String, TradingViewFetcher.TVMarketData> data) {
     runOnUiThread(() -> {
         addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
         StringBuilder sb = new StringBuilder();
@@ -155,19 +155,20 @@ public class MainActivity extends AppCompatActivity {
               .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
               .append(d.aboveMA200 ? " ↗️ MA200" : " ↘️ MA200")
               
-              // ── 1. AJOUT DES 4 INDICATEURS MACRO RESTAURÉS ──
+              // ── 1. LES 4 INDICATEURS MACRO (Correction de la Variance pour le Forex/Taux) ──
               .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
               .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
               .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
-              .append(d.variance > 0.001 ? " | Var: " + String.format(Locale.US, "%.4f", d.variance) : "")
+              .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance)) // Toujours visible, précis à 6 décimales
               
-              // ── 2. NIVEAUX INSTITUTIONNELS ET CASSURES ──
+              // ── 2. NIVEAUX INSTITUTIONNELS ET CASSURES (Mise en page aérée) ──
               .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, "%.4f", d.pdh) : "")
-              .append(d.pdl > 0 ? " PDL=" + String.format(Locale.US, "%.4f", d.pdl) : "")
-              .append(d.brokeAbovePDH ? " 🔺PDH" : d.brokeBelowPDL ? " 🔻PDL" : "")
+              .append(d.pdl > 0 ? " | PDL=" + String.format(Locale.US, "%.4f", d.pdl) : "")
+              .append(d.brokeAbovePDH ? " 🔺[Breakout PDH]" : d.brokeBelowPDL ? " 🔻[Breakdown PDL]" : "")
+              
               .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, "%.4f", d.pwh) : "")
-              .append(d.pwl > 0 ? " PWL=" + String.format(Locale.US, "%.4f", d.pwl) : "")
-              .append(d.brokeAbovePWH ? " 🚀PWH" : d.brokeBelowPWL ? " 🔥PWL" : "")
+              .append(d.pwl > 0 ? " | PWL=" + String.format(Locale.US, "%.4f", d.pwl) : "")
+              .append(d.brokeAbovePWH ? " 🚀[Breakout PWH]" : d.brokeBelowPWL ? " 🔥[Breakdown PWL]" : "")
               .append("\n");
         }
         
@@ -175,12 +176,12 @@ public class MainActivity extends AppCompatActivity {
         
         // Envoi à Telegram pour vérification visuelle immédiate
         NotificationService.sendTelegramSecure(
-            "📊 *DONNÉES TRADINGVIEW COMPLETES (TEST)*\n" + sb.toString(),
+            "📊 *DONNÉES TRADINGVIEW COMPLETES (TEST)*\n\n" + sb.toString(),
             getApplicationContext()
         );
     });
- }
-
+  }
+                
                 @Override
                 public void onError(String error) {
                     runOnUiThread(() -> addLog("❌ [TV] Erreur : " + error));
