@@ -148,6 +148,18 @@ public class TradingViewFetcher {
         void onError(String error);
     }
 
+    // ── AJOUTEZ CETTE MÉTHODE ICI ──
+    public static void fetchAll(OnDataReadyListener listener) {
+        if (listener == null) return;
+        
+        if (cache.isEmpty()) {
+            listener.onError("Le cache temps réel est actuellement vide. Attendez que le WebSocket se connecte.");
+        } else {
+            // Renvoie une copie non modifiable du cache actuel à la MainActivity
+            listener.onDataReady(Collections.unmodifiableMap(cache));
+        }
+    }
+
     public static void start(Context context) {
         if (isRunning.getAndSet(true)) {
             logToUI("⏳ [TV] Déjà en cours.");
