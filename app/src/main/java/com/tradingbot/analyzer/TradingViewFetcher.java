@@ -44,55 +44,42 @@ public class TradingViewFetcher {
 
     // ── Structure de données avec 4 indicateurs ──
     public static class TVMarketData {
-        public final String symbol;
-        public final double price;
-        public final double changePercent;      // 1. Variation depuis clôture précédente
-        public final double high;
-        public final double low;
-        public final double open;
-        public final double prevClose;
-        public final double variance;           // 2. Variance sur 20 ticks (volatilité intraday)
-        public final double volatilityPercent;  // 3. Amplitude daily (High-Low) en %
-        public final double dailyRangePercent;  // 4. Position dans la fourchette du jour (0=Low, 100=High)
-        public final boolean isNearHigh;
-public final boolean isNearLow;
-public final double weeklyHigh;   // H semaine précédente
-public final double weeklyLow;    // L semaine précédente
-public final boolean isAboveWeeklyHigh;
-public final boolean isBelowWeeklyLow;
-public final boolean isNearWeeklyHigh;  // dans les 0.5%
-public final boolean isNearWeeklyLow;   // dans les 0.5%
-public final long timestamp;
+    public final String symbol;
+    public final double price;
+    public final double changePercent;
+    public final double ma200;
+    public final boolean aboveMA200;
+    // ── Previous Day High/Low ──
+    public final double pdh; // Previous Day High
+    public final double pdl; // Previous Day Low
+    public final boolean brokeAbovePDH; // prix > PDH
+    public final boolean brokeBelowPDL; // prix < PDL
+    // ── Previous Week High/Low ──
+    public final double pwh; // Previous Week High
+    public final double pwl; // Previous Week Low
+    public final boolean brokeAbovePWH; // prix > PWH
+    public final boolean brokeBelowPWL; // prix < PWL
+    public final long timestamp;
 
-public TVMarketData(String symbol, double price, double changePercent,
-                    double high, double low, double open, double prevClose,
-                    double variance, double weeklyHigh, double weeklyLow,
-                    long timestamp) {
-            this.symbol        = symbol;
-            this.price         = price;
-            this.changePercent = changePercent;
-            this.high          = high;
-            this.low           = low;
-            this.open          = open;
-            this.prevClose     = prevClose;
-            this.variance      = variance;
-            this.volatilityPercent = (high > 0 && low > 0 && high != low)
-                    ? (high - low) / ((high + low) / 2) * 100
-                    : 0.0;
-            double range = high - low;
-            this.dailyRangePercent = (range > 0) ? ((price - low) / range) * 100 : 50.0;
-            this.isNearHigh = this.dailyRangePercent >= 95.0;
-            this.isNearLow  = this.dailyRangePercent <= 5.0;
-            this.timestamp  = timestamp;
-    
-            this.weeklyHigh = weeklyHigh;
-            this.weeklyLow  = weeklyLow;
-            this.isAboveWeeklyHigh = weeklyHigh > 0 && price > weeklyHigh;
-            this.isBelowWeeklyLow  = weeklyLow  > 0 && price < weeklyLow;
-            this.isNearWeeklyHigh  = weeklyHigh > 0 && price >= weeklyHigh * 0.995 && !isAboveWeeklyHigh;
-            this.isNearWeeklyLow   = weeklyLow  > 0 && price <= weeklyLow  * 1.005 && !isBelowWeeklyLow;
-        }
+    public TVMarketData(String symbol, double price, double changePercent,
+                        double ma200, double pdh, double pdl,
+                        double pwh, double pwl, long timestamp) {
+        this.symbol        = symbol;
+        this.price         = price;
+        this.changePercent = changePercent;
+        this.ma200         = ma200;
+        this.aboveMA200    = (ma200 > 0) && (price > ma200);
+        this.pdh           = pdh;
+        this.pdl           = pdl;
+        this.brokeAbovePDH = (pdh > 0) && (price > pdh);
+        this.brokeBelowPDL = (pdl > 0) && (price < pdl);
+        this.pwh           = pwh;
+        this.pwl           = pwl;
+        this.brokeAbovePWH = (pwh > 0) && (price > pwh);
+        this.brokeBelowPWL = (pwl > 0) && (price < pwl);
+        this.timestamp     = timestamp;
     }
+}
     // Clés SharedPreferences pour weekly levels
 private static final String PREFS_WEEKLY = "TradingBotPrefs";
 private static final String PREF_WEEKLY_UPDATED = "weekly_levels_updated";
