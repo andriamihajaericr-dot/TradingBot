@@ -172,13 +172,24 @@ private static double getWeeklyLow(String key) {
     return appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE)
         .getFloat(key + "_weekly_low", 0f);
 }
-    // ── Caches et gestionnaires ──
-    private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
+// ── Caches et gestionnaires ──
+private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
+// Cache PDH/PDL (mis à jour 1x/jour à minuit)
+private static final ConcurrentHashMap<String, Double> pdhCache = new ConcurrentHashMap<>();
+private static final ConcurrentHashMap<String, Double> pdlCache = new ConcurrentHashMap<>();
+// Cache PWH/PWL (mis à jour 1x/semaine le lundi)
+private static final ConcurrentHashMap<String, Double> pwhCache = new ConcurrentHashMap<>();
+private static final ConcurrentHashMap<String, Double> pwlCache = new ConcurrentHashMap<>();
+// Anti-spam alertes (1 alerte par niveau par actif max)
+private static final ConcurrentHashMap<String, Boolean> alertFiredPDH = new ConcurrentHashMap<>();
+private static final ConcurrentHashMap<String, Boolean> alertFiredPDL = new ConcurrentHashMap<>();
+private static final ConcurrentHashMap<String, Boolean> alertFiredPWH = new ConcurrentHashMap<>();
+private static final ConcurrentHashMap<String, Boolean> alertFiredPWL = new ConcurrentHashMap<>();
+private static final AtomicBoolean isRunning = new AtomicBoolean(false);
     private static final ConcurrentHashMap<String, VarianceCalculator> varianceCalculators = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Long> lastAlertTime = new ConcurrentHashMap<>(); // anti-spam
     private static final long ALERT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 
-    private static final AtomicBoolean isRunning = new AtomicBoolean(false);
     private static final AtomicBoolean isConnecting = new AtomicBoolean(false);
     private static final AtomicBoolean connected = new AtomicBoolean(false);
     private static Context appContext;
