@@ -347,16 +347,20 @@ fetchPreviousLevels();
                                         variance = calc.getVariance();
                                     }
                                     // Mise à jour du cache
-                                    TVMarketData newData = new TVMarketData(key, price, change,
-                                    high, low, open, prevClose,
-                                    variance,
-                                    getWeeklyHigh(key),
-                                    getWeeklyLow(key),
-                                    System.currentTimeMillis());
-                                    cache.put(key, newData);
+                                    double pdh = pdhCache.getOrDefault(key, 0.0);
+double pdl = pdlCache.getOrDefault(key, 0.0);
+double pwh = pwhCache.getOrDefault(key, 0.0);
+double pwl = pwlCache.getOrDefault(key, 0.0);
+TVMarketData newData = new TVMarketData(key, price, change,
+        high, low, open, prevClose,
+        variance, pdh, pdl, pwh, pwl,
+        System.currentTimeMillis());
+cache.put(key, newData);
 
-                                    // Vérification des extrémités et envoi d'alerte
-                                    checkAndAlert(key, newData);
+// Vérification cassures PDH/PDL/PWH/PWL
+checkAndAlert(key, newData);
+
+                                    (key, newData);
                                 }
                             }
                         }
