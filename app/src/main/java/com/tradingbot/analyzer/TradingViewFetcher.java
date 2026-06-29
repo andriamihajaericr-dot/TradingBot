@@ -84,94 +84,6 @@ public class TradingViewFetcher {
 private static final String PREFS_WEEKLY = "TradingBotPrefs";
 private static final String PREF_WEEKLY_UPDATED = "weekly_levels_updated";
 
-public static void fetchWeeklyLevels() {
-    // Fetch 1x par semaine seulement — le lundi
-    if (appContext == null) return;
-    SharedPreferences prefs = appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE);
-    long lastUpdate = prefs.getLong(PREF_WEEKLY_UPDATED, 0);
-    long now = System.currentTimeMillis();
-    // Si mis à jour il y a moins de 6 jours — skip
-    if (now - lastUpdate < 6 * 24 * 60 * 60 * 1000L) {
-        Log.d(TAG, "[TV WEEKLY] Niveaux weekly déjà à jour.");
-        return;
-    }
-
-    new Thread(() -> {
-        String apiKey = prefs.getString("macro_api_key", "");
-        if (apiKey.isEmpty()) apiKey = prefs.getString("twelve_data_key", "");
-        if (apiKey.isEmpty()) {
-            logToUI("⚠️ [TV WEEKLY] Clé TwelveData absente — niveaux weekly non chargés.");
-            return;
-        }
-
-        // Mapping TwelveData symbols
-        Map<String, String> tdMap = new HashMap<String, String>() {{
-            put("GOLD",    "XAU/USD");
-            put("USOIL",   "WTI/USD");
-            put("EURUSD",  "EUR/USD");
-            put("USDJPY",  "USD/JPY");
-            put("GBPUSD",  "GBP/USD");
-            put("AUDUSD",  "AUD/USD");
-            put("USDCAD",  "USD/CAD");
-            put("BITCOIN", "BTC/USD");
-            put("NASDAQ",  "QQQ");
-            put("US500",   "SPY");
-            put("DXY",     "DXY");
-        }};
-
-        SharedPreferences.Editor editor = prefs.edit();
-        int count = 0;
-
-        for (Map.Entry<String, String> entry : tdMap.entrySet()) {
-            String key   = entry.getKey();
-            String tdSym = entry.getValue();
-            try {
-                // Récupérer les 2 dernières bougies weekly
-                String url = "https://api.twelvedata.com/time_series?symbol=" + tdSym
-                    + "&interval=1week&outputsize=2&apikey=" + apiKey;
-                OkHttpClient httpClient = new OkHttpClient.Builder()
-                    .connectTimeout(10, TimeUnit.SECONDS)
-                    .readTimeout(10, TimeUnit.SECONDS)
-                    .build();
-                Request req = new Request.Builder().url(url).build();
-                try (Response resp = httpClient.newCall(req).execute()) {
-                    if (resp.body() == null) continue;
-                    JSONObject json = new JSONObject(resp.body().string());
-                    JSONArray values = json.optJSONArray("values");
-                    if (values != null && values.length() >= 2) {
-                        // Index 0 = semaine en cours, Index 1 = semaine précédente
-                        JSONObject prevWeek = values.getJSONObject(1);
-                        double wHigh = prevWeek.optDouble("high", 0);
-                        double wLow  = prevWeek.optDouble("low",  0);
-                        editor.putFloat(key + "_weekly_high", (float) wHigh);
-                        editor.putFloat(key + "_weekly_low",  (float) wLow);
-                        count++;
-                        Log.i(TAG, "[TV WEEKLY] " + key + " → H=" + wHigh + " L=" + wLow);
-                    }
-                }
-                Thread.sleep(500); // pause entre appels
-            } catch (Exception e) {
-                Log.e(TAG, "[TV WEEKLY] Erreur " + key + " : " + e.getMessage());
-            }
-        }
-        editor.putLong(PREF_WEEKLY_UPDATED, now);
-        editor.apply();
-        logToUI("✅ [TV WEEKLY] " + count + " niveaux weekly chargés.");
-    }).start();
-}
-
-// Récupérer les niveaux weekly depuis SharedPreferences
-private static double getWeeklyHigh(String key) {
-    if (appContext == null) return 0;
-    return appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE)
-        .getFloat(key + "_weekly_high", 0f);
-}
-
-private static double getWeeklyLow(String key) {
-    if (appContext == null) return 0;
-    return appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE)
-        .getFloat(key + "_weekly_low", 0f);
-}
 // ── Caches et gestionnaires ──
 private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
 // Cache PDH/PDL (mis à jour 1x/jour à minuit)
@@ -360,7 +272,7 @@ cache.put(key, newData);
 // Vérification cassures PDH/PDL/PWH/PWL
 checkAndAlert(key, newData);
 
-                                    (key, newData);
+                
                                 }
                             }
                         }
@@ -417,7 +329,7 @@ checkAndAlert(key, newData);
             "📈 Zone de continuation haussière — surveiller les retracements vers PWH comme support.";
         NotificationService.sendTelegramSecure(msg, appContext);
         logToUI("🚀 [PWH CASSÉ] " + key + " > " + String.format(Locale.US, "%.4f", data.pwh));
-    }
+    
 
     // ── PWL cassé à la baisse ──
     if (data.brokeBelowPWL && !Boolean.TRUE.equals(alertFiredPWL.get(key))) {
@@ -525,7 +437,7 @@ private static String httpGetSimple(String urlStr) {
         Log.e(TAG, "[TV HTTP] Erreur : " + e.getMessage());
     }
     return null;
-                    }
+  }
             @Override
             public void onFailure(WebSocket ws, Throwable t, Response response) {
                 handleDisconnection();
@@ -650,15 +562,16 @@ private static String httpGetSimple(String urlStr) {
             TVMarketData d = cache.get(key);
             if (d != null) {
                 sb.append(key).append(" : ")
-                  .append(String.format(Locale.US, "%.4f", d.price))
-                  .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
-                  .append(" | H: ").append(String.format(Locale.US, "%.4f", d.high))
-                  .append(" | L: ").append(String.format(Locale.US, "%.4f", d.low))
-                  .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
-                  .append(" | Range pos: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
-                  .append(d.isNearHigh ? " 🔺 près haut" : d.isNearLow ? " 🔻 près bas" : "")
-                  .append(d.variance > 0.001 ? " | Var tick: " + String.format(Locale.US, "%.4f", d.variance) : "")
-                  .append("\n");
+  .append(String.format(Locale.US, "%.4f", d.price))
+  .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
+  .append(d.aboveMA200 ? " ↗️ MA200" : " ↘️ MA200")
+  .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, "%.4f", d.pdh) : "")
+  .append(d.pdl > 0 ? " PDL=" + String.format(Locale.US, "%.4f", d.pdl) : "")
+  .append(d.brokeAbovePDH ? " 🔺PDH" : d.brokeBelowPDL ? " 🔻PDL" : "")
+  .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, "%.4f", d.pwh) : "")
+  .append(d.pwl > 0 ? " PWL=" + String.format(Locale.US, "%.4f", d.pwl) : "")
+  .append(d.brokeAbovePWH ? " 🚀PWH" : d.brokeBelowPWL ? " 🔥PWL" : "")
+  .append("\n");
             }
         }
 
@@ -667,11 +580,7 @@ private static String httpGetSimple(String urlStr) {
         sb.append("🏦 RÉGIME FED : ").append(regimeFed).append("\n");
         sb.append("─────────────────────────────\n");
         sb.append("📊 INDICATEURS :\n");
-        sb.append("• Variation (%) = tendance depuis clôture précédente\n");
-        sb.append("• Amplitude (%) = volatilité daily (High-Low)\n");
-        sb.append("• Range pos (%) = position du prix dans la fourchette du jour (0% = Low, 100% = High)\n");
-        sb.append("• Var tick = volatilité intraday (sur 20 ticks)\n");
-        sb.append("🔔 Des alertes Telegram sont envoyées lorsque le prix approche les extrêmes (>95% haut ou <5% bas).");
+        sb.append("🔔 Alertes automatiques : cassure PDH/PDL (daily) et PWH/PWL (weekly) envoyées sur Telegram.");
         return sb.toString();
     }
 
