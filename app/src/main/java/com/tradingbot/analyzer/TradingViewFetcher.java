@@ -211,13 +211,24 @@ private static final AtomicBoolean isRunning = new AtomicBoolean(false);
             return;
         }
         appContext = context.getApplicationContext();
-        client = new OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
-                .build();
-        logToUI("📡 [TV] Démarrage du pipeline TradingView (WebSocket).");
-        connectWebSocket();
-        fetchWeeklyLevels(); // Charge les niveaux weekly au démarrage
+SharedPreferences prefs = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE);
+twelveDataKey = prefs.getString("macro_api_key", "");
+if (twelveDataKey.isEmpty()) twelveDataKey = prefs.getString("twelve_data_key", "");
+if (twelveDataKey.isEmpty()) {
+    SharedPreferences prefs2 = appContext.getSharedPreferences("TradingBot", Context.MODE_PRIVATE);
+    twelveDataKey = prefs2.getString("macro_api_key", "");
+}
+if (twelveDataKey.isEmpty()) {
+    logToUI("⚠️ [TV] Clé TwelveData absente – fallback SMA et PDH/PWH désactivés.");
+}
+client = new OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build();
+logToUI("📡 [TV] Démarrage du pipeline TradingView (WebSocket).");
+connectWebSocket();
+// Charger PDH/PDL et PWH/PWL au démarrage via TwelveData
+fetchPreviousLevels();
     }
 
     public static void stop() {
