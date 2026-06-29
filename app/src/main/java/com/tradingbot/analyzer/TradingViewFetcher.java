@@ -80,6 +80,7 @@ public class TradingViewFetcher {
         this.timestamp     = timestamp;
     }
 }
+    private static String twelveDataKey = "";
     // Clés SharedPreferences pour weekly levels
 private static final String PREFS_WEEKLY = "TradingBotPrefs";
 private static final String PREF_WEEKLY_UPDATED = "weekly_levels_updated";
