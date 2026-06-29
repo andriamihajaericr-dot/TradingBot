@@ -329,7 +329,7 @@ checkAndAlert(key, newData);
             "📈 Zone de continuation haussière — surveiller les retracements vers PWH comme support.";
         NotificationService.sendTelegramSecure(msg, appContext);
         logToUI("🚀 [PWH CASSÉ] " + key + " > " + String.format(Locale.US, "%.4f", data.pwh));
-    
+    }
 
     // ── PWL cassé à la baisse ──
     if (data.brokeBelowPWL && !Boolean.TRUE.equals(alertFiredPWL.get(key))) {
