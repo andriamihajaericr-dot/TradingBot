@@ -431,7 +431,101 @@ checkAndAlert(key, newData);
         logToUI("🔥 [PWL CASSÉ] " + key + " < " + String.format(Locale.US, "%.4f", data.pwl));
     }
  }
+   // ─────────────────────────────────────────────────────────────────────────
+// RÉCUPÉRATION PDH/PDL (veille) ET PWH/PWL (semaine précédente)
+// ─────────────────────────────────────────────────────────────────────────
 
+public static void fetchPreviousLevels() {
+    if (twelveDataKey.isEmpty() || appContext == null) {
+        logToUI("⚠️ [TV] Clé absente — PDH/PDL/PWH/PWL non chargés.");
+        return;
+    }
+    new Thread(() -> {
+        logToUI("🔄 [TV] Chargement PDH/PDL/PWH/PWL...");
+        Map<String, String> tdMap = new HashMap<String, String>() {{
+            put("GOLD",    "XAU/USD");
+            put("USOIL",   "WTI/USD");
+            put("EURUSD",  "EUR/USD");
+            put("USDJPY",  "USD/JPY");
+            put("GBPUSD",  "GBP/USD");
+            put("AUDUSD",  "AUD/USD");
+            put("USDCAD",  "USD/CAD");
+            put("BITCOIN", "BTC/USD");
+            put("NASDAQ",  "QQQ");
+            put("US500",   "SPY");
+            put("DXY",     "DXY");
+        }};
+        int count = 0;
+        for (Map.Entry<String, String> entry : tdMap.entrySet()) {
+            String key   = entry.getKey();
+            String tdSym = entry.getValue();
+            try {
+                // PDH/PDL — 3 bougies daily, index 1 = veille
+                String urlD = "https://api.twelvedata.com/time_series?symbol=" + tdSym
+                    + "&interval=1day&outputsize=3&apikey=" + twelveDataKey;
+                String respD = httpGetSimple(urlD);
+                if (respD != null) {
+                    JSONObject json = new JSONObject(respD);
+                    JSONArray vals  = json.optJSONArray("values");
+                    if (vals != null && vals.length() >= 2) {
+                        JSONObject prev = vals.getJSONObject(1);
+                        double pdh = prev.optDouble("high", 0);
+                        double pdl = prev.optDouble("low",  0);
+                        if (pdh > 0) { pdhCache.put(key, pdh); alertFiredPDH.remove(key); }
+                        if (pdl > 0) { pdlCache.put(key, pdl); alertFiredPDL.remove(key); }
+                        logToUI("📅 [PDH/PDL] " + key + " PDH=" +
+                            String.format(Locale.US, "%.4f", pdh) +
+                            " PDL=" + String.format(Locale.US, "%.4f", pdl));
+                    }
+                }
+                // PWH/PWL — 2 bougies weekly, index 1 = semaine précédente
+                String urlW = "https://api.twelvedata.com/time_series?symbol=" + tdSym
+                    + "&interval=1week&outputsize=2&apikey=" + twelveDataKey;
+                String respW = httpGetSimple(urlW);
+                if (respW != null) {
+                    JSONObject json = new JSONObject(respW);
+                    JSONArray vals  = json.optJSONArray("values");
+                    if (vals != null && vals.length() >= 2) {
+                        JSONObject prevW = vals.getJSONObject(1);
+                        double pwh = prevW.optDouble("high", 0);
+                        double pwl = prevW.optDouble("low",  0);
+                        if (pwh > 0) { pwhCache.put(key, pwh); alertFiredPWH.remove(key); }
+                        if (pwl > 0) { pwlCache.put(key, pwl); alertFiredPWL.remove(key); }
+                        logToUI("📅 [PWH/PWL] " + key + " PWH=" +
+                            String.format(Locale.US, "%.4f", pwh) +
+                            " PWL=" + String.format(Locale.US, "%.4f", pwl));
+                    }
+                }
+                count++;
+                Thread.sleep(600);
+            } catch (Exception e) {
+                Log.e(TAG, "[TV PDH/PWH] Erreur " + key + " : " + e.getMessage());
+            }
+        }
+        logToUI("✅ [TV] PDH/PDL/PWH/PWL chargés pour " + count + " actifs.");
+    }).start();
+}
+
+private static String httpGetSimple(String urlStr) {
+    try {
+        HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(8000);
+        if (conn.getResponseCode() == 200) {
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) sb.append(line);
+            br.close();
+            conn.disconnect();
+            return sb.toString();
+        }
+        conn.disconnect();
+    } catch (Exception e) {
+        Log.e(TAG, "[TV HTTP] Erreur : " + e.getMessage());
+    }
+    return null;
+                    }
             @Override
             public void onFailure(WebSocket ws, Throwable t, Response response) {
                 handleDisconnection();
