@@ -331,31 +331,60 @@ public class TradingViewFetcher {
                 long now = System.currentTimeMillis();
 
                 // Alertes extrêmes intraday (Anti-spam 5 min)
-                // Alertes extrêmes intraday (Anti-spam 5 min)
                 Long last = lastAlertTime.get(key);
                 if (last == null || (now - last) > ALERT_COOLDOWN_MS) {
-                    if (data.isNearHigh) {
-                        String msg = "📊 *" + key + "* 🔺 Approche du *plus haut du jour*\n" +
-                                "Prix actuel : `" + String.format(Locale.US, "%.4f", data.price) + "`\n" +
-                                "Position : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "% du range.\n" +
-                                (data.pdh > 0 ? "• PDH: `" + String.format(Locale.US, "%.4f", data.pdh) + "` | PDL: `" + String.format(Locale.US, "%.4f", data.pdl) + "`\n" : "") +
-                                (data.pwh > 0 ? "• PWH: `" + String.format(Locale.US, "%.4f", data.pwh) + "` | PWL: `" + String.format(Locale.US, "%.4f", data.pwl) + "`\n" : "");
+                    if (data.isNearHigh || data.isNearLow) {
+                        StringBuilder sb = new StringBuilder();
                         
-                        NotificationService.sendTelegramSecure(msg, appContext);
-                        lastAlertTime.put(key, now);
-                    } else if (data.isNearLow) {
-                        String msg = "📊 *" + key + "* 🔻 Approche du *plus bas du jour*\n" +
-                                "Prix actuel : `" + String.format(Locale.US, "%.4f", data.price) + "`\n" +
-                                "Position : " + String.format(Locale.US, "%.0f", data.dailyRangePercent) + "% du range.\n" +
-                                (data.pdh > 0 ? "• PDH: `" + String.format(Locale.US, "%.4f", data.pdh) + "` | PDL: `" + String.format(Locale.US, "%.4f", data.pdl) + "`\n" : "") +
-                                (data.pwh > 0 ? "• PWH: `" + String.format(Locale.US, "%.4f", data.pwh) + "` | PWL: `" + String.format(Locale.US, "%.4f", data.pwl) + "`\n" : "");
+                        // En-tête dynamique selon l'extrême touché
+                        if (data.isNearHigh) {
+                            sb.append("📊 *").append(key).append("* 🔺 Approche du *plus haut du jour*\n\n");
+                        } else {
+                            sb.append("📊 *").append(key).append("* 🔻 Approche du *plus bas du jour*\n\n");
+                        }
                         
-                        NotificationService.sendTelegramSecure(msg, appContext);
+                        sb.append("🔹 *PRIX ACTUEL* : `").append(String.format(Locale.US, "%.4f", data.price)).append("`\n\n");
+                        
+                        // ── INTEGRATION DES 4 INDICATEURS COMPLETS ──
+                        sb.append("📈 *LES 4 INDICATEURS TEMPS RÉEL :*\n");
+                        sb.append("• 1. Variation : `").append(String.format(Locale.US, "%+.2f", data.changePercent)).append("%` (vs Clôture)\n");
+                        sb.append("• 2. Volatilité Tick (20t) : `").append(String.format(Locale.US, "%.6f", data.variance)).append("` (Variance)\n");
+                        sb.append("• 3. Amplitude Daily : `").append(String.format(Locale.US, "%.2f", data.volatilityPercent)).append("%` (High-Low)\n");
+                        sb.append("• 4. Position Range : `").append(String.format(Locale.US, "%.1f", data.dailyRangePercent)).append("%` (0=Bas, 100=Haut)\n\n");
+                        
+                        // ── RECONSTITUTION DES NIVEAUX PIVOTS INSTITUTIONNELS ──
+                        sb.append("🏛️ *NIVEAUX PIVOTS (TwelveData) :*\n");
+                        if (data.pdh > 0 || data.pdl > 0) {
+                            sb.append("• *Daily* : PDH = `").append(String.format(Locale.US, "%.4f", data.pdh))
+                              .append("` | PDL = `").append(String.format(Locale.US, "%.4f", data.pdl)).append("`\n");
+                        } else {
+                            sb.append("• *Daily* : ⚠️ En attente du chargement TwelveData\n");
+                        }
+                        
+                        if (data.pwh > 0 || data.pwl > 0) {
+                            sb.append("• *Weekly* : PWH = `").append(String.format(Locale.US, "%.4f", data.pwh))
+                              .append("` | PWL = `").append(String.format(Locale.US, "%.4f", data.pwl)).append("`\n");
+                        } else {
+                            sb.append("• *Weekly* : ⚠️ En attente du chargement TwelveData\n");
+                        }
+
+                        // État visuel immédiat en cas de cassure confirmée simultanée
+                        if (data.brokeAbovePDH || data.brokeBelowPDL || data.brokeAbovePWH || data.brokeBelowPWL) {
+                            sb.append("\n⚡ *Statut de cassure :*");
+                            if (data.brokeAbovePDH) sb.append(" 🔺[Breakout PDH]");
+                            if (data.brokeBelowPDL) sb.append(" 🔻[Breakdown PDL]");
+                            if (data.brokeAbovePWH) sb.append(" 🚀[Breakout PWH]");
+                            if (data.brokeBelowPWL) sb.append(" 🔥[Breakdown PWL]");
+                            sb.append("\n");
+                        }
+
+                        // Envoi sécurisé à Telegram
+                        NotificationService.sendTelegramSecure(sb.toString(), appContext);
                         lastAlertTime.put(key, now);
                     }
-                                                                                                                                       }
+                }
 
-                // Alertes de cassures Institutionnelles (1 seule fois par session)
+                // Alertes de cassures Institutionnelles uniques (Conservées pour déclenchement sur ligne)
                 if (data.brokeAbovePDH && !Boolean.TRUE.equals(alertFiredPDH.get(key))) {
                     alertFiredPDH.put(key, true);
                     NotificationService.sendTelegramSecure("🔺 *" + key + "* — Cassure du *Previous Day High* (`" + data.price + "`)", appContext);
@@ -372,7 +401,7 @@ public class TradingViewFetcher {
                     alertFiredPWL.put(key, true);
                     NotificationService.sendTelegramSecure("🔥 *" + key + "* — Breakdown *Previous Week Low* (`" + data.price + "`) !", appContext);
                 }
-            }
+                                                                    }
 
             @Override
             public void onFailure(WebSocket ws, Throwable t, Response response) { handleDisconnection(); }
