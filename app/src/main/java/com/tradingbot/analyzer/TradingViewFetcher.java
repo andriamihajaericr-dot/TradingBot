@@ -166,13 +166,14 @@ public class TradingViewFetcher {
     logToUI("💾 [TV Cache] Anciens niveaux chargés depuis le stockage local (Sécurité Offline).");
     }
       // À minuit chaque jour — sauvegarder le High/Low du jour qui se termine comme PDH/PDL du lendemain
-public static void rolloverDailyLevels() {
-    for (Map.Entry<String, TVMarketData> e : cache.entrySet()) {
-        pdhCache.put(e.getKey(), e.getValue().high); // si tu gardes high/low daily du WebSocket
-        pdlCache.put(e.getKey(), e.getValue().low);
+    public static void rolloverDailyLevels() {
+    // Plus besoin de modifier pdhCache/pdlCache ici, TwelveData s'en occupe de manière asynchrone !
+    alertFiredPDH.clear();
+    alertFiredPDL.clear();
+    alertFiredPWH.clear();
+    alertFiredPWL.clear();
+    logToUI("🔄 [Anti-Spam] Réinitialisation des déclencheurs d'alertes pivots pour la nouvelle session.");
     }
-    logToUI("🔄 [PDH/PDL] Rollover quotidien — niveaux calculés depuis WebSocket.");
-}
     // ── AJOUTEZ CETTE MÉTHODE ICI ──
     public static void fetchAll(OnDataReadyListener listener) {
         if (listener == null) return;
