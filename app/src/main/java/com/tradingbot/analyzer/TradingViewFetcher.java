@@ -147,7 +147,14 @@ public class TradingViewFetcher {
         void onDataReady(Map<String, TVMarketData> data);
         void onError(String error);
     }
-
+      // À minuit chaque jour — sauvegarder le High/Low du jour qui se termine comme PDH/PDL du lendemain
+public static void rolloverDailyLevels() {
+    for (Map.Entry<String, TVMarketData> e : cache.entrySet()) {
+        pdhCache.put(e.getKey(), e.getValue().high); // si tu gardes high/low daily du WebSocket
+        pdlCache.put(e.getKey(), e.getValue().low);
+    }
+    logToUI("🔄 [PDH/PDL] Rollover quotidien — niveaux calculés depuis WebSocket.");
+}
     // ── AJOUTEZ CETTE MÉTHODE ICI ──
     public static void fetchAll(OnDataReadyListener listener) {
         if (listener == null) return;
