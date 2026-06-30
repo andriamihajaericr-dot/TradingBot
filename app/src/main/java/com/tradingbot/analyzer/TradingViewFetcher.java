@@ -462,10 +462,27 @@ if (respD != null) {
     } else {
         JSONArray vals = jsonD.optJSONArray("values");
         if (vals != null && vals.length() >= 2) {
-            double pdh = vals.getJSONObject(1).optDouble("high", 0);
-            double pdl = vals.getJSONObject(1).optDouble("low", 0);
-            pdhCache.put(key, pdh);
-            pdlCache.put(key, pdl);
+    double pdh = vals.getJSONObject(1).optDouble("high", 0);
+    double pdl = vals.getJSONObject(1).optDouble("low", 0);
+    // Garde-fou : rejeter si la valeur est aberrante (>50% d'écart avec le prix WebSocket actuel)
+    TVMarketData current = cache.get(key);
+    boolean coherent = true;
+    if (current != null && current.price > 0 && pdh > 0) {
+        double ecart = Math.abs(pdh - current.price) / current.price;
+        if (ecart > 0.5) {
+            coherent = false;
+            Log.e(TAG, "[TV PDH/PDL] " + key + " INCOHÉRENT : PDH=" + pdh +
+                " vs prix actuel=" + current.price + " (écart " +
+                String.format(Locale.US, "%.0f", ecart * 100) + "%) — instrument TwelveData différent, rejeté.");
+            logToUI("⚠️ [PDH/PDL] " + key + " incohérent — données TwelveData rejetées (mauvais symbole probable).");
+        }
+    }
+    if (coherent) {
+        pdhCache.put(key, pdh);
+        pdlCache.put(key, pdl);
+        logToUI("📅 [PDH/PDL] " + key + " : H=" + String.format(Locale.US, "%.4f", pdh)
+            + " L=" + String.format(Locale.US, "%.4f", pdl));
+    }
             logToUI("📅 [PDH/PDL] " + key + " : H=" + String.format(Locale.US, "%.4f", pdh)
                 + " L=" + String.format(Locale.US, "%.4f", pdl));
         } else {
