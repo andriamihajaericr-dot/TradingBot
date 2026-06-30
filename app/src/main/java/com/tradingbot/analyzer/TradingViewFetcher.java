@@ -444,92 +444,109 @@ public static void rolloverDailyLevels() {
         });
     }
 
-    public static void fetchPreviousLevels() {
-        if (twelveDataKey.isEmpty() || appContext == null) return;
-        new Thread(() -> {
-            logToUI("🔄 [TV] Chargement PDH/PDL/PWH/PWL via TwelveData...");
-            Map<String, String> tdMap = new HashMap<String, String>() {{
-                put("GOLD", "XAU/USD"); put("USOIL", "WTI"); 
-                put("USDJPY", "USD/JPY"); put("GBPUSD", "GBP/USD"); 
-                put("NASDAQ", "QQQ");
-                put("US500", "SPY");
-            }};
-            for (Map.Entry<String, String> entry : tdMap.entrySet()) {
-                String key = entry.getKey();
-                String tdSym = entry.getValue();
-                try {
-                    // Daily (index 1 = veille)
-                    String urlD = "https://api.twelvedata.com/time_series?symbol=" + tdSym + "&interval=1day&outputsize=3&apikey=" + twelveDataKey;
-                    String respD = httpGetSimple(urlD);
-if (respD != null) {
-    JSONObject jsonD = new JSONObject(respD);
-    if (jsonD.has("code") && jsonD.optInt("code") != 200) {
-        Log.e(TAG, "[TV PDH/PDL] Erreur API " + key + " (" + tdSym + ") : " + jsonD.optString("message"));
-        logToUI("❌ [PDH/PDL] " + key + " : " + jsonD.optString("message"));
-    } else {
-        JSONArray vals = jsonD.optJSONArray("values");
-        if (vals != null && vals.length() >= 2) {
-    double pdh = vals.getJSONObject(1).optDouble("high", 0);
-    double pdl = vals.getJSONObject(1).optDouble("low", 0);
-    // Garde-fou : rejeter si la valeur est aberrante (>50% d'écart avec le prix WebSocket actuel)
-    TVMarketData current = cache.get(key);
-    boolean coherent = true;
-    if (current != null && current.price > 0 && pdh > 0) {
-        double ecart = Math.abs(pdh - current.price) / current.price;
-        if (ecart > 0.5) {
-            coherent = false;
-            Log.e(TAG, "[TV PDH/PDL] " + key + " INCOHÉRENT : PDH=" + pdh +
-                " vs prix actuel=" + current.price + " (écart " +
-                String.format(Locale.US, "%.0f", ecart * 100) + "%) — instrument TwelveData différent, rejeté.");
-            logToUI("⚠️ [PDH/PDL] " + key + " incohérent — données TwelveData rejetées (mauvais symbole probable).");
-        }
-    }
-    if (coherent) {
-        pdhCache.put(key, pdh);
-        pdlCache.put(key, pdl);
-        logToUI("📅 [PDH/PDL] " + key + " : H=" + String.format(Locale.US, "%.4f", pdh)
-            + " L=" + String.format(Locale.US, "%.4f", pdl));
-    }
-            logToUI("📅 [PDH/PDL] " + key + " : H=" + String.format(Locale.US, "%.4f", pdh)
-                + " L=" + String.format(Locale.US, "%.4f", pdl));
-        } else {
-            Log.w(TAG, "[TV PDH/PDL] Données insuffisantes pour " + key + " (" + tdSym + ")");
-        }
-    }
-} else {
-    Log.e(TAG, "[TV PDH/PDL] Réponse réseau null pour " + key + " (" + tdSym + ")");
-}
-                    // Weekly (index 1 = semaine précédente)
-                    String urlW = "https://api.twelvedata.com/time_series?symbol=" + tdSym + "&interval=1week&outputsize=2&apikey=" + twelveDataKey;
-                    String respW = httpGetSimple(urlW);
-if (respW != null) {
-    JSONObject jsonW = new JSONObject(respW);
-    if (jsonW.has("code") && jsonW.optInt("code") != 200) {
-        Log.e(TAG, "[TV PWH/PWL] Erreur API " + key + " (" + tdSym + ") : " + jsonW.optString("message"));
-        logToUI("❌ [PWH/PWL] " + key + " : " + jsonW.optString("message"));
-    } else {
-        JSONArray vals = jsonW.optJSONArray("values");
-        if (vals != null && vals.length() >= 2) {
-            double pwh = vals.getJSONObject(1).optDouble("high", 0);
-            double pwl = vals.getJSONObject(1).optDouble("low", 0);
-            pwhCache.put(key, pwh);
-            pwlCache.put(key, pwl);
-            logToUI("📅 [PWH/PWL] " + key + " : H=" + String.format(Locale.US, "%.4f", pwh)
-                + " L=" + String.format(Locale.US, "%.4f", pwl));
-        } else {
-            Log.w(TAG, "[TV PWH/PWL] Données insuffisantes pour " + key + " (" + tdSym + ")");
-        }
-    }
-} else {
-    Log.e(TAG, "[TV PWH/PWL] Réponse réseau null pour " + key + " (" + tdSym + ")");
- }
-                    Thread.sleep(600);
-                } catch (Exception e) { Log.e(TAG, "Erreur niveaux " + key, e); }
-            }
-            logToUI("✅ [TV] Niveaux pivots chargés en mémoire vive.");
-        }).start();
-    }
+      public static void fetchPreviousLevels() {
+    if (twelveDataKey.isEmpty() || appContext == null) return;
+    
+    // 1. CHARGEMENT IMMÉDIAT DU CACHE LOCAL (Sécurité en cas de coupure réseau)
+    loadLevelsFromStorage();
 
+    new Thread(() -> {
+        logToUI("🔄 [TV] Chargement PDH/PDL/PWH/PWL via TwelveData...");
+        
+        // Alignement parfait des instruments pour éviter le rejet d'écart de prix
+        Map<String, String> tdMap = new HashMap<String, String>() {{
+            put("GOLD", "XAU/USD"); 
+            put("USOIL", "WTI/USD"); 
+            put("USDJPY", "USD/JPY"); 
+            put("GBPUSD", "GBP/USD"); 
+            put("NASDAQ", "IXIC");   // Vrai indice au lieu de l'ETF QQQ
+            put("US500", "SPX");     // Vrai indice au lieu de l'ETF SPY
+        }};
+
+        SharedPreferences prefs = appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+
+        for (Map.Entry<String, String> entry : tdMap.entrySet()) {
+            String key = entry.getKey();
+            String tdSym = entry.getValue();
+            try {
+                // Requête Daily avec contrainte Timezone de l'Échange (&timezone=Exchange)
+                String urlD = "https://api.twelvedata.com/time_series?symbol=" + tdSym 
+                        + "&interval=1day&outputsize=3&timezone=Exchange&apikey=" + twelveDataKey;
+                String respD = httpGetSimple(urlD);
+                
+                if (respD != null) {
+                    JSONObject jsonD = new JSONObject(respD);
+                    if (jsonD.has("code") && jsonD.optInt("code") != 200) {
+                        Log.e(TAG, "[TV PDH/PDL] Erreur API " + key + " : " + jsonD.optString("message"));
+                    } else {
+                        JSONArray vals = jsonD.optJSONArray("values");
+                        if (vals != null && vals.length() >= 2) {
+                            double pdh = vals.getJSONObject(1).optDouble("high", 0);
+                            double pdl = vals.getJSONObject(1).optDouble("low", 0);
+
+                            // Garde-fou de cohérence macro
+                            TVMarketData current = cache.get(key);
+                            boolean coherent = true;
+                            if (current != null && current.price > 0 && pdh > 0) {
+                                double ecart = Math.abs(pdh - current.price) / current.price;
+                                if (ecart > 0.5) { coherent = false; }
+                            }
+                            
+                            if (coherent && pdh > 0 && pdl > 0) {
+                                pdhCache.put(key, pdh);
+                                pdlCache.put(key, pdl);
+                                
+                                // Sauvegarde persistante sur le disque
+                                editor.putFloat("pdh_" + key, (float) pdh);
+                                editor.putFloat("pdl_" + key, (float) pdl);
+                                
+                                logToUI("📅 [PDH/PDL] " + key + " mis à jour : H=" 
+                                    + String.format(Locale.US, "%.4f", pdh) + " L=" + String.format(Locale.US, "%.4f", pdl));
+                            }
+                        }
+                    }
+                }
+
+                // Requête Weekly avec contrainte Timezone
+                String urlW = "https://api.twelvedata.com/time_series?symbol=" + tdSym 
+                        + "&interval=1week&outputsize=2&timezone=Exchange&apikey=" + twelveDataKey;
+                String respW = httpGetSimple(urlW);
+                
+                if (respW != null) {
+                    JSONObject jsonW = new JSONObject(respW);
+                    if (jsonW.has("code") && jsonW.optInt("code") != 200) {
+                        Log.e(TAG, "[TV PWH/PWL] Erreur API " + key + " : " + jsonW.optString("message"));
+                    } else {
+                        JSONArray vals = jsonW.optJSONArray("values");
+                        if (vals != null && vals.length() >= 2) {
+                            double pwh = vals.getJSONObject(1).optDouble("high", 0);
+                            double pwl = vals.getJSONObject(1).optDouble("low", 0);
+                            
+                            if (pwh > 0 && pwl > 0) {
+                                pwhCache.put(key, pwh);
+                                pwlCache.put(key, pwl);
+                                
+                                // Sauvegarde persistante sur le disque
+                                editor.putFloat("pwh_" + key, (float) pwh);
+                                editor.putFloat("pwl_" + key, (float) pwl);
+                                
+                                logToUI("📅 [PWH/PWL] " + key + " mis à jour : H=" 
+                                    + String.format(Locale.US, "%.4f", pwh) + " L=" + String.format(Locale.US, "%.4f", pwl));
+                            }
+                        }
+                    }
+                }
+                Thread.sleep(600); // Respect du rate-limit de l'API standard
+            } catch (Exception e) { 
+                Log.e(TAG, "Erreur traitement niveaux " + key, e); 
+            }
+        }
+        editor.apply(); // Valide l'écriture de toutes les SharedPreferences d'un coup
+        logToUI("✅ [TV] Niveaux pivots sauvegardés localement et figés en mémoire.");
+    }).start();
+}
+                    
     private static String httpGetSimple(String urlStr) {
         try {
             HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
