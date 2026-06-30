@@ -149,38 +149,51 @@ public class MainActivity extends AppCompatActivity {
         
         for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : data.entrySet()) {
             TradingViewFetcher.TVMarketData d = entry.getValue();
+            String key = entry.getKey();
             
-            sb.append("• *").append(entry.getKey()).append("* : ")
-              .append(String.format(Locale.US, "%.4f", d.price))
-              .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
-              .append(d.aboveMA200 ? " ↗️ MA200" : " ↘️ MA200")
+            // ── Détermination dynamique de la précision des décimales ──
+            String formatPrice;
+            if ("GBPUSD".equals(key)) { 
+                formatPrice = "%.5f";       // 5 décimales pour le GBPUSD (Vantage precision)
+            } else if ("USDJPY".equals(key)) { 
+                formatPrice = "%.3f";       // 3 décimales pour l'USDJPY (Vantage precision)
+            } else if ("NASDAQ".equals(key) || "US500".equals(key)) { 
+                formatPrice = "%.2f";       // 2 décimales pour les indices (Spreadex indices)
+            } else { 
+                formatPrice = "%.4f";       // 4 décimales par défaut (GOLD, USOIL)
+            }
+            
+            sb.append("• ").append(key).append(" : ")
+              .append(String.format(Locale.US, formatPrice, d.price))
+              .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%) ")
+              .append(d.aboveMA200 ? "↗️ MA200" : "↘️ MA200")
               
-              // ── 1. LES 4 INDICATEURS MACRO (Correction de la Variance pour le Forex/Taux) ──
+              // ── 1. LES 4 INDICATEURS MACRO ──
               .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
               .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
               .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
-              .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance)) // Toujours visible, précis à 6 décimales
+              .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance))
               
-              // ── 2. NIVEAUX INSTITUTIONNELS ET CASSURES (Mise en page aérée) ──
-              .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, "%.4f", d.pdh) : "")
-              .append(d.pdl > 0 ? " | PDL=" + String.format(Locale.US, "%.4f", d.pdl) : "")
+              // ── 2. NIVEAUX INSTITUTIONNELS ET CASSURES (Mise en page synchronisée) ──
+              .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, formatPrice, d.pdh) : "")
+              .append(d.pdl > 0 ? " | PDL=" + String.format(Locale.US, formatPrice, d.pdl) : "")
               .append(d.brokeAbovePDH ? " 🔺[Breakout PDH]" : d.brokeBelowPDL ? " 🔻[Breakdown PDL]" : "")
               
-              .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, "%.4f", d.pwh) : "")
-              .append(d.pwl > 0 ? " | PWL=" + String.format(Locale.US, "%.4f", d.pwl) : "")
+              .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, formatPrice, d.pwh) : "")
+              .append(d.pwl > 0 ? " | PWL=" + String.format(Locale.US, formatPrice, d.pwl) : "")
               .append(d.brokeAbovePWH ? " 🚀[Breakout PWH]" : d.brokeBelowPWL ? " 🔥[Breakdown PWL]" : "")
               .append("\n");
         }
         
         addLog("📊 Données TV :\n" + sb.toString());
         
-        // Envoi à Telegram pour vérification visuelle immédiate
+        // Envoi à Telegram pour vérification visuelle immédiate 100% propre
         NotificationService.sendTelegramSecure(
             "📊 *DONNÉES TRADINGVIEW COMPLETES (TEST)*\n\n" + sb.toString(),
             getApplicationContext()
         );
     });
-  }
+}
                 
                 @Override
                 public void onError(String error) {
