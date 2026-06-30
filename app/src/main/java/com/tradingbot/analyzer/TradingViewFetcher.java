@@ -447,66 +447,63 @@ public class TradingViewFetcher {
         });
     }
 
-     public static void fetchPreviousLevels() {
+    public static void fetchPreviousLevels() {
     if (twelveDataKey.isEmpty() || appContext == null) return;
     
-    // Chargement de sécurité depuis le disque local au démarrage
+    // Charger immédiatement ce qui est présent en mémoire locale au démarrage
     loadLevelsFromStorage();
 
     new Thread(() -> {
-        logToUI("🔄 [TV] Synchronisation des niveaux pivots TwelveData (Mode Précision)...");
-        
-        // Traduction parfaite vers les flux institutionnels de TwelveData
-        Map<String, String> tdMap = new HashMap<String, String>() {{
-            put("GOLD", "XAU/USD"); 
-            put("USOIL", "WTI/USD"); 
-            put("USDJPY", "USD/JPY"); 
-            put("GBPUSD", "GBP/USD"); 
-            put("NASDAQ", "NDX"); // Nasdaq 100 Index officiel
-            put("US500", "SPX");   // S&P 500 Index officiel
-        }};
+        try {
+            // Pause initiale pour stabiliser le lancement de l'application
+            Thread.sleep(1500);
+            Log.d(TAG, "🔄 [TwelveData Batch] Démarrage de la synchronisation groupée...");
 
-        SharedPreferences prefs = appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
+            // Cartographie des symboles
+            Map<String, String> tdMap = new HashMap<String, String>() {{
+                put("USDJPY", "USD/JPY"); 
+                put("GBPUSD", "GBP/USD"); 
+                put("NASDAQ", "NDX"); 
+                put("US500", "SPX");   
+                put("GOLD", "XAU/USD"); 
+                put("USOIL", "WTI/USD"); 
+            }};
 
-        for (Map.Entry<String, String> entry : tdMap.entrySet()) {
-            String key = entry.getKey();
-            String tdSym = entry.getValue();
-            try {
-                // Construction de l'URL Daily avec fuseau horaire officiel de l'échange
-                String urlD = "https://api.twelvedata.com/time_series?symbol=" + tdSym 
-                        + "&interval=1day&outputsize=3&timezone=Exchange&apikey=" + twelveDataKey;
-                String respD = httpGetSimple(urlD);
+            // Construction de la chaîne des symboles séparés par des virgules (ex: "USD/JPY,GBP/USD,NDX...")
+            StringBuilder sbSymbols = new StringBuilder();
+            int idx = 0;
+            for (String tdSym : tdMap.values()) {
+                sbSymbols.append(tdSym);
+                if (idx < tdMap.size() - 1) sbSymbols.append(",");
+                idx++;
+            }
+            String allSymbols = sbSymbols.toString();
+
+            SharedPreferences prefs = appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+
+            // ══════════════════════════════════════════════════════════════
+            // 1. REQUÊTE GENERALE BATCH DAILY (1 seule requête pour les 6 actifs)
+            // ══════════════════════════════════════════════════════════════
+            String urlD = "https://api.twelvedata.com/time_series?symbol=" + allSymbols 
+                    + "&interval=1day&outputsize=3&timezone=Exchange&apikey=" + twelveDataKey;
+            String respD = httpGetSimple(urlD);
+
+            if (respD != null && !respD.contains("\"status\":\"error\"")) {
+                JSONObject rootD = new JSONObject(respD);
                 
-                if (respD != null) {
-                    JSONObject jsonD = new JSONObject(respD);
-                    if (!jsonD.has("code") || jsonD.optInt("code") == 200) {
-                        JSONArray vals = jsonD.optJSONArray("values");
+                for (Map.Entry<String, String> entry : tdMap.entrySet()) {
+                    String key = entry.getKey();
+                    String tdSym = entry.getValue();
+                    
+                    if (rootD.has(tdSym)) {
+                        JSONObject assetJson = rootD.getJSONObject(tdSym);
+                        JSONArray vals = assetJson.optJSONArray("values");
                         if (vals != null && vals.length() >= 2) {
                             double pdh = vals.getJSONObject(1).optDouble("high", 0);
                             double pdl = vals.getJSONObject(1).optDouble("low", 0);
-
-                            // Ajustement spécifique pour l'Or si votre flux direct est indexé différemment
-                            if (key.equals("GOLD") && pdh > 0 && pdh < 3000) {
-                                // Fallback : Si TwelveData renvoie 2300 et votre WS est à 4000,
-                                // on adapte temporairement le garde-fou pour éviter le blocage
-                                TVMarketData current = cache.get(key);
-                                if (current != null && current.price > 3500) {
-                                    double ratio = current.price / 2330.0; // Coefficient d'alignement contractuel
-                                    pdh *= ratio;
-                                    pdl *= ratio;
-                                }
-                            }
-
-                            // Garde-fou de cohérence macro numérique
-                            TVMarketData current = cache.get(key);
-                            boolean coherent = true;
-                            if (current != null && current.price > 0 && pdh > 0 && !key.equals("GOLD")) {
-                                double ecart = Math.abs(pdh - current.price) / current.price;
-                                if (ecart > 0.5) { coherent = false; }
-                            }
                             
-                            if (coherent && pdh > 0 && pdl > 0) {
+                            if (pdh > 0 && pdl > 0) {
                                 pdhCache.put(key, pdh);
                                 pdlCache.put(key, pdl);
                                 editor.putFloat("pdh_" + key, (float) pdh);
@@ -515,28 +512,35 @@ public class TradingViewFetcher {
                         }
                     }
                 }
+                editor.commit();
+                Log.d(TAG, "✅ [TwelveData Batch] Tous les niveaux DAILY ont été mis à jour.");
+            } else {
+                Log.e(TAG, "🔴 [TwelveData Batch] Échec ou Quota dépassé sur le lot Daily.");
+            }
 
-                // Construction de l'URL Weekly avec fuseau horaire de l'échange
-                String urlW = "https://api.twelvedata.com/time_series?symbol=" + tdSym 
-                        + "&interval=1week&outputsize=3&timezone=Exchange&apikey=" + twelveDataKey;
-                String respW = httpGetSimple(urlW);
+            // Pause de sécurité pour respecter la fluidité du serveur TwelveData
+            Thread.sleep(1200);
+
+            // ══════════════════════════════════════════════════════════════
+            // 2. REQUÊTE GENERALE BATCH WEEKLY (1 seule requête pour les 6 actifs)
+            // ══════════════════════════════════════════════════════════════
+            String urlW = "https://api.twelvedata.com/time_series?symbol=" + allSymbols 
+                    + "&interval=1week&outputsize=3&timezone=Exchange&apikey=" + twelveDataKey;
+            String respW = httpGetSimple(urlW);
+
+            if (respW != null && !respW.contains("\"status\":\"error\"")) {
+                JSONObject rootW = new JSONObject(respW);
                 
-                if (respW != null) {
-                    JSONObject jsonW = new JSONObject(respW);
-                    if (!jsonW.has("code") || jsonW.optInt("code") == 200) {
-                        JSONArray vals = jsonW.optJSONArray("values");
+                for (Map.Entry<String, String> entry : tdMap.entrySet()) {
+                    String key = entry.getKey();
+                    String tdSym = entry.getValue();
+                    
+                    if (rootW.has(tdSym)) {
+                        JSONObject assetJson = rootW.getJSONObject(tdSym);
+                        JSONArray vals = assetJson.optJSONArray("values");
                         if (vals != null && vals.length() >= 2) {
                             double pwh = vals.getJSONObject(1).optDouble("high", 0);
                             double pwl = vals.getJSONObject(1).optDouble("low", 0);
-                            
-                            if (key.equals("GOLD") && pwh > 0 && pwh < 3000) {
-                                TVMarketData current = cache.get(key);
-                                if (current != null && current.price > 3500) {
-                                    double ratio = current.price / 2330.0;
-                                    pwh *= ratio;
-                                    pwl *= ratio;
-                                }
-                            }
                             
                             if (pwh > 0 && pwl > 0) {
                                 pwhCache.put(key, pwh);
@@ -547,17 +551,20 @@ public class TradingViewFetcher {
                         }
                     }
                 }
-                
-                logToUI("✅ [Matrice Sync] " + key + " chargé avec succès.");
-                Thread.sleep(600); // Rate-limit anti-blocage
-            } catch (Exception e) { 
-                Log.e(TAG, "Erreur synchro niveaux " + key, e); 
+                editor.commit();
+                Log.d(TAG, "✅ [TwelveData Batch] Tous les niveaux WEEKLY ont été mis à jour.");
+            } else {
+                Log.e(TAG, "🔴 [TwelveData Batch] Échec ou Quota dépassé sur le lot Weekly.");
             }
+
+            logToUI("🏛️ [Fonda IOF] Matrice pivot globale synchronisée par traitement par lot.");
+
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur fatale lors du traitement par lot des pivots", e);
         }
-        editor.apply();
-        logToUI("🏛️ [Fonda IOF] Tous les pivots de la veille sont figés au sol.");
     }).start();
-}
+    }
+
 
 // Ajoutez cette méthode pour éviter le chargement à vide au démarrage
 private static void loadLevelsFromStorage() {
