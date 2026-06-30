@@ -29,18 +29,19 @@ public class TradingViewFetcher {
 
     private static final String TAG = "TradingViewFetcher";
 
-    // ── Tickers TradingView (mode anonyme) ──
+     // ── Tickers TradingView (mode anonyme) ──
+    // Mis à jour pour utiliser Spreadex (Indices rapides) et Vantage (Forex réactif)
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
        // put("DXY",     "TVC:DXY");
        // put("VIX",     "CBOE:VIX");
        // put("US10Y",   "TVC:US10Y");
-        put("US500",   "OANDA:SPX500USD");
-        put("NASDAQ",  "QQQ");
+        put("US500",   "SPREADEX:SPX");      // S&P 500 via Spreadex
+        put("NASDAQ",  "SPREADEX:NDX");      // Nasdaq 100 via Spreadex (au lieu de l'ETF QQQ)
         put("GOLD",    "TVC:GOLD");
         put("USOIL",   "TVC:USOIL");
         //put("EURUSD",  "FX:EURUSD");
-        put("USDJPY",  "FX:USDJPY");
-        put("GBPUSD",  "FX:GBPUSD");
+        put("USDJPY",  "VANTAGE:USDJPY");    // USD/JPY via Vantage
+        put("GBPUSD",  "VANTAGE:GBPUSD");    // GBP/USD via Vantage
         //put("AUDUSD",  "FX:AUDUSD");
         //put("USDCAD",  "FX:USDCAD");
        // put("BITCOIN", "BINANCE:BTCUSDT");
