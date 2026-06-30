@@ -557,23 +557,6 @@ public class TradingViewFetcher {
     }).start();
 }
 
-// AJOUTEZ CETTE MÉTHODE JUSTE EN DESSOUS POUR ASSURER LE REPLI SECURISE (Fallback)
-private static void loadLevelsFromStorage() {
-    if (appContext == null) return;
-    SharedPreferences prefs = appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE);
-    
-    for (String key : SYMBOL_MAP.keySet()) {
-        double savedPdh = prefs.getFloat("pdh_" + key, 0f);
-        double savedPdl = prefs.getFloat("pdl_" + key, 0f);
-        double savedPwh = prefs.getFloat("pwh_" + key, 0f);
-        double savedPwl = prefs.getFloat("pwl_" + key, 0f);
-
-        if (savedPdh > 0) pdhCache.put(key, savedPdh);
-        if (savedPdl > 0) pdlCache.put(key, savedPdl);
-        if (savedPwh > 0) pwhCache.put(key, savedPwh);
-        if (savedPwl > 0) pwlCache.put(key, savedPwl);
-    }
-                                                                   }
                     
     private static String httpGetSimple(String urlStr) {
         try {
