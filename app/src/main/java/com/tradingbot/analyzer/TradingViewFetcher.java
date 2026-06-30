@@ -615,44 +615,43 @@ private static void loadLevelsFromStorage() {
     public static Map<String, TVMarketData> getCache() { return Collections.unmodifiableMap(cache); }
 
     // ── AFFICHAGE ADAPTÉ POUR MAINACTIVITY (4 Indicateurs + Cassures) ──
-    public static String buildContexteMacroGlobal(Context ctx) {
-        if (cache.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder();
-        sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
+ public static String buildContexteMacroGlobal(Context ctx) {
+    if (cache.isEmpty()) return "";
+    StringBuilder sb = new StringBuilder();
+    sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
 
-         for (String key : SYMBOL_MAP.keySet()) {
-            TVMarketData d = cache.get(key);
-            if (d != null) {
-                sb.append(key).append(" : ")
-                  .append(String.format(Locale.US, "%.4f", d.price))
-                  .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
-                  .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
-                  .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
-                  .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
-                  .append(d.variance > 0.001 ? " | Var: " + String.format(Locale.US, "%.4f", d.variance) : "")
-                  
-                  // ── AJOUT DES VALEURS NUMÉRIQUES DES NIVEAUX PIVOTS ──
-                  .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, "%.4f", d.pdh) : "")
-                  .append(d.pdl > 0 ? " PDL=" + String.format(Locale.US, "%.4f", d.pdl) : "")
-                  .append(d.brokeAbovePDH ? " 🔺PDH" : d.brokeBelowPDL ? " 🔻PDL" : "")
-                  .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, "%.4f", d.pwh) : "")
-                  .append(d.pwl > 0 ? " PWL=" + String.format(Locale.US, "%.4f", d.pwl) : "")
-                  .append(d.brokeAbovePWH ? " 🚀PWH" : d.brokeBelowPWL ? " 🔥PWL" : "")
-                  .append("\n");
-            }
-         }
-        String regimeFed = ctx.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
-                .getString("fed_regime", "PAUSE HAWKISH | Warsh | Taux 3.50-3.75% | CPI 4.2%");
-        sb.append("🏦 RÉGIME FED : ").append(regimeFed).append("\n");
-        sb.append("─────────────────────────────\n");
-        sb.append("📊 INDICATEURS :\n");
-        sb.append("• Variation (%) = Tendance depuis clôture précédente\n");
-        sb.append("• Amplitude (%) = Volatilité journalière (High-Low)\n");
-        sb.append("• Range pos (%) = Position actuelle dans la journée (0% = Low, 100% = High)\n");
-        sb.append("• Var tick = Volatilité intraday en direct (sur 20 ticks)\n");
-        return sb.toString();
-    }
+     for (String key : SYMBOL_MAP.keySet()) {
+        TVMarketData d = cache.get(key);
+        if (d != null) {
+            // Détermination dynamique du format des décimales selon l'actif
+            String formatPrice;
+            if (key.equals("GBPUSD")) { formatPrice = "%.5f"; } // 5 chiffres après la virgule
+            else if (key.equals("USDJPY")) { formatPrice = "%.3f"; } // 3 chiffres après la virgule
+            else if (key.equals("NASDAQ") || key.equals("US500")) { formatPrice = "%.2f"; } // 2 chiffres
+            else { formatPrice = "%.4f"; } // Fallback par défaut
 
+            sb.append("• ").append(key).append(" : ")
+              .append(String.format(Locale.US, formatPrice, d.price))
+              .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
+              .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
+              .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
+              .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
+              
+              // Affichage dynamique des pivots avec la précision de l'instrument
+              .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, formatPrice, d.pdh) : "")
+              .append(d.pdl > 0 ? " | PDL=" + String.format(Locale.US, formatPrice, d.pdl) : "")
+              .append(d.brokeAbovePDH ? " 🔺Breakout PDH" : d.brokeBelowPDL ? " 🔻Breakdown PDL" : "")
+              .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, formatPrice, d.pwh) : "")
+              .append(d.pwl > 0 ? " | PWL=" + String.format(Locale.US, formatPrice, d.pwl) : "")
+              .append(d.brokeAbovePWH ? " 🚀Breakout PWH" : d.brokeBelowPWL ? " 🔥Breakdown PWL" : "")
+              .append("\n");
+        }
+     }
+    String regimeFed = ctx.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+            .getString("fed_regime", "PAUSE HAWKISH | Warsh | Taux 3.50-3.75% | CPI 4.2%");
+    sb.append("\n🏦 RÉGIME FED : ").append(regimeFed).append("\n");
+    return sb.toString();
+}
     private static void logToUI(String msg) {
         if (MainActivity.instance != null) { MainActivity.instance.addLog(msg); }
     }
