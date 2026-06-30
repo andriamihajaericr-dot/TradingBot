@@ -478,13 +478,27 @@ if (respD != null) {
                     // Weekly (index 1 = semaine précédente)
                     String urlW = "https://api.twelvedata.com/time_series?symbol=" + tdSym + "&interval=1week&outputsize=2&apikey=" + twelveDataKey;
                     String respW = httpGetSimple(urlW);
-                    if (respW != null) {
-                        JSONArray vals = new JSONObject(respW).optJSONArray("values");
-                        if (vals != null && vals.length() >= 2) {
-                            pwhCache.put(key, vals.getJSONObject(1).optDouble("high", 0));
-                            pwlCache.put(key, vals.getJSONObject(1).optDouble("low", 0));
-                        }
-                    }
+if (respW != null) {
+    JSONObject jsonW = new JSONObject(respW);
+    if (jsonW.has("code") && jsonW.optInt("code") != 200) {
+        Log.e(TAG, "[TV PWH/PWL] Erreur API " + key + " (" + tdSym + ") : " + jsonW.optString("message"));
+        logToUI("❌ [PWH/PWL] " + key + " : " + jsonW.optString("message"));
+    } else {
+        JSONArray vals = jsonW.optJSONArray("values");
+        if (vals != null && vals.length() >= 2) {
+            double pwh = vals.getJSONObject(1).optDouble("high", 0);
+            double pwl = vals.getJSONObject(1).optDouble("low", 0);
+            pwhCache.put(key, pwh);
+            pwlCache.put(key, pwl);
+            logToUI("📅 [PWH/PWL] " + key + " : H=" + String.format(Locale.US, "%.4f", pwh)
+                + " L=" + String.format(Locale.US, "%.4f", pwl));
+        } else {
+            Log.w(TAG, "[TV PWH/PWL] Données insuffisantes pour " + key + " (" + tdSym + ")");
+        }
+    }
+} else {
+    Log.e(TAG, "[TV PWH/PWL] Réponse réseau null pour " + key + " (" + tdSym + ")");
+ }
                     Thread.sleep(600);
                 } catch (Exception e) { Log.e(TAG, "Erreur niveaux " + key, e); }
             }
