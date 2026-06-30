@@ -131,9 +131,9 @@ public class MainActivity extends AppCompatActivity {
                 this
             );
             // === TEST MARKET DATA (Twelve Data) ===
-            runOnUiThread(() -> addLog("📡 [TEST] Lancement MarketDataFetcher..."));
-            MarketDataFetcher.testRealTimeFreshness();
-            runOnUiThread(() -> addLog("✅ [TEST] MarketDataFetcher terminé - Voir les messages 🔴 ci-dessus pour le détail des erreurs"));
+            //runOnUiThread(() -> addLog("📡 [TEST] Lancement MarketDataFetcher..."));
+            //MarketDataFetcher.testRealTimeFreshness();
+          //  runOnUiThread(() -> addLog("✅ [TEST] MarketDataFetcher terminé - Voir les messages 🔴 ci-dessus pour le détail des erreurs"));
 
             // === TEST TRADINGVIEW FETCHER ===
             runOnUiThread(() -> addLog("📊 [TEST] Lancement TradingViewFetcher..."));
