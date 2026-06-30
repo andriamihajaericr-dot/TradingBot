@@ -442,7 +442,7 @@ public class TradingViewFetcher {
         new Thread(() -> {
             logToUI("🔄 [TV] Chargement PDH/PDL/PWH/PWL via TwelveData...");
             Map<String, String> tdMap = new HashMap<String, String>() {{
-                put("GOLD", "XAU/USD"); put("USOIL", "WTI/USD"); 
+                put("GOLD", "XAU/USD"); put("USOIL", "WTI"); 
                 put("USDJPY", "USD/JPY"); put("GBPUSD", "GBP/USD"); 
                 put("NASDAQ", "QQQ");
                 put("US500", "SPY");
@@ -454,13 +454,27 @@ public class TradingViewFetcher {
                     // Daily (index 1 = veille)
                     String urlD = "https://api.twelvedata.com/time_series?symbol=" + tdSym + "&interval=1day&outputsize=3&apikey=" + twelveDataKey;
                     String respD = httpGetSimple(urlD);
-                    if (respD != null) {
-                        JSONArray vals = new JSONObject(respD).optJSONArray("values");
-                        if (vals != null && vals.length() >= 2) {
-                            pdhCache.put(key, vals.getJSONObject(1).optDouble("high", 0));
-                            pdlCache.put(key, vals.getJSONObject(1).optDouble("low", 0));
-                        }
-                    }
+if (respD != null) {
+    JSONObject jsonD = new JSONObject(respD);
+    if (jsonD.has("code") && jsonD.optInt("code") != 200) {
+        Log.e(TAG, "[TV PDH/PDL] Erreur API " + key + " (" + tdSym + ") : " + jsonD.optString("message"));
+        logToUI("❌ [PDH/PDL] " + key + " : " + jsonD.optString("message"));
+    } else {
+        JSONArray vals = jsonD.optJSONArray("values");
+        if (vals != null && vals.length() >= 2) {
+            double pdh = vals.getJSONObject(1).optDouble("high", 0);
+            double pdl = vals.getJSONObject(1).optDouble("low", 0);
+            pdhCache.put(key, pdh);
+            pdlCache.put(key, pdl);
+            logToUI("📅 [PDH/PDL] " + key + " : H=" + String.format(Locale.US, "%.4f", pdh)
+                + " L=" + String.format(Locale.US, "%.4f", pdl));
+        } else {
+            Log.w(TAG, "[TV PDH/PDL] Données insuffisantes pour " + key + " (" + tdSym + ")");
+        }
+    }
+} else {
+    Log.e(TAG, "[TV PDH/PDL] Réponse réseau null pour " + key + " (" + tdSym + ")");
+}
                     // Weekly (index 1 = semaine précédente)
                     String urlW = "https://api.twelvedata.com/time_series?symbol=" + tdSym + "&interval=1week&outputsize=2&apikey=" + twelveDataKey;
                     String respW = httpGetSimple(urlW);
