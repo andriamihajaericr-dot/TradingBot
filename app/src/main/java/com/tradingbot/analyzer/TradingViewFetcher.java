@@ -31,19 +31,19 @@ public class TradingViewFetcher {
 
     // ── Tickers TradingView (mode anonyme) ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
-        put("DXY",     "TVC:DXY");
-        put("VIX",     "CBOE:VIX");
-        put("US10Y",   "TVC:US10Y");
+       // put("DXY",     "TVC:DXY");
+       // put("VIX",     "CBOE:VIX");
+       // put("US10Y",   "TVC:US10Y");
         put("US500",   "OANDA:SPX500USD");
         put("NASDAQ",  "QQQ");
-        put("GOLD",    "OANDA:XAUUSD");
+        put("GOLD",    "TVC:GOLD");
         put("USOIL",   "TVC:USOIL");
-        put("EURUSD",  "FX:EURUSD");
+        //put("EURUSD",  "FX:EURUSD");
         put("USDJPY",  "FX:USDJPY");
         put("GBPUSD",  "FX:GBPUSD");
-        put("AUDUSD",  "FX:AUDUSD");
-        put("USDCAD",  "FX:USDCAD");
-        put("BITCOIN", "BINANCE:BTCUSDT");
+        //put("AUDUSD",  "FX:AUDUSD");
+        //put("USDCAD",  "FX:USDCAD");
+       // put("BITCOIN", "BINANCE:BTCUSDT");
     }};
 
     // ── Structure de données unifiée avec les 4 indicateurs + Niveaux pivots ──
@@ -442,10 +442,10 @@ public class TradingViewFetcher {
         new Thread(() -> {
             logToUI("🔄 [TV] Chargement PDH/PDL/PWH/PWL via TwelveData...");
             Map<String, String> tdMap = new HashMap<String, String>() {{
-                put("GOLD", "XAU/USD"); put("USOIL", "WTI/USD"); put("EURUSD", "EUR/USD");
-                put("USDJPY", "USD/JPY"); put("GBPUSD", "GBP/USD"); put("AUDUSD", "AUD/USD");
-                put("USDCAD", "USD/CAD"); put("BITCOIN", "BTC/USD"); put("NASDAQ", "QQQ");
-                put("US500", "SPY"); put("DXY", "DXY");
+                put("GOLD", "XAU/USD"); put("USOIL", "WTI/USD"); 
+                put("USDJPY", "USD/JPY"); put("GBPUSD", "GBP/USD"); 
+                put("NASDAQ", "QQQ");
+                put("US500", "SPY");
             }};
             for (Map.Entry<String, String> entry : tdMap.entrySet()) {
                 String key = entry.getKey();
