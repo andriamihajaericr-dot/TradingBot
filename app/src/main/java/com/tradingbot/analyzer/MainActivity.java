@@ -162,14 +162,12 @@ TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
                   .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance))
                   
                   // ── 2. NIVEAUX INSTITUTIONNELS ET CASSURES ──
-                  .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, formatPrice, d.pdh) : "")
-                  .append(d.pdl > 0 ? " | PDL=" + String.format(Locale.US, formatPrice, d.pdl) : "")
-                  .append(d.brokeAbovePDH ? " 🔺[Breakout PDH]" : d.brokeBelowPDL ? " 🔻[Breakdown PDL]" : "")
-                  
-                  .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, formatPrice, d.pwh) : "")
-                  .append(d.pwl > 0 ? " | PWL=" + String.format(Locale.US, formatPrice, d.pwl) : "")
-                  .append(d.brokeAbovePWH ? " 🚀[Breakout PWH]" : d.brokeBelowPWL ? " 🔥[Breakdown PWL]" : "")
-                  .append("\n");
+                    .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, formatPrice, d.pdh) : "")
+                    .append(d.pdl > 0 ? " | PDL=" + String.format(Locale.US, formatPrice, d.pdl) : "")
+                    .append(d.brokeAbovePDH ? " 🔺Breakout PDH" : d.brokeBelowPDL ? " 🔻Breakdown PDL" : "")
+                    .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, formatPrice, d.pwh) : "")
+                    .append(d.pwl > 0 ? " | PWL=" + String.format(Locale.US, formatPrice, d.pwl) : "")
+                    .append(d.brokeAbovePWH ? " 🚀Breakout PWH" : d.brokeBelowPWL ? " 🔥Breakdown PWL" : "")
             }
             
             addLog("📊 Données TV :\n" + sb.toString());
