@@ -186,7 +186,7 @@ TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
     public void onError(String error) {
         runOnUiThread(() -> addLog("❌ [TV] Erreur : " + error));
     }
-})
+});
             // ... autres tests (régime, calendrier, etc.) si vous en avez ...
         } catch (Exception e) {
             Log.e(TAG, "Échec test complet", e);
