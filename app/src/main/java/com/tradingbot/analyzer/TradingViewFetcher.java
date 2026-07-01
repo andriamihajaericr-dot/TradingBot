@@ -35,7 +35,7 @@ public class TradingViewFetcher {
        // put("DXY",     "TVC:DXY");
        // put("VIX",     "CBOE:VIX");
        // put("US10Y",   "TVC:US10Y");
-        put("US500",   "SPREADEX:SPX");      // S&P 500 via Spreadex
+        put("SP500",   "SPREADEX:SPX");      // S&P 500 via Spreadex
         put("NASDAQ",  "SPREADEX:NDX");      // Nasdaq 100 via Spreadex (au lieu de l'ETF QQQ)
         put("GOLD",    "TVC:GOLD");
         put("USOIL",   "TVC:USOIL");
@@ -464,7 +464,7 @@ public class TradingViewFetcher {
                 put("USDJPY", "USD/JPY"); 
                 put("GBPUSD", "GBP/USD"); 
                 put("NASDAQ", "NDX"); 
-                put("US500", "SPX");   
+                put("SP500", "SPX");   
                 put("GOLD", "XAU/USD"); 
                 put("USOIL", "WTI/USD"); 
             }};
@@ -634,7 +634,7 @@ private static void loadLevelsFromStorage() {
             String formatPrice;
             if (key.equals("GBPUSD")) { formatPrice = "%.5f"; } // 5 chiffres après la virgule
             else if (key.equals("USDJPY")) { formatPrice = "%.3f"; } // 3 chiffres après la virgule
-            else if (key.equals("NASDAQ") || key.equals("US500")) { formatPrice = "%.2f"; } // 2 chiffres
+            else if (key.equals("NASDAQ") || key.equals("SP500")) { formatPrice = "%.2f"; } // 2 chiffres
             else { formatPrice = "%.4f"; } // Fallback par défaut
 
             sb.append("• ").append(key).append(" : ")
