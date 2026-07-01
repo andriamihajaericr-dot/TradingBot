@@ -464,141 +464,105 @@ public class TradingViewFetcher {
 
     public static void fetchPreviousLevels() {
     if (twelveDataKey.isEmpty() || appContext == null) return;
-    
-    // Charger immédiatement ce qui est présent en mémoire locale au démarrage
     loadLevelsFromStorage();
 
     new Thread(() -> {
         try {
-            // Pause initiale pour stabiliser le lancement de l'application
-            Thread.sleep(1500);
-            Log.d(TAG, "🔄 [TwelveData Batch] Démarrage de la synchronisation groupée...");
+            Thread.sleep(2000);
+            logToUI("🔄 [TV Pivots] Démarrage récupération PDH/PDL/PWH/PWL...");
 
-            // Cartographie des symboles
-            Map<String, String> tdMap = new HashMap<String, String>() {{
-                put("USDJPY", "USD/JPY"); 
-                put("GBPUSD", "GBP/USD"); 
-                put("NASDAQ", "NDX"); 
-                put("SP500", "SPX");   
-                put("GOLD", "XAU/USD"); 
-                put("USOIL", "WTI/USD"); 
-            }};
+            Map<String, String> tdMap = new LinkedHashMap<>();
+            tdMap.put("USDJPY", "USD/JPY");
+            tdMap.put("GBPUSD", "GBP/USD");
+            tdMap.put("NASDAQ", "NDX");
+            tdMap.put("SP500",  "SPX");
+            tdMap.put("GOLD",   "XAU/USD");
+            tdMap.put("USOIL",  "WTI/USD");
 
-            // Construction de la chaîne des symboles séparés par des virgules (ex: "USD/JPY,GBP/USD,NDX...")
-            StringBuilder sbSymbols = new StringBuilder();
-            int idx = 0;
-            for (String tdSym : tdMap.values()) {
-                sbSymbols.append(tdSym);
-                if (idx < tdMap.size() - 1) sbSymbols.append(",");
-                idx++;
-            }
-            String allSymbols = sbSymbols.toString();
+            // Construction URL propre avec jointure explicite
+            String allSymbols = String.join(",", tdMap.values());
 
             SharedPreferences prefs = appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE);
             SharedPreferences.Editor editor = prefs.edit();
 
-            // ══════════════════════════════════════════════════════════════
-            // 1. REQUÊTE GENERALE BATCH DAILY (1 seule requête pour les 6 actifs)
-            // ══════════════════════════════════════════════════════════════
-            // 🛡️ Anti-429 : attendre que le quota minute soit disponible (partagé avec MarketDataFetcher)
-            int costD = 6 * 2; // 6 symboles × 2 crédits estimés
-            while (!MarketDataFetcher.tryReserveCredits(costD)) {
-                long msWait = 60000L - (System.currentTimeMillis() % 60000L) + 200;
-                Log.d(TAG, "⏳ [TV Pivots] Quota minute épuisé — attente " + msWait + "ms");
-                Thread.sleep(msWait);
-            }
-            String allSymbolsEncoded = allSymbols.replace("/", "%2F");
-            int cost = tdMap.size() * 2; // 6 symboles × 2 crédits
-                while (!MarketDataFetcher.tryReserveCredits(cost)) {
-                    long msWait = 60000L - (System.currentTimeMillis() % 60000L) + 500;
-                    Log.d(TAG, "⏳ [TV Pivots Daily] Quota épuisé — attente " + msWait + "ms");
-                    Thread.sleep(msWait);
-                }
-                //String allSymbolsEncoded = allSymbols.replace("/", "%2F");
-                String urlD = "https://api.twelvedata.com/time_series?symbol=" + allSymbolsEncoded
-                        + "&interval=1day&outputsize=2&timezone=Exchange&apikey=" + twelveDataKey;
-                String respD = httpGetSimple(urlD);
-            if (respD != null && !respD.contains("\"status\":\"error\"")) {
-            JSONObject rootD = new JSONObject(respD);
-            Log.d(TAG, "📦 [TV Daily] Clés reçues : " + rootD.keys().toString());
-            for (Map.Entry<String, String> entry : tdMap.entrySet()) {
-                String key = entry.getKey();
-                String tdSym = entry.getValue();
-                Log.d(TAG, "🔍 [TV Daily] Cherche clé '" + tdSym + "' dans réponse → " + rootD.has(tdSym));
-                if (rootD.has(tdSym)) {
-                        JSONObject assetJson = rootD.getJSONObject(tdSym);
-                        JSONArray vals = assetJson.optJSONArray("values");
+            // ── DAILY ──
+            String urlD = "https://api.twelvedata.com/time_series?symbol="
+                    + allSymbols
+                    + "&interval=1day&outputsize=2&apikey=" + twelveDataKey;
+            logToUI("📡 [TV Pivots] Requête Daily → " + urlD.substring(0, Math.min(80, urlD.length())) + "...");
+            String respD = httpGetSimple(urlD);
+
+            if (respD == null) {
+                logToUI("🔴 [TV Pivots] Réponse Daily NULL (429 ou réseau)");
+            } else if (respD.contains("\"status\":\"error\"")) {
+                logToUI("🔴 [TV Pivots] Erreur Daily : " + respD.substring(0, Math.min(200, respD.length())));
+            } else {
+                JSONObject rootD = new JSONObject(respD);
+                logToUI("📦 [TV Pivots] Clés Daily reçues : " + rootD.keys().toString());
+                int saved = 0;
+                for (Map.Entry<String, String> entry : tdMap.entrySet()) {
+                    String key    = entry.getKey();
+                    String tdSym  = entry.getValue();
+                    if (rootD.has(tdSym)) {
+                        JSONArray vals = rootD.getJSONObject(tdSym).optJSONArray("values");
                         if (vals != null && vals.length() >= 2) {
                             double pdh = vals.getJSONObject(1).optDouble("high", 0);
-                            double pdl = vals.getJSONObject(1).optDouble("low", 0);
-                            
+                            double pdl = vals.getJSONObject(1).optDouble("low",  0);
                             if (pdh > 0 && pdl > 0) {
                                 pdhCache.put(key, pdh);
                                 pdlCache.put(key, pdl);
-                               // APRÈS — stocker en String pour garder la précision double
                                 editor.putString("pdh_" + key, String.valueOf(pdh));
                                 editor.putString("pdl_" + key, String.valueOf(pdl));
+                                saved++;
                             }
                         }
+                    } else {
+                        logToUI("⚠️ [TV Pivots] Clé '" + tdSym + "' absente de la réponse Daily");
                     }
                 }
                 editor.commit();
-                Log.d(TAG, "✅ [TwelveData Batch] Tous les niveaux DAILY ont été mis à jour.");
-            } else {
-                Log.e(TAG, "🔴 [TwelveData Batch] Échec ou Quota dépassé sur le lot Daily.");
+                logToUI("✅ [TV Pivots] Daily : " + saved + "/6 actifs sauvegardés");
             }
 
-            // Pause de sécurité pour respecter la fluidité du serveur TwelveData
-            Thread.sleep(1200);
+            Thread.sleep(2000);
 
-            // ══════════════════════════════════════════════════════════════
-            // 2. REQUÊTE GENERALE BATCH WEEKLY (1 seule requête pour les 6 actifs)
-            // ══════════════════════════════════════════════════════════════
-            // 🛡️ Anti-429 : réserver les crédits pour le batch Weekly
-            int costW = 6 * 2;
-            while (!MarketDataFetcher.tryReserveCredits(costW)) {
-                long msWait = 60000L - (System.currentTimeMillis() % 60000L) + 200;
-                Log.d(TAG, "⏳ [TV Pivots Weekly] Quota minute épuisé — attente " + msWait + "ms");
-                Thread.sleep(msWait);
-            }
-          while (!MarketDataFetcher.tryReserveCredits(cost)) {
-                long msWait = 60000L - (System.currentTimeMillis() % 60000L) + 500;
-                Log.d(TAG, "⏳ [TV Pivots Weekly] Quota épuisé — attente " + msWait + "ms");
-                Thread.sleep(msWait);
-            }
-            String urlW = "https://api.twelvedata.com/time_series?symbol=" + allSymbolsEncoded
-                    + "&interval=1week&outputsize=2&timezone=Exchange&apikey=" + twelveDataKey;
+            // ── WEEKLY ──
+            String urlW = "https://api.twelvedata.com/time_series?symbol="
+                    + allSymbols
+                    + "&interval=1week&outputsize=2&apikey=" + twelveDataKey;
+            logToUI("📡 [TV Pivots] Requête Weekly...");
             String respW = httpGetSimple(urlW);
-            if (respW != null && !respW.contains("\"status\":\"error\"")) {
+
+            if (respW == null) {
+                logToUI("🔴 [TV Pivots] Réponse Weekly NULL (429 ou réseau)");
+            } else if (respW.contains("\"status\":\"error\"")) {
+                logToUI("🔴 [TV Pivots] Erreur Weekly : " + respW.substring(0, Math.min(200, respW.length())));
+            } else {
                 JSONObject rootW = new JSONObject(respW);
-                
+                int saved = 0;
                 for (Map.Entry<String, String> entry : tdMap.entrySet()) {
-                    String key = entry.getKey();
+                    String key   = entry.getKey();
                     String tdSym = entry.getValue();
-                    
                     if (rootW.has(tdSym)) {
-                        JSONObject assetJson = rootW.getJSONObject(tdSym);
-                        JSONArray vals = assetJson.optJSONArray("values");
+                        JSONArray vals = rootW.getJSONObject(tdSym).optJSONArray("values");
                         if (vals != null && vals.length() >= 2) {
                             double pwh = vals.getJSONObject(1).optDouble("high", 0);
-                            double pwl = vals.getJSONObject(1).optDouble("low", 0);
-                            
+                            double pwl = vals.getJSONObject(1).optDouble("low",  0);
                             if (pwh > 0 && pwl > 0) {
                                 pwhCache.put(key, pwh);
                                 pwlCache.put(key, pwl);
                                 editor.putString("pwh_" + key, String.valueOf(pwh));
                                 editor.putString("pwl_" + key, String.valueOf(pwl));
+                                saved++;
                             }
                         }
                     }
                 }
-            editor.commit();
-                Log.d(TAG, "✅ [TwelveData Batch] Tous les niveaux WEEKLY ont été mis à jour.");
-            } else {
-                Log.e(TAG, "🔴 [TwelveData Batch] Échec ou Quota dépassé sur le lot Weekly.");
+                editor.commit();
+                logToUI("✅ [TV Pivots] Weekly : " + saved + "/6 actifs sauvegardés");
             }
 
-            // ✅ Injecter les pivots dans les TVMarketData déjà en cache
+            // ── Injection dans le cache TVMarketData ──
             for (String key : SYMBOL_MAP.keySet()) {
                 TVMarketData existing = cache.get(key);
                 if (existing != null) {
@@ -606,21 +570,21 @@ public class TradingViewFetcher {
                     double pdl = pdlCache.getOrDefault(key, 0.0);
                     double pwh = pwhCache.getOrDefault(key, 0.0);
                     double pwl = pwlCache.getOrDefault(key, 0.0);
-                    TVMarketData updated = new TVMarketData(
+                    cache.put(key, new TVMarketData(
                         existing.symbol, existing.price, existing.changePercent,
                         existing.high, existing.low, existing.open, existing.prevClose,
-                        existing.variance, 0.0, pdh, pdl, pwh, pwl,
-                        existing.timestamp
-                    );
-                    cache.put(key, updated);
+                        existing.variance, 0.0, pdh, pdl, pwh, pwl, existing.timestamp
+                    ));
                 }
             }
-            logToUI("🏛️ [Fonda IOF] Matrice pivot globale synchronisée par traitement par lot.");
+            logToUI("🏛️ [TV Pivots] Injection cache terminée — PDH/PDL/PWH/PWL actifs");
+
         } catch (Exception e) {
-            Log.e(TAG, "Erreur fatale lors du traitement par lot des pivots", e);
+            logToUI("❌ [TV Pivots] Erreur fatale : " + e.getMessage());
+            Log.e(TAG, "Erreur fetchPreviousLevels", e);
         }
     }).start();
-    }
+}
 
 
 // Ajoutez cette méthode pour éviter le chargement à vide au démarrage
@@ -644,13 +608,26 @@ private static void loadLevelsFromStorage() {
         try {
             HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
             conn.setConnectTimeout(8000); conn.setReadTimeout(8000);
-            if (conn.getResponseCode() == 200) {
+            int code = conn.getResponseCode();
+            if (code == 200) {
                 BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 StringBuilder sb = new StringBuilder(); String line;
                 while ((line = br.readLine()) != null) sb.append(line);
                 br.close(); conn.disconnect(); return sb.toString();
+            } else {
+                // Lire le corps de l'erreur pour diagnostiquer (429, 401, etc.)
+                InputStream errStream = conn.getErrorStream();
+                if (errStream != null) {
+                    BufferedReader br = new BufferedReader(new InputStreamReader(errStream));
+                    StringBuilder sb = new StringBuilder(); String line;
+                    while ((line = br.readLine()) != null) sb.append(line);
+                    br.close();
+                    Log.e(TAG, "🔴 [TV HTTP] Code " + code + " — " + sb.toString());
+                } else {
+                    Log.e(TAG, "🔴 [TV HTTP] Code " + code + " — pas de corps d'erreur");
+                }
+                conn.disconnect();
             }
-            conn.disconnect();
         } catch (Exception e) { Log.e(TAG, "HTTP Erreur: " + e.getMessage()); }
         return null;
     }
