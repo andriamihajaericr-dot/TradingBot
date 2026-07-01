@@ -63,7 +63,7 @@ public class MarketDataFetcher {
     // depuis le dernier appel, le compteur est remis à zéro avant réservation. Retourne
     // false si la réservation dépasserait le quota — dans ce cas, AUCUN crédit n'est
     // consommé et l'appelant doit attendre la minute suivante avant de réessayer.
-    private static synchronized boolean tryReserveCredits(int estimatedCost) {
+    public static synchronized boolean tryReserveCredits(int estimatedCost) {
         long nowMinute = System.currentTimeMillis() / 60000L;
         if (nowMinute != currentCreditMinuteWindow.get()) {
             currentCreditMinuteWindow.set(nowMinute);
