@@ -191,8 +191,19 @@ public class TradingViewFetcher {
                 .readTimeout(15, TimeUnit.SECONDS)
                 .build();
         logToUI("📡 [TV] Démarrage du pipeline TradingView (WebSocket).");
-        connectWebSocket();
-        fetchPreviousLevels();
+        cconnectWebSocket();
+        // 🛡️ N'appeler fetchPreviousLevels que si le slot TwelveData est libre
+        if (MarketDataFetcher.tryAcquireBatchSlot()) {
+            fetchPreviousLevels();
+        } else {
+            // Slot occupé : différer de 65s pour ne pas percuter MarketDataFetcher
+            new Thread(() -> {
+                try {
+                    Thread.sleep(65000L);
+                    fetchPreviousLevels();
+                } catch (InterruptedException ignored) {}
+            }).start();
+        }
     }
 
     public static void stop() {
@@ -489,10 +500,16 @@ public class TradingViewFetcher {
             // ══════════════════════════════════════════════════════════════
             // 1. REQUÊTE GENERALE BATCH DAILY (1 seule requête pour les 6 actifs)
             // ══════════════════════════════════════════════════════════════
-            String urlD = "https://api.twelvedata.com/time_series?symbol=" + allSymbols 
-                    + "&interval=1day&outputsize=3&timezone=Exchange&apikey=" + twelveDataKey;
+            // 🛡️ Anti-429 : attendre que le quota minute soit disponible (partagé avec MarketDataFetcher)
+            int costD = 6 * 2; // 6 symboles × 2 crédits estimés
+            while (!MarketDataFetcher.tryReserveCredits(costD)) {
+                long msWait = 60000L - (System.currentTimeMillis() % 60000L) + 200;
+                Log.d(TAG, "⏳ [TV Pivots] Quota minute épuisé — attente " + msWait + "ms");
+                Thread.sleep(msWait);
+            }
+            String urlD = "https://api.twelvedata.com/time_series?symbol=" + allSymbols
+                    + "&interval=1day&outputsize=2&timezone=Exchange&apikey=" + twelveDataKey;
             String respD = httpGetSimple(urlD);
-
             if (respD != null && !respD.contains("\"status\":\"error\"")) {
                 JSONObject rootD = new JSONObject(respD);
                 
@@ -529,8 +546,15 @@ public class TradingViewFetcher {
             // ══════════════════════════════════════════════════════════════
             // 2. REQUÊTE GENERALE BATCH WEEKLY (1 seule requête pour les 6 actifs)
             // ══════════════════════════════════════════════════════════════
-            String urlW = "https://api.twelvedata.com/time_series?symbol=" + allSymbols 
-                    + "&interval=1week&outputsize=3&timezone=Exchange&apikey=" + twelveDataKey;
+            // 🛡️ Anti-429 : réserver les crédits pour le batch Weekly
+            int costW = 6 * 2;
+            while (!MarketDataFetcher.tryReserveCredits(costW)) {
+                long msWait = 60000L - (System.currentTimeMillis() % 60000L) + 200;
+                Log.d(TAG, "⏳ [TV Pivots Weekly] Quota minute épuisé — attente " + msWait + "ms");
+                Thread.sleep(msWait);
+            }
+            String urlW = "https://api.twelvedata.com/time_series?symbol=" + allSymbols
+                    + "&interval=1week&outputsize=2&timezone=Exchange&apikey=" + twelveDataKey;
             String respW = httpGetSimple(urlW);
 
             if (respW != null && !respW.contains("\"status\":\"error\"")) {
