@@ -131,7 +131,7 @@ TradingViewFetcher.start(getApplicationContext());
 // 🟢 AJOUT CRITIQUE : Pause de 5 secondes pour laisser le cache se remplir !
 runOnUiThread(() -> addLog("⏳ [TEST] Attente de la stabilisation du flux et des pivots (5s)..."));
 try {
-    Thread.sleep(5000); 
+    Thread.sleep(12000); 
 } catch (InterruptedException ignored) {}
 
 // 2. Récupérer les données une fois que tout est chargé et stabilisé
@@ -153,8 +153,7 @@ TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
                 
                 sb.append("• ").append(key).append(" : ")
                   .append(String.format(Locale.US, formatPrice, d.price))
-                  .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%) ")
-                  .append(d.aboveMA200 ? "↗️ MA200" : "↘️ MA200")
+                  .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
                   
                   // ── 1. LES 4 INDICATEURS MACRO ──
                   .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
