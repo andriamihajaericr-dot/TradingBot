@@ -191,7 +191,7 @@ public class TradingViewFetcher {
                 .readTimeout(15, TimeUnit.SECONDS)
                 .build();
         logToUI("📡 [TV] Démarrage du pipeline TradingView (WebSocket).");
-        cconnectWebSocket();
+        connectWebSocket();
         // 🛡️ N'appeler fetchPreviousLevels que si le slot TwelveData est libre
         if (MarketDataFetcher.tryAcquireBatchSlot()) {
             fetchPreviousLevels();
