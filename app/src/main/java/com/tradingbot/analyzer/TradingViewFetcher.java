@@ -286,17 +286,20 @@ public class TradingViewFetcher {
                             JSONObject quote = p.getJSONObject(1);
                             String ticker = quote.optString("n");
                             JSONObject v = quote.optJSONObject("v");
+                            
                             if (v != null && v.has("lp")) {
+                                 String key = getKeyFromTicker(ticker);
+                                if (key != null) {
                                 double price = v.optDouble("lp", 0);
                                 double change = v.optDouble("chp", 0);
+                                    
                                 TVMarketData existing = cache.get(key);
                                 double high      = v.optDouble("high_price",       existing != null && existing.high > 0      ? existing.high      : price);
                                 double low       = v.optDouble("low_price",        existing != null && existing.low  > 0      ? existing.low       : price);
                                 double open      = v.optDouble("open_price",       existing != null && existing.open > 0      ? existing.open      : price);
                                 double prevClose = v.optDouble("prev_close_price", existing != null && existing.prevClose > 0 ? existing.prevClose : price);
 
-                                String key = getKeyFromTicker(ticker);
-                                if (key != null) {
+                               
                                     VarianceCalculator calc = varianceCalculators.get(key);
                                     double variance = 0.0;
                                     if (calc != null) {
