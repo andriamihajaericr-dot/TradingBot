@@ -119,88 +119,74 @@ public class MainActivity extends AppCompatActivity {
         });
 
         testBtn.setOnClickListener(v -> {
-    addLog("🧪 [TEST] Déclenchement du diagnostic complet...");
+    addLog("🧪 [TEST] Déclenchement RECUP DONNÉES TV...");
     new Thread(() -> {
         try {
-            // ✅ Test 1 — Telegram
-            NotificationService.sendTelegramSecure(
-                "🧪 *TEST DU CAPTEUR DE MACROS ÉCONOMIQUE*\n" +
-                "✅ Statut : Opérationnel\n" +
-                "🕒 Zone : UTC+3 (Madagascar)\n" +
-                "📡 Flux : Liaison montante et descendante OK.",
-                this
-            );
-            // === TEST MARKET DATA (Twelve Data) ===
-            //runOnUiThread(() -> addLog("📡 [TEST] Lancement MarketDataFetcher..."));
-            //MarketDataFetcher.testRealTimeFreshness();
-          //  runOnUiThread(() -> addLog("✅ [TEST] MarketDataFetcher terminé - Voir les messages 🔴 ci-dessus pour le détail des erreurs"));
+                // === TEST TRADINGVIEW FETCHER ===
+runOnUiThread(() -> addLog("📊 [TEST] Lancement TradingViewFetcher..."));
 
-            // === TEST TRADINGVIEW FETCHER ===
-            runOnUiThread(() -> addLog("📊 [TEST] Lancement TradingViewFetcher..."));
-            // Démarrer le fetcher si pas déjà fait (il gère les appels répétés)
-            TradingViewFetcher.start(getApplicationContext());
-            // Récupérer les données une fois
-            TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
+// 1. Démarrer le pipeline (WebSocket + requêtes pivots en arrière-plan)
+TradingViewFetcher.start(getApplicationContext());
+
+// 🟢 AJOUT CRITIQUE : Pause de 5 secondes pour laisser le cache se remplir !
+runOnUiThread(() -> addLog("⏳ [TEST] Attente de la stabilisation du flux et des pivots (5s)..."));
+try {
+    Thread.sleep(5000); 
+} catch (InterruptedException ignored) {}
+
+// 2. Récupérer les données une fois que tout est chargé et stabilisé
+TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
     @Override
     public void onDataReady(Map<String, TradingViewFetcher.TVMarketData> data) {
-    runOnUiThread(() -> {
-        addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
-        StringBuilder sb = new StringBuilder();
-        
-        for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : data.entrySet()) {
-            TradingViewFetcher.TVMarketData d = entry.getValue();
-            String key = entry.getKey();
+        runOnUiThread(() -> {
+            addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
+            StringBuilder sb = new StringBuilder();
             
-            // ── Détermination dynamique de la précision des décimales ──
-            String formatPrice;
-            if ("GBPUSD".equals(key)) { 
-                formatPrice = "%.5f";       // 5 décimales pour le GBPUSD (Vantage precision)
-            } else if ("USDJPY".equals(key)) { 
-                formatPrice = "%.3f";       // 3 décimales pour l'USDJPY (Vantage precision)
-            } else if ("NASDAQ".equals(key) || "US500".equals(key)) { 
-                formatPrice = "%.2f";       // 2 décimales pour les indices (Spreadex indices)
-            } else { 
-                formatPrice = "%.4f";       // 4 décimales par défaut (GOLD, USOIL)
+            for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : data.entrySet()) {
+                TradingViewFetcher.TVMarketData d = entry.getValue();
+                String key = entry.getKey();
+                
+                String formatPrice = "%.4f";
+                if ("GBPUSD".equals(key)) formatPrice = "%.5f";
+                else if ("USDJPY".equals(key)) formatPrice = "%.3f";
+                else if ("NASDAQ".equals(key) || "US500".equals(key)) formatPrice = "%.2f";
+                
+                sb.append("• ").append(key).append(" : ")
+                  .append(String.format(Locale.US, formatPrice, d.price))
+                  .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%) ")
+                  .append(d.aboveMA200 ? "↗️ MA200" : "↘️ MA200")
+                  
+                  // ── 1. LES 4 INDICATEURS MACRO ──
+                  .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
+                  .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
+                  .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
+                  .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance))
+                  
+                  // ── 2. NIVEAUX INSTITUTIONNELS ET CASSURES ──
+                  .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, formatPrice, d.pdh) : "")
+                  .append(d.pdl > 0 ? " | PDL=" + String.format(Locale.US, formatPrice, d.pdl) : "")
+                  .append(d.brokeAbovePDH ? " 🔺[Breakout PDH]" : d.brokeBelowPDL ? " 🔻[Breakdown PDL]" : "")
+                  
+                  .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, formatPrice, d.pwh) : "")
+                  .append(d.pwl > 0 ? " | PWL=" + String.format(Locale.US, formatPrice, d.pwl) : "")
+                  .append(d.brokeAbovePWH ? " 🚀[Breakout PWH]" : d.brokeBelowPWL ? " 🔥[Breakdown PWL]" : "")
+                  .append("\n");
             }
             
-            sb.append("• ").append(key).append(" : ")
-              .append(String.format(Locale.US, formatPrice, d.price))
-              .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%) ")
-              .append(d.aboveMA200 ? "↗️ MA200" : "↘️ MA200")
-              
-              // ── 1. LES 4 INDICATEURS MACRO ──
-              .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
-              .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
-              .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
-              .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance))
-              
-              // ── 2. NIVEAUX INSTITUTIONNELS ET CASSURES (Mise en page synchronisée) ──
-              .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, formatPrice, d.pdh) : "")
-              .append(d.pdl > 0 ? " | PDL=" + String.format(Locale.US, formatPrice, d.pdl) : "")
-              .append(d.brokeAbovePDH ? " 🔺[Breakout PDH]" : d.brokeBelowPDL ? " 🔻[Breakdown PDL]" : "")
-              
-              .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, formatPrice, d.pwh) : "")
-              .append(d.pwl > 0 ? " | PWL=" + String.format(Locale.US, formatPrice, d.pwl) : "")
-              .append(d.brokeAbovePWH ? " 🚀[Breakout PWH]" : d.brokeBelowPWL ? " 🔥[Breakdown PWL]" : "")
-              .append("\n");
-        }
-        
-        addLog("📊 Données TV :\n" + sb.toString());
-        
-        // Envoi à Telegram pour vérification visuelle immédiate 100% propre
-        NotificationService.sendTelegramSecure(
-            "📊 *DONNÉES TRADINGVIEW COMPLETES (TEST)*\n\n" + sb.toString(),
-            getApplicationContext()
-        );
-    });
-}
-                
-                @Override
-                public void onError(String error) {
-                    runOnUiThread(() -> addLog("❌ [TV] Erreur : " + error));
-                }
-            });
-
+            addLog("📊 Données TV :\n" + sb.toString());
+            
+            NotificationService.sendTelegramSecure(
+                "📊 *DONNÉES TRADINGVIEW COMPLETES (TEST)*\n\n" + sb.toString(),
+                getApplicationContext()
+            );
+        });
+    }
+    
+    @Override
+    public void onError(String error) {
+        runOnUiThread(() -> addLog("❌ [TV] Erreur : " + error));
+    }
+})
             // ... autres tests (régime, calendrier, etc.) si vous en avez ...
         } catch (Exception e) {
             Log.e(TAG, "Échec test complet", e);
