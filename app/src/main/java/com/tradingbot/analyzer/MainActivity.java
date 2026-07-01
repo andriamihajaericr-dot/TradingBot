@@ -131,7 +131,7 @@ TradingViewFetcher.start(getApplicationContext());
 // 🟢 AJOUT CRITIQUE : Pause de 5 secondes pour laisser le cache se remplir !
 runOnUiThread(() -> addLog("⏳ [TEST] Attente de la stabilisation du flux et des pivots (5s)..."));
 try {
-    Thread.sleep(12000); 
+    Thread.sleep(16000); 
 } catch (InterruptedException ignored) {}
 
 // 2. Récupérer les données une fois que tout est chargé et stabilisé
@@ -161,15 +161,15 @@ TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
                   .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
                   .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance))
                   // ── 2. NIVEAUX INSTITUTIONNELS ET CASSURES (Ajout des parenthèses de priorité) ──
-  .append(d.pdh > 0 ? (" | PDH=" + String.format(Locale.US, formatPrice, d.pdh)) : "")
-  .append(d.pdl > 0 ? (" | PDL=" + String.format(Locale.US, formatPrice, d.pdl)) : "")
-  .append(d.brokeAbovePDH ? " 🔺[Breakout PDH]" : (d.brokeBelowPDL ? " 🔻[Breakdown PDL]" : ""))
-  
-  .append(d.pwh > 0 ? (" | PWH=" + String.format(Locale.US, formatPrice, d.pwh)) : "")
-  .append(d.pwl > 0 ? (" | PWL=" + String.format(Locale.US, formatPrice, d.pwl)) : "")
-  .append(d.brokeAbovePWH ? " 🚀[Breakout PWH]" : (d.brokeBelowPWL ? " 🔥[Breakdown PWL]" : ""))
-  .append("\n");
+                  .append(d.pdh > 0 ? (" | PDH=" + String.format(Locale.US, formatPrice, d.pdh)) : "")
+                  .append(d.pdl > 0 ? (" | PDL=" + String.format(Locale.US, formatPrice, d.pdl)) : "")
+                  .append(d.brokeAbovePDH ? " 🔺[Breakout PDH]" : (d.brokeBelowPDL ? " 🔻[Breakdown PDL]" : ""))
                   
+                  .append(d.pwh > 0 ? (" | PWH=" + String.format(Locale.US, formatPrice, d.pwh)) : "")
+                  .append(d.pwl > 0 ? (" | PWL=" + String.format(Locale.US, formatPrice, d.pwl)) : "")
+                  .append(d.brokeAbovePWH ? " 🚀[Breakout PWH]" : (d.brokeBelowPWL ? " 🔥[Breakdown PWL]" : ""))
+                  .append("\n");
+                                  
             }
             
             addLog("📊 Données TV :\n" + sb.toString());
