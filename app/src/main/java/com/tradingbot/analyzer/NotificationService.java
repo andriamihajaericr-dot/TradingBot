@@ -230,12 +230,9 @@ public class NotificationService extends NotificationListenerService {
     
     private static final Map<String, String> EMOJI_ASSET_MAP = new HashMap<>();
     static {
-        EMOJI_ASSET_MAP.put("📈", "US10Y"); EMOJI_ASSET_MAP.put("💻", "NASDAQ");
-        EMOJI_ASSET_MAP.put("📊", "SP500"); EMOJI_ASSET_MAP.put("🏆", "GOLD");
-        EMOJI_ASSET_MAP.put("🛢️", "USOIL"); EMOJI_ASSET_MAP.put("🇪🇺", "EURUSD");
-        EMOJI_ASSET_MAP.put("🇯🇵", "USDJPY"); EMOJI_ASSET_MAP.put("🇨🇦", "USDCAD");
-        EMOJI_ASSET_MAP.put("🇬🇧", "GBPUSD"); EMOJI_ASSET_MAP.put("🇦🇺", "AUDUSD");
-        EMOJI_ASSET_MAP.put("₿", "BITCOIN");
+        EMOJI_ASSET_MAP.put("💻", "NASDAQ"); EMOJI_ASSET_MAP.put("📊", "SP500");
+        EMOJI_ASSET_MAP.put("🏆", "GOLD");   EMOJI_ASSET_MAP.put("🛢️", "USOIL");
+        EMOJI_ASSET_MAP.put("🇯🇵", "USDJPY"); EMOJI_ASSET_MAP.put("🇬🇧", "GBPUSD");
     }
 
     private void captureForecastFromReport(String report) {
@@ -971,9 +968,8 @@ if (fluxGeo) {
     if (!ripposteUSA)
         fb = fb.replaceAll("(• 🏆 GOLD\\s*:\\s*)🔴", "$1🟢");
     // USOIL/USDCAD/AUDUSD : toujours haussiers en crise GÉO
+    // USOIL : toujours haussier en crise GÉO
     if (fb.contains("USOIL : 🔴"))  fb = fb.replace("• 🛢️ USOIL : 🔴",  "• 🛢️ USOIL : 🟢");
-    if (fb.contains("USDCAD : 🔴")) fb = fb.replace("• 🇨🇦 USDCAD : 🔴", "• 🇨🇦 USDCAD : 🟢");
-    if (fb.contains("AUDUSD : 🔴")) fb = fb.replace("• 🇦🇺 AUDUSD : 🔴", "• 🇦🇺 AUDUSD : 🟢");
     filteredFb = new StringBuilder(fb);
      }
     int convFb = extrairePourcentageConviction(fallbackReport);
@@ -1364,21 +1360,11 @@ if (fluxGeo) {
                             // Cas non couvert nommément par EconomicEventDetector → on garde le comportement historique
                             eventTypeStr = "OIL-INVENTORY";
                         }
-                        // Sinon : eventTypeStr reste la valeur riche fournie par EconomicEventDetector
-                        // (ex: FED-WARSH-SIGNAL, INFLATION-DATA, ISM-INDICATOR, PMI-FLASH, MICHIGAN-SENTIMENT,
-                        // GDP-ADVANCE, TRADE-TARIFF, CHINA-MACRO, etc.)
-        
-                        // 3️⃣ SYNCHRONISATION MACRO DÉTERMINISTE avec enrichissement calendaire
-                        // Enrichir le contenu avec les données du calendrier (ACTUAL/FORECAST) si disponibles
-                        String enrichedBody = EventValidator.enrichWithCalendar(title, bodyTextRaw, postTimeMs);
+                             String enrichedBody = EventValidator.enrichWithCalendar(title, bodyTextRaw, postTimeMs);
                         EconomicAnalyzer.EvaluationResult ecoResult = EconomicAnalyzer.analyserEvenement(title, enrichedBody);
                         Log.d(TAG, "Devise détectée : " + ecoResult.currency + ", poids : " + ecoResult.weight);
                         // Le poids n'est plus forcé à 5 ou 3 statiquement, il découle de la surprise de l'écart mathématique (1 à 4)
                         int finalCalculatedWeight = ecoResult.weight;
-                        // Ajustement du pavillon suprême selon le verdict de l'analyseur mathématique ou de l'urgence géopolitique
-                        // 🆕 Exploite désormais detectedEvt.getRawImpact() (HIGH/MEDIUM/LOW/NEUTRE) en plus du score
-                        // mathématique d'EconomicAnalyzer, pour que les types riches (Warsh, ISM, PMI Flash, Michigan,
-                        // GDP-Advance) déclenchent eux aussi le statut suprême même si le calcul de poids reste bas.
                         String rawImpact = detectedEvt.getRawImpact();
                         if (finalCalculatedWeight >= 3 || currentSpeaker.equals("FED") || eventTypeStr.equals("GEOPOLITICAL")
                                 || "HIGH".equals(rawImpact) || "FED-WARSH-SIGNAL".equals(detectedEvt.eventType)) {
@@ -1395,54 +1381,40 @@ if (fluxGeo) {
                             lastSpeechTime = currentTime;
                             lastSpeaker = speakerToken;
                         }
-                        // 5️⃣ Matrice de ciblage et d'allocation des Actifs Financiers (Thread-safe via liste locale)
+
                         List<String> enrichedAssets = new ArrayList<>();
-                        if (upperFeed.contains("EUR") || upperFeed.contains("ECB") || upperFeed.contains("LAGARDE")) enrichedAssets.add("EURUSD");
                         if (upperFeed.contains("JPY") || upperFeed.contains("YEN") || upperFeed.contains("BOJ")) enrichedAssets.add("USDJPY");
                         if (upperFeed.contains("GBP") || upperFeed.contains("BOE")) enrichedAssets.add("GBPUSD");
-                        if (upperFeed.contains("AUD") || upperFeed.contains("RBA")) enrichedAssets.add("AUDUSD");
-                        if (upperFeed.contains("CAD") || upperFeed.contains("BOC")) enrichedAssets.add("USDCAD");
                         if (upperFeed.contains("GOLD") || upperFeed.contains("XAU")) enrichedAssets.add("GOLD");
                         if (upperFeed.contains("NASDAQ") || upperFeed.contains("TECH") || upperFeed.contains("AI")) enrichedAssets.add("NASDAQ");
                         if (upperFeed.contains("SP500") || upperFeed.contains("S&P")) enrichedAssets.add("SP500");
-                        if (upperFeed.contains("BITCOIN") || upperFeed.contains("BTC")) enrichedAssets.add("BITCOIN");
-        
-                        // Association contextuelle Pétrole / Risque d'approvisionnement (Hormuz)
-                        if (upperFeed.contains("OIL") || upperFeed.contains("WTI") || upperFeed.contains("CRUDE") || 
+                        
+                        if (upperFeed.contains("OIL") || upperFeed.contains("WTI") || upperFeed.contains("CRUDE") ||
                             upperFeed.contains("EIA") || upperFeed.contains("HORMUZ") || upperFeed.contains("ORMUZ")) {
                             if (!enrichedAssets.contains("USOIL")) enrichedAssets.add("USOIL");
-                            if (!enrichedAssets.contains("USDCAD")) enrichedAssets.add("USDCAD");
                             if (!enrichedAssets.contains("GOLD")) enrichedAssets.add("GOLD");
                         }
-        
-                        // Profil d'allocation en Régime de Crise Géopolitique
+                        
                         if (eventTypeStr.equals("GEOPOLITICAL")) {
-                            String[] geoAssets = {"GOLD", "USOIL", "USDJPY", "US10Y", "NASDAQ", "SP500"};
+                            String[] geoAssets = {"GOLD", "USOIL", "USDJPY", "NASDAQ", "SP500"};
                             for (String asset : geoAssets) {
                                 if (!enrichedAssets.contains(asset)) enrichedAssets.add(asset);
                             }
                         }
-        
-                        // Profil d'allocation standard lors des chocs macroéconomiques majeurs
+                        
                         if (isSupremeRank && !eventTypeStr.equals("GEOPOLITICAL")) {
-                            String[] macroAssets = {"US10Y", "NASDAQ", "SP500", "GOLD", "EURUSD", "USDJPY", "BITCOIN"};
+                            String[] macroAssets = {"NASDAQ", "SP500", "GOLD", "USDJPY", "GBPUSD"};
                             for (String asset : macroAssets) {
                                 if (!enrichedAssets.contains(asset)) enrichedAssets.add(asset);
                             }
                         }
-        
-                        // Panier de secours par défaut si aucun mot-clé d'actif n'a matché
+                        
                         if (enrichedAssets.isEmpty()) {
                             enrichedAssets.add("NASDAQ");
                             enrichedAssets.add("SP500");
-                            enrichedAssets.add("US10Y");
+                            enrichedAssets.add("GOLD");
                         }
-        
-                        // 6️⃣ Validation de cohérence temporelle et historique via EventValidator
-                        // APRÈS
-                        // ✅ CORRECTIF : on injecte la source déjà identifiée (finalSourceName) dans le contenu passé
-                        // au validateur, pour que calculateBreakingNewsConfidence() puisse réellement la reconnaître
-                        // au lieu de chercher en vain le mot "financialjuice" dans le texte de l'actu elle-même.
+                        
                         EventValidator.ValidationResult validationResult = EventValidator.validate(NotificationService.this, title, bodyTextRaw + " [" + finalSourceName + "]", currentTime, enrichedAssets);
                         
                         // Log dans l'Ui
@@ -1667,21 +1639,13 @@ if (fluxGeo) {
             if (context == null) return;
             String fingerprint = String.valueOf((source + title + body).hashCode());
             NotificationService instance = serviceInstance;
-        
-            // ✅ Sauvegarder dans SQLite pour inclusion dans le Daily Report (INCHANGÉ)
-            // ✅ Ne pas re-sauvegarder si déjà en DB — updateActualIfMissing l'a déjà mis à jour
-        // Sauvegarder uniquement si vraiment absent (fingerprint non existant)
-              // 2. Gestion intelligente des actifs (Priorité aux paramètres, repli sur la liste globale)
-            List<String> finalAssetsList = (assets != null && !assets.isEmpty()) ? assets : new ArrayList<>(Arrays.asList(
-                "GOLD","NASDAQ","SP500","BITCOIN","EURUSD",
-                "USDJPY","GBPUSD","AUDUSD","USDCAD","USOIL","US10Y"
+                 List<String> finalAssetsList = (assets != null && !assets.isEmpty()) ? assets : new ArrayList<>(Arrays.asList(
+                "GOLD","NASDAQ","SP500",
+                "USDJPY","GBPUSD","USOIL"
             ));
             // Conversion de la Liste en String pour correspondre au schéma SQLite
             String assetsStr = String.join(",", finalAssetsList);
-            // ✅ AUDIT EXHAUSTIF (bug 9) : double garde NPE — instance peut être null (service non démarré)
-            // et getEventDb() peut être null (import de base en cours) ; sans ce garde, un appelant futur
-            // sans try/catch dédié ferait planter le service au lieu de simplement ignorer la sauvegarde.
-            EventDatabase db = (instance != null) ? instance.getEventDb() : null;
+                EventDatabase db = (instance != null) ? instance.getEventDb() : null;
             if (db != null) {
                 if (!db.isEventAlreadySaved(title, System.currentTimeMillis() / 1000)) {
                     int dynamicWeight = EconomicCalendarAPI.isSupremeCalendarIndicator(title) ? 5 : 3;
@@ -2055,8 +2019,8 @@ if (fluxGeo) {
                 messages.put(new JSONObject().put("role", "system").put("content", SYSTEM_PROMPT));
 
                 String assetSpecs = "Spécifications strictes des Pictogrammes d'Actifs à insérer devant chaque ligne :\n" +
-                                    "GOLD: 🏆, USOIL: 🛢️, NASDAQ: 💻, SP500: 📊, US10Y: 📈, BITCOIN: ₿, " +
-                                    "EURUSD: 🇪🇺, GBPUSD: 🇬🇧, AUDUSD: 🇦🇺, USDCAD: 🇨🇦, USDJPY: 🇯🇵";
+                    "GOLD: 🏆, USOIL: 🛢️, NASDAQ: 💻, SP500: 📊, " +
+                    "GBPUSD: 🇬🇧, USDJPY: 🇯🇵";
                 messages.put(new JSONObject().put("role", "system").put("content", assetSpecs));
                 messages.put(new JSONObject().put("role", "user").put("content", "Flux brut reçu : " + feed + "\nMémoire contextuelle ordonnée par importance :\n" + history));
                 payload.put("messages", messages);
@@ -2199,9 +2163,9 @@ if (fluxGeo) {
             upper.contains("WILLIAMS")    || upper.contains("KUGLER")          ||
             upper.contains("FOMC")        || upper.contains("FEDERAL RESERVE") ||
             upper.contains("FED CHAIR")   || upper.contains("FED RATE")) {
-            assets.addAll(Arrays.asList(
-                "GOLD", "NASDAQ", "SP500", "BITCOIN",
-                "USDJPY", "EURUSD", "GBPUSD", "AUDUSD", "USDCAD", "US10Y"
+           assets.addAll(Arrays.asList(
+                "GOLD", "NASDAQ", "SP500",
+                "USDJPY", "GBPUSD"
             ));
         }
 
@@ -2218,29 +2182,11 @@ if (fluxGeo) {
         if (upper.contains("SP500")  || upper.contains("S&P")    ||
             upper.contains("SPX")) assets.add("SP500");
 
-        if (upper.contains("BITCOIN") || upper.contains("BTC")   ||
-            upper.contains("CRYPTO")) assets.add("BITCOIN");
-
-        if (upper.contains("YIELD")  || upper.contains("US10Y")  ||
-            upper.contains("BOND")   || upper.contains("TREASURY")) assets.add("US10Y");
-
-        if (upper.contains("EURUSD")   || upper.contains("ECB")       ||
-            upper.contains("EUROZONE") || upper.contains("LAGARDE")   ||
-            upper.contains("BCE")      || upper.contains("FRANKFURT") ||
-            upper.matches(".*\\bEUR\\b.*")) assets.add("EURUSD");
-
         if (upper.contains("GBP")    || upper.contains("GBPUSD") ||
             upper.contains("CABLE")  || upper.contains("BOE")    ||
             upper.contains("BAILEY")) assets.add("GBPUSD");
 
-        if (upper.contains("AUD")    || upper.contains("AUDUSD") ||
-            upper.contains("AUSSIE") || upper.contains("RBA")    ||
-            upper.contains("BULLOCK")) assets.add("AUDUSD");
-
-        if (upper.contains("CAD")    || upper.contains("USDCAD") ||
-            upper.contains("LOONIE") || upper.contains("BOC")    ||
-            upper.contains("MACKLEM")) assets.add("USDCAD");
-
+         
         if (upper.contains("JPY")    || upper.contains("USDJPY") ||
             upper.contains("YEN")    || upper.contains("BOJ")    ||
             upper.contains("UEDA")) assets.add("USDJPY");
@@ -2249,7 +2195,7 @@ if (fluxGeo) {
         if (assets.isEmpty()) {
             assets.add("NASDAQ");
             assets.add("SP500");
-            assets.add("US10Y");
+            assets.add("GOLD");
         }
 
         return new ArrayList<>(new LinkedHashSet<>(assets));
@@ -3307,9 +3253,9 @@ private void registerNetworkCallback() {
                     "⚠️ [ALERTE SYSTÈME : RÉGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE ACTIF]. " +
                     "Le risque de guerre au Moyen-Orient ou une menace sur le Détroit d'Hormuz est prioritaire. " +
                     "L'Or (GOLD) doit refléter le flux refuge (Safe-Haven). " +
-                    "Appliquer immédiatement la CONTRAINTE 11.\n\n";
-            }
-            return directiveDeCrise + SYSTEM_PROMPT;
+                    "Appliquer immédiatement la CONTRAINTE 10.\n\n";
+        }
+        return directiveDeCrise + SYSTEM_PROMPT;
     }
         
     // Méthode 2 — version avec prompt personnalisé (séparée, au même niveau)
@@ -3335,7 +3281,7 @@ private void registerNetworkCallback() {
             if (alerteGéoMajeure) {
                 directiveDeCrise =
                     "⚠️ [ALERTE SYSTÈME : RÉGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE ACTIF]. " +
-                    "Appliquer immédiatement la CONTRAINTE 11.\n\n";
+                    "Appliquer immédiatement la CONTRAINTE 10.\n\n";
             }
             // ✅ Utilise basePrompt (contient le guidage mathématique si présent)
             return directiveDeCrise + basePrompt;
@@ -3366,8 +3312,7 @@ private void registerNetworkCallback() {
             String alerteFlash = 
                 "⚠️ [ALERTE SYSTÈME CRITIQUE : EXCEPTION DE CRISE ACTIVE].\n" +
                 "Le registre des dernières 24h fait état d'une ESCALADE MILITAIRE DIRECTE ou d'une MENACE SUR L'OFFRE (notamment Hormuz).\n" +
-                "CONSIGNE : Tu te trouves dans le cas d'exception absolue décrit à la CONTRAINTE 11. Active immédiatement la matrice géopolitique prioritaire (Régime de dominance géopolitique sur l'inflation) pour l'alignement des 11 actifs et le fait marquant.\n\n";
-            
+                "CONSIGNE : Tu te trouves dans le cas d'exception absolue décrit à la section GÉOPOLITIQUE. Active immédiatement la matrice géopolitique prioritaire (Régime de dominance géopolitique sur l'inflation) pour l'alignement des 6 actifs et le fait marquant.\n\n";
             return alerteFlash + promptDeBase;
         }
     
