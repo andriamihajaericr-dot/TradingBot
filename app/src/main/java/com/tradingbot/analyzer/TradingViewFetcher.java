@@ -514,7 +514,7 @@ public class TradingViewFetcher {
                     Log.d(TAG, "⏳ [TV Pivots Daily] Quota épuisé — attente " + msWait + "ms");
                     Thread.sleep(msWait);
                 }
-                String allSymbolsEncoded = allSymbols.replace("/", "%2F");
+                //String allSymbolsEncoded = allSymbols.replace("/", "%2F");
                 String urlD = "https://api.twelvedata.com/time_series?symbol=" + allSymbolsEncoded
                         + "&interval=1day&outputsize=2&timezone=Exchange&apikey=" + twelveDataKey;
                 String respD = httpGetSimple(urlD);
