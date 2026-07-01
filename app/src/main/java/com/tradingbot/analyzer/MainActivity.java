@@ -149,7 +149,7 @@ TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
                 String formatPrice = "%.4f";
                 if ("GBPUSD".equals(key)) formatPrice = "%.5f";
                 else if ("USDJPY".equals(key)) formatPrice = "%.3f";
-                else if ("NASDAQ".equals(key) || "US500".equals(key)) formatPrice = "%.2f";
+                else if ("NASDAQ".equals(key) || "SP500".equals(key)) formatPrice = "%.2f";
                 
                 sb.append("• ").append(key).append(" : ")
                   .append(String.format(Locale.US, formatPrice, d.price))
