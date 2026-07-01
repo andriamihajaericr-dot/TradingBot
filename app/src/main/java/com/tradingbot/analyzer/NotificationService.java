@@ -687,46 +687,46 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 List<String> historique = db.obtenirTexteEvenementsRecents();
                 String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
                 // Vérifier et réinitialiser le compteur à minuit UTC
-long nowUtc = System.currentTimeMillis();
-long midnightUtc = (nowUtc / 86400000L + 1) * 86400000L;
-if (nowUtc >= tokenResetTime) {
-    dailyTokensUsed.set(0);
-    tokenResetTime = midnightUtc;
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("🔄 [TOKEN] Compteur TPD réinitialisé (minuit UTC).");
-}
-// Vérifier budget restant
-    int used = dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
-getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
-    .putInt("daily_tokens_used", used)
-    .putLong("token_reset_time", tokenResetTime)
-    .apply();
-
-JSONObject jsonPayload;
-if (used > TOKEN_BUDGET_DAILY) {
-    Log.w(TAG, "[TOKEN] Budget TPD épuisé (" + used + ") — bascule directe fallback.");
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("⚠️ [TOKEN] Budget 90k atteint — fallback préventif.");
-    // Forcer directement le modèle fallback sans attendre le 429
-    jsonPayload = new JSONObject();
-    jsonPayload.put("model", GROQ_MODEL_FALLBACK);
-    jsonPayload.put("temperature", 0.0);
-    jsonPayload.put("max_tokens", 600);
-// Injecter rappel format strict dans le system prompt du fallback
-JSONArray msgsFb = jsonPayload.getJSONArray("messages");
-JSONObject sysMsgFb = msgsFb.getJSONObject(0);
-String sysContentFb = sysMsgFb.getString("content");
-sysMsgFb.put("content", sysContentFb +
-    "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
-    "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
-    "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n" +
-    "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'");
-} else {
-    jsonPayload = new JSONObject();
-    jsonPayload.put("model", GROQ_MODEL);
-    jsonPayload.put("temperature", 0.02);
-    jsonPayload.put("max_tokens", 600);
-}
+                long nowUtc = System.currentTimeMillis();
+                long midnightUtc = (nowUtc / 86400000L + 1) * 86400000L;
+                if (nowUtc >= tokenResetTime) {
+                    dailyTokensUsed.set(0);
+                    tokenResetTime = midnightUtc;
+                    if (MainActivity.instance != null)
+                        MainActivity.instance.addLog("🔄 [TOKEN] Compteur TPD réinitialisé (minuit UTC).");
+                }
+                // Vérifier budget restant
+                    int used = dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+                    .putInt("daily_tokens_used", used)
+                    .putLong("token_reset_time", tokenResetTime)
+                    .apply();
+                
+                JSONObject jsonPayload;
+                if (used > TOKEN_BUDGET_DAILY) {
+                    Log.w(TAG, "[TOKEN] Budget TPD épuisé (" + used + ") — bascule directe fallback.");
+                    if (MainActivity.instance != null)
+                        MainActivity.instance.addLog("⚠️ [TOKEN] Budget 90k atteint — fallback préventif.");
+                    // Forcer directement le modèle fallback sans attendre le 429
+                    jsonPayload = new JSONObject();
+                    jsonPayload.put("model", GROQ_MODEL_FALLBACK);
+                    jsonPayload.put("temperature", 0.0);
+                    jsonPayload.put("max_tokens", 600);
+                // Injecter rappel format strict dans le system prompt du fallback
+                JSONArray msgsFb = jsonPayload.getJSONArray("messages");
+                JSONObject sysMsgFb = msgsFb.getJSONObject(0);
+                String sysContentFb = sysMsgFb.getString("content");
+                sysMsgFb.put("content", sysContentFb +
+                    "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
+                    "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
+                    "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n" +
+                    "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'");
+                } else {
+                    jsonPayload = new JSONObject();
+                    jsonPayload.put("model", GROQ_MODEL);
+                    jsonPayload.put("temperature", 0.02);
+                    jsonPayload.put("max_tokens", 600);
+                }
     
                 JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content", promptFinal));
@@ -785,33 +785,33 @@ sysMsgFb.put("content", sysContentFb +
                     boolean inImpactSection = false;
     
                     java.util.Set<String> actifsDejaSeen = new java.util.HashSet<>();
-for (String line : lines) {
-    // Masquer les actifs NEUTRE — inutiles pour le trading
-    if (line.contains("NEUTRE") || line.matches(".*•.*:.*= \\|.*")) continue;
-    // Masquer les doublons d'actifs (ex: EURUSD affiché 2 fois)
-    if (line.trim().startsWith("•")) {
-        String actifKey = line.trim().length() > 15 ? line.trim().substring(0, 15) : line.trim();
-        if (!actifsDejaSeen.add(actifKey)) continue;
-    }
-    String trimmed = line.trim();
-    if (trimmed.isEmpty()) continue;
-    if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
-        trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
-        filteredMessage.append(line).append("\n");
-        if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
-        continue;
-    }
-    if (inImpactSection && trimmed.startsWith("•")) {
-        String upperLine = line.toUpperCase(Locale.ROOT);
-        boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
-        boolean isSignificant = !isInclinationNeutral &&
-            (upperLine.contains("BULLISH") || upperLine.contains("BEARISH"));
-        if (isSignificant) {
-            filteredMessage.append(line).append("\n");
-            activeSignalsCount++;
-        }
-    }
-}
+                    for (String line : lines) {
+                        // Masquer les actifs NEUTRE — inutiles pour le trading
+                        if (line.contains("NEUTRE") || line.matches(".*•.*:.*= \\|.*")) continue;
+                        // Masquer les doublons d'actifs (ex: EURUSD affiché 2 fois)
+                        if (line.trim().startsWith("•")) {
+                            String actifKey = line.trim().length() > 15 ? line.trim().substring(0, 15) : line.trim();
+                            if (!actifsDejaSeen.add(actifKey)) continue;
+                        }
+                        String trimmed = line.trim();
+                        if (trimmed.isEmpty()) continue;
+                        if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
+                            trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
+                            filteredMessage.append(line).append("\n");
+                            if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
+                            continue;
+                        }
+                        if (inImpactSection && trimmed.startsWith("•")) {
+                            String upperLine = line.toUpperCase(Locale.ROOT);
+                            boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
+                            boolean isSignificant = !isInclinationNeutral &&
+                                (upperLine.contains("BULLISH") || upperLine.contains("BEARISH"));
+                            if (isSignificant) {
+                                filteredMessage.append(line).append("\n");
+                                activeSignalsCount++;
+                            }
+                        }
+                    }
     
                     // ✅ Application du filtre conviction
                     // APRÈS
@@ -826,119 +826,119 @@ for (String line : lines) {
                             );
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport;
                             sendTelegramSecure(finalPayload, NotificationService.this);
-// Extraire résumé directionnel pour affichage rappel inertie
-StringBuilder impactResume = new StringBuilder();
-for (String l : aiReport.split("\n")) {
-    if (l.matches(".*•.*:.*[🟢🔴].*")) {
-        String[] parts = l.split("\\|");
-        if (parts.length > 0) impactResume.append(parts[0].trim()).append(" ");
-    }
-}
-String impactFinal = impactResume.length() > 0
-    ? impactResume.toString().trim()
-    : aiReport.contains("FLUX DOMINANT") ?
-      "Flux: " + aiReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim() : "N/A";
-      db.markEventAsSynced(fingerprint, impactFinal.length() > 200
-    ? impactFinal.substring(0, 200) : impactFinal);
-                            } else {
-                                Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
-                            db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
-                        }
-                    } else {
-                        db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                            // Extraire résumé directionnel pour affichage rappel inertie
+                            StringBuilder impactResume = new StringBuilder();
+                            for (String l : aiReport.split("\n")) {
+                                if (l.matches(".*•.*:.*[🟢🔴].*")) {
+                                    String[] parts = l.split("\\|");
+                                    if (parts.length > 0) impactResume.append(parts[0].trim()).append(" ");
+                                }
+                            }
+                            String impactFinal = impactResume.length() > 0
+                                ? impactResume.toString().trim()
+                                : aiReport.contains("FLUX DOMINANT") ?
+                                  "Flux: " + aiReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim() : "N/A";
+                                  db.markEventAsSynced(fingerprint, impactFinal.length() > 200
+                                ? impactFinal.substring(0, 200) : impactFinal);
+                                                        } else {
+                                                            Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
+                                                        db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
+                                                    }
+                                                } else {
+                                                    db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                                                }
+                                            } else {
+                                                Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
+                                            if (status == 429) {
+                                Log.w(TAG, "[GROQ] 429 TPD — Bascule automatique vers " + GROQ_MODEL_FALLBACK);
+                                if (MainActivity.instance != null)
+                                    MainActivity.instance.addLog("⚠️ [GROQ] Quota épuisé — fallback sur modèle léger.");
+                                conn.disconnect();
+                                try {
+                                    jsonPayload.put("model", GROQ_MODEL_FALLBACK);
+                                    jsonPayload.put("temperature", 0.0);
+                                    jsonPayload.put("max_tokens", 600);
+                                    String contexteFallback = "";
+                                    try {
+                                List<String> historiqueDb = db.obtenirTexteEvenementsRecents();
+                                if (historiqueDb != null && !historiqueDb.isEmpty()) {
+                                    contexteFallback += "CONTEXTE RÉCENT (derniers événements) :\n"
+                                        + String.join("\n", historiqueDb.subList(0, Math.min(3, historiqueDb.size())))
+                                        + "\n\n";
+                                }
+                                // 2. Prix LKV cache
+                                if (cachedMarketData != null && !cachedMarketData.isEmpty()) {
+                                StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
+                                for (Map.Entry<String, MarketDataFetcher.MarketData> e : cachedMarketData.entrySet()) {
+                                    prixLkv.append(e.getKey()).append(" : ")
+                                           .append(String.format(Locale.US, "%.4f", e.getValue().price))
+                                           .append("\n");
+                                }
+                                contexteFallback += prixLkv.toString() + "\n";
+                                }
+                             // 3. Flux dominant sauvegardé
+                                String dernierFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                                    .getString("last_dominant_flow", null);
+                                if (dernierFlux != null && !dernierFlux.isEmpty()) {
+                                    contexteFallback += "FLUX DOMINANT PRÉCÉDENT : " + dernierFlux + "\n"
+                                        + "RÈGLE : si le nouveau driver est cohérent, maintiens ce flux. "
+                                        + "Si contradictoire, justifie explicitement le changement de régime.\n\n";
+                                }
+            } catch (Exception eCtx) {
+                Log.w(TAG, "[FALLBACK] Enrichissement contexte échoué : " + eCtx.getMessage());
+            }
+            // Injecter dans le message user existant
+            JSONArray msgsFallback = jsonPayload.getJSONArray("messages");
+            JSONObject userMsg = msgsFallback.getJSONObject(msgsFallback.length() - 1);
+            String bodyEnrichi = contexteFallback + userMsg.getString("content");
+            userMsg.put("content", bodyEnrichi);
+                    java.net.URL urlFallback = new java.net.URL(GROQ_URL);
+                    java.net.HttpURLConnection connFallback = (java.net.HttpURLConnection) urlFallback.openConnection();
+                    connFallback.setRequestMethod("POST");
+                    connFallback.setDoOutput(true);
+                    connFallback.setRequestProperty("Authorization", "Bearer " + apiKey);
+                    connFallback.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                    connFallback.setConnectTimeout(15000);
+                    connFallback.setReadTimeout(15000);
+                    try (java.io.OutputStream osFb = connFallback.getOutputStream()) {
+                        byte[] inputFb = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                        osFb.write(inputFb, 0, inputFb.length);
+                        osFb.flush();
                     }
-                } else {
-                    Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
-                if (status == 429) {
-    Log.w(TAG, "[GROQ] 429 TPD — Bascule automatique vers " + GROQ_MODEL_FALLBACK);
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("⚠️ [GROQ] Quota épuisé — fallback sur modèle léger.");
-    conn.disconnect();
-    try {
-        jsonPayload.put("model", GROQ_MODEL_FALLBACK);
-        jsonPayload.put("temperature", 0.0);
-        jsonPayload.put("max_tokens", 600);
-        String contexteFallback = "";
-        try {
-    List<String> historiqueDb = db.obtenirTexteEvenementsRecents();
-    if (historiqueDb != null && !historiqueDb.isEmpty()) {
-        contexteFallback += "CONTEXTE RÉCENT (derniers événements) :\n"
-            + String.join("\n", historiqueDb.subList(0, Math.min(3, historiqueDb.size())))
-            + "\n\n";
-    }
-    // 2. Prix LKV cache
-    if (cachedMarketData != null && !cachedMarketData.isEmpty()) {
-    StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
-    for (Map.Entry<String, MarketDataFetcher.MarketData> e : cachedMarketData.entrySet()) {
-        prixLkv.append(e.getKey()).append(" : ")
-               .append(String.format(Locale.US, "%.4f", e.getValue().price))
-               .append("\n");
-    }
-    contexteFallback += prixLkv.toString() + "\n";
-    }
- // 3. Flux dominant sauvegardé
-    String dernierFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-        .getString("last_dominant_flow", null);
-    if (dernierFlux != null && !dernierFlux.isEmpty()) {
-        contexteFallback += "FLUX DOMINANT PRÉCÉDENT : " + dernierFlux + "\n"
-            + "RÈGLE : si le nouveau driver est cohérent, maintiens ce flux. "
-            + "Si contradictoire, justifie explicitement le changement de régime.\n\n";
-    }
-} catch (Exception eCtx) {
-    Log.w(TAG, "[FALLBACK] Enrichissement contexte échoué : " + eCtx.getMessage());
-}
-// Injecter dans le message user existant
-JSONArray msgsFallback = jsonPayload.getJSONArray("messages");
-JSONObject userMsg = msgsFallback.getJSONObject(msgsFallback.length() - 1);
-String bodyEnrichi = contexteFallback + userMsg.getString("content");
-userMsg.put("content", bodyEnrichi);
-        java.net.URL urlFallback = new java.net.URL(GROQ_URL);
-        java.net.HttpURLConnection connFallback = (java.net.HttpURLConnection) urlFallback.openConnection();
-        connFallback.setRequestMethod("POST");
-        connFallback.setDoOutput(true);
-        connFallback.setRequestProperty("Authorization", "Bearer " + apiKey);
-        connFallback.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        connFallback.setConnectTimeout(15000);
-        connFallback.setReadTimeout(15000);
-        try (java.io.OutputStream osFb = connFallback.getOutputStream()) {
-            byte[] inputFb = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-            osFb.write(inputFb, 0, inputFb.length);
-            osFb.flush();
-        }
-        int statusFb = connFallback.getResponseCode();
-        if (statusFb == java.net.HttpURLConnection.HTTP_OK) {
-            StringBuilder fbResp = new StringBuilder();
-            try (java.io.BufferedReader brFb = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(connFallback.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                String lineFb;
-                while ((lineFb = brFb.readLine()) != null) fbResp.append(lineFb);
-            }
-            JSONObject jsonFb = new JSONObject(fbResp.toString());
-            String fallbackReport = jsonFb.getJSONArray("choices")
-                    .getJSONObject(0).getJSONObject("message").getString("content");
-            if (fallbackReport != null && fallbackReport.length() >= 50) {
-    // Filtrer NEUTRE avant envoi — même logique que modèle principal
-    StringBuilder filteredFb = new StringBuilder();
-    boolean inImpactFb = false;
-    for (String lFb : fallbackReport.split("\n")) {
-        if (lFb.contains("NEUTRE") || lFb.matches(".*•.*:.*= \\|.*")) continue;
-        String trimFb = lFb.trim();
-        if (trimFb.isEmpty()) continue;
-        if (trimFb.startsWith("🚨") || trimFb.startsWith("🕒") || trimFb.startsWith("📊") ||
-            trimFb.startsWith("🎯") || trimFb.startsWith("📢") || trimFb.startsWith("🏁") ||
-            trimFb.startsWith("--- IMPACTS")) {
-            filteredFb.append(lFb).append("\n");
-            if (trimFb.startsWith("--- IMPACTS")) inImpactFb = true;
-            continue;
-        }
-        if (inImpactFb && trimFb.startsWith("•")) {
-            String upperFb = lFb.toUpperCase(Locale.ROOT);
-            if (!upperFb.contains("MAIS NEUTRE") &&
-                (upperFb.contains("BULLISH") || upperFb.contains("BEARISH") ||
-                 lFb.contains("🟢") || lFb.contains("🔴"))) {
-                filteredFb.append(lFb).append("\n");
-            }
-        }
+                    int statusFb = connFallback.getResponseCode();
+                    if (statusFb == java.net.HttpURLConnection.HTTP_OK) {
+                        StringBuilder fbResp = new StringBuilder();
+                        try (java.io.BufferedReader brFb = new java.io.BufferedReader(
+                                new java.io.InputStreamReader(connFallback.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                            String lineFb;
+                            while ((lineFb = brFb.readLine()) != null) fbResp.append(lineFb);
+                        }
+                        JSONObject jsonFb = new JSONObject(fbResp.toString());
+                        String fallbackReport = jsonFb.getJSONArray("choices")
+                                .getJSONObject(0).getJSONObject("message").getString("content");
+                        if (fallbackReport != null && fallbackReport.length() >= 50) {
+                // Filtrer NEUTRE avant envoi — même logique que modèle principal
+                StringBuilder filteredFb = new StringBuilder();
+                boolean inImpactFb = false;
+                for (String lFb : fallbackReport.split("\n")) {
+                    if (lFb.contains("NEUTRE") || lFb.matches(".*•.*:.*= \\|.*")) continue;
+                    String trimFb = lFb.trim();
+                    if (trimFb.isEmpty()) continue;
+                    if (trimFb.startsWith("🚨") || trimFb.startsWith("🕒") || trimFb.startsWith("📊") ||
+                        trimFb.startsWith("🎯") || trimFb.startsWith("📢") || trimFb.startsWith("🏁") ||
+                        trimFb.startsWith("--- IMPACTS")) {
+                        filteredFb.append(lFb).append("\n");
+                        if (trimFb.startsWith("--- IMPACTS")) inImpactFb = true;
+                        continue;
+                    }
+                    if (inImpactFb && trimFb.startsWith("•")) {
+                        String upperFb = lFb.toUpperCase(Locale.ROOT);
+                        if (!upperFb.contains("MAIS NEUTRE") &&
+                            (upperFb.contains("BULLISH") || upperFb.contains("BEARISH") ||
+                             lFb.contains("🟢") || lFb.contains("🔴"))) {
+                            filteredFb.append(lFb).append("\n");
+                        }
+                    }
     }
     // Seuil conviction plus élevé sur fallback — modèle léger moins fiable
     
@@ -975,69 +975,69 @@ if (fluxGeo) {
     if (fb.contains("USDCAD : 🔴")) fb = fb.replace("• 🇨🇦 USDCAD : 🔴", "• 🇨🇦 USDCAD : 🟢");
     if (fb.contains("AUDUSD : 🔴")) fb = fb.replace("• 🇦🇺 AUDUSD : 🔴", "• 🇦🇺 AUDUSD : 🟢");
     filteredFb = new StringBuilder(fb);
- }
-int convFb = extrairePourcentageConviction(fallbackReport);
-// Vérifier cohérence vecteur/flux — rejeter si contradiction
-boolean vecteurGeo = fallbackReport.contains("VECTEUR CIBLE : GÉO") || fallbackReport.contains("VECTEUR CIBLE : GÉOPOLITIQUE");
-//boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
-boolean fluxHawkish = fallbackReport.contains("FLUX DOMINANT : DOLLAR FORT") || fallbackReport.contains("VECTEUR CIBLE : HAWKISH");
-boolean contradiction = (vecteurGeo && fluxHawkish) || (fluxGeo && fluxHawkish);
-if (contradiction) {
-    Log.d(TAG, "[FALLBACK] Contradiction vecteur/flux détectée — rapport rejeté.");
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("⚪ [FALLBACK] Contradiction régime — ignoré.");
-} else if (convFb >= 55 || (isSupremeRank && convFb >= 45)) {
-    sendTelegramSecure("⚡ *[ANALYSE FONDAMENTALE]* " + filteredFb.toString().trim(), NotificationService.this);
-} else {
-    Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — ignoré.");
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("⚪ [FALLBACK] Conviction " + convFb + "% insuffisante — ignoré.");
-}
-    StringBuilder impactFb = new StringBuilder();
-for (String l : fallbackReport.split("\n")) {
-    if (l.matches(".*•.*:.*[🟢🔴].*")) {
-        String[] parts = l.split("\\|");
-        if (parts.length > 0) impactFb.append(parts[0].trim()).append(" ");
+     }
+    int convFb = extrairePourcentageConviction(fallbackReport);
+    // Vérifier cohérence vecteur/flux — rejeter si contradiction
+    boolean vecteurGeo = fallbackReport.contains("VECTEUR CIBLE : GÉO") || fallbackReport.contains("VECTEUR CIBLE : GÉOPOLITIQUE");
+    //boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
+    boolean fluxHawkish = fallbackReport.contains("FLUX DOMINANT : DOLLAR FORT") || fallbackReport.contains("VECTEUR CIBLE : HAWKISH");
+    boolean contradiction = (vecteurGeo && fluxHawkish) || (fluxGeo && fluxHawkish);
+    if (contradiction) {
+        Log.d(TAG, "[FALLBACK] Contradiction vecteur/flux détectée — rapport rejeté.");
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("⚪ [FALLBACK] Contradiction régime — ignoré.");
+    } else if (convFb >= 55 || (isSupremeRank && convFb >= 45)) {
+        sendTelegramSecure("⚡ *[ANALYSE FONDAMENTALE]* " + filteredFb.toString().trim(), NotificationService.this);
+    } else {
+        Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — ignoré.");
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("⚪ [FALLBACK] Conviction " + convFb + "% insuffisante — ignoré.");
     }
-}
-String impactFinalFb = impactFb.length() > 0
-    ? impactFb.toString().trim()
-    : "Flux: " + (fallbackReport.contains("FLUX DOMINANT") ?
-      fallbackReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim() : "N/A");
-if (db != null) db.markEventAsSynced(fingerprint, impactFinalFb.length() > 200
-    ? impactFinalFb.substring(0, 200) : impactFinalFb);
-    // Sauvegarder le flux dominant pour contexte fallback suivant
-    try {
-        Pattern fluxPattern = Pattern.compile("FLUX DOMINANT\\s*:\\s*(.+)");
-        Matcher fluxMatcher = fluxPattern.matcher(fallbackReport);
-        if (fluxMatcher.find()) {
-            String nouveauFlux = fluxMatcher.group(1).trim();
-String ancienFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-    .getString("last_dominant_flow", null);
-getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-    .edit()
-    .putString("last_dominant_flow", nouveauFlux)
-    .apply();
-// 🚨 Alerte changement de régime
- String ancienFluxNorm = ancienFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
-String nouveauFluxNorm = nouveauFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
-// Envoyer UNIQUEMENT si le régime change réellement
-if (ancienFlux != null && !ancienFlux.isEmpty()
-        && !ancienFluxNorm.equals(nouveauFluxNorm)
-        && !nouveauFluxNorm.isEmpty()) {
-    String alerteChangement =
-        "🔄 *CHANGEMENT DE RÉGIME DÉTECTÉ*\n" +
-        "━━━━━━━━━━━━━━━━━━━━\n" +
-        "📤 Ancien flux : *" + ancienFlux + "*\n" +
-        "📥 Nouveau flux : *" + nouveauFlux + "*\n" +
-        "⚡ Source : " + sourceName + "\n" +
-        "🕒 " + new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss",
-            java.util.Locale.FRANCE)
-            .format(new java.util.Date());
-    sendTelegramSecure(alerteChangement, NotificationService.this);
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("🔄 [RÉGIME] " + ancienFlux + " → " + nouveauFlux);
-}
+        StringBuilder impactFb = new StringBuilder();
+    for (String l : fallbackReport.split("\n")) {
+        if (l.matches(".*•.*:.*[🟢🔴].*")) {
+            String[] parts = l.split("\\|");
+            if (parts.length > 0) impactFb.append(parts[0].trim()).append(" ");
+        }
+    }
+    String impactFinalFb = impactFb.length() > 0
+        ? impactFb.toString().trim()
+        : "Flux: " + (fallbackReport.contains("FLUX DOMINANT") ?
+          fallbackReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim() : "N/A");
+    if (db != null) db.markEventAsSynced(fingerprint, impactFinalFb.length() > 200
+        ? impactFinalFb.substring(0, 200) : impactFinalFb);
+        // Sauvegarder le flux dominant pour contexte fallback suivant
+        try {
+            Pattern fluxPattern = Pattern.compile("FLUX DOMINANT\\s*:\\s*(.+)");
+            Matcher fluxMatcher = fluxPattern.matcher(fallbackReport);
+            if (fluxMatcher.find()) {
+                String nouveauFlux = fluxMatcher.group(1).trim();
+    String ancienFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+        .getString("last_dominant_flow", null);
+    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+        .edit()
+        .putString("last_dominant_flow", nouveauFlux)
+        .apply();
+    // 🚨 Alerte changement de régime
+     String ancienFluxNorm = ancienFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
+    String nouveauFluxNorm = nouveauFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
+    // Envoyer UNIQUEMENT si le régime change réellement
+    if (ancienFlux != null && !ancienFlux.isEmpty()
+            && !ancienFluxNorm.equals(nouveauFluxNorm)
+            && !nouveauFluxNorm.isEmpty()) {
+        String alerteChangement =
+            "🔄 *CHANGEMENT DE RÉGIME DÉTECTÉ*\n" +
+            "━━━━━━━━━━━━━━━━━━━━\n" +
+            "📤 Ancien flux : *" + ancienFlux + "*\n" +
+            "📥 Nouveau flux : *" + nouveauFlux + "*\n" +
+            "⚡ Source : " + sourceName + "\n" +
+            "🕒 " + new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss",
+                java.util.Locale.FRANCE)
+                .format(new java.util.Date());
+        sendTelegramSecure(alerteChangement, NotificationService.this);
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("🔄 [RÉGIME] " + ancienFlux + " → " + nouveauFlux);
+    }
         }
     } catch (Exception eFlux) {
         Log.w(TAG, "[FALLBACK] Sauvegarde flux dominant échouée : " + eFlux.getMessage());
@@ -1053,71 +1053,71 @@ if (ancienFlux != null && !ancienFlux.isEmpty()
         Log.e(TAG, "[GROQ] Erreur lors du fallback modèle léger", eFb);
         db.markEventAsSynced(fingerprint, "FAILED_FALLBACK_EXCEPTION");
     }
-} else if (status >= 500) {
-    Log.w(TAG, "[GROQ] Statut " + status + " serveur transitoire — événement laissé en attente.");
-} else {
-    db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
+    } else if (status >= 500) {
+        Log.w(TAG, "[GROQ] Statut " + status + " serveur transitoire — événement laissé en attente.");
+    } else {
+        db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
+                        }
                     }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
-                if (db != null) {
-                    try {
-                        db.markEventAsSynced(fingerprint, "FAILED_CRITICAL_EXCEPTION");
-                    } catch (Exception ex) {
-                        Log.e(TAG, "Impossible de forcer la mise à jour du verrou SQLite", ex);
+                } catch (Exception e) {
+                    Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
+                    if (db != null) {
+                        try {
+                            db.markEventAsSynced(fingerprint, "FAILED_CRITICAL_EXCEPTION");
+                        } catch (Exception ex) {
+                            Log.e(TAG, "Impossible de forcer la mise à jour du verrou SQLite", ex);
+                        }
                     }
+                } finally {
+                    if (conn != null) conn.disconnect();
                 }
-            } finally {
-                if (conn != null) conn.disconnect();
             }
-        }
         });    
     }
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
-    new Thread(() -> {
-        try {
-            android.content.SharedPreferences prefs =
-                context.getSharedPreferences("TradingBot", Context.MODE_PRIVATE);
-            String token  = prefs.getString("tg_token", "");
-            String chatId = prefs.getString("tg_chat_id", "");
-            if (token.isEmpty() || chatId.isEmpty()) {
-                Log.w(TAG, "[TELEGRAM] Token ou Chat ID manquant — envoi annulé.");
-                return;
-            }
-
-            // ✅ Découpage automatique si message > 4000 chars (limite Telegram = 4096)
-            int MAX = 4000;
-            List<String> chunks = new ArrayList<>();
-            if (message.length() <= MAX) {
-                chunks.add(message);
-            } else {
-                // Découpe proprement sur les sauts de ligne pour ne pas couper une ligne en deux
-                String[] lines = message.split("\n");
-                StringBuilder current = new StringBuilder();
-                for (String line : lines) {
-                    if (current.length() + line.length() + 1 > MAX) {
-                        chunks.add(current.toString().trim());
-                        current = new StringBuilder();
-                    }
-                    current.append(line).append("\n");
+        new Thread(() -> {
+            try {
+                android.content.SharedPreferences prefs =
+                    context.getSharedPreferences("TradingBot", Context.MODE_PRIVATE);
+                String token  = prefs.getString("tg_token", "");
+                String chatId = prefs.getString("tg_chat_id", "");
+                if (token.isEmpty() || chatId.isEmpty()) {
+                    Log.w(TAG, "[TELEGRAM] Token ou Chat ID manquant — envoi annulé.");
+                    return;
                 }
-                if (current.length() > 0) chunks.add(current.toString().trim());
+    
+                // ✅ Découpage automatique si message > 4000 chars (limite Telegram = 4096)
+                int MAX = 4000;
+                List<String> chunks = new ArrayList<>();
+                if (message.length() <= MAX) {
+                    chunks.add(message);
+                } else {
+                    // Découpe proprement sur les sauts de ligne pour ne pas couper une ligne en deux
+                    String[] lines = message.split("\n");
+                    StringBuilder current = new StringBuilder();
+                    for (String line : lines) {
+                        if (current.length() + line.length() + 1 > MAX) {
+                            chunks.add(current.toString().trim());
+                            current = new StringBuilder();
+                        }
+                        current.append(line).append("\n");
+                    }
+                    if (current.length() > 0) chunks.add(current.toString().trim());
+                }
+    
+                for (String chunk : chunks) {
+                    sendChunkToTelegram(chunk, token, chatId, "Markdown");
+                    if (chunks.size() > 1) Thread.sleep(500); // anti-flood entre morceaux
+                }
+    
+            } catch (Exception e) {
+                Log.e(TAG, "[TELEGRAM] Erreur envoi", e);
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("❌ [TELEGRAM] Erreur : " + e.getMessage());
             }
-
-            for (String chunk : chunks) {
-                sendChunkToTelegram(chunk, token, chatId, "Markdown");
-                if (chunks.size() > 1) Thread.sleep(500); // anti-flood entre morceaux
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "[TELEGRAM] Erreur envoi", e);
-            if (MainActivity.instance != null)
-                MainActivity.instance.addLog("❌ [TELEGRAM] Erreur : " + e.getMessage());
-        }
-    }).start();
-}
+        }).start();
+    }
 
     // ✅ NOUVELLE méthode helper — envoie un seul chunk, retente en texte brut si Markdown rejeté
     private static void sendChunkToTelegram(String text, String token,
@@ -1453,25 +1453,18 @@ if (ancienFlux != null && !ancienFlux.isEmpty()
                         if (validationResult != null && !validationResult.isConfirmed) {
                         // Cas particulier : inertie macro (driver déjà actif) → on envoie un rappel Telegram
                         if (validationResult.isInertiaBlock) {
-                            // Utiliser le type de base de l'événement détecté par EconomicEventDetector,
-// qui est plus stable que celui de EventValidator.
-String inertiaKeySource;
-if (eventTypeStr != null && !eventTypeStr.isEmpty()) {
-    inertiaKeySource = eventTypeStr;
-} else if (validationResult.detectedTypeForInertia != null && !validationResult.detectedTypeForInertia.isEmpty()) {
-    inertiaKeySource = validationResult.detectedTypeForInertia;
-} else {
-    inertiaKeySource = "UNKNOWN";
-}
+                         // qui est plus stable que celui de EventValidator.
+                        String inertiaKeySource;
+                        if (eventTypeStr != null && !eventTypeStr.isEmpty()) {
+                            inertiaKeySource = eventTypeStr;
+                        } else if (validationResult.detectedTypeForInertia != null && !validationResult.detectedTypeForInertia.isEmpty()) {
+                            inertiaKeySource = validationResult.detectedTypeForInertia;
+                        } else {
+                            inertiaKeySource = "UNKNOWN";
+                        }
                               String inertiaPrefKey = "inertia_reminder_" + inertiaKeySource;
                             long nowMs = System.currentTimeMillis();
-
-                            // 🛡️ Étape 1 : verrou atomique en mémoire — bloque les rafales
-                            // de notifications quasi simultanées (même milliseconde).
-                            // putIfAbsent + merge en une opération atomique : si une autre
-                            // notification vient juste de réserver ce créneau, on sort
-                            // immédiatement sans toucher au SharedPreferences.
-                            Long previousMemory = lastInertiaReminderSentMemory.putIfAbsent(inertiaPrefKey, nowMs);
+                           Long previousMemory = lastInertiaReminderSentMemory.putIfAbsent(inertiaPrefKey, nowMs);
                             if (previousMemory != null) {
                                 if ((nowMs - previousMemory) < INERTIA_REMINDER_COOLDOWN_MS) {
                                     Log.d(TAG, "[RAPPEL] Driver " + inertiaKeySource + " déjà rappelé (verrou mémoire), ignoré.");      
@@ -1493,30 +1486,30 @@ if (eventTypeStr != null && !eventTypeStr.isEmpty()) {
                             inertiaPrefs.edit().putLong(inertiaPrefKey, nowMs).apply();
 
                             // Ne pas envoyer le rappel si l'impact précédent est vide, neutre ou insignifiant
-String lastImpact = validationResult.lastEventSummary;
-boolean impactInsignifiant = lastImpact == null
-    || lastImpact.isEmpty()
-    || lastImpact.contains("Filtré – tous les actifs neutres")
-    || lastImpact.contains("Filtré – conviction trop faible")
-    || lastImpact.contains("FAILED_FALLBACK")
-    || lastImpact.contains("Historique — impact non disponible");
-if (impactInsignifiant) {
-    Log.d(TAG, "[RAPPEL] Impact précédent insignifiant — rappel ignoré.");
-    return;
-}
-String reminderMsg = "⏳ *RAPPEL : DRIVER DÉJÀ ACTIF*\n" +
-                     "🔹 " + validationResult.reason + "\n\n" +
-                     "📋 *Dernier événement similaire :*\n" +
-                     lastImpact;
-sendTelegramSecure(reminderMsg, NotificationService.this);
-                            Log.d(TAG, "[RAPPEL] Driver actif : rappel envoyé.");
-                            return; // On arrête le traitement normal
-                        }
-                        // Pour les autres cas de rejet (doublon, rumeur, faible confiance, etc.)
-                        if (finalCalculatedWeight < 4) {
-                            Log.d(TAG, "[COUPE-CIRCUIT TIMING] Événement rejeté : " + validationResult.reason);
-                            return;
-                        }
+                            String lastImpact = validationResult.lastEventSummary;
+                            boolean impactInsignifiant = lastImpact == null
+                                || lastImpact.isEmpty()
+                                || lastImpact.contains("Filtré – tous les actifs neutres")
+                                || lastImpact.contains("Filtré – conviction trop faible")
+                                || lastImpact.contains("FAILED_FALLBACK")
+                                || lastImpact.contains("Historique — impact non disponible");
+                            if (impactInsignifiant) {
+                                Log.d(TAG, "[RAPPEL] Impact précédent insignifiant — rappel ignoré.");
+                                return;
+                            }
+                            String reminderMsg = "⏳ *RAPPEL : DRIVER DÉJÀ ACTIF*\n" +
+                                                 "🔹 " + validationResult.reason + "\n\n" +
+                                                 "📋 *Dernier événement similaire :*\n" +
+                                                 lastImpact;
+                            sendTelegramSecure(reminderMsg, NotificationService.this);
+                                                        Log.d(TAG, "[RAPPEL] Driver actif : rappel envoyé.");
+                                                        return; // On arrête le traitement normal
+                                                    }
+                                                    // Pour les autres cas de rejet (doublon, rumeur, faible confiance, etc.)
+                                                    if (finalCalculatedWeight < 4) {
+                                                        Log.d(TAG, "[COUPE-CIRCUIT TIMING] Événement rejeté : " + validationResult.reason);
+                                                        return;
+                                                    }
                         }
     
                      // APRÈS (remplace le bloc déjà patché précédemment)
@@ -1784,40 +1777,40 @@ sendTelegramSecure(reminderMsg, NotificationService.this);
         EconomicCalendarAPI.init(this);
         EventValidator.setAppContext(this); 
         serviceInstance = this;
-// 🛡️ Restaurer compteur tokens depuis SharedPreferences
-SharedPreferences tokenPrefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
-long savedResetTime = tokenPrefs.getLong("token_reset_time", 0L);
-int savedTokens = tokenPrefs.getInt("daily_tokens_used", 0);
-long nowInit = System.currentTimeMillis();
-if (nowInit < savedResetTime) {
-    dailyTokensUsed.set(savedTokens);
-    tokenResetTime = savedResetTime;
-    Log.i(TAG, "[TOKEN] Compteur restauré : " + savedTokens + " tokens utilisés.");
-} else {
-    dailyTokensUsed.set(0);
-    tokenResetTime = (nowInit / 86400000L + 1) * 86400000L;
-    Log.i(TAG, "[TOKEN] Nouveau jour — compteur remis à zéro.");
-}                 // ✅ Assure la survie de l'instance pour l'IA
+        // 🛡️ Restaurer compteur tokens depuis SharedPreferences
+        SharedPreferences tokenPrefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
+        long savedResetTime = tokenPrefs.getLong("token_reset_time", 0L);
+        int savedTokens = tokenPrefs.getInt("daily_tokens_used", 0);
+        long nowInit = System.currentTimeMillis();
+        if (nowInit < savedResetTime) {
+            dailyTokensUsed.set(savedTokens);
+            tokenResetTime = savedResetTime;
+            Log.i(TAG, "[TOKEN] Compteur restauré : " + savedTokens + " tokens utilisés.");
+        } else {
+            dailyTokensUsed.set(0);
+            tokenResetTime = (nowInit / 86400000L + 1) * 86400000L;
+            Log.i(TAG, "[TOKEN] Nouveau jour — compteur remis à zéro.");
+    }                 // ✅ Assure la survie de l'instance pour l'IA
         
         // ── Déportation du préchargement réseau dans un thread d'arrière-plan ──
     new Thread(new Runnable() {
     @Override
     public void run() {
-        try {
-            // Guard : évite le double appel avec BACKFILL qui se déclenche
-            // quasi simultanément via registerNetworkCallback().onAvailable()
-            long now = System.currentTimeMillis();
-            if (now - lastCalendarBackfillMillis < CALENDAR_BACKFILL_GUARD_MS) {
-                Log.d(TAG, "[SERVICE] Préchargement initial ignoré — BACKFILL déjà actif.");
-                return;
+    try {
+                // Guard : évite le double appel avec BACKFILL qui se déclenche
+                // quasi simultanément via registerNetworkCallback().onAvailable()
+                long now = System.currentTimeMillis();
+                if (now - lastCalendarBackfillMillis < CALENDAR_BACKFILL_GUARD_MS) {
+                    Log.d(TAG, "[SERVICE] Préchargement initial ignoré — BACKFILL déjà actif.");
+                    return;
+                }
+                lastCalendarBackfillMillis = now;
+                EventValidator.preloadCalendar();
+            } catch (Exception e) {
+                Log.e(TAG, "[SERVICE] Erreur lors du préchargement du calendrier", e);
             }
-            lastCalendarBackfillMillis = now;
-            EventValidator.preloadCalendar();
-        } catch (Exception e) {
-            Log.e(TAG, "[SERVICE] Erreur lors du préchargement du calendrier", e);
         }
-    }
-    }).start();
+        }).start();
     
         createNotificationChannel();
         //startDailyBriefScheduler();
@@ -2310,20 +2303,7 @@ if (nowInit < savedResetTime) {
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
         if (!today.equals(lastSent)) {
             Log.d(TAG, "[DAILY] Rattrapage pour " + targetHour + "h : envoi immédiat");
-            // ✅ CORRECTIF : le marquage "envoyé" ne doit avoir lieu QUE si l'envoi a
-            // réellement réussi. Avant, putString() était inconditionnel : si la base
-            // SQLite était encore vide/en cours d'import (cas typique juste après le
-            // lancement du service), generateAndSendDailyBrief() échouait silencieusement
-            // (ou envoyait juste un message de repli) mais le créneau était quand même
-            // marqué "consommé" pour la journée — plus aucune tentative ne suivait.
-            //
-            // 🛡️ CORRECTIF NetworkOnMainThreadException : cet appel était synchrone,
-            // directement dans le corps de scheduleDailyBriefAt(), donc exécuté sur le
-            // thread appelant (onCreate() = thread principal Android lors du démarrage
-            // du service). generateAndSendDailyBrief() fait du réseau bloquant (HttpURLConnection
-            // vers Groq) — interdit sur le thread principal depuis Android 3.0+. On le
-            // déporte maintenant sur le pool de threads du scheduler.
-            scheduler.execute(() -> {
+                scheduler.execute(() -> {
                 boolean sent = generateAndSendDailyBrief();
                 if (sent) {
                     getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -2353,9 +2333,7 @@ if (nowInit < savedResetTime) {
         String prefKey = PREF_LAST_DAILY_REPORT + targetHour;
         String lastSent = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(prefKey, "");
         if (!currentDay.equals(lastSent)) {
-            // ✅ CORRECTIF : même garde que le rattrapage — on ne marque "envoyé"
-            // que si generateAndSendDailyBrief() a réellement abouti.
-            boolean sent = generateAndSendDailyBrief();
+              boolean sent = generateAndSendDailyBrief();
             if (sent) {
                 getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                     .edit()
@@ -2392,13 +2370,7 @@ if (nowInit < savedResetTime) {
         sdfDate.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
         String dateStr = sdfDate.format(Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo")).getTime());
 
-        // =========================================================================
-        // SÉCURITÉ REPLI AUTOMATIQUE : INTERCEPTION DIRECTE ABSENCE 24H
-        // =========================================================================
-        // =========================================================================
-        // SÉCURITÉ REPLI AUTOMATIQUE : INTERCEPTION DIRECTE ABSENCE 24H
-        // =========================================================================
-        if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
+           if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
             Log.w(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h.");
     
             // Éviter les envois multiples : utiliser SharedPreferences avec un délai
@@ -2437,185 +2409,185 @@ if (nowInit < savedResetTime) {
         // Récupération de la mémoire d'inertie du marché (SharedPreferences)
         SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
         String lastDominantFlow = prefs.getString("last_daily_flow", "NEUTRE / PRUDENCE RECOMMANDÉE");
-String systemPromptFinal = "CONTEXTE HIER (INERTIE DE MARCHÉ) : Le flux dominant de la veille était : " + lastDominantFlow + ".\n" +
-    "Si les événements actuels ne contredisent pas ce flux de manière écrasante (>70% de conviction), conserve-le pour éviter les faux signaux.\n\n" +
-    baseSystemPrompt + "\n\n" +
-    "Tu es un expert en macroéconomie. Tu dois rédiger ton rapport en terminant obligatoirement par la ligne suivante formatée de cette exacte façon :\n" +
-    "🏁 FLUX DOMINANT : [Insère ici le flux sélectionné]";
-        JSONObject payload = new JSONObject();
-int usedD = dailyTokensUsed.addAndGet(2000);
-getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
-    .putInt("daily_tokens_used", usedD)
-    .putLong("token_reset_time", tokenResetTime)
-    .apply();
-payload.put("model", usedD > TOKEN_BUDGET_DAILY ? GROQ_MODEL_FALLBACK : GROQ_MODEL);
-if (usedD > TOKEN_BUDGET_DAILY && MainActivity.instance != null)
-    MainActivity.instance.addLog("⚠️ [DAILY] Budget token atteint — modèle léger.");
-payload.put("temperature", 0.02);
-
-JSONArray messages = new JSONArray();
-messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
-        // ✅ Snapshot marché injecté dans le daily comme dans le pipeline news live
-
-String dailyMarketSnapshot = "Données de marché indisponibles.";
-try {
-    List<String> twelveDataAssets = new ArrayList<>(TWELVE_DATA_ASSETS);
-    Map<String, MarketDataFetcher.MarketData> snap = null;
-    if (MarketDataFetcher.tryAcquireBatchSlot()) {
-    snap = MarketDataFetcher.getMarketDataBatch(twelveDataAssets);
-    } else {
-    Log.w(TAG, "[DAILY] Slot Twelve Data occupé — dailyDrivers suffisant");
-    }
-
-    StringBuilder sbM = new StringBuilder("📊 COURS AU MOMENT DU RAPPORT :\n");
-    boolean hasData = false;
-
-    if (snap != null && !snap.isEmpty()) {
-        for (String asset : twelveDataAssets) {
-            MarketDataFetcher.MarketData d = snap.get(asset);
-            if (d != null && d.price > 0) {
-                String sign = d.changePercent >= 0 ? "+" : "";
-                String emojiVariation = (d.changePercent > 0) ? "🟢"
-                    : (d.changePercent < 0) ? "🔴" : "⚪";
-                sbM.append(asset).append(" => ")
-                   .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
-                       d.price, sign, d.changePercent, emojiVariation))
-                   .append("\n");
-                hasData = true;
-            }
-        }
-    }
-
-    if (hasData) {
-        dailyMarketSnapshot = sbM.toString();
-    }
-
-} catch (Exception e) {
-    Log.w(TAG, "[DAILY] Snapshot marché indisponible : " + e.getMessage());
-}
-String currentFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-    .getString("last_dominant_flow", "INDÉTERMINÉ");
-messages.put(new JSONObject().put("role", "user").put("content",
-    "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n\n" +
-    "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlow + "\n" +
-    "─────────────────────────────\n" +
-    dailyMarketSnapshot + "\n" +
-    "─────────────────────────────\n" +
-    "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers + "\n" +
-    "─────────────────────────────\n\n" +
-    "⚠️ INSTRUCTION SPÉCIALE : Identifie dans le texte la source de chaque événement (Bloomberg, FinancialJuice, etc.) " +
-    "et applique la RÈGLE 12 (Pondération des sources et comptage des signaux).\n" +
-    "Tu dois impérativement fournir dans le rapport le nombre d'événements en faveur de RISK-OFF et RISK-ON.\n" +
-    "Si plus de 60% du poids penche vers RISK-OFF, le FLUX DOMINANT doit refléter cette majorité écrasante."));
-        payload.put("messages", messages);
-        payload.put("temperature", 0.02);
-        payload.put("max_tokens", 1500);
-        URL url = new URL(GROQ_URL);
-        conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-        conn.setConnectTimeout(15000); 
-        conn.setReadTimeout(20000);
-        conn.setDoOutput(true);
-
-        // ✅ Gestion sécurisée de l'OutputStream
-        try (OutputStream os = conn.getOutputStream()) {
-            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-            os.write(input, 0, input.length);
-            os.flush();
-        }
-
-        int responseCode = conn.getResponseCode();
-        if (responseCode == HttpURLConnection.HTTP_OK) {
-            StringBuilder r = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = br.readLine()) != null) {
-                    r.append(line);
-                }
-            }
-            
-            JSONObject jsonResponse = new JSONObject(r.toString());
-            String aiResult = jsonResponse.getJSONArray("choices")
-                                         .getJSONObject(0)
-                                         .getJSONObject("message")
-                                         .getString("content");
-
-    if (aiResult != null && aiResult.trim().length() > 50) {
-    sendTelegramSecure(aiResult.trim(), this);
-    Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
-
-    // Parsing et persistance du flux dominant pour le lendemain
-    Pattern flowPattern = Pattern.compile("(?i)🏁\\s*FLUX\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
-    Matcher flowMatcher = flowPattern.matcher(aiResult);
-    if (flowMatcher.find()) {
-        String newFlow = flowMatcher.group(1).trim();
-        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-            .edit()
-            .putString("last_daily_flow", newFlow)
-            .apply();
-        Log.d(TAG, "💾 Inertie mise à jour. Flux enregistré pour demain : " + newFlow);
-    } else {
-        Log.w(TAG, "[DAILY] Balise '🏁 FLUX DOMINANT :' introuvable. Préférences inchangées.");
-    }
-        return true ;
-            } else {
-               Log.w(TAG, "[DAILY] Groq réponse vide — contenu : "
-               + (aiResult != null ? aiResult.trim() : "null"));
-              if (MainActivity.instance != null) {
-              MainActivity.instance.addLog("⚠️ [DAILY] Groq réponse vide ou insuffisante");
-              }
-            }
-        } else {
-            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
-                StringBuilder errorResponse = new StringBuilder();
-                String line;
-                while ((line = errorReader.readLine()) != null) {
-                    errorResponse.append(line);
-                }
-                Log.e(TAG, "[DAILY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
-if (responseCode == 429) {
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("⚠️ [DAILY] 429 TPD — bascule sur modèle léger.");
-    try {
-        payload.put("model", GROQ_MODEL_FALLBACK);
-        payload.put("max_tokens", 1500);
-        conn.disconnect();
-        URL urlFbD = new URL(GROQ_URL);
-        HttpURLConnection connFbD = (HttpURLConnection) urlFbD.openConnection();
-        connFbD.setRequestMethod("POST");
-        connFbD.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        connFbD.setRequestProperty("Authorization", "Bearer " + apiKey);
-        connFbD.setConnectTimeout(15000);
-        connFbD.setReadTimeout(20000);
-        connFbD.setDoOutput(true);
-        try (OutputStream osFbD = connFbD.getOutputStream()) {
-            osFbD.write(payload.toString().getBytes(StandardCharsets.UTF_8));
-        }
-        if (connFbD.getResponseCode() == HttpURLConnection.HTTP_OK) {
-            StringBuilder rFbD = new StringBuilder();
-            try (BufferedReader brFbD = new BufferedReader(new InputStreamReader(connFbD.getInputStream(), StandardCharsets.UTF_8))) {
-                String lineFbD;
-                while ((lineFbD = brFbD.readLine()) != null) rFbD.append(lineFbD);
-            }
-            String reportFbD = new JSONObject(rFbD.toString())
-                .getJSONArray("choices").getJSONObject(0)
-                .getJSONObject("message").getString("content");
-            if (reportFbD != null && reportFbD.length() > 50) {
-                sendTelegramSecure("📅 *[DAILY - FALLBACK]* " + reportFbD, NotificationService.this);
-                if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("✅ [DAILY] Rapport envoyé via modèle léger.");
-            }
-        }
-        connFbD.disconnect();
-    } catch (Exception eFbD) {
-        Log.e(TAG, "[DAILY] Fallback échoué", eFbD);
-    }
-} else if (MainActivity.instance != null) {
-    MainActivity.instance.addLog("❌ [DAILY] Erreur HTTP " + responseCode + " de Groq : "
-        + truncateForLog(errorResponse.toString()));
-}
+                    String systemPromptFinal = "CONTEXTE HIER (INERTIE DE MARCHÉ) : Le flux dominant de la veille était : " + lastDominantFlow + ".\n" +
+                        "Si les événements actuels ne contredisent pas ce flux de manière écrasante (>70% de conviction), conserve-le pour éviter les faux signaux.\n\n" +
+                        baseSystemPrompt + "\n\n" +
+                        "Tu es un expert en macroéconomie. Tu dois rédiger ton rapport en terminant obligatoirement par la ligne suivante formatée de cette exacte façon :\n" +
+                        "🏁 FLUX DOMINANT : [Insère ici le flux sélectionné]";
+                            JSONObject payload = new JSONObject();
+                    int usedD = dailyTokensUsed.addAndGet(2000);
+                    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+                        .putInt("daily_tokens_used", usedD)
+                        .putLong("token_reset_time", tokenResetTime)
+                        .apply();
+                    payload.put("model", usedD > TOKEN_BUDGET_DAILY ? GROQ_MODEL_FALLBACK : GROQ_MODEL);
+                    if (usedD > TOKEN_BUDGET_DAILY && MainActivity.instance != null)
+                        MainActivity.instance.addLog("⚠️ [DAILY] Budget token atteint — modèle léger.");
+                    payload.put("temperature", 0.02);
+                    
+                    JSONArray messages = new JSONArray();
+                    messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
+                            // ✅ Snapshot marché injecté dans le daily comme dans le pipeline news live
+                    
+                    String dailyMarketSnapshot = "Données de marché indisponibles.";
+                    try {
+                        List<String> twelveDataAssets = new ArrayList<>(TWELVE_DATA_ASSETS);
+                        Map<String, MarketDataFetcher.MarketData> snap = null;
+                        if (MarketDataFetcher.tryAcquireBatchSlot()) {
+                        snap = MarketDataFetcher.getMarketDataBatch(twelveDataAssets);
+                        } else {
+                        Log.w(TAG, "[DAILY] Slot Twelve Data occupé — dailyDrivers suffisant");
+                        }
+                    
+                        StringBuilder sbM = new StringBuilder("📊 COURS AU MOMENT DU RAPPORT :\n");
+                        boolean hasData = false;
+                    
+                        if (snap != null && !snap.isEmpty()) {
+                            for (String asset : twelveDataAssets) {
+                                MarketDataFetcher.MarketData d = snap.get(asset);
+                                if (d != null && d.price > 0) {
+                                    String sign = d.changePercent >= 0 ? "+" : "";
+                                    String emojiVariation = (d.changePercent > 0) ? "🟢"
+                                        : (d.changePercent < 0) ? "🔴" : "⚪";
+                                    sbM.append(asset).append(" => ")
+                                       .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
+                                           d.price, sign, d.changePercent, emojiVariation))
+                                       .append("\n");
+                                    hasData = true;
+                                }
+                            }
+                        }
+                    
+                        if (hasData) {
+                            dailyMarketSnapshot = sbM.toString();
+                        }
+                    
+                    } catch (Exception e) {
+                        Log.w(TAG, "[DAILY] Snapshot marché indisponible : " + e.getMessage());
+                    }
+                    String currentFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                        .getString("last_dominant_flow", "INDÉTERMINÉ");
+                    messages.put(new JSONObject().put("role", "user").put("content",
+                        "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n\n" +
+                        "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlow + "\n" +
+                        "─────────────────────────────\n" +
+                        dailyMarketSnapshot + "\n" +
+                        "─────────────────────────────\n" +
+                        "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers + "\n" +
+                        "─────────────────────────────\n\n" +
+                        "⚠️ INSTRUCTION SPÉCIALE : Identifie dans le texte la source de chaque événement (Bloomberg, FinancialJuice, etc.) " +
+                        "et applique la RÈGLE 12 (Pondération des sources et comptage des signaux).\n" +
+                        "Tu dois impérativement fournir dans le rapport le nombre d'événements en faveur de RISK-OFF et RISK-ON.\n" +
+                        "Si plus de 60% du poids penche vers RISK-OFF, le FLUX DOMINANT doit refléter cette majorité écrasante."));
+                            payload.put("messages", messages);
+                            payload.put("temperature", 0.02);
+                            payload.put("max_tokens", 1500);
+                            URL url = new URL(GROQ_URL);
+                            conn = (HttpURLConnection) url.openConnection();
+                            conn.setRequestMethod("POST");
+                            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+                            conn.setConnectTimeout(15000); 
+                            conn.setReadTimeout(20000);
+                            conn.setDoOutput(true);
+                    
+                            // ✅ Gestion sécurisée de l'OutputStream
+                            try (OutputStream os = conn.getOutputStream()) {
+                                byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+                                os.write(input, 0, input.length);
+                                os.flush();
+                            }
+                    
+                            int responseCode = conn.getResponseCode();
+                            if (responseCode == HttpURLConnection.HTTP_OK) {
+                                StringBuilder r = new StringBuilder();
+                                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                                    String line;
+                                    while ((line = br.readLine()) != null) {
+                                        r.append(line);
+                                    }
+                                }
+                                
+                                JSONObject jsonResponse = new JSONObject(r.toString());
+                                String aiResult = jsonResponse.getJSONArray("choices")
+                                                             .getJSONObject(0)
+                                                             .getJSONObject("message")
+                                                             .getString("content");
+                    
+                        if (aiResult != null && aiResult.trim().length() > 50) {
+                        sendTelegramSecure(aiResult.trim(), this);
+                        Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
+                    
+                        // Parsing et persistance du flux dominant pour le lendemain
+                        Pattern flowPattern = Pattern.compile("(?i)🏁\\s*FLUX\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
+                        Matcher flowMatcher = flowPattern.matcher(aiResult);
+                        if (flowMatcher.find()) {
+                            String newFlow = flowMatcher.group(1).trim();
+                            getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                                .edit()
+                                .putString("last_daily_flow", newFlow)
+                                .apply();
+                            Log.d(TAG, "💾 Inertie mise à jour. Flux enregistré pour demain : " + newFlow);
+                        } else {
+                            Log.w(TAG, "[DAILY] Balise '🏁 FLUX DOMINANT :' introuvable. Préférences inchangées.");
+                        }
+                            return true ;
+                                } else {
+                                   Log.w(TAG, "[DAILY] Groq réponse vide — contenu : "
+                                   + (aiResult != null ? aiResult.trim() : "null"));
+                                  if (MainActivity.instance != null) {
+                                  MainActivity.instance.addLog("⚠️ [DAILY] Groq réponse vide ou insuffisante");
+                                  }
+                                }
+                            } else {
+                                try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
+                                    StringBuilder errorResponse = new StringBuilder();
+                                    String line;
+                                    while ((line = errorReader.readLine()) != null) {
+                                        errorResponse.append(line);
+                                    }
+                                    Log.e(TAG, "[DAILY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
+                    if (responseCode == 429) {
+                        if (MainActivity.instance != null)
+                            MainActivity.instance.addLog("⚠️ [DAILY] 429 TPD — bascule sur modèle léger.");
+                        try {
+                            payload.put("model", GROQ_MODEL_FALLBACK);
+                            payload.put("max_tokens", 1500);
+                            conn.disconnect();
+                            URL urlFbD = new URL(GROQ_URL);
+                            HttpURLConnection connFbD = (HttpURLConnection) urlFbD.openConnection();
+                            connFbD.setRequestMethod("POST");
+                            connFbD.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                            connFbD.setRequestProperty("Authorization", "Bearer " + apiKey);
+                            connFbD.setConnectTimeout(15000);
+                            connFbD.setReadTimeout(20000);
+                            connFbD.setDoOutput(true);
+                            try (OutputStream osFbD = connFbD.getOutputStream()) {
+                                osFbD.write(payload.toString().getBytes(StandardCharsets.UTF_8));
+                            }
+                            if (connFbD.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                                StringBuilder rFbD = new StringBuilder();
+                                try (BufferedReader brFbD = new BufferedReader(new InputStreamReader(connFbD.getInputStream(), StandardCharsets.UTF_8))) {
+                                    String lineFbD;
+                                    while ((lineFbD = brFbD.readLine()) != null) rFbD.append(lineFbD);
+                                }
+                                String reportFbD = new JSONObject(rFbD.toString())
+                                    .getJSONArray("choices").getJSONObject(0)
+                                    .getJSONObject("message").getString("content");
+                                if (reportFbD != null && reportFbD.length() > 50) {
+                                    sendTelegramSecure("📅 *[DAILY - FALLBACK]* " + reportFbD, NotificationService.this);
+                                    if (MainActivity.instance != null)
+                                        MainActivity.instance.addLog("✅ [DAILY] Rapport envoyé via modèle léger.");
+                                }
+                            }
+                            connFbD.disconnect();
+                        } catch (Exception eFbD) {
+                            Log.e(TAG, "[DAILY] Fallback échoué", eFbD);
+                        }
+                    } else if (MainActivity.instance != null) {
+                        MainActivity.instance.addLog("❌ [DAILY] Erreur HTTP " + responseCode + " de Groq : "
+                            + truncateForLog(errorResponse.toString()));
+                    }
                     }
                 }
             } catch (Exception e) {
@@ -2718,19 +2690,19 @@ if (responseCode == 429) {
 
         // Mémoire d'inertie mensuelle — contexte du mois précédent
         String lastMonthlyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-    .getString("last_monthly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
-String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-    .getString("last_dominant_flow", "INDÉTERMINÉ");
-        JSONObject payload = new JSONObject();
-int usedM = dailyTokensUsed.addAndGet(2000);
-getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
-    .putInt("daily_tokens_used", usedM)
-    .putLong("token_reset_time", tokenResetTime)
-    .apply();
-payload.put("model", usedM > TOKEN_BUDGET_DAILY ? GROQ_MODEL_FALLBACK : GROQ_MODEL);
-if (usedM > TOKEN_BUDGET_DAILY && MainActivity.instance != null)
-    MainActivity.instance.addLog("⚠️ [MONTHLY] Budget token atteint — modèle léger.");
-payload.put("temperature", 0.05);
+            .getString("last_monthly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
+        String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+            .getString("last_dominant_flow", "INDÉTERMINÉ");
+                JSONObject payload = new JSONObject();
+        int usedM = dailyTokensUsed.addAndGet(2000);
+        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+            .putInt("daily_tokens_used", usedM)
+            .putLong("token_reset_time", tokenResetTime)
+            .apply();
+        payload.put("model", usedM > TOKEN_BUDGET_DAILY ? GROQ_MODEL_FALLBACK : GROQ_MODEL);
+        if (usedM > TOKEN_BUDGET_DAILY && MainActivity.instance != null)
+            MainActivity.instance.addLog("⚠️ [MONTHLY] Budget token atteint — modèle léger.");
+        payload.put("temperature", 0.05);
         JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content",
     "Tu es un analyste macroéconomique et stratège de marché quant senior de niveau institutionnel.\n" +
