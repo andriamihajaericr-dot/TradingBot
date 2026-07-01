@@ -297,9 +297,8 @@ public class EventValidator {
                 rawExtracted.contains("HOUSING") || rawExtracted.contains("BEIGE BOOK") || rawExtracted.contains("MINUTES")) {
                 
                 String[] usAssets = {
-                    "GOLD", "NASDAQ", "SP500", "USOIL", "US10Y", 
-                    "USDJPY", "EURUSD", "GBPUSD", "USDCAD", "AUDUSD", 
-                    "BITCOIN"
+                    "GOLD", "NASDAQ", "SP500", "USOIL",
+                    "USDJPY", "GBPUSD"
                 };
                 
                 for(String a : usAssets) {
@@ -311,21 +310,6 @@ public class EventValidator {
             }
         }
     
-        // ── BLOC 2 : ZONE EURO 🇪🇺 ──
-        if (rawExtracted.contains("EUROZONE") || rawExtracted.contains("GERMANY") || rawExtracted.contains("FRANCE") || 
-            rawExtracted.contains("ITALY") || rawExtracted.contains("ECB") || rawExtracted.contains("BCE") || rawExtracted.contains("LAGARDE")) {
-            
-            if (rawExtracted.contains("CPI") || rawExtracted.contains("HICP") || rawExtracted.contains("INFLATION") || 
-                rawExtracted.contains("PMI") || rawExtracted.contains("ZEW") || rawExtracted.contains("IFO") || 
-                rawExtracted.contains("GDP") || rawExtracted.contains("PIB") || rawExtracted.contains("RATE") || 
-                rawExtracted.contains("TAUX") || rawExtracted.contains("SPREAD") || rawExtracted.contains("BTP") || rawExtracted.contains("OAT")) {
-                if (!detectedAssets.contains("EURUSD")) {
-                    detectedAssets.add("EURUSD");
-                    assetsEnrichedInThisBlock = true;
-                }
-            }
-        }
-        
         // ── BLOC 3 : ROYAUME-UNI 🇬🇧 ──
         if (rawExtracted.contains("UK ") || rawExtracted.contains("UNITED KINGDOM") || rawExtracted.contains("BRITAIN") || 
             rawExtracted.contains("BOE") || rawExtracted.contains("BAILEY") || rawExtracted.contains("MPC")) {
@@ -341,28 +325,7 @@ public class EventValidator {
             }
         }
         
-        // ── BLOC 4 : CANADA 🇨🇦 ──
-        if (rawExtracted.contains("CANADA") || rawExtracted.contains("CANADIAN") || rawExtracted.contains("BOC") || rawExtracted.contains("MACKLEM")) {
-            if (rawExtracted.contains("CPI") || rawExtracted.contains("INFLATION") || rawExtracted.contains("GDP") || 
-                rawExtracted.contains("RATE") || rawExtracted.contains("TAUX") || rawExtracted.contains("EMPLOYMENT") || rawExtracted.contains("UNEMPLOYMENT")) {
-                if (!detectedAssets.contains("USDCAD")) { detectedAssets.add("USDCAD"); assetsEnrichedInThisBlock = true; }
-                if (!detectedAssets.contains("USOIL")) { detectedAssets.add("USOIL"); assetsEnrichedInThisBlock = true; }
-            }
-        }
-        
-        // ── BLOC 5 : AUSTRALIE & CHINE 🇦🇺 🇨🇳 ──
-        if (rawExtracted.contains("AUSTRALIA") || rawExtracted.contains("AUSTRALIAN") || rawExtracted.contains("RBA") || 
-            rawExtracted.contains("BULLOCK") || rawExtracted.contains("CHINA") || rawExtracted.contains("CHINESE") || 
-            rawExtracted.contains("PBOC") || rawExtracted.contains("CNY") || rawExtracted.contains("YUAN")) {
-            
-            if (rawExtracted.contains("CPI") || rawExtracted.contains("INFLATION") || rawExtracted.contains("GDP") || 
-                rawExtracted.contains("PMI") || rawExtracted.contains("RATE") || rawExtracted.contains("TAUX") || 
-                rawExtracted.contains("CAIXIN") || rawExtracted.contains("TRADE BALANCE") || rawExtracted.contains("BALANCE COMMERCIALE") || 
-                rawExtracted.contains("TARIFF") || rawExtracted.contains("TRADE WAR") || rawExtracted.contains("STIMULUS")) {
-                if (!detectedAssets.contains("AUDUSD")) { detectedAssets.add("AUDUSD"); assetsEnrichedInThisBlock = true; }
-            }
-        }
-        
+      
         // ── BLOC 6 : JAPON 🇯🇵 ──
         if (rawExtracted.contains("JAPAN") || rawExtracted.contains("JAPANESE") || rawExtracted.contains("TOKYO") || 
             rawExtracted.contains("BOJ") || rawExtracted.contains("UEDA") || rawExtracted.contains("MOF")) {
@@ -375,21 +338,18 @@ public class EventValidator {
         }
         
         // ── BLOC 7 : SÉCURITÉ MATIÈRES PREMIÈRES & CRYPTO ──
-        if (rawExtracted.contains("EIA") || rawExtracted.contains("API") || rawExtracted.contains("OPEC") || 
-            rawExtracted.contains("CRUDE") || rawExtracted.contains("OIL INVENTORIES") || rawExtracted.contains("NATURAL GAS") || 
+        // ── BLOC 7 : SÉCURITÉ MATIÈRES PREMIÈRES ──
+        if (rawExtracted.contains("EIA") || rawExtracted.contains("API") || rawExtracted.contains("OPEC") ||
+            rawExtracted.contains("CRUDE") || rawExtracted.contains("OIL INVENTORIES") || rawExtracted.contains("NATURAL GAS") ||
             rawExtracted.contains("PÉTROLE") || rawExtracted.contains("STOCKS")) {
             if (!detectedAssets.contains("USOIL")) { detectedAssets.add("USOIL"); assetsEnrichedInThisBlock = true; }
         }
-        if (rawExtracted.contains("SEC ") || rawExtracted.contains("ETF") || rawExtracted.contains("BITCOIN") || 
-            rawExtracted.contains("CRYPTO") || rawExtracted.contains("BINANCE")) {
-            if (!detectedAssets.contains("BITCOIN")) { detectedAssets.add("BITCOIN"); assetsEnrichedInThisBlock = true; }
-        }
-    
+            
         // ── BLOC 8 : SÉCURITÉ RENDEMENTS & EARNINGS CORPORATE ──
-        if (rawExtracted.contains("REAL YIELDS") || rawExtracted.contains("REAL RATES") || 
+        // ── BLOC 8 : SÉCURITÉ RENDEMENTS & EARNINGS CORPORATE ──
+        if (rawExtracted.contains("REAL YIELDS") || rawExtracted.contains("REAL RATES") ||
             rawExtracted.contains("GOLD RESERVES") || rawExtracted.contains("TIPS")) {
             if (!detectedAssets.contains("GOLD")) { detectedAssets.add("GOLD"); assetsEnrichedInThisBlock = true; }
-            if (!detectedAssets.contains("US10Y")) { detectedAssets.add("US10Y"); assetsEnrichedInThisBlock = true; }
         }
         if (rawExtracted.contains("EARNINGS") || rawExtracted.contains("PROFIT WARNING") || rawExtracted.contains("GUIDANCE") || 
             rawExtracted.contains("EPS ") || rawExtracted.contains("REVENUE") || rawExtracted.contains("NVDA") || 
@@ -625,11 +585,11 @@ public class EventValidator {
             if (upperText.contains("HORMUZ") || upperText.contains("ORMUZ")) {
                 geo.contextLabel = "Détroit d'Hormuz - Menace sur l'offre pétrole";
                 score += 40;
-                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN", "EURUSD", "GBPUSD", "USDCAD", "AUDUSD", "US10Y"));
+                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "GBPUSD"));
             } else if (hasFactualAction) {
                 geo.contextLabel = "Moyen-Orient - Action Militaire";
                 score += 35;
-                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN", "EURUSD", "GBPUSD", "USDCAD", "AUDUSD", "US10Y"));
+                geo.impactedAssets.addAll(Arrays.asList("USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "GBPUSD"));
             } else if (isTrumpIran) {
                 geo.contextLabel = "Moyen-Orient - Déclaration Trump/Iran";
                 score += 18;   
@@ -637,7 +597,7 @@ public class EventValidator {
             } else {
                 geo.contextLabel = "Moyen-Orient / Pétrole";
                 score += 22;
-                geo.impactedAssets.addAll(Arrays.asList("GOLD", "USOIL", "USDJPY", "US10Y"));
+                geo.impactedAssets.addAll(Arrays.asList("GOLD", "USOIL", "USDJPY"));
             }
             geoZoneFound = true;
         }
@@ -659,7 +619,7 @@ public class EventValidator {
 
         if (isEuropeEst && !geoZoneFound) {
             geo.contextLabel = "Europe de l'Est / OTAN";
-            geo.impactedAssets.addAll(Arrays.asList("EURUSD", "GBPUSD", "USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500", "BITCOIN"));
+           geo.impactedAssets.addAll(Arrays.asList("GBPUSD", "USOIL", "GOLD", "USDJPY", "NASDAQ", "SP500"));
             score += 20;
             geoZoneFound = true;
         }
@@ -676,7 +636,7 @@ public class EventValidator {
 
         if (isAsiePacifique && !geoZoneFound) {
             geo.contextLabel = "Asie-Pacifique / Chine";
-            geo.impactedAssets.addAll(Arrays.asList("AUDUSD", "USDJPY", "NASDAQ", "SP500", "GOLD", "BITCOIN", "USOIL"));
+            geo.impactedAssets.addAll(Arrays.asList("USDJPY", "NASDAQ", "SP500", "GOLD", "USOIL")); 
             score += 20;
             geoZoneFound = true;
         }
@@ -1915,8 +1875,7 @@ public static void checkUpcomingAlerts() {
         if (assetUpper.contains("OIL") || assetUpper.contains("PETROLE") || assetUpper.contains("WTI")) {
             return isPositiveShock ? "BUY  📈" : "SELL 📉";
         }
-        if (assetUpper.equals("BITCOIN")) assetUpper = "BTCUSD";
-        if (assetUpper.length() == 6) {
+       if (assetUpper.length() == 6) {
             String baseCurrency = assetUpper.substring(0, 3);
             String quoteCurrency = assetUpper.substring(3, 6);
             if (baseCurrency.equals(currencyUpper)) return isPositiveShock ? "BUY  📈" : "SELL 📉";
