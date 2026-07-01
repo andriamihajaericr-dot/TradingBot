@@ -75,22 +75,22 @@ public class NotificationService extends NotificationListenerService {
     // Seuil de divergence (0.5% est plus sûr pour éviter le bruit sur le Forex)
     private static final double DIVERGENCE_THRESHOLD = 0.5;
     private final ConcurrentHashMap<String, PrevailingDirection> lastForecast = new ConcurrentHashMap<>();
-// Protection anti-spam : évite de scanner en boucle si le marché est instable
-private final ConcurrentHashMap<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
-private static final long ALERT_COOLDOWN_MS = 60 * 60 * 1000L; // 1 heure de cooldown par actif
-private static final long INERTIA_REMINDER_COOLDOWN_MS = 60 * 60 * 1000L; // 1 rappel max par heure par type de driver
-
-private final ConcurrentHashMap<String, Long> lastInertiaReminderSentMemory = new ConcurrentHashMap<>();
-    private static class PrevailingDirection {
-        final String direction; // "BULLISH", "BEARISH" ou "NEUTRE"
-        final double referencePrice;
-        final long timestamp;
-        PrevailingDirection(String dir, double price, long ts) {
-            this.direction = dir;
-            this.referencePrice = price;
-            this.timestamp = ts;
+    // Protection anti-spam : évite de scanner en boucle si le marché est instable
+    private final ConcurrentHashMap<String, Long> lastAlertsSent = new ConcurrentHashMap<>();
+    private static final long ALERT_COOLDOWN_MS = 60 * 60 * 1000L; // 1 heure de cooldown par actif
+    private static final long INERTIA_REMINDER_COOLDOWN_MS = 60 * 60 * 1000L; // 1 rappel max par heure par type de driver
+    
+    private final ConcurrentHashMap<String, Long> lastInertiaReminderSentMemory = new ConcurrentHashMap<>();
+        private static class PrevailingDirection {
+            final String direction; // "BULLISH", "BEARISH" ou "NEUTRE"
+            final double referencePrice;
+            final long timestamp;
+            PrevailingDirection(String dir, double price, long ts) {
+                this.direction = dir;
+                this.referencePrice = price;
+                this.timestamp = ts;
+            }
         }
-    }
 
     private void startForegroundServiceNotification() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -127,85 +127,85 @@ private final ConcurrentHashMap<String, Long> lastInertiaReminderSentMemory = ne
 
     
     private void checkAndSendMissedWeeklyReport() {
-    SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
-    long lastWeeklySentMs = prefs.getLong("last_weekly_sent_ms", 0L);
-
-    // Trouver le dernier vendredi à 22h00 (Mada) 
-    Calendar lastFriday = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
-    lastFriday.set(Calendar.HOUR_OF_DAY, 22);
-    lastFriday.set(Calendar.MINUTE, 0);
-    lastFriday.set(Calendar.SECOND, 0);
-    lastFriday.set(Calendar.MILLISECOND, 0);
-    // Reculer jusqu'au dernier vendredi
-    while (lastFriday.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY) {
-        lastFriday.add(Calendar.DAY_OF_MONTH, -1);
-    }
-    // Si ce vendredi est dans le futur, reculer d'une semaine
-    if (lastFriday.getTimeInMillis() > System.currentTimeMillis()) {
-        lastFriday.add(Calendar.DAY_OF_MONTH, -7);
-    }
-
-    long lastFridayMs = lastFriday.getTimeInMillis();
-    boolean alreadySent = lastWeeklySentMs >= lastFridayMs;
-
-    if (!alreadySent) {
-        Log.d(TAG, "[WEEKLY] Rapport manqué détecté — envoi immédiat du rattrapage");
-        if (MainActivity.instance != null) {
-            MainActivity.instance.addLog("📅 [WEEKLY] Rapport manqué → envoi du rattrapage");
+        SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
+        long lastWeeklySentMs = prefs.getLong("last_weekly_sent_ms", 0L);
+    
+        // Trouver le dernier vendredi à 22h00 (Mada) 
+        Calendar lastFriday = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+        lastFriday.set(Calendar.HOUR_OF_DAY, 22);
+        lastFriday.set(Calendar.MINUTE, 0);
+        lastFriday.set(Calendar.SECOND, 0);
+        lastFriday.set(Calendar.MILLISECOND, 0);
+        // Reculer jusqu'au dernier vendredi
+        while (lastFriday.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY) {
+            lastFriday.add(Calendar.DAY_OF_MONTH, -1);
         }
-        // Délai 30s pour laisser le service se stabiliser avant l'appel Groq
-        scheduler.schedule(this::generateAndSendWeeklyReport, 30, TimeUnit.SECONDS);
-    } else {
-        Log.d(TAG, "[WEEKLY] Rapport déjà envoyé cette semaine — pas de rattrapage nécessaire");
-    }
+        // Si ce vendredi est dans le futur, reculer d'une semaine
+        if (lastFriday.getTimeInMillis() > System.currentTimeMillis()) {
+            lastFriday.add(Calendar.DAY_OF_MONTH, -7);
+        }
+    
+        long lastFridayMs = lastFriday.getTimeInMillis();
+        boolean alreadySent = lastWeeklySentMs >= lastFridayMs;
+    
+        if (!alreadySent) {
+            Log.d(TAG, "[WEEKLY] Rapport manqué détecté — envoi immédiat du rattrapage");
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("📅 [WEEKLY] Rapport manqué → envoi du rattrapage");
+            }
+            // Délai 30s pour laisser le service se stabiliser avant l'appel Groq
+            scheduler.schedule(this::generateAndSendWeeklyReport, 30, TimeUnit.SECONDS);
+        } else {
+            Log.d(TAG, "[WEEKLY] Rapport déjà envoyé cette semaine — pas de rattrapage nécessaire");
+        }
     }
 
     private void checkAndSendMissedMonthlyReport() {
-    SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
-    long lastMonthlySentMs = prefs.getLong("last_monthly_sent_ms", 0L);
-
-    Calendar lastEndOfMonth = Calendar.getInstance(
+        SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
+        long lastMonthlySentMs = prefs.getLong("last_monthly_sent_ms", 0L);
+    
+        Calendar lastEndOfMonth = Calendar.getInstance(
         TimeZone.getTimeZone("Indian/Antananarivo"));
-    lastEndOfMonth.set(Calendar.HOUR_OF_DAY, 23);
-    lastEndOfMonth.set(Calendar.MINUTE, 0);
-    lastEndOfMonth.set(Calendar.SECOND, 0);
-    lastEndOfMonth.set(Calendar.MILLISECOND, 0);
-    lastEndOfMonth.set(Calendar.DAY_OF_MONTH, 1);
-    lastEndOfMonth.add(Calendar.DAY_OF_MONTH, -1);
-
-    long lastEndOfMonthMs = lastEndOfMonth.getTimeInMillis();
-
-    if (lastMonthlySentMs < lastEndOfMonthMs
-            && lastEndOfMonthMs < System.currentTimeMillis()) {
-        Log.d(TAG, "[MONTHLY] Rapport mensuel manqué → rattrapage dans 60s");
-        if (MainActivity.instance != null)
-            MainActivity.instance.addLog(
-                "📊 [MONTHLY] Rapport manqué → rattrapage en cours");
-        scheduler.schedule((Runnable) this::generateAndPurgeMonthlyReport, 60, TimeUnit.SECONDS);
-    } else {
-        Log.d(TAG, "[MONTHLY] Rapport mensuel déjà envoyé — pas de rattrapage");
+        lastEndOfMonth.set(Calendar.HOUR_OF_DAY, 23);
+        lastEndOfMonth.set(Calendar.MINUTE, 0);
+        lastEndOfMonth.set(Calendar.SECOND, 0);
+        lastEndOfMonth.set(Calendar.MILLISECOND, 0);
+        lastEndOfMonth.set(Calendar.DAY_OF_MONTH, 1);
+        lastEndOfMonth.add(Calendar.DAY_OF_MONTH, -1);
+    
+        long lastEndOfMonthMs = lastEndOfMonth.getTimeInMillis();
+    
+        if (lastMonthlySentMs < lastEndOfMonthMs
+                && lastEndOfMonthMs < System.currentTimeMillis()) {
+            Log.d(TAG, "[MONTHLY] Rapport mensuel manqué → rattrapage dans 60s");
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog(
+                    "📊 [MONTHLY] Rapport manqué → rattrapage en cours");
+            scheduler.schedule((Runnable) this::generateAndPurgeMonthlyReport, 60, TimeUnit.SECONDS);
+        } else {
+            Log.d(TAG, "[MONTHLY] Rapport mensuel déjà envoyé — pas de rattrapage");
+        }
     }
-}
     
     public static final List<String> TWELVE_DATA_ASSETS = Arrays.asList(
     "NASDAQ", "GOLD", "EURUSD", "USOIL"); // 4 actifs = 1 seul batch → 1 appel réseau
-@Override
-public void onListenerConnected() {
-    super.onListenerConnected();
-    Log.i(TAG, "✅ [LISTENER] Connecté — le bot reçoit bien le flux système.");
-    if (MainActivity.instance != null) {
-        MainActivity.instance.addLog("✅ [SYSTÈME] Accès notifications confirmé par Android.");
+    @Override
+    public void onListenerConnected() {
+        super.onListenerConnected();
+        Log.i(TAG, "✅ [LISTENER] Connecté — le bot reçoit bien le flux système.");
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog("✅ [SYSTÈME] Accès notifications confirmé par Android.");
+        }
     }
-}
-
-@Override
-public void onListenerDisconnected() {
-    super.onListenerDisconnected();
-    Log.e(TAG, "🔴 [LISTENER] DÉCONNECTÉ — plus aucune notification ne sera captée !");
-    if (MainActivity.instance != null) {
-        MainActivity.instance.addLog("🔴 [SYSTÈME] Accès notifications COUPÉ (vérifie Paramètres > Accès aux notifications).");
+    
+    @Override
+    public void onListenerDisconnected() {
+        super.onListenerDisconnected();
+        Log.e(TAG, "🔴 [LISTENER] DÉCONNECTÉ — plus aucune notification ne sera captée !");
+        if (MainActivity.instance != null) {
+            MainActivity.instance.addLog("🔴 [SYSTÈME] Accès notifications COUPÉ (vérifie Paramètres > Accès aux notifications).");
+        }
     }
-}
     // Ajoutez cette méthode à la fin de votre classe NotificationService.java
     public static String formatEventForDisplay(EconomicCalendarAPI.CalendarEvent e) {
         if (e.actual == null || e.actual.equals("N/A") || e.actual.isEmpty()) {
@@ -349,7 +349,7 @@ public void onListenerDisconnected() {
     "IDENTITÉ\n" +
     "══════════════════════════════════════════════════════\n" +
     "Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
-    "Objectif : Identifier le DRIVER DOMINANT d'une actualité, appliquer la hiérarchie macroéconomique, puis projeter son impact sur les 11 actifs obligatoires.\n\n" +
+    "Objectif : Identifier le DRIVER DOMINANT d'une actualité, appliquer la hiérarchie macroéconomique, puis projeter son impact sur les 6 actifs obligatoires.\n\n" +
 
     "══════════════════════════════════════════════════════\n" +
     "HIÉRARCHIE DES DRIVERS\n" +
@@ -367,9 +367,7 @@ public void onListenerDisconnected() {
     "• Trump, Iran, Israël, sanctions verbales = impact limité.\n" +
     "• Discussions, négociations, trêves potentielles = impact limité.\n" +
     "• Une géopolitique majeure exige : frappe, missile, embargo, blocage d'Hormuz, opération militaire réelle.\n" +
-    "• Bitcoin est un amplificateur. Il suit NASDAQ/SP500 avec amplitude x2 à x3. Il n'est jamais le driver principal.\n" +
     "• Pondération des sources : Bloomberg, Reuters, FT, FJ = forte. Twitter, ZeroHedge, rumeurs = faible (conviction ≤40%).\n\n" +
-
     "══════════════════════════════════════════════════════\n" +
     "RÈGLES DE FIABILITÉ\n" +
     "══════════════════════════════════════════════════════\n" +
@@ -390,34 +388,27 @@ public void onListenerDisconnected() {
     "══════════════════════════════════════════════════════\n" +
     "MATRICES DIRECTIONNELLES (↑=BULLISH, ↓=BEARISH)\n" +
     "══════════════════════════════════════════════════════\n" +
-    "HAWKISH US : US10Y↑ USDCAD↑ USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ BTC↓ EURUSD↓ GBPUSD↓ AUDUSD↓ USOIL= | FLUX : DOLLAR FORT\n" +
+    "HAWKISH US : USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ GBPUSD↓ USOIL= | FLUX : DOLLAR FORT\n" +
     "DOVISH US : inverse | FLUX : DOLLAR FAIBLE\n" +
-    "GÉO escalade : USOIL↑ USDJPY↓ NASDAQ↓ SP500↓ BTC↓ EURUSD↓ GBPUSD↓ AUDUSD↑ USDCAD↓ US10Y↓ | FLUX : CRISE GÉOPOLITIQUE\n" +
+    "GÉO escalade : USOIL↑ USDJPY↓ NASDAQ↓ SP500↓ GBPUSD↓ | FLUX : CRISE GÉOPOLITIQUE\n" +
     "GOLD en crise GÉO Iran/Hormuz :\n" +
     "- Attaque tanker/drone/tension SANS riposte USA confirmée → GOLD🟢 immédiat (historique : +0.8% à +1.5%)\n" +
     "- Riposte militaire USA confirmée (frappe/bombardement/Pentagon/airstrike) → GOLD🔴 30-60min puis rebond\n" +
     "- RÈGLE PAR DÉFAUT : si texte ne contient pas 'riposte/strike/Pentagon/airstrike/bombardement' → GOLD🟢 obligatoirement\n" +
-    "GÉO désescalade : GOLD↓ USOIL↓ NASDAQ↑ SP500↑ BTC↑ USDJPY↑ AUDUSD↑ (conviction≤45%) | USDCAD↑ SAUF si USOIL reste BULLISH par ailleurs (alors USDCAD=NEUTRE, le préciser) | FLUX : RISK-ON\n" +
-    "EIA déficit : USOIL↑ USDCAD↓ | EIA surplus : USOIL↓ USDCAD↑\n" +
-    "TARIFS escalade : NASDAQ↓ SP500↓ AUDUSD↓ USOIL↓ USDJPY↓ GOLD↑ BTC↓ EURUSD↓ GBPUSD↓ | FLUX : RISK-OFF\n" +
-    "CHINE forte : AUDUSD↑ USOIL↑ NASDAQ↑ SP500↑ EURUSD↑ BTC↑ USDCAD↓ | FLUX : RISK-ON\n" +
-    "SENTIMENT faible : NASDAQ↓ SP500↓ GOLD↑ USOIL↓ BTC↓ | FLUX : RISK-OFF MODÉRÉ\n" +
-    "IPO majeure : NASDAQ↑ SP500↑ BTC↑ GOLD↓ USDJPY↓ EURUSD↑ AUDUSD↑ USDCAD↓ | FLUX : RISK-ON\n" +
+    "GÉO désescalade : GOLD↓ USOIL↓ NASDAQ↑ SP500↑ USDJPY↑ | FLUX : RISK-ON\n" +
+    "EIA déficit : USOIL↑ | EIA surplus : USOIL↓\n" +
+    "TARIFS escalade : NASDAQ↓ SP500↓ USOIL↓ USDJPY↓ GOLD↑ GBPUSD↓ | FLUX : RISK-OFF\n" +
+    "CHINE forte : USOIL↑ NASDAQ↑ SP500↑ | FLUX : RISK-ON\n" +
+    "SENTIMENT faible : NASDAQ↓ SP500↓ GOLD↑ USOIL↓ | FLUX : RISK-OFF MODÉRÉ\n" +
+    "IPO majeure : NASDAQ↑ SP500↑ GOLD↓ USDJPY↓ | FLUX : RISK-ON\n" +
     "RÈGLE JUSTIFICATION : la matrice donne la DIRECTION, jamais le TEXTE. Pour chaque actif, déduis et écris le mécanisme causal exact (ex: taux/devise/refuge/corrélation) reliant le driver détecté à cet actif précis — jamais une formule générique répétée.\n\n" +
-    "CORRÉLATION EURUSD/GBPUSD : ils bougent dans le même sens à 90% (même dénominateur USD). " +
-    "Divergence autorisée UNIQUEMENT si : news BoE seul, crise UK spécifique, Brexit. " +
-    "Hors ces cas, direction EURUSD = direction GBPUSD obligatoirement.\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "BANQUES CENTRALES ÉTRANGÈRES\n" +
     "══════════════════════════════════════════════════════\n" +
-    "BCE dovish → EURUSD↓ ; BCE hawkish → EURUSD↑\n" +
-"ERREUR FRÉQUENTE INTERDITE : BCE hawkish ≠ EURUSD🔴. " +
-"Schnabel/Lagarde hawkish = différentiel BCE-Fed réduit = EURUSD🟢 OBLIGATOIREMENT.\n" +
     "BoJ dovish → USDJPY↑ ; BoJ hawkish → USDJPY↓\n" +
     "BoE dovish → GBPUSD↓ ; BoE hawkish → GBPUSD↑\n" +
-    "RBA dovish → AUDUSD↓ ; RBA hawkish → AUDUSD↑\n" +
-    "BoC dovish → USDCAD↑ USOIL↓ ; BoC hawkish → USDCAD↓ USOIL↑\n" +
-    "RÈGLE ABSOLUE : US10Y, NASDAQ, SP500, BTC, GOLD, USOIL = NEUTRE pour toute news étrangère (sauf choc global explicite ou driver énergie/géo simultané).\n\n" +
+    "EURUSD (CONTEXTE UNIQUEMENT) : EURUSD n'est pas un actif suivi. Si une donnée BCE/zone euro est fournie en contexte, utilise-la uniquement pour calibrer la cohérence directionnelle de GBPUSD (corrélation EUR/GBP), sans jamais l'afficher comme ligne séparée dans le rapport.\n" +
+    "RÈGLE ABSOLUE : NASDAQ, SP500, GOLD, USOIL = NEUTRE pour toute news étrangère (sauf choc global explicite ou driver énergie/géo simultané).\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "CONTRAINTES ABSOLUES\n" +
     "══════════════════════════════════════════════════════\n" +
@@ -430,14 +421,12 @@ public void onListenerDisconnected() {
     "   - Régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires : USDJPY↑ = GBPUSD↓ et inversement.\n" +
     "   - Régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire : les deux baissent en risk-off, les deux montent en risk-on.\n" +
     "   - Divergence autorisée UNIQUEMENT si BoJ seul (GBPUSD neutre) ou BoE seul (USDJPY neutre).\n" +
-    "7. CORRÉLATION EURUSD/GBPUSD : même direction obligatoire dans 90% des cas.\n" +
-    "   - Divergence autorisée UNIQUEMENT si news BoE seul, crise UK spécifique ou Brexit.\n" +
-    "8. Chaque actif : direction + mécanisme causal précis ≤8 mots. INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour'.\n" +
+    "7. Chaque actif : direction + mécanisme causal précis ≤8 mots. INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour'.\n" +
     "DIRECTION OBLIGATOIRE : utiliser exclusivement 🟢 pour BULLISH, 🔴 pour BEARISH, NEUTRE pour neutre. Interdit d'écrire 'BULLISH', 'BEARISH', '↑', '↓', '='.\n" +
     "Lister uniquement les actifs impactés — omettre les NEUTRE.\n" +
-    "9. Pas de doubles astérisques (**) – utiliser *simple*.\n" +
-    "10. VECTEUR CIBLE autorisé : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
-    "11. En cas de crise géopolitique, appliquer l'exception et mentionner \"Régime Safe-Haven\".\n\n" +
+    "8. Pas de doubles astérisques (**) – utiliser *simple*.\n" +
+    "9. VECTEUR CIBLE autorisé : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
+    "10. En cas de crise géopolitique, appliquer l'exception et mentionner \"Régime Safe-Haven\".\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "FORMAT DE SORTIE OBLIGATOIRE\n" +
     "══════════════════════════════════════════════════════\n" +
@@ -447,17 +436,12 @@ public void onListenerDisconnected() {
     "🎯 VECTEUR CIBLE : [VALEUR AUTORISÉE]\n" +
     "📢 FAIT MARQUANT : [Analyse synthétique du driver dominant]\n" +
     "--- IMPACTS ACQUISITION ---\n" +
-    "• 📈 US10Y : [direction] | [justification ≤10 mots]\n" +
     "• 💻 NASDAQ : [direction] | [justification ≤10 mots]\n" +
     "• 📊 SP500 : [direction] | [justification ≤10 mots]\n" +
     "• 🏆 GOLD : [direction] | [justification ≤10 mots]\n" +
     "• 🛢️ USOIL : [direction] | [justification ≤10 mots]\n" +
-    "• 🇪🇺 EURUSD : [direction] | [justification ≤10 mots]\n" +
     "• 🇯🇵 USDJPY : [direction] | [justification ≤10 mots]\n" +
-    "• 🇨🇦 USDCAD : [direction] | [justification ≤10 mots]\n" +
     "• 🇬🇧 GBPUSD : [direction] | [justification ≤10 mots]\n" +
-    "• 🇦🇺 AUDUSD : [direction] | [justification ≤10 mots]\n" +
-    "• ₿ BITCOIN : [direction] | [justification ≤10 mots]\n" +
     "🏁 FLUX DOMINANT : [FLUX EXACT ISSUE DES MATRICES]";
 
         private static final String DAILY_SYSTEM_PROMPT =
