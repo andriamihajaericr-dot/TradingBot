@@ -47,22 +47,11 @@ public class MarketDataFetcher {
     private static final int CREDITS_PER_SYMBOL_ESTIMATE = 2; // observé dans les logs (forex/commodities)
     private static final int MAX_CREDITS_PER_MINUTE = 8; // limite du plan Twelve Data actuel
 
-    // 🛡️ CORRECTIF 429 RÉSIDUEL : tryAcquireBatchSlot() garantit 65s entre APPELS,
-    // mais Twelve Data compte les crédits par MINUTE CALENDAIRE (ex: 20:15:00-20:15:59),
-    // pas par fenêtre glissante. Deux appels distincts (ex: deux chocs macro traités
-    // en parallèle) peuvent chacun passer le cooldown de 65s tout en tombant dans la
-    // même minute calendaire et cumuler plus que MAX_CREDITS_PER_MINUTE. Ce compteur
-    // global, remis à zéro à chaque nouvelle minute, suit la consommation RÉELLE et
-    // partagée entre tous les appels, peu importe leur origine.
     private static final java.util.concurrent.atomic.AtomicLong currentCreditMinuteWindow =
         new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis() / 60000L);
     private static final java.util.concurrent.atomic.AtomicInteger creditsUsedThisMinute =
         new java.util.concurrent.atomic.AtomicInteger(0);
 
-    // Réserve atomiquement le coût estimé d'un sous-lot. Si la minute calendaire a changé
-    // depuis le dernier appel, le compteur est remis à zéro avant réservation. Retourne
-    // false si la réservation dépasserait le quota — dans ce cas, AUCUN crédit n'est
-    // consommé et l'appelant doit attendre la minute suivante avant de réessayer.
     public static synchronized boolean tryReserveCredits(int estimatedCost) {
         long nowMinute = System.currentTimeMillis() / 60000L;
         if (nowMinute != currentCreditMinuteWindow.get()) {
@@ -82,19 +71,19 @@ public class MarketDataFetcher {
     private static final java.util.concurrent.atomic.AtomicLong lastBatchCallTime =
     new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis() - 65000L);
 
-public static long getLastBatchCallTime() {
-    return lastBatchCallTime.get();
-}
-
-// Tente de réserver le slot — retourne true si on peut appeler, false si trop tôt
-public static synchronized boolean tryAcquireBatchSlot() {
-    long now = System.currentTimeMillis();
-    if (now - lastBatchCallTime.get() < 65000L) {
-        return false; // Slot occupé
+    public static long getLastBatchCallTime() {
+        return lastBatchCallTime.get();
     }
-    lastBatchCallTime.set(now); // Réserve immédiatement
-    return true;
-}
+
+    // Tente de réserver le slot — retourne true si on peut appeler, false si trop tôt
+    public static synchronized boolean tryAcquireBatchSlot() {
+        long now = System.currentTimeMillis();
+        if (now - lastBatchCallTime.get() < 65000L) {
+            return false; // Slot occupé
+        }
+        lastBatchCallTime.set(now); // Réserve immédiatement
+        return true;
+    }
     private static final Map<String, CachedEntry> MARKET_DATA_CACHE = new ConcurrentHashMap<>();
     private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(5); // 5 min — couvre les attentes quota longues
 
@@ -123,11 +112,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
         MainActivity.instance.addLog("🔍 === TEST FRESHNESS MARKET DATA ===");
     }
 
-    // 🛡️ CORRECTIF 429 : ce bouton appelait getMarketDataBatch() directement, en
-    // contournant le circuit breaker tryAcquireBatchSlot() respecté par tout le
-    // reste du bot (NotificationService). Un clic pendant que le bot venait déjà
-    // de consommer son quota minute déclenchait l'épuisement HTTP 429 chez Twelve Data.
-    if (!tryAcquireBatchSlot()) {
+     if (!tryAcquireBatchSlot()) {
         String msg = "⏭️ [TEST] Slot Twelve Data occupé (cooldown 65s) — test annulé pour éviter un 429.";
         Log.w(TAG, msg);
         if (MainActivity.instance != null) {
@@ -238,8 +223,7 @@ public static synchronized boolean tryAcquireBatchSlot() {
         //ASSET_CONFIGS.add(new AssetConfig("SP500",   "SPY",      false, 1.5, 0.8));
         ASSET_CONFIGS.add(new AssetConfig("NASDAQ",  "QQQ",      false, 1.5, 0.8));
         ASSET_CONFIGS.add(new AssetConfig("GOLD",    "XAU/USD",  false, 1.5, 0.7));
-        //ASSET_CONFIGS.add(new AssetConfig("BITCOIN", "BTC/USD",  false, 3.0, 1.5));
-        ASSET_CONFIGS.add(new AssetConfig("EURUSD",  "EUR/USD",  false, 0.5, 0.25));
+         ASSET_CONFIGS.add(new AssetConfig("EURUSD",  "EUR/USD",  false, 0.5, 0.25));
         //ASSET_CONFIGS.add(new AssetConfig("GBPUSD",  "GBP/USD",  false, 0.5, 0.25));
         //ASSET_CONFIGS.add(new AssetConfig("AUDUSD",  "AUD/USD",  false, 0.5, 0.25));
         //ASSET_CONFIGS.add(new AssetConfig("USDJPY",  "USD/JPY",  false, 0.5, 0.25));
