@@ -507,8 +507,9 @@ public class TradingViewFetcher {
                             if (pdh > 0 && pdl > 0) {
                                 pdhCache.put(key, pdh);
                                 pdlCache.put(key, pdl);
-                                editor.putFloat("pdh_" + key, (float) pdh);
-                                editor.putFloat("pdl_" + key, (float) pdl);
+                               // APRÈS — stocker en String pour garder la précision double
+                                editor.putString("pdh_" + key, String.valueOf(pdh));
+                                editor.putString("pdl_" + key, String.valueOf(pdl));
                             }
                         }
                     }
@@ -546,8 +547,8 @@ public class TradingViewFetcher {
                             if (pwh > 0 && pwl > 0) {
                                 pwhCache.put(key, pwh);
                                 pwlCache.put(key, pwl);
-                                editor.putFloat("pwh_" + key, (float) pwh);
-                                editor.putFloat("pwl_" + key, (float) pwl);
+                                editor.putString("pwh_" + key, String.valueOf(pwh));
+                                editor.putString("pwl_" + key, String.valueOf(pwl));
                             }
                         }
                     }
@@ -572,10 +573,10 @@ private static void loadLevelsFromStorage() {
     if (appContext == null) return;
     SharedPreferences prefs = appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE);
     for (String key : SYMBOL_MAP.keySet()) {
-        double savedPdh = prefs.getFloat("pdh_" + key, 0f);
-        double savedPdl = prefs.getFloat("pdl_" + key, 0f);
-        double savedPwh = prefs.getFloat("pwh_" + key, 0f);
-        double savedPwl = prefs.getFloat("pwl_" + key, 0f);
+       double savedPdh = Double.parseDouble(prefs.getString("pdh_" + key, "0"));
+        double savedPdl = Double.parseDouble(prefs.getString("pdl_" + key, "0"));
+        double savedPwh = Double.parseDouble(prefs.getString("pwh_" + key, "0"));
+        double savedPwl = Double.parseDouble(prefs.getString("pwl_" + key, "0"));
 
         if (savedPdh > 0) pdhCache.put(key, savedPdh);
         if (savedPdl > 0) pdlCache.put(key, savedPdl);
@@ -645,7 +646,7 @@ private static void loadLevelsFromStorage() {
               .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
               .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
               .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
-              
+              .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance))
               // Affichage dynamique des pivots avec la précision de l'instrument
               .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, formatPrice, d.pdh) : "")
               .append(d.pdl > 0 ? " | PDL=" + String.format(Locale.US, formatPrice, d.pdl) : "")
