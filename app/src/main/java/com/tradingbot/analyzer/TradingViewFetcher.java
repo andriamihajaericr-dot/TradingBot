@@ -242,7 +242,7 @@ public class TradingViewFetcher {
 
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
-                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(20));
+                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(5));
                     sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker});
                 }
                 logToUI("📥 [TV WS] " + SYMBOL_MAP.size() + " symboles abonnés.");
@@ -289,10 +289,11 @@ public class TradingViewFetcher {
                             if (v != null && v.has("lp")) {
                                 double price = v.optDouble("lp", 0);
                                 double change = v.optDouble("chp", 0);
-                                double high = v.optDouble("high_price", price);
-                                double low = v.optDouble("low_price", price);
-                                double open = v.optDouble("open_price", price);
-                                double prevClose = v.optDouble("prev_close_price", price);
+                                TVMarketData existing = cache.get(key);
+                                double high      = v.optDouble("high_price",       existing != null && existing.high > 0      ? existing.high      : price);
+                                double low       = v.optDouble("low_price",        existing != null && existing.low  > 0      ? existing.low       : price);
+                                double open      = v.optDouble("open_price",       existing != null && existing.open > 0      ? existing.open      : price);
+                                double prevClose = v.optDouble("prev_close_price", existing != null && existing.prevClose > 0 ? existing.prevClose : price);
 
                                 String key = getKeyFromTicker(ticker);
                                 if (key != null) {
@@ -614,8 +615,9 @@ private static void loadLevelsFromStorage() {
             }
         }
         public synchronized double getVariance() {
-            if (!initialized) return 0;
-            double mean = sum / period; return (sumSq / period) - (mean * mean);
+            if (count < 2) return 0;  // retourner dès 2 ticks au lieu d'attendre 20
+            int n = Math.min(count, period);
+            double mean = sum / n; return (sumSq / n) - (mean * mean);
         }
     }
 
