@@ -2744,32 +2744,30 @@ payload.put("temperature", 0.05);
     "5. Un événement tactique ne peut jamais annuler un événement suprême.\n" +
     "6. Si deux événements suprêmes se contredisent, signaler explicitement la divergence.\n" +
     "7. Les risques résiduels doivent provenir d'un thème déjà présent dans le registre.\n" +
-    "8. Aucun actif hors liste des 11 actifs autorisés.\n" +
+    "8. Aucun actif hors liste des 6 actifs autorisés.\n" +
     "9. NASDAQ et SP500 doivent rester cohérents dans les conclusions.\n" +
-    "10. BTC doit rester cohérent avec le régime Risk-On/Risk-Off sauf événement crypto spécifique observé dans le registre.\n" +
-    "11. Si les données sont insuffisantes, écrire explicitement : CONCLUSION LIMITÉE PAR LE MANQUE DE DONNÉES.\n\n" +
-
+    "10. Si les données sont insuffisantes, écrire explicitement : CONCLUSION LIMITÉE PAR LE MANQUE DE DONNÉES.\n\n" +
     "HIÉRARCHIE DES ÉVÉNEMENTS :\n" +
     "SUPRÊME : FED, FOMC, Powell, CPI, Core CPI, PCE, Core PCE, NFP, Chômage, GDP, ISM.\n" +
     "SECONDAIRE : EIA, OPEC, PMI, résultats majeurs, données sectorielles.\n" +
     "TACTIQUE : Géopolitique, Tarifs, Sentiment, Rumeurs.\n\n" +
 
     "RÈGLE DE JUSTIFICATION :\n" +
-"- Chaque justification doit être factuelle : chiffre observé (ex: 'CPI 3.8% vs 3.5% attendu') ou événement nommé (ex: 'Powell hawkish FOMC mai').\n" +
-"- Longueur maximale : 10 mots.\n" +
-"- Style institutionnel obligatoire : 'prime de risque élargie', 'flight-to-quality activé', 'différentiel de taux déterminant', 'révision bénéfices à la baisse'.\n" +
-"- NUANCE GÉO OBLIGATOIRE : défaut crise GÉO Iran/Hormuz = GOLD🟢 refuge (historique +0.8% à +1.5%). " +
-"Riposte militaire USA confirmée uniquement = GOLD🔴 court terme. " +
-"RÈGLE PAR DÉFAUT : sans 'riposte/strike/Pentagon' dans le texte → GOLD🟢.\n" +
-"- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'contexte difficile', toute phrase sans ancrage factuel.\n\n" +                                                                    
-"Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
-"US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n" +
-"CORRÉLATION USDJPY/GBPUSD : " +
-"En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
-"En régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire (les deux baissent en risk-off, les deux montent en risk-on). " +
-"Divergence possible UNIQUEMENT si BoJ seul (neutre GBPUSD) ou BoE seul (neutre USDJPY).\n" +                                                           
-"CORRÉLATION EURUSD/GBPUSD : même direction obligatoire sauf news BoE seul ou crise UK spécifique.\n" +
-"Lister uniquement les actifs avec impact réel — omettre les NEUTRE.\n\n" +
+    "- Chaque justification doit être factuelle : chiffre observé (ex: 'CPI 3.8% vs 3.5% attendu') ou événement nommé (ex: 'Powell hawkish FOMC mai').\n" +
+    "- Longueur maximale : 10 mots.\n" +
+    "- Style institutionnel obligatoire : 'prime de risque élargie', 'flight-to-quality activé', 'différentiel de taux déterminant', 'révision bénéfices à la baisse'.\n" +
+    "- NUANCE GÉO OBLIGATOIRE : défaut crise GÉO Iran/Hormuz = GOLD🟢 refuge (historique +0.8% à +1.5%). " +
+    "Riposte militaire USA confirmée uniquement = GOLD🔴 court terme. " +
+    "RÈGLE PAR DÉFAUT : sans 'riposte/strike/Pentagon' dans le texte → GOLD🟢.\n" +
+    "- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'contexte difficile', toute phrase sans ancrage factuel.\n\n" +                                                                    
+    "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 6 actifs :\n" +
+    "NASDAQ, SP500, GOLD, USOIL, USDJPY, GBPUSD.\n" +
+    "EURUSD (CONTEXTE UNIQUEMENT, non listé) : s'il apparaît dans le registre, utilise-le uniquement pour calibrer la cohérence directionnelle de GBPUSD (corrélation EUR/GBP) — ne jamais l'afficher comme ligne séparée.\n" +
+    "CORRÉLATION USDJPY/GBPUSD : " +
+    "En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
+    "En régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire (les deux baissent en risk-off, les deux montent en risk-on). " +
+    "Divergence possible UNIQUEMENT si BoJ seul (neutre GBPUSD) ou BoE seul (neutre USDJPY).\n" +
+    "Lister uniquement les actifs avec impact réel — omettre les NEUTRE.\n\n" +
     "Format OBLIGATOIRE et STRICT :\n\n" +
 
     "1. 🔥 LES CHOCS MACRO MAJEURS DU MOIS (1 à 3 selon l'importance réelle) :\n" +
@@ -2777,12 +2775,11 @@ payload.put("temperature", 0.05);
     "   (Répéter pour chaque choc identifié, maximum 3. Si moins, ne pas inventer.)\n\n" +
 
     "2. 🏛️ POSITIONNEMENT MONÉTAIRE & ANTICIPATIONS :\n" +
-    "   • Posture de la Réserve Fédérale : [HAWKISH / DOVISH / DATA-DEPENDENT]\n" +
-    "   • Dynamique du US10Y : [EXPANSION / COMPRESSION / NEUTRE]\n\n" +
-
+    "   • Posture de la Réserve Fédérale : [HAWKISH / DOVISH / DATA-DEPENDENT]\n\n" +
+    
     "3. 📉 MATRICE DE PERFORMANCE & DÉVIATION DE NOS ACTIFS :\n" +
-    "   • Actifs Leaders : [Actifs parmi les 11] => [HAUSSE / BAISSE]\n" +
-    "   • Actifs Sous Tension : [Actifs parmi les 11 montrant volatilité ou retournement]\n\n" +
+    "   • Actifs Leaders : [Actifs parmi les 6] => [HAUSSE / BAISSE]\n" +
+    "   • Actifs Sous Tension : [Actifs parmi les 6 montrant volatilité ou retournement]\n\n" +
 
     "4. 🛡️ RISQUES RÉSIDUELS ET INERTIE (MOIS SUIVANT) :\n" +
     "   • Risque Majeur Détecté : [Uniquement issu d'un thème observé]\n" +
@@ -2793,10 +2790,9 @@ payload.put("temperature", 0.05);
     "   [REGIME STRUCTUREL] => [CONSÉQUENCE PRINCIPALE SUR LES ACTIFS]\n\n" +
 
     "   Exemples :\n" +
-    "   DOLLAR FORT STRUCTUREL => pression durable sur EURUSD et GOLD.\n" +
-    "   RISK-ON STRUCTUREL => soutien durable NASDAQ, SP500 et BTC.\n" +
+    "   DOLLAR FORT STRUCTUREL => pression durable sur GOLD.\n" +
+    "   RISK-ON STRUCTUREL => soutien durable NASDAQ et SP500.\n" +
     "   RISK-OFF STRUCTUREL => préférence pour GOLD et USD.\n\n" +
-
     "CONTRAINTES DE RÉDACTION :\n" +
     "• Utiliser uniquement *italique simple*.\n" +
     "• Interdiction des doubles astérisques (**).\n" +
@@ -2996,50 +2992,41 @@ payload.put("temperature", 0.05);
     "5. Un événement tactique ne peut normalement pas annuler un événement suprême, sauf exception géopolitique majeure (voir règle de crise).\n" +
     "6. Si deux événements suprêmes se contredisent, signaler explicitement la divergence.\n" +
     "7. Les risques résiduels et l'agenda stratégique doivent s'appuyer sur des thèmes observés.\n" +
-    "8. Aucun actif hors liste des 11 actifs autorisés.\n" +
+    "8. Aucun actif hors liste des 6 actifs autorisés.\n" +
     "9. NASDAQ et SP500 doivent rester cohérents dans les conclusions.\n" +
-    "10. BTC doit suivre les règles de cohérence avec le régime dominant (voir règle BTC).\n" +
-    "11. Si les données sont insuffisantes, écrire explicitement : CONCLUSION LIMITÉE PAR LE MANQUE DE DONNÉES.\n" +
-    "12. Si aucun événement de rang SUPRÊME n'est présent dans la semaine, le rapport doit indiquer :\n" +
+    "10. Si les données sont insuffisantes, écrire explicitement : CONCLUSION LIMITÉE PAR LE MANQUE DE DONNÉES.\n" +
+    "11. Si aucun événement de rang SUPRÊME n'est présent dans la semaine, le rapport doit indiquer :\n" +
     "    \"SEMAINE DOMINÉE PAR DES DRIVERS SECONDAIRES OU TACTIQUES.\"\n" +
-    "13. Si plusieurs événements sont présents, sélectionner uniquement les 3 événements les plus importants après application de la hiérarchie SUPRÊME > SECONDAIRE > TACTIQUE.\n" +
-    "14. Les événements retenus doivent être classés par importance décroissante avant analyse.\n" +
-    "15. Le FLUX HEBDO DOMINANT doit toujours être dérivé de l'événement ayant le rang le plus élevé observé, sauf activation explicite de la règle CRISE GÉOPOLITIQUE (voir règle de crise).\n" +
-    "16. Si un événement est classé SURPRISE, expliquer en une phrase pourquoi il diffère du consensus.\n" +
-    "17. Si le régime est DOLLAR FORT ou DOLLAR FAIBLE, la justification doit obligatoirement mentionner US10Y, FED ou données macro américaines.\n" +
-    "18. En cas d'absence de consensus clair entre plusieurs drivers majeurs, conserver un régime NEUTRE et attribuer un niveau de confiance FAIBLE.\n\n" +
+    "12. Le FLUX HEBDO DOMINANT doit toujours être dérivé de l'événement ayant le rang le plus élevé observé, sauf activation explicite de la règle CRISE GÉOPOLITIQUE (voir règle de crise).\n" +
+    "13. Si le régime est DOLLAR FORT ou DOLLAR FAIBLE, la justification doit obligatoirement mentionner FED ou données macro américaines.\n" +
+    "14. En cas d'absence de consensus clair entre plusieurs drivers majeurs, conserver un régime NEUTRE et attribuer un niveau de confiance FAIBLE.\n\n" +
 
     "HIÉRARCHIE DES ÉVÉNEMENTS :\n" +
     "SUPRÊME : FED, FOMC, Powell, CPI, Core CPI, PCE, Core PCE, NFP, Chômage, GDP, ISM.\n" +
     "SECONDAIRE : EIA, OPEC, PMI, résultats majeurs, données sectorielles.\n" +
     "TACTIQUE : Géopolitique, Tarifs, Sentiment, Rumeurs.\n\n" +
 
-    "RÈGLE BTC (priorités) :\n" +
-    "Priorité 1 : suivre le régime RISK-ON / RISK-OFF.\n" +
-    "Priorité 2 : suivre DOLLAR FORT / DOLLAR FAIBLE.\n" +
-    "Exception : si un événement crypto spécifique est explicitement observé dans le registre, il peut modifier la direction de BTC.\n\n" +
-
     "RÈGLE DE CRISE GÉOPOLITIQUE :\n" +
     "Un événement tactique ne peut normalement pas annuler un événement suprême.\n" +
     "Exception : en cas de choc géopolitique majeur confirmé (guerre ouverte, attaque militaire directe, fermeture d'une route énergétique stratégique, mobilisation militaire massive ou crise systémique), le régime géopolitique devient temporairement dominant et peut supplanter un driver suprême jusqu'à normalisation du marché.\n" +
-    "Si un événement géopolitique provoque un mouvement global de fuite vers les actifs refuges (GOLD, USD, JPY) et une baisse simultanée des actifs risqués (NASDAQ, SP500, BTC), alors le régime CRISE GÉOPOLITIQUE devient prioritaire.\n" +
+    "Si un événement géopolitique provoque un mouvement global de fuite vers les actifs refuges (GOLD, USD, JPY) et une baisse simultanée des actifs risqués (NASDAQ, SP500), alors le régime CRISE GÉOPOLITIQUE devient prioritaire.\n" +
     "Flux dominant autorisé : CRISE GÉOPOLITIQUE => priorité sur tous les autres régimes (et supplante la règle 15).\n\n" +
-     "RÈGLE DE JUSTIFICATION :\n" +
-"- Chaque justification doit être factuelle : chiffre observé (ex: 'NFP +250k vs +185k attendu') ou événement nommé (ex: 'minutes FOMC hawkish').\n" +
-"- Longueur maximale : 10 mots.\n" +
-"- Style institutionnel obligatoire : 'surprise haussière NFP renforce dollar', 'flight-to-quality vers JPY et GOLD', 'prime géopolitique activée sur USOIL'.\n" +
-"- NUANCE GÉO : défaut crise GÉO Iran/Hormuz → GOLD🟢 refuge immédiat. " +
-"Exception riposte USA confirmée → GOLD🔴 court terme. " +
-"Sans mot-clé militaire explicite dans le texte → GOLD🟢 par défaut.\n" +
-"- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'sentiment dégradé', toute généralité sans chiffre ni source.\n\n" +                        
+    "RÈGLE DE JUSTIFICATION :\n" +
+    "- Chaque justification doit être factuelle : chiffre observé (ex: 'NFP +250k vs +185k attendu') ou événement nommé (ex: 'minutes FOMC hawkish').\n" +
+    "- Longueur maximale : 10 mots.\n" +
+    "- Style institutionnel obligatoire : 'surprise haussière NFP renforce dollar', 'flight-to-quality vers JPY et GOLD', 'prime géopolitique activée sur USOIL'.\n" +
+    "- NUANCE GÉO : défaut crise GÉO Iran/Hormuz → GOLD🟢 refuge immédiat. " +
+    "Exception riposte USA confirmée → GOLD🔴 court terme. " +
+    "Sans mot-clé militaire explicite dans le texte → GOLD🟢 par défaut.\n" +
+    "- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'sentiment dégradé', toute généralité sans chiffre ni source.\n\n" +                        
 
-    "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 11 actifs :\n" +
-    "US10Y, NASDAQ, SP500, GOLD, USOIL, EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, BTC.\n" +
+    "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 6 actifs :\n" +
+    "NASDAQ, SP500, GOLD, USOIL, USDJPY, GBPUSD.\n" +
+    "EURUSD (CONTEXTE UNIQUEMENT, non listé) : s'il apparaît dans le registre, utilise-le uniquement pour calibrer la cohérence directionnelle de GBPUSD (corrélation EUR/GBP) — ne jamais l'afficher comme ligne séparée.\n" +
     "CORRÉLATION USDJPY/GBPUSD : " +
-"En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
-"En régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire (les deux baissent en risk-off, les deux montent en risk-on). " +
-"Divergence possible UNIQUEMENT si BoJ seul (neutre GBPUSD) ou BoE seul (neutre USDJPY).\n" +
-    "CORRÉLATION EURUSD/GBPUSD : même direction obligatoire sauf news BoE seul ou crise UK spécifique.\n" +
+    "En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
+    "En régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire (les deux baissent en risk-off, les deux montent en risk-on). " +
+    "Divergence possible UNIQUEMENT si BoJ seul (neutre GBPUSD) ou BoE seul (neutre USDJPY).\n" +
     "Lister uniquement les actifs avec impact réel — omettre les NEUTRE.\n\n" +
     "Format OBLIGATOIRE et STRICT :\n\n" +
 
@@ -3065,13 +3052,9 @@ payload.put("temperature", 0.05);
     "3. 🎯 IMPACTS DIRECTS SUR NOS ACTIFS SPÉCIFIQUES :\n" +
     "   • 🇺🇸 INDICES (SP500, NASDAQ) : [HAUSSE / BAISSE / NEUTRE] => [Justification macro, ≤10 mots]\n" +
     "   • 🪙 REFUGES & MATIÈRES (GOLD, USOIL) : [HAUSSE / BAISSE / NEUTRE] => [Justification macro, ≤10 mots]\n" +
-    "   • 💵 FOREX (OBLIGATOIRE : les 5 paires doivent apparaître explicitement) :\n" +
-    "     └ EURUSD : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n" +
+    "   • 💵 FOREX (OBLIGATOIRE : les 2 paires doivent apparaître explicitement) :\n" +
     "     └ USDJPY : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n" +
-    "     └ GBPUSD : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n" +
-    "     └ AUDUSD : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n" +
-    "     └ USDCAD : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n" +
-    "   • ⚡ CRYPTO (BTC) : [HAUSSE / BAISSE / NEUTRE] => [Justification cohérente avec la règle BTC, ≤10 mots]\n\n" +
+    "     └ GBPUSD : [HAUSSE / BAISSE / NEUTRE] => [Justification, ≤10 mots]\n\n" +
 
     "4. 📅 AGENDA STRATÉGIQUE (Semaine Prochaine) :\n" +
     "   IMPORTANT : Utiliser UNIQUEMENT les événements futurs explicitement présents dans les données brutes fournies.\n" +
@@ -3084,8 +3067,8 @@ payload.put("temperature", 0.05);
     "   [REGIME STRUCTUREL] => [CONSÉQUENCE PRINCIPALE SUR LES ACTIFS]\n" +
     "   Dérivé exclusivement de l'événement de rang le plus élevé, SAUF si la règle CRISE GÉOPOLITIQUE est activée (dans ce cas, utiliser CRISE GÉOPOLITIQUE).\n\n" +
     "   Exemples :\n" +
-    "   DOLLAR FORT => pression sur EURUSD et GOLD.\n" +
-    "   RISK-ON => soutien NASDAQ, SP500 et BTC.\n" +
+    "   DOLLAR FORT => pression sur GOLD.\n" +
+    "   RISK-ON => soutien NASDAQ et SP500.\n" +
     "   RISK-OFF => préférence pour GOLD et USD.\n" +
     "   CRISE GÉOPOLITIQUE => fuite vers GOLD, USD, JPY ; baisse des actifs risqués.\n\n" +
 
