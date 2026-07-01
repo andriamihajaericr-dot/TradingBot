@@ -507,17 +507,25 @@ public class TradingViewFetcher {
                 Log.d(TAG, "⏳ [TV Pivots] Quota minute épuisé — attente " + msWait + "ms");
                 Thread.sleep(msWait);
             }
-            String urlD = "https://api.twelvedata.com/time_series?symbol=" + allSymbols
-                    + "&interval=1day&outputsize=2&timezone=Exchange&apikey=" + twelveDataKey;
-            String respD = httpGetSimple(urlD);
+            String allSymbolsEncoded = allSymbols.replace("/", "%2F");
+            int cost = tdMap.size() * 2; // 6 symboles × 2 crédits
+                while (!MarketDataFetcher.tryReserveCredits(cost)) {
+                    long msWait = 60000L - (System.currentTimeMillis() % 60000L) + 500;
+                    Log.d(TAG, "⏳ [TV Pivots Daily] Quota épuisé — attente " + msWait + "ms");
+                    Thread.sleep(msWait);
+                }
+                String allSymbolsEncoded = allSymbols.replace("/", "%2F");
+                String urlD = "https://api.twelvedata.com/time_series?symbol=" + allSymbolsEncoded
+                        + "&interval=1day&outputsize=2&timezone=Exchange&apikey=" + twelveDataKey;
+                String respD = httpGetSimple(urlD);
             if (respD != null && !respD.contains("\"status\":\"error\"")) {
-                JSONObject rootD = new JSONObject(respD);
-                
-                for (Map.Entry<String, String> entry : tdMap.entrySet()) {
-                    String key = entry.getKey();
-                    String tdSym = entry.getValue();
-                    
-                    if (rootD.has(tdSym)) {
+            JSONObject rootD = new JSONObject(respD);
+            Log.d(TAG, "📦 [TV Daily] Clés reçues : " + rootD.keys().toString());
+            for (Map.Entry<String, String> entry : tdMap.entrySet()) {
+                String key = entry.getKey();
+                String tdSym = entry.getValue();
+                Log.d(TAG, "🔍 [TV Daily] Cherche clé '" + tdSym + "' dans réponse → " + rootD.has(tdSym));
+                if (rootD.has(tdSym)) {
                         JSONObject assetJson = rootD.getJSONObject(tdSym);
                         JSONArray vals = assetJson.optJSONArray("values");
                         if (vals != null && vals.length() >= 2) {
@@ -553,10 +561,14 @@ public class TradingViewFetcher {
                 Log.d(TAG, "⏳ [TV Pivots Weekly] Quota minute épuisé — attente " + msWait + "ms");
                 Thread.sleep(msWait);
             }
-            String urlW = "https://api.twelvedata.com/time_series?symbol=" + allSymbols
+          while (!MarketDataFetcher.tryReserveCredits(cost)) {
+                long msWait = 60000L - (System.currentTimeMillis() % 60000L) + 500;
+                Log.d(TAG, "⏳ [TV Pivots Weekly] Quota épuisé — attente " + msWait + "ms");
+                Thread.sleep(msWait);
+            }
+            String urlW = "https://api.twelvedata.com/time_series?symbol=" + allSymbolsEncoded
                     + "&interval=1week&outputsize=2&timezone=Exchange&apikey=" + twelveDataKey;
             String respW = httpGetSimple(urlW);
-
             if (respW != null && !respW.contains("\"status\":\"error\"")) {
                 JSONObject rootW = new JSONObject(respW);
                 
