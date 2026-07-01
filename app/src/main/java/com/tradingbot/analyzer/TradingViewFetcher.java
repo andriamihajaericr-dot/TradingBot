@@ -556,14 +556,30 @@ public class TradingViewFetcher {
                         }
                     }
                 }
-                editor.commit();
+            editor.commit();
                 Log.d(TAG, "✅ [TwelveData Batch] Tous les niveaux WEEKLY ont été mis à jour.");
             } else {
                 Log.e(TAG, "🔴 [TwelveData Batch] Échec ou Quota dépassé sur le lot Weekly.");
             }
 
+            // ✅ Injecter les pivots dans les TVMarketData déjà en cache
+            for (String key : SYMBOL_MAP.keySet()) {
+                TVMarketData existing = cache.get(key);
+                if (existing != null) {
+                    double pdh = pdhCache.getOrDefault(key, 0.0);
+                    double pdl = pdlCache.getOrDefault(key, 0.0);
+                    double pwh = pwhCache.getOrDefault(key, 0.0);
+                    double pwl = pwlCache.getOrDefault(key, 0.0);
+                    TVMarketData updated = new TVMarketData(
+                        existing.symbol, existing.price, existing.changePercent,
+                        existing.high, existing.low, existing.open, existing.prevClose,
+                        existing.variance, 0.0, pdh, pdl, pwh, pwl,
+                        existing.timestamp
+                    );
+                    cache.put(key, updated);
+                }
+            }
             logToUI("🏛️ [Fonda IOF] Matrice pivot globale synchronisée par traitement par lot.");
-
         } catch (Exception e) {
             Log.e(TAG, "Erreur fatale lors du traitement par lot des pivots", e);
         }
