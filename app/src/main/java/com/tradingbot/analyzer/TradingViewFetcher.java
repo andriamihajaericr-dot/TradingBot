@@ -228,6 +228,7 @@ public class TradingViewFetcher {
             private String chartSessionId;
 
             @Override
+        
             public void onOpen(WebSocket ws, Response response) {
                 activeWs = ws;
                 logToUI("✅ [TV WS] Canal ouvert.");
@@ -235,7 +236,7 @@ public class TradingViewFetcher {
                 isConnecting.set(false);
                 cache.clear();
             
-                // 1. Session de prix Temps Réel (Quotes) - Utilisation de Object[]
+                // 1. Session de prix Temps Réel (Quotes)
                 quoteSessionId = "qs_" + UUID.randomUUID().toString().substring(0, 12);
                 sendMessage(ws, "set_auth_token", new Object[]{"unauthorized_user_token"});
                 sendMessage(ws, "quote_create_session", new Object[]{quoteSessionId});
@@ -257,7 +258,7 @@ public class TradingViewFetcher {
                     // Flux de cotations en temps réel
                     sendMessage(ws, "quote_add_symbols", new Object[]{quoteSessionId, ticker});
             
-                    // Configuration simplifiée : On envoie directement le ticker sous forme de String pure
+                    // SOLUTION CRITIQUE : Passage du ticker épuré en direct sans enrobage complexe
                     String symId = "sym_" + idCounter;
                     pendingSymbolResolution.put(symId, key);
                     sendMessage(ws, "resolve_symbol", new Object[]{chartSessionId, symId, ticker});
@@ -292,6 +293,19 @@ public class TradingViewFetcher {
                     idx = endPayload;
                 }
             }
+            private void sendMessage(WebSocket ws, String method, Object[] params) { // Remplacé String[] par Object[]
+                try {
+                    JSONArray arr = new JSONArray();
+                    for (Object p : params) arr.put(p);
+                    JSONObject msg = new JSONObject();
+                    msg.put("m", method);
+                    msg.put("p", arr);
+                    String payload = msg.toString();
+                    ws.send("~m~" + payload.length() + "~m~" + payload);
+                } catch (Exception e) {
+                    Log.e(TAG, "[TV WS] Erreur envoi message", e);
+                }
+            }
 
             private void processJsonPayload(String payload) {
                 try {
@@ -299,14 +313,14 @@ public class TradingViewFetcher {
                     JSONObject json = new JSONObject(payload);
                     String m = json.optString("m");
             
-                    // ── RÉSOLUTION DE SYMBOLE : DÉCLENCHE LA CRÉATION DES SÉRIES D/W ──
+                   // ── RÉSOLUTION DE SYMBOLE : DÉCLENCHE LA CRÉATION DES SÉRIES D/W ──
                     if ("symbol_resolved".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
                             String symId = p.getString(1);
                             String key = pendingSymbolResolution.remove(symId);
                             if (key != null && activeWs != null) {
-                                // CORRECTION CRITIQUE : Le 3 final est un entier (Integer), pas un String "3"
+                                // CORRECTION : Le dernier paramètre est désormais le chiffre numérique 3
                                 sendMessage(activeWs, "create_series", new Object[]{chartSessionId, "ser_d_" + key, "s1", symId, "D", 3});
                                 sendMessage(activeWs, "create_series", new Object[]{chartSessionId, "ser_w_" + key, "s1", symId, "W", 3});
                             }
@@ -510,19 +524,7 @@ public class TradingViewFetcher {
                 }
             }
 
-          private void sendMessage(WebSocket ws, String method, Object[] params) { // Remplacé String[] par Object[]
-            try {
-                JSONArray arr = new JSONArray();
-                for (Object p : params) arr.put(p);
-                JSONObject msg = new JSONObject();
-                msg.put("m", method);
-                msg.put("p", arr);
-                String payload = msg.toString();
-                ws.send("~m~" + payload.length() + "~m~" + payload);
-            } catch (Exception e) {
-                Log.e(TAG, "[TV WS] Erreur envoi message", e);
-            }
-        }
+          
         });
     }
 
