@@ -235,11 +235,11 @@ public class TradingViewFetcher {
                 isConnecting.set(false);
                 cache.clear();
             
-                // 1. Session de prix Temps Réel (Quotes)
+                // 1. Session de prix Temps Réel (Quotes) - Utilisation de Object[]
                 quoteSessionId = "qs_" + UUID.randomUUID().toString().substring(0, 12);
-                sendMessage(ws, "set_auth_token", new String[]{"unauthorized_user_token"});
-                sendMessage(ws, "quote_create_session", new String[]{quoteSessionId});
-                sendMessage(ws, "quote_set_fields", new String[]{
+                sendMessage(ws, "set_auth_token", new Object[]{"unauthorized_user_token"});
+                sendMessage(ws, "quote_create_session", new Object[]{quoteSessionId});
+                sendMessage(ws, "quote_set_fields", new Object[]{
                         quoteSessionId,
                         "lp", "chp", "ch", "high_price", "low_price",
                         "open_price", "prev_close_price"
@@ -247,7 +247,7 @@ public class TradingViewFetcher {
             
                 // 2. Session Historique Native (Charts)
                 chartSessionId = "cs_" + UUID.randomUUID().toString().substring(0, 12);
-                sendMessage(ws, "chart_create_session", new String[]{chartSessionId, ""});
+                sendMessage(ws, "chart_create_session", new Object[]{chartSessionId, ""});
             
                 int idCounter = 1;
                 for (String key : SYMBOL_MAP.keySet()) {
@@ -255,12 +255,12 @@ public class TradingViewFetcher {
                     varianceCalculators.putIfAbsent(key, new VarianceCalculator(5));
             
                     // Flux de cotations en temps réel
-                    sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker});
+                    sendMessage(ws, "quote_add_symbols", new Object[]{quoteSessionId, ticker});
             
-                    // Configuration des flux de graphes pour obtenir les chandeliers fermés passés
+                    // Configuration simplifiée : On envoie directement le ticker sous forme de String pure
                     String symId = "sym_" + idCounter;
                     pendingSymbolResolution.put(symId, key);
-                    sendMessage(ws, "resolve_symbol", new String[]{chartSessionId, symId, "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"});
+                    sendMessage(ws, "resolve_symbol", new Object[]{chartSessionId, symId, ticker});
                     idCounter++;
                 }
             
@@ -306,8 +306,9 @@ public class TradingViewFetcher {
                             String symId = p.getString(1);
                             String key = pendingSymbolResolution.remove(symId);
                             if (key != null && activeWs != null) {
-                                sendMessage(activeWs, "create_series", new String[]{chartSessionId, "ser_d_" + key, "s1", symId, "D", "3"});
-                                sendMessage(activeWs, "create_series", new String[]{chartSessionId, "ser_w_" + key, "s1", symId, "W", "3"});
+                                // CORRECTION CRITIQUE : Le 3 final est un entier (Integer), pas un String "3"
+                                sendMessage(activeWs, "create_series", new Object[]{chartSessionId, "ser_d_" + key, "s1", symId, "D", 3});
+                                sendMessage(activeWs, "create_series", new Object[]{chartSessionId, "ser_w_" + key, "s1", symId, "W", 3});
                             }
                         }
                         return;
