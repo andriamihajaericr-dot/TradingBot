@@ -256,15 +256,27 @@ public class TradingViewFetcher {
                     sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker});
 
                     // Configuration des flux de graphes pour obtenir les chandeliers fermés passés
-                    String symId = "sym_" + idCounter;
-                    String serIdD = "ser_d_" + key;
-                    String serIdW = "ser_w_" + key;
-
+                   String symId = "sym_" + idCounter;
+                    pendingSymbolResolution.put(symId, key);
                     sendMessage(ws, "resolve_symbol", new String[]{chartSessionId, symId, "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"});
-                    sendMessage(ws, "create_series", new String[]{chartSessionId, serIdD, "s1", symId, "D", "3"});
-                    sendMessage(ws, "create_series", new String[]{chartSessionId, serIdW, "s1", symId, "W", "3"});
-
                     idCounter++;
+                    if ("symbol_resolved".equals(m)) {
+                    JSONArray p = json.getJSONArray("p");
+                    if (p.length() > 1) {
+                        String symId = p.getString(1);
+                        String key = pendingSymbolResolution.remove(symId);
+                        if (key != null) {
+                            sendMessage(ws, "create_series", new String[]{chartSessionId, "ser_d_"+key, "s1", symId, "D", "3"});
+                            sendMessage(ws, "create_series", new String[]{chartSessionId, "ser_w_"+key, "s1", symId, "W", "3"});
+                        }
+                    }
+                    return;
+                }
+                if ("symbol_error".equals(m) || "series_error".equals(m) || "critical_error".equals(m) || "protocol_error".equals(m)) {
+                    Log.e(TAG, "[TV WS] Erreur serveur (" + m + ") : " + payload);
+                    logToUI("❌ [TV WS] Erreur serveur TradingView (" + m + ")");
+                    return;
+                }
                 }
                 logToUI("📥 [TV WS] Flux temps réel et sessions pivots TradingView initialisés.");
             }
