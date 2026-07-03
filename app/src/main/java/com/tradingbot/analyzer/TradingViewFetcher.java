@@ -232,7 +232,7 @@ public class TradingViewFetcher {
                 connected.set(true);
                 isConnecting.set(false);
                 cache.clear();
-
+            
                 // 1. Session de prix Temps Réel (Quotes)
                 quoteSessionId = "qs_" + UUID.randomUUID().toString().substring(0, 12);
                 sendMessage(ws, "set_auth_token", new String[]{"unauthorized_user_token"});
@@ -242,42 +242,26 @@ public class TradingViewFetcher {
                         "lp", "chp", "ch", "high_price", "low_price",
                         "open_price", "prev_close_price"
                 });
-
+            
                 // 2. Session Historique Native (Charts)
                 chartSessionId = "cs_" + UUID.randomUUID().toString().substring(0, 12);
                 sendMessage(ws, "chart_create_session", new String[]{chartSessionId, ""});
-
+            
                 int idCounter = 1;
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
-                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(5)); 
-                    
+                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(5));
+            
                     // Flux de cotations en temps réel
                     sendMessage(ws, "quote_add_symbols", new String[]{quoteSessionId, ticker});
-
+            
                     // Configuration des flux de graphes pour obtenir les chandeliers fermés passés
-                   String symId = "sym_" + idCounter;
+                    String symId = "sym_" + idCounter;
                     pendingSymbolResolution.put(symId, key);
                     sendMessage(ws, "resolve_symbol", new String[]{chartSessionId, symId, "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"});
                     idCounter++;
-                    if ("symbol_resolved".equals(m)) {
-                    JSONArray p = json.getJSONArray("p");
-                    if (p.length() > 1) {
-                        String symId = p.getString(1);
-                        String key = pendingSymbolResolution.remove(symId);
-                        if (key != null) {
-                            sendMessage(ws, "create_series", new String[]{chartSessionId, "ser_d_"+key, "s1", symId, "D", "3"});
-                            sendMessage(ws, "create_series", new String[]{chartSessionId, "ser_w_"+key, "s1", symId, "W", "3"});
-                        }
-                    }
-                    return;
                 }
-                if ("symbol_error".equals(m) || "series_error".equals(m) || "critical_error".equals(m) || "protocol_error".equals(m)) {
-                    Log.e(TAG, "[TV WS] Erreur serveur (" + m + ") : " + payload);
-                    logToUI("❌ [TV WS] Erreur serveur TradingView (" + m + ")");
-                    return;
-                }
-                }
+            
                 logToUI("📥 [TV WS] Flux temps réel et sessions pivots TradingView initialisés.");
             }
 
@@ -312,18 +296,39 @@ public class TradingViewFetcher {
                     if (!payload.startsWith("{")) return;
                     JSONObject json = new JSONObject(payload);
                     String m = json.optString("m");
-
+            
+                    // ── RÉSOLUTION DE SYMBOLE : DÉCLENCHE LA CRÉATION DES SÉRIES D/W ──
+                    if ("symbol_resolved".equals(m)) {
+                        JSONArray p = json.getJSONArray("p");
+                        if (p.length() > 1) {
+                            String symId = p.getString(1);
+                            String key = pendingSymbolResolution.remove(symId);
+                            if (key != null && activeWs != null) {
+                                sendMessage(activeWs, "create_series", new String[]{chartSessionId, "ser_d_" + key, "s1", symId, "D", "3"});
+                                sendMessage(activeWs, "create_series", new String[]{chartSessionId, "ser_w_" + key, "s1", symId, "W", "3"});
+                            }
+                        }
+                        return;
+                    }
+            
+                    // ── ERREURS SERVEUR TRADINGVIEW ──
+                    if ("symbol_error".equals(m) || "series_error".equals(m) || "critical_error".equals(m) || "protocol_error".equals(m)) {
+                        Log.e(TAG, "[TV WS] Erreur serveur (" + m + ") : " + payload);
+                        logToUI("❌ [TV WS] Erreur serveur TradingView (" + m + ")");
+                        return;
+                    }
+            
                     // ── EXTRACTION NATIVE ET EXCLUSIVE DU HIGH / LOW PRECEDENT (CHART ENDPOINT) ──
                     if ("timescale_update".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
                             JSONObject seriesData = p.getJSONObject(1);
                             java.util.Iterator<String> keys = seriesData.keys();
-                            
+            
                             while (keys.hasNext()) {
-                                String seriesId = keys.next(); 
+                                String seriesId = keys.next();
                                 JSONObject obj = seriesData.getJSONObject(seriesId);
-                                
+            
                                 if (obj.has("s")) {
                                     JSONArray sArr = obj.getJSONArray("s");
                                     if (sArr.length() >= 2) {
@@ -332,9 +337,9 @@ public class TradingViewFetcher {
                                         if (prevBar.has("v")) {
                                             JSONArray vArr = prevBar.getJSONArray("v"); // [TS, Open, High, Low, Close]
                                             if (vArr.length() >= 4) {
-                                                double historicalHigh = vArr.getDouble(2); 
-                                                double historicalLow  = vArr.getDouble(3); 
-                                                
+                                                double historicalHigh = vArr.getDouble(2);
+                                                double historicalLow  = vArr.getDouble(3);
+            
                                                 if (seriesId.startsWith("ser_d_")) {
                                                     String key = seriesId.substring(6);
                                                     pdhCache.put(key, historicalHigh);
@@ -352,7 +357,7 @@ public class TradingViewFetcher {
                         }
                         return;
                     }
-
+            
                     // ── PARSING FLUX TEMPS RÉEL (QUOTES) ──
                     if ("qsd".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
@@ -360,42 +365,42 @@ public class TradingViewFetcher {
                             JSONObject quote = p.getJSONObject(1);
                             String ticker = quote.optString("n");
                             JSONObject v = quote.optJSONObject("v");
-                            
+            
                             if (v != null && v.has("lp")) {
                                 String key = getKeyFromTicker(ticker);
                                 if (key != null) {
                                     double price = v.optDouble("lp", 0);
                                     double change = v.optDouble("chp", 0);
-                                        
+            
                                     TVMarketData existing = cache.get(key);
                                     double high      = v.optDouble("high_price",       existing != null && existing.high > 0      ? existing.high      : price);
                                     double low       = v.optDouble("low_price",        existing != null && existing.low  > 0      ? existing.low       : price);
                                     double open      = v.optDouble("open_price",       existing != null && existing.open > 0      ? existing.open      : price);
                                     double prevClose = v.optDouble("prev_close_price", existing != null && existing.prevClose > 0 ? existing.prevClose : price);
-
+            
                                     // Sécurité d'élargissement dynamique intraday
                                     if (price > high) high = price;
                                     if (price < low) low = price;
-
+            
                                     VarianceCalculator calc = varianceCalculators.get(key);
                                     double variance = 0.0;
                                     if (calc != null) {
                                         calc.addPrice(price);
                                         variance = calc.getVariance();
                                     }
-
+            
                                     double pdh = pdhCache.getOrDefault(key, 0.0);
                                     double pdl = pdlCache.getOrDefault(key, 0.0);
                                     double pwh = pwhCache.getOrDefault(key, 0.0);
                                     double pwl = pwlCache.getOrDefault(key, 0.0);
-
+            
                                     TVMarketData newData = new TVMarketData(
                                             key, price, change, high, low, open, prevClose,
                                             variance, 0.0, pdh, pdl, pwh, pwl,
                                             System.currentTimeMillis()
                                     );
                                     cache.put(key, newData);
-
+            
                                     checkAndAlert(key, newData);
                                 }
                             }
