@@ -23,8 +23,8 @@ import okhttp3.WebSocketListener;
 public class TradingViewFetcher {
 
     private static final String TAG = "TradingViewFetcher";
-    private WebSocket activeWs;
-    private final Map<String, String> pendingSymbolResolution = new java.util.concurrent.ConcurrentHashMap<>();
+    private static WebSocket activeWs;
+    private static final Map<String, String> pendingSymbolResolution = new ConcurrentHashMap<>();
     // ── Matrice Complète des 11 Actifs Macro Fonda IOF ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
         // Indices & Obligataire
@@ -229,6 +229,7 @@ public class TradingViewFetcher {
 
             @Override
             public void onOpen(WebSocket ws, Response response) {
+                activeWs = ws;
                 logToUI("✅ [TV WS] Canal ouvert.");
                 connected.set(true);
                 isConnecting.set(false);
