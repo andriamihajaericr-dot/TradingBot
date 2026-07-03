@@ -509,19 +509,19 @@ public class TradingViewFetcher {
                 }
             }
 
-            private void sendMessage(WebSocket ws, String method, String[] params) {
-                try {
-                    JSONArray arr = new JSONArray();
-                    for (String p : params) arr.put(p);
-                    JSONObject msg = new JSONObject();
-                    msg.put("m", method);
-                    msg.put("p", arr);
-                    String payload = msg.toString();
-                    ws.send("~m~" + payload.length() + "~m~" + payload);
-                } catch (Exception e) {
-                    Log.e(TAG, "[TV WS] Erreur envoi message", e);
-                }
+          private void sendMessage(WebSocket ws, String method, Object[] params) { // Remplacé String[] par Object[]
+            try {
+                JSONArray arr = new JSONArray();
+                for (Object p : params) arr.put(p);
+                JSONObject msg = new JSONObject();
+                msg.put("m", method);
+                msg.put("p", arr);
+                String payload = msg.toString();
+                ws.send("~m~" + payload.length() + "~m~" + payload);
+            } catch (Exception e) {
+                Log.e(TAG, "[TV WS] Erreur envoi message", e);
             }
+        }
         });
     }
 
