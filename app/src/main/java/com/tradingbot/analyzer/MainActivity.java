@@ -77,9 +77,17 @@ public class MainActivity extends AppCompatActivity {
         }
     });
 
+    private WebhookServer webhookServer;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+      
+    try {
+        webhookServer = new WebhookServer(this);
+        addLog("✅ Serveur Webhook démarré sur le port 8080");
+    } catch (IOException e) {
+        addLog("❌ Erreur démarrage serveur : " + e.getMessage());
+    }
         setContentView(R.layout.activity_main);
         instance = this;
 
@@ -607,5 +615,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         instance = null;  
+        
+    if (webhookServer != null) {
+        webhookServer.stop();
+        webhookServer = null;
+    }
     }
 }
