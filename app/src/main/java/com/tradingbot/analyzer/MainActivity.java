@@ -163,16 +163,16 @@ public class MainActivity extends AppCompatActivity {
                                       .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
                                       .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
                                       .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance))
-                                      
+                                      .append("\n");
                                          // ── 2. NIVEAUX INSTITUTIONNELS ET CASSURES NATIVES ──
-sb.append(d.pdh > 0 ? (" | PDH=" + String.format(Locale.US, formatPrice, d.pdh)) : " | PDH=⏳(En attente TV)");
-sb.append(d.pdl > 0 ? (" | PDL=" + String.format(Locale.US, formatPrice, d.pdl)) : " | PDL=⏳(En attente TV)");
-sb.append(d.brokeAbovePDH ? " 🔺[Breakout PDH]" : (d.brokeBelowPDL ? " 🔻[Breakdown PDL]" : ""));
-
-sb.append(d.pwh > 0 ? (" | PWH=" + String.format(Locale.US, formatPrice, d.pwh)) : " | PWH=⏳(En attente TV)");
-sb.append(d.pwl > 0 ? (" | PWL=" + String.format(Locale.US, formatPrice, d.pwl)) : " | PWL=⏳(En attente TV)");
-sb.append(d.brokeAbovePWH ? " 🚀[Breakout PWH]" : (d.brokeBelowPWL ? " 🔥[Breakdown PWL]" : ""));
-sb.append("\n");
+                                    sb.append(d.pdh > 0 ? (" | PDH=" + String.format(Locale.US, formatPrice, d.pdh)) : " | PDH=⏳(En attente TV)");
+                                    sb.append(d.pdl > 0 ? (" | PDL=" + String.format(Locale.US, formatPrice, d.pdl)) : " | PDL=⏳(En attente TV)");
+                                    sb.append(d.brokeAbovePDH ? " 🔺[Breakout PDH]" : (d.brokeBelowPDL ? " 🔻[Breakdown PDL]" : ""));
+                                    
+                                    sb.append(d.pwh > 0 ? (" | PWH=" + String.format(Locale.US, formatPrice, d.pwh)) : " | PWH=⏳(En attente TV)");
+                                    sb.append(d.pwl > 0 ? (" | PWL=" + String.format(Locale.US, formatPrice, d.pwl)) : " | PWL=⏳(En attente TV)");
+                                    sb.append(d.brokeAbovePWH ? " 🚀[Breakout PWH]" : (d.brokeBelowPWL ? " 🔥[Breakdown PWL]" : ""));
+                                    sb.append("\n");
                                       
                                 }
                                 
