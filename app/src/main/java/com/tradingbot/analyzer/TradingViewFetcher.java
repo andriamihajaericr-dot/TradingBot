@@ -254,14 +254,18 @@ public class TradingViewFetcher {
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
                     varianceCalculators.putIfAbsent(key, new VarianceCalculator(5));
-            
-                    // Flux de cotations en temps réel
+                
+                    // 1. Flux de cotations en temps réel (Accepte le ticker brut)
                     sendMessage(ws, "quote_add_symbols", new Object[]{quoteSessionId, ticker});
-            
-                    // SOLUTION CRITIQUE : Passage du ticker épuré en direct sans enrobage complexe
+                
+                    // 2. Flux Graphique Historique (Exige l'enrobage JSON préfixé par '=')
                     String symId = "sym_" + idCounter;
                     pendingSymbolResolution.put(symId, key);
-                    sendMessage(ws, "resolve_symbol", new Object[]{chartSessionId, symId, ticker});
+                    
+                    // CORRECTION : Enrobage JSON requis pour éviter la "protocol_error"
+                    String symbolJson = "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}";
+                    
+                    sendMessage(ws, "resolve_symbol", new Object[]{chartSessionId, symId, symbolJson});
                     idCounter++;
                 }
             
