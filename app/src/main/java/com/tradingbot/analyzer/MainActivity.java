@@ -126,84 +126,45 @@ public class MainActivity extends AppCompatActivity {
         });
 
         testBtn.setOnClickListener(v -> {
-            addLog("🧪 [TEST] Déclenchement RECUP DONNÉES TV...");
-            new Thread(() -> {
-                try {
-                    // === TEST TRADINGVIEW FETCHER ===
-                    runOnUiThread(() -> addLog("📊 [TEST] Lancement TradingViewFetcher..."));
+    addLog("🧪 [TEST] Déclenchement RECUP DONNÉES TV...");
+    new Thread(() -> {
+        try {
+            runOnUiThread(() -> addLog("📊 [TEST] Lancement TradingViewFetcher..."));
 
-                    // 1. Démarrer le pipeline (WebSocket + requêtes pivots natifs en arrière-plan)
-                    TradingViewFetcher.start(getApplicationContext());
+            TradingViewFetcher.start(getApplicationContext());
 
-                    // Modifié pour correspondre à la réalité temporelle du Thread.sleep
-                    runOnUiThread(() -> addLog("⏳ [TEST] Attente de la stabilisation du flux et des pivots (16s)..."));
-                    try {
-                        Thread.sleep(16000); 
-                    } catch (InterruptedException ignored) {}
+            runOnUiThread(() -> addLog("⏳ [TEST] Attente de la stabilisation du flux et des pivots (16s)..."));
+            try { Thread.sleep(16000); } catch (InterruptedException ignored) {}
 
-                    // 2. Récupérer les données une fois que tout est chargé et stabilisé
-                    TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
-                        @Override
-                        public void onDataReady(Map<String, TradingViewFetcher.TVMarketData> data) {
-                            runOnUiThread(() -> {
-                                addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
-                                StringBuilder sb = new StringBuilder();
-                                
-                                for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : data.entrySet()) {
-                                    TradingViewFetcher.TVMarketData d = entry.getValue();
-                                    String key = entry.getKey();
-                                    
-                                    String formatPrice = "%.4f";
-                                    if ("GBPUSD".equals(key) || "EURUSD".equals(key) || "AUDUSD".equals(key) || "USDCAD".equals(key)) {
-                                        formatPrice = "%.5f";
-                                    } else if ("USDJPY".equals(key)) {
-                                        formatPrice = "%.3f";
-                                    } else if ("NASDAQ".equals(key) || "SP500".equals(key) || "GOLD".equals(key) || "USOIL".equals(key) || "BITCOIN".equals(key)) {
-                                        formatPrice = "%.2f";
-                                    }
-                                    
-                                    sb.append("• ").append(key).append(" : ")
-                                      .append(String.format(Locale.US, formatPrice, d.price))
-                                      .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
-                                      
-                                      // ── 1. LES 4 INDICATEURS MACRO ──
-                                      .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
-                                      .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
-                                      .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
-                                      .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance))
-                                      .append("\n");
-                                         // ── 2. NIVEAUX INSTITUTIONNELS ET CASSURES NATIVES ──
-                                    sb.append(d.pdh > 0 ? (" | PDH=" + String.format(Locale.US, formatPrice, d.pdh)) : " | PDH=⏳(En attente TV)");
-                                    sb.append(d.pdl > 0 ? (" | PDL=" + String.format(Locale.US, formatPrice, d.pdl)) : " | PDL=⏳(En attente TV)");
-                                    sb.append(d.brokeAbovePDH ? " 🔺[Breakout PDH]" : (d.brokeBelowPDL ? " 🔻[Breakdown PDL]" : ""));
-                                    
-                                    sb.append(d.pwh > 0 ? (" | PWH=" + String.format(Locale.US, formatPrice, d.pwh)) : " | PWH=⏳(En attente TV)");
-                                    sb.append(d.pwl > 0 ? (" | PWL=" + String.format(Locale.US, formatPrice, d.pwl)) : " | PWL=⏳(En attente TV)");
-                                    sb.append(d.brokeAbovePWH ? " 🚀[Breakout PWH]" : (d.brokeBelowPWL ? " 🔥[Breakdown PWL]" : ""));
-                                    sb.append("\n");
-                                      
-                                }
-                                
-                                addLog("📊 Données TV :\n" + sb.toString());
-                                
-                                NotificationService.sendTelegramSecure(
-                                    "📊 *DONNÉES TRADINGVIEW COMPLETES (TEST)*\n\n" + sb.toString(),
-                                    getApplicationContext()
-                                );
-                            });
-                        }
+            TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
+                @Override
+                public void onDataReady(Map<String, TradingViewFetcher.TVMarketData> data) {
+                    runOnUiThread(() -> {
+                        addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
                         
-                        @Override
-                        public void onError(String error) {
-                            runOnUiThread(() -> addLog("❌ [TV] Erreur : " + error));
-                        }
+                        // Appel direct de la structure centralisée native de votre Fetcher
+                        String contexteMacro = TradingViewFetcher.buildContexteMacroGlobal(getApplicationContext());
+                        
+                        addLog("📊 Données TV :\n" + contexteMacro);
+                        
+                        NotificationService.sendTelegramSecure(
+                            "📊 *DONNÉES TRADINGVIEW COMPLETES (TEST)*\n\n" + contexteMacro,
+                            getApplicationContext()
+                        );
                     });
-                } catch (Exception e) {
-                    Log.e(TAG, "Échec test complet", e);
-                    runOnUiThread(() -> addLog("❌ [TEST] Erreur : " + e.getMessage()));
                 }
-            }).start();
-        });
+                
+                @Override
+                public void onError(String error) {
+                    runOnUiThread(() -> addLog("❌ [TV] Erreur : " + error));
+                }
+            });
+        } catch (Exception e) {
+            android.util.Log.e("TradingBotTest", "Échec test complet", e);
+            runOnUiThread(() -> addLog("❌ [TEST] Erreur : " + e.getMessage()));
+        }
+    }).start();
+});
          
         exportBtn.setOnClickListener(v -> exportDatabaseToStorage());
         importBtn.setOnClickListener(v -> importDatabaseFromStorage());
