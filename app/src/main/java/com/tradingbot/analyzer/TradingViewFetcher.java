@@ -183,17 +183,6 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
         logToUI("🔄 [Anti-Spam] Réinitialisation des déclencheurs d'alertes pivots pour la nouvelle session.");
     }
 
-    public static void injectKeyLevels(String asset, double pdh, double pdl, double pwh, double pwl) {
-        if (pdh > 0) { pdhCache.put(asset, pdh); saveLevelToStorage(asset, "pdh", pdh); }
-        if (pdl > 0) { pdlCache.put(asset, pdl); saveLevelToStorage(asset, "pdl", pdl); }
-        if (pwh > 0) { pwhCache.put(asset, pwh); saveLevelToStorage(asset, "pwh", pwh); }
-        if (pwl > 0) { pwlCache.put(asset, pwl); saveLevelToStorage(asset, "pwl", pwl); }
-        
-        alertFiredPDH.remove(asset);
-        alertFiredPDL.remove(asset);
-        alertFiredPWH.remove(asset);
-        alertFiredPWL.remove(asset);
-    }
 
     public static void fetchAll(OnDataReadyListener listener) {
         if (listener == null) return;
