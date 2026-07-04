@@ -84,18 +84,31 @@ public class WebhookServer extends NanoHTTPD {
         }
     }
 
-    // ── Sauvegarde des niveaux dans SharedPreferences ──
+    // ── Sauvegarde et Injection en temps réel des niveaux ──
     private void saveLevels(String asset, JSONObject obj) throws org.json.JSONException {
+        double dh = obj.getDouble("daily_high");
+        double dl = obj.getDouble("daily_low");
+        double wh = obj.getDouble("weekly_high");
+        double wl = obj.getDouble("weekly_low");
+        double mh = obj.getDouble("monthly_high");
+        double ml = obj.getDouble("monthly_low");
+        double h4h = obj.getDouble("h4_high");
+        double h4l = obj.getDouble("h4_low");
+
+        // 1. Stockage local pour le prochain redémarrage
         SharedPreferences prefs = context.getSharedPreferences("KeyLevels", Context.MODE_PRIVATE);
         prefs.edit()
-            .putFloat(asset + "_daily_high", (float) obj.getDouble("daily_high"))
-            .putFloat(asset + "_daily_low", (float) obj.getDouble("daily_low"))
-            .putFloat(asset + "_weekly_high", (float) obj.getDouble("weekly_high"))
-            .putFloat(asset + "_weekly_low", (float) obj.getDouble("weekly_low"))
-            .putFloat(asset + "_monthly_high", (float) obj.getDouble("monthly_high"))
-            .putFloat(asset + "_monthly_low", (float) obj.getDouble("monthly_low"))
-            .putFloat(asset + "_h4_high", (float) obj.getDouble("h4_high"))
-            .putFloat(asset + "_h4_low", (float) obj.getDouble("h4_low"))
+            .putFloat(asset + "_daily_high", (float) dh)
+            .putFloat(asset + "_daily_low", (float) dl)
+            .putFloat(asset + "_weekly_high", (float) wh)
+            .putFloat(asset + "_weekly_low", (float) wl)
+            .putFloat(asset + "_monthly_high", (float) mh)
+            .putFloat(asset + "_monthly_low", (float) ml)
+            .putFloat(asset + "_h4_high", (float) h4h)
+            .putFloat(asset + "_h4_low", (float) h4l)
             .apply();
+
+        // 2. Injection directe dans le moteur d'alerte temps réel de l'application
+        TradingViewFetcher.injectKeyLevels(asset, dh, dl, wh, wl);
     }
 }
