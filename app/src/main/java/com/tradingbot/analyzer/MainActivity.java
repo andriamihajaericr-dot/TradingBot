@@ -570,9 +570,5 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         instance = null;  
         
-    if (webhookServer != null) {
-        webhookServer.stop();
-        webhookServer = null;
-    }
     } 
 }
