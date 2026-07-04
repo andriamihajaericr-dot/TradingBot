@@ -85,7 +85,7 @@ public class WebhookServer extends NanoHTTPD {
     }
 
     // ── Sauvegarde des niveaux dans SharedPreferences ──
-    private void saveLevels(String asset, JSONObject obj) {
+    private void saveLevels(String asset, JSONObject obj) throws org.json.JSONException {
         SharedPreferences prefs = context.getSharedPreferences("KeyLevels", Context.MODE_PRIVATE);
         prefs.edit()
             .putFloat(asset + "_daily_high", (float) obj.getDouble("daily_high"))
