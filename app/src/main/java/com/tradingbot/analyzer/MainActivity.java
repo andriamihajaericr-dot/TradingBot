@@ -82,15 +82,14 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
       
-    try {
-        webhookServer = new WebhookServer(this);
-        addLog("✅ Serveur Webhook démarré sur le port 8080");
-    } catch (IOException e) {
-        addLog("❌ Erreur démarrage serveur : " + e.getMessage());
-    }
-        setContentView(R.layout.activity_main);
-        instance = this;
-
+    setContentView(R.layout.activity_main);
+instance = this;
+try {
+    webhookServer = new WebhookServer(this);
+    addLog("✅ Serveur Webhook démarré sur le port 8080");
+} catch (Exception e) {
+    addLog("❌ Erreur démarrage serveur : " + e.getMessage());
+}
         eventDb = EventDatabase.getInstance(this);
         EventValidator.setAppContext(this);
         
