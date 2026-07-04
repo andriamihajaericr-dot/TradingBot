@@ -119,6 +119,30 @@ public class TradingViewFetcher {
         }
     }
 
+       /**
+ * Injecte les niveaux PDH/PDL/PWH/PWL reçus depuis WebhookServer (TradingView Pine Script)
+ * Appelé par WebhookServer.saveLevels() à chaque réception d'un event "levels"
+ */
+public static void injectKeyLevels(String asset, double pdh, double pdl,
+                                    double pwh, double pwl) {
+    if (asset == null || asset.isEmpty()) return;
+    if (pdh > 0) { pdhCache.put(asset, pdh); alertFiredPDH.remove(asset); }
+    if (pdl > 0) { pdlCache.put(asset, pdl); alertFiredPDL.remove(asset); }
+    if (pwh > 0) { pwhCache.put(asset, pwh); alertFiredPWH.remove(asset); }
+    if (pwl > 0) { pwlCache.put(asset, pwl); alertFiredPWL.remove(asset); }
+    Log.i("TradingViewFetcher", "[INJECT] " + asset +
+        " PDH=" + String.format(java.util.Locale.US, "%.4f", pdh) +
+        " PDL=" + String.format(java.util.Locale.US, "%.4f", pdl) +
+        " PWH=" + String.format(java.util.Locale.US, "%.4f", pwh) +
+        " PWL=" + String.format(java.util.Locale.US, "%.4f", pwl));
+    if (MainActivity.instance != null) {
+        MainActivity.instance.addLog("✅ [INJECT] " + asset +
+            " PDH=" + String.format(java.util.Locale.US, "%.4f", pdh) +
+            " PDL=" + String.format(java.util.Locale.US, "%.4f", pdl) +
+            " PWH=" + String.format(java.util.Locale.US, "%.4f", pwh) +
+            " PWL=" + String.format(java.util.Locale.US, "%.4f", pwl));
+    }
+}
     private static String twelveDataKey = "";
     private static final String PREFS_WEEKLY = "TradingBotPrefs";
 
