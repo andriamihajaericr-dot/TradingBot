@@ -602,30 +602,23 @@ private static String httpGetSimple(String url) {
     }
     return null;
 }
-
-     private static void fetchFromPolygon() {
+ private static void fetchFromPolygon() {
     if (appContext == null) return;
     
-    // 1. On utilise une variable temporaire pour la recherche
     String tempApiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
         .getString("macro_api_key", "");
-        
     if (tempApiKey.isEmpty()) {
         tempApiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
             .getString("twelve_data_key", "");
     }
-    
     if (tempApiKey.isEmpty()) {
         logToUI("⚠️ [Polygon] Clé absente — saisir la clé Polygon dans le champ TwelveData.");
         return;
     }
     
-    // 2. LA CORRECTION : On fige la clé dans une variable finale pour le Lambda
     final String apiKey = tempApiKey;
-
     logToUI("🔄 [Polygon] Chargement PDH/PDL/PWH/PWL...");
 
-    // Mapping actif → ticker Polygon
     String[][] polygonMap = {
         {"GOLD",    "C:XAUUSD"},
         {"GBPUSD",  "C:GBPUSD"},
@@ -636,117 +629,94 @@ private static String httpGetSimple(String url) {
     };
 
     new Thread(() -> {
-        // Le reste de votre code reste strictement IDENTIQUE.
-        // La variable 'apiKey' étant désormais 'final', le compilateur acceptera le build.
         int count = 0;
-        // Calculer les dates semaine précédente
-        java.util.Calendar cal = java.util.Calendar.getInstance();
-        cal.add(java.util.Calendar.DAY_OF_YEAR, -7);
-        String dateFrom = new java.text.SimpleDateFormat("yyyy-MM-dd",
-            java.util.Locale.US).format(cal.getTime());
-        cal.add(java.util.Calendar.DAY_OF_YEAR, 6);
-        String dateTo = new java.text.SimpleDateFormat("yyyy-MM-dd",
-            java.util.Locale.US).format(cal.getTime());
 
-        // Utilisation d'une boucle indexée pour gérer proprement la dernière pause
+        // 🛠️ FIX DATE WEEKLY : On élargit la fenêtre à 30 jours pour charger assez de bougies
+        java.util.Calendar calW = java.util.Calendar.getInstance();
+        String dateToWeek = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(calW.getTime());
+        calW.add(java.util.Calendar.DAY_OF_YEAR, -30); 
+        String dateFromWeek = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(calW.getTime());
+
+        // Configuration fuseau UTC+3 pour le calcul journalier
+        java.util.TimeZone tzMada = java.util.TimeZone.getTimeZone("GMT+3");
+        java.util.Calendar calMada = java.util.Calendar.getInstance(tzMada);
+        calMada.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        calMada.set(java.util.Calendar.MINUTE, 0);
+        calMada.set(java.util.Calendar.SECOND, 0);
+        calMada.set(java.util.Calendar.MILLISECOND, 0);
+        long localTodayMidnightUTC = calMada.getTimeInMillis();
+        long targetStartUTC = localTodayMidnightUTC - (24 * 60 * 60 * 1000);
+        long targetEndUTC   = localTodayMidnightUTC - 1;
+
+        java.text.SimpleDateFormat polySdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+        polySdf.setTimeZone(tzMada);
+        calMada.add(java.util.Calendar.DAY_OF_YEAR, -3);
+        String dateFromH = polySdf.format(calMada.getTime());
+        String dateToH   = polySdf.format(new java.util.Date());
+
         for (int i = 0; i < polygonMap.length; i++) {
             String asset  = polygonMap[i][0];
             String ticker = polygonMap[i][1];
             try {
-                   // ── 1. PDH/PDL Dynamique aligné sur UTC+3 (Mada) avec Extended Hours ──
+                // ── 1. PDH/PDL Dynamique (UTC+3) ──
+                String urlPrev = "https://api.polygon.io/v2/aggs/ticker/" + ticker 
+                    + "/range/1/hour/" + dateFromH + "/" + dateToH 
+                    + "?adjusted=true&extended_hours=true&sort=asc&apiKey=" + apiKey;
 
-// Définition de votre fuseau horaire de référence
-java.util.TimeZone tzMada = java.util.TimeZone.getTimeZone("GMT+3");
-java.util.Calendar calMada = java.util.Calendar.getInstance(tzMada);
+                String respPrev = httpGetSimple(urlPrev);
+                if (respPrev != null) {
+                    JSONObject json = new JSONObject(respPrev);
+                    JSONArray results = json.optJSONArray("results");
+                    if (results != null && results.length() > 0) {
+                        double maxHighLocal = Double.MIN_VALUE;
+                        double minLowLocal  = Double.MAX_VALUE;
+                        boolean hashValidData = false;
 
-// Calculer les bornes en millisecondes du JOUR PRÉCÉDENT en UTC+3
-calMada.set(java.util.Calendar.HOUR_OF_DAY, 0);
-calMada.set(java.util.Calendar.MINUTE, 0);
-calMada.set(java.util.Calendar.SECOND, 0);
-calMada.set(java.util.Calendar.MILLISECOND, 0);
-long localTodayMidnightUTC = calMada.getTimeInMillis(); // Minuit aujourd'hui à Mada
+                        for (int j = 0; j < results.length(); j++) {
+                            JSONObject candle = results.getJSONObject(j);
+                            long t = candle.optLong("t", 0);
+                            if (t >= targetStartUTC && t <= targetEndUTC) {
+                                double candleHigh = candle.optDouble("h", 0);
+                                double candleLow  = candle.optDouble("l", 0);
+                                if (candleHigh > maxHighLocal) maxHighLocal = candleHigh;
+                                if (candleLow < minLowLocal && candleLow > 0)  minLowLocal = candleLow;
+                                hashValidData = true;
+                            }
+                        }
 
-long targetStartUTC = localTodayMidnightUTC - (24 * 60 * 60 * 1000); // Début jour précédent 00:00
-long targetEndUTC   = localTodayMidnightUTC - 1;                      // Fin jour précédent 23:59
+                        if (hashValidData) {
+                            pdhCache.put(asset, maxHighLocal);
+                            pdlCache.put(asset, minLowLocal);
+                            saveLevelToStorage(asset, "pdh", maxHighLocal);
+                            saveLevelToStorage(asset, "pdl", minLowLocal);
+                            alertFiredPDH.remove(asset);
+                            alertFiredPDL.remove(asset);
+                            count++;
+                            logToUI("🎯 [DAILY UTC+3] " + asset + " H=" + String.format(Locale.US, "%.4f", maxHighLocal) + " L=" + String.format(Locale.US, "%.4f", minLowLocal));
+                        }
+                    }
+                }
 
-// Formater les dates textuelles pour l'appel d'historique Polygon (on prend large : 3 jours)
-java.text.SimpleDateFormat polySdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
-polySdf.setTimeZone(tzMada);
-calMada.add(java.util.Calendar.DAY_OF_YEAR, -3);
-String dateFromH = polySdf.format(calMada.getTime());
-String dateToH   = polySdf.format(new java.util.Date()); // Aujourd'hui
-
-// URL configurée en HOURLY (1h) + EXTENDED_HOURS pour capter la volatilité nocturne des indices/ETF
-String urlPrev = "https://api.polygon.io/v2/aggs/ticker/" + ticker 
-    + "/range/1/hour/" + dateFromH + "/" + dateToH 
-    + "?adjusted=true&extended_hours=true&sort=asc&apiKey=" + apiKey;
-
-String respPrev = httpGetSimple(urlPrev); // Call 1
-
-if (respPrev != null) {
-    JSONObject json = new JSONObject(respPrev);
-    JSONArray results = json.optJSONArray("results");
-    
-    if (results != null && results.length() > 0) {
-        double maxHighLocal = Double.MIN_VALUE;
-        double minLowLocal  = Double.MAX_VALUE;
-        boolean hashValidData = false;
-
-        // On scanne chaque bougie horaire retournée par Polygon
-        for (int j = 0; j < results.length(); j++) {
-            JSONObject candle = results.getJSONObject(j);
-            long t = candle.optLong("t", 0); // Timestamp UTC absolu du début de la bougie
-
-            // La magie opère ici : On vérifie si la bougie appartient à VOTRE journée précédente (UTC+3)
-            if (t >= targetStartUTC && t <= targetEndUTC) {
-                double candleHigh = candle.optDouble("h", 0);
-                double candleLow  = candle.optDouble("l", 0);
-
-                if (candleHigh > maxHighLocal) maxHighLocal = candleHigh;
-                if (candleLow < minLowLocal && candleLow > 0)  minLowLocal = candleLow;
-                hashValidData = true;
-            }
-        }
-
-        // Si des bougies ont été validées pour votre journée locale, on applique les niveaux
-        if (hashValidData) {
-            double pdh = maxHighLocal;
-            double pdl = minLowLocal;
-
-            pdhCache.put(asset, pdh);
-            pdlCache.put(asset, pdl);
-            saveLevelToStorage(asset, "pdh", pdh);
-            saveLevelToStorage(asset, "pdl", pdl);
-            alertFiredPDH.remove(asset);
-            alertFiredPDL.remove(asset);
-            count++;
-            
-            logToUI("🎯 [UTC+3 FIX] " + asset +
-                " PDH=" + String.format(java.util.Locale.US, "%.4f", pdh) +
-                " PDL=" + String.format(java.util.Locale.US, "%.4f", pdl));
-        } else {
-            Log.w(TAG, "⚠️ Aucune donnée horaire correspondante trouvée pour " + asset + " dans la plage UTC+3 cible.");
-        }
-    }
-    }
-                // PAUSE ANTI-429 (Obligatoire après le premier appel)
+                // ⏳ Pause anti-429
                 Thread.sleep(12500);
 
-                // ── 2. PWH/PWL — bougie weekly précédente ──
+                // ── 2. PWH/PWL — Corrigé avec historique large de 30 jours ──
                 String urlWeek = "https://api.polygon.io/v2/aggs/ticker/"
                     + ticker + "/range/1/week/"
-                    + dateFrom + "/" + dateTo
+                    + dateFromWeek + "/" + dateToWeek
                     + "?adjusted=true&sort=desc&limit=2&apiKey=" + apiKey;
-                String respWeek = httpGetSimple(urlWeek); // Call 2[cite: 2]
                 
+                String respWeek = httpGetSimple(urlWeek);
                 if (respWeek != null) {
                     JSONObject json = new JSONObject(respWeek);
                     JSONArray results = json.optJSONArray("results");
+                    
+                    // Désormais, length >= 2 sera TOUJOURS vrai car on demande un historique de 30 jours
                     if (results != null && results.length() >= 2) {
-                        // Index 1 = semaine précédente (desc)
-                        JSONObject prevWeek = results.getJSONObject(1);
+                        JSONObject prevWeek = results.getJSONObject(1); // Index 1 = Semaine précédente fermée
                         double pwh = prevWeek.optDouble("h", 0);
                         double pwl = prevWeek.optDouble("l", 0);
+                        
                         if (pwh > 0) {
                             pwhCache.put(asset, pwh);
                             pwlCache.put(asset, pwl);
@@ -754,27 +724,24 @@ if (respPrev != null) {
                             saveLevelToStorage(asset, "pwl", pwl);
                             alertFiredPWH.remove(asset);
                             alertFiredPWL.remove(asset);
-                            logToUI("✅ [PWH/PWL] " + asset +
-                                " H=" + String.format(Locale.US, "%.4f", pwh) +
-                                " L=" + String.format(Locale.US, "%.4f", pwl));
+                            logToUI("✅ [WEEKLY] " + asset + " H=" + String.format(Locale.US, "%.4f", pwh) + " L=" + String.format(Locale.US, "%.4f", pwl));
                         }
                     }
                 }
                 
-                // PAUSE ANTI-429 (Après le deuxième appel, sauf si c'est le tout dernier actif)
+                // ⏳ Pause anti-429 avant le prochain actif
                 if (i < polygonMap.length - 1) {
                     Thread.sleep(12500);
                 }
                 
             } catch (Exception e) {
                 Log.e(TAG, "[Polygon] Erreur " + asset + " : " + e.getMessage());
-                logToUI("❌ [Polygon] " + asset + " : " + e.getMessage());
             }
         }
-        logToUI("✅ [Polygon] " + count + " actifs chargés — PDH/PDL/PWH/PWL précis.");
+        logToUI("✅ [Polygon] " + count + " actifs chargés (Pivots Daily & Weekly synchronisés).");
     }).start();
     }
-
+    
     private static void saveLevelToStorage(String key, String type, double value) {
         if (appContext == null || value <= 0) return;
         try {
