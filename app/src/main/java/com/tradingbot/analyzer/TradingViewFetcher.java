@@ -576,6 +576,34 @@ public static void fetchPreviousLevels() {
     }
     fetchFromPolygon();
 }
+    /**
+ * Effectue une requête HTTP GET synchrone standard à l'aide du client OkHttp existant.
+ * Doit impérativement être appelé depuis un thread d'arrière-plan.
+ */
+private static String httpGetSimple(String url) {
+    if (client == null) {
+        // Sécurité au cas où la méthode serait appelée hors du cycle de démarrage standard
+        client = new OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .build();
+    }
+
+    Request request = new Request.Builder()
+            .url(url)
+            .build();
+
+    try (Response response = client.newCall(request).execute()) {
+        if (response.isSuccessful() && response.body() != null) {
+            return response.body().string();
+        } else {
+            Log.e(TAG, "[HTTP] Échec de la requête. Code: " + response.code() + " pour l'URL: " + url);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "[HTTP] Erreur lors de l'exécution de httpGetSimple: " + e.getMessage(), e);
+    }
+    return null;
+}
 
 private static void fetchFromPolygon() {
     if (appContext == null) return;
