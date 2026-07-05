@@ -152,7 +152,10 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
     private static final ConcurrentHashMap<String, Double> pdlCache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Double> pwhCache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Double> pwlCache = new ConcurrentHashMap<>();
-    
+    static final ConcurrentHashMap<String, Double> pmhCache = new ConcurrentHashMap<>();
+    static final ConcurrentHashMap<String, Double> pmlCache = new ConcurrentHashMap<>();
+    static final ConcurrentHashMap<String, Boolean> alertFiredPMH = new ConcurrentHashMap<>();
+    static final ConcurrentHashMap<String, Boolean> alertFiredPML = new ConcurrentHashMap<>();
     // Anti-spam alertes
     private static final ConcurrentHashMap<String, Boolean> alertFiredPDH = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Boolean> alertFiredPDL = new ConcurrentHashMap<>();
