@@ -6,7 +6,6 @@ import android.content.SharedPreferences;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
