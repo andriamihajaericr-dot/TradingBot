@@ -653,33 +653,82 @@ private static String httpGetSimple(String url) {
             String asset  = polygonMap[i][0];
             String ticker = polygonMap[i][1];
             try {
-                // ── 1. PDH/PDL — endpoint /prev ──
-                String urlPrev = "https://api.polygon.io/v2/aggs/ticker/"
-                    + ticker + "/prev?adjusted=true&apiKey=" + apiKey;
-                String respPrev = httpGetSimple(urlPrev); // Call 1[cite: 2]
-                
-                if (respPrev != null) {
-                    JSONObject json = new JSONObject(respPrev);
-                    JSONArray results = json.optJSONArray("results");
-                    if (results != null && results.length() > 0) {
-                        JSONObject day = results.getJSONObject(0);
-                        double pdh = day.optDouble("h", 0);
-                        double pdl = day.optDouble("l", 0);
-                        if (pdh > 0) {
-                            pdhCache.put(asset, pdh);
-                            pdlCache.put(asset, pdl);
-                            saveLevelToStorage(asset, "pdh", pdh);
-                            saveLevelToStorage(asset, "pdl", pdl);
-                            alertFiredPDH.remove(asset);
-                            alertFiredPDL.remove(asset);
-                            count++;
-                            logToUI("✅ [PDH/PDL] " + asset +
-                                " H=" + String.format(Locale.US, "%.4f", pdh) +
-                                " L=" + String.format(Locale.US, "%.4f", pdl));
-                        }
-                    }
-                }
+                   // ── 1. PDH/PDL Dynamique aligné sur UTC+3 (Mada) avec Extended Hours ──
 
+// Définition de votre fuseau horaire de référence
+java.util.TimeZone tzMada = java.util.TimeZone.getTimeZone("GMT+3");
+java.util.Calendar calMada = java.util.Calendar.getInstance(tzMada);
+
+// Calculer les bornes en millisecondes du JOUR PRÉCÉDENT en UTC+3
+calMada.set(java.util.Calendar.HOUR_OF_DAY, 0);
+calMada.set(java.util.Calendar.MINUTE, 0);
+calMada.set(java.util.Calendar.SECOND, 0);
+calMada.set(java.util.Calendar.MILLISECOND, 0);
+long localTodayMidnightUTC = calMada.getTimeInMillis(); // Minuit aujourd'hui à Mada
+
+long targetStartUTC = localTodayMidnightUTC - (24 * 60 * 60 * 1000); // Début jour précédent 00:00
+long targetEndUTC   = localTodayMidnightUTC - 1;                      // Fin jour précédent 23:59
+
+// Formater les dates textuelles pour l'appel d'historique Polygon (on prend large : 3 jours)
+java.text.SimpleDateFormat polySdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+polySdf.setTimeZone(tzMada);
+calMada.add(java.util.Calendar.DAY_OF_YEAR, -3);
+String dateFromH = polySdf.format(calMada.getTime());
+String dateToH   = polySdf.format(new java.util.Date()); // Aujourd'hui
+
+// URL configurée en HOURLY (1h) + EXTENDED_HOURS pour capter la volatilité nocturne des indices/ETF
+String urlPrev = "https://api.polygon.io/v2/aggs/ticker/" + ticker 
+    + "/range/1/hour/" + dateFromH + "/" + dateToH 
+    + "?adjusted=true&extended_hours=true&sort=asc&apiKey=" + apiKey;
+
+String respPrev = httpGetSimple(urlPrev); // Call 1
+
+if (respPrev != null) {
+    JSONObject json = new JSONObject(respPrev);
+    JSONArray results = json.optJSONArray("results");
+    
+    if (results != null && results.length() > 0) {
+        double maxHighLocal = Double.MIN_VALUE;
+        double minLowLocal  = Double.MAX_VALUE;
+        boolean hashValidData = false;
+
+        // On scanne chaque bougie horaire retournée par Polygon
+        for (int j = 0; j < results.length(); j++) {
+            JSONObject candle = results.getJSONObject(j);
+            long t = candle.optLong("t", 0); // Timestamp UTC absolu du début de la bougie
+
+            // La magie opère ici : On vérifie si la bougie appartient à VOTRE journée précédente (UTC+3)
+            if (t >= targetStartUTC && t <= targetEndUTC) {
+                double candleHigh = candle.optDouble("h", 0);
+                double candleLow  = candle.optDouble("l", 0);
+
+                if (candleHigh > maxHighLocal) maxHighLocal = candleHigh;
+                if (candleLow < minLowLocal && candleLow > 0)  minLowLocal = candleLow;
+                hashValidData = true;
+            }
+        }
+
+        // Si des bougies ont été validées pour votre journée locale, on applique les niveaux
+        if (hashValidData) {
+            double pdh = maxHighLocal;
+            double pdl = minLowLocal;
+
+            pdhCache.put(asset, pdh);
+            pdlCache.put(asset, pdl);
+            saveLevelToStorage(asset, "pdh", pdh);
+            saveLevelToStorage(asset, "pdl", pdl);
+            alertFiredPDH.remove(asset);
+            alertFiredPDL.remove(asset);
+            count++;
+            
+            logToUI("🎯 [UTC+3 FIX] " + asset +
+                " PDH=" + String.format(java.util.Locale.US, "%.4f", pdh) +
+                " PDL=" + String.format(java.util.Locale.US, "%.4f", pdl));
+        } else {
+            Log.w(TAG, "⚠️ Aucune donnée horaire correspondante trouvée pour " + asset + " dans la plage UTC+3 cible.");
+        }
+    }
+    }
                 // PAUSE ANTI-429 (Obligatoire après le premier appel)
                 Thread.sleep(12500);
 
