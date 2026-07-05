@@ -146,7 +146,7 @@ public class MainActivity extends AppCompatActivity {
                                     reportBuilder.append("🔹 *").append(symbol).append("*\n")
                                             .append("  • Daily   -> PDH: ").append(md.pdh).append(" | PDL: ").append(md.pdl).append("\n")
                                             .append("  • Weekly  -> PWH: ").append(md.pwh).append(" | PWL: ").append(md.pwl).append("\n")
-                                            .append("  • Monthly -> PMH: ").append(md.pmh).append(" | PML: ").append(md.pml).append("\n\n");
+                                            //.append("  • Monthly -> PMH: ").append(md.pmh).append(" | PML: ").append(md.pml).append("\n\n");
                                 }
                                 
                                 // Intégration du reste du contexte macro global normal
