@@ -608,18 +608,23 @@ private static String httpGetSimple(String url) {
      private static void fetchFromPolygon() {
     if (appContext == null) return;
     
-    // Réutiliser la clé TwelveData existante — l'utilisateur remplace
-    // simplement sa clé TwelveData par sa clé Polygon dans l'UI
-    String apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+    // 1. On utilise une variable temporaire pour la recherche
+    String tempApiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
         .getString("macro_api_key", "");
-    if (apiKey.isEmpty()) {
-        apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+        
+    if (tempApiKey.isEmpty()) {
+        tempApiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
             .getString("twelve_data_key", "");
     }
-    if (apiKey.isEmpty()) {
+    
+    if (tempApiKey.isEmpty()) {
         logToUI("⚠️ [Polygon] Clé absente — saisir la clé Polygon dans le champ TwelveData.");
         return;
     }
+    
+    // 2. LA CORRECTION : On fige la clé dans une variable finale pour le Lambda
+    final String apiKey = tempApiKey;
+
     logToUI("🔄 [Polygon] Chargement PDH/PDL/PWH/PWL...");
 
     // Mapping actif → ticker Polygon
@@ -629,10 +634,12 @@ private static String httpGetSimple(String url) {
         {"USDJPY",  "C:USDJPY"},
         {"NASDAQ",  "QQQ"},
         {"SP500",   "SPY"},
-        {"USOIL",   "C:USOILUSD"}, // WTI via Polygon
+        {"USOIL",   "C:USOILUSD"},
     };
 
     new Thread(() -> {
+        // Le reste de votre code reste strictement IDENTIQUE.
+        // La variable 'apiKey' étant désormais 'final', le compilateur acceptera le build.
         int count = 0;
         // Calculer les dates semaine précédente
         java.util.Calendar cal = java.util.Calendar.getInstance();
