@@ -127,7 +127,7 @@ public class MainActivity extends AppCompatActivity {
                     TradingViewFetcher.start(getApplicationContext());
 
                     runOnUiThread(() -> addLog("⏳ [TEST] Attente de la stabilisation du flux et des pivots (16s)..."));
-                    try { Thread.sleep(16000); } catch (InterruptedException ignored) {}
+                    try { Thread.sleep(140000); } catch (InterruptedException ignored) {}
 
                     TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
                         @Override
@@ -145,7 +145,7 @@ public class MainActivity extends AppCompatActivity {
                                     
                                     reportBuilder.append("🔹 *").append(symbol).append("*\n")
                                             .append("  • Daily   -> PDH: ").append(md.pdh).append(" | PDL: ").append(md.pdl).append("\n")
-                                            .append("  • Weekly  -> PWH: ").append(md.pwh).append(" | PWL: ").append(md.pwl).append("\n")
+                                            .append("  • Weekly  -> PWH: ").append(md.pwh).append(" | PWL: ").append(md.pwl).append("\n");
                                             //.append("  • Monthly -> PMH: ").append(md.pmh).append(" | PML: ").append(md.pml).append("\n\n");
                                 }
                                 
