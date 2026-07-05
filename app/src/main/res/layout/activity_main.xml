@@ -76,7 +76,7 @@
             android:id="@+id/macroApiKeyInput"
             android:layout_width="match_parent" 
             android:layout_height="wrap_content"
-            android:hint="Clé TwelveData API (Données Marché)"
+            android:hint="Clé Polygon.io API (PDH/PDL/PWH/PWL)"
             android:inputType="textPassword"
             android:textColor="#ffffff" 
             android:textColorHint="#555555"
