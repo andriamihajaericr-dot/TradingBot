@@ -665,7 +665,7 @@ private static String httpGetSimple(String url) {
                 String respPrev = httpGetSimple(urlPrev);
                 if (respPrev != null) {
                     JSONObject json = new JSONObject(respPrev);
-                    
+                
                     // Sécurité : Affichage direct de l'erreur API si la clé ou le plan bloque
                     if (json.has("error")) {
                         logToUI("❌ [Polygon Daily] " + asset + " : " + json.optString("error"));
