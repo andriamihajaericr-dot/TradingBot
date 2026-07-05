@@ -605,20 +605,21 @@ private static String httpGetSimple(String url) {
     return null;
 }
 
-private static void fetchFromPolygon() {
+     private static void fetchFromPolygon() {
     if (appContext == null) return;
-     // Réutiliser la clé TwelveData existante — l'utilisateur remplace
-// simplement sa clé TwelveData par sa clé Polygon dans l'UI
-String apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
-    .getString("macro_api_key", "");
-if (apiKey.isEmpty()) {
-    apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
-        .getString("twelve_data_key", "");
-}
-if (apiKey.isEmpty()) {
-    logToUI("⚠️ [Polygon] Clé absente — saisir la clé Polygon dans le champ TwelveData.");
-    return;
-}
+    
+    // Réutiliser la clé TwelveData existante — l'utilisateur remplace
+    // simplement sa clé TwelveData par sa clé Polygon dans l'UI
+    String apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+        .getString("macro_api_key", "");
+    if (apiKey.isEmpty()) {
+        apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+            .getString("twelve_data_key", "");
+    }
+    if (apiKey.isEmpty()) {
+        logToUI("⚠️ [Polygon] Clé absente — saisir la clé Polygon dans le champ TwelveData.");
+        return;
+    }
     logToUI("🔄 [Polygon] Chargement PDH/PDL/PWH/PWL...");
 
     // Mapping actif → ticker Polygon
@@ -642,14 +643,16 @@ if (apiKey.isEmpty()) {
         String dateTo = new java.text.SimpleDateFormat("yyyy-MM-dd",
             java.util.Locale.US).format(cal.getTime());
 
-        for (String[] row : polygonMap) {
-            String asset  = row[0];
-            String ticker = row[1];
+        // Utilisation d'une boucle indexée pour gérer proprement la dernière pause
+        for (int i = 0; i < polygonMap.length; i++) {
+            String asset  = polygonMap[i][0];
+            String ticker = polygonMap[i][1];
             try {
-                // ── PDH/PDL — endpoint /prev ──
+                // ── 1. PDH/PDL — endpoint /prev ──
                 String urlPrev = "https://api.polygon.io/v2/aggs/ticker/"
                     + ticker + "/prev?adjusted=true&apiKey=" + apiKey;
-                String respPrev = httpGetSimple(urlPrev);
+                String respPrev = httpGetSimple(urlPrev); // Call 1[cite: 2]
+                
                 if (respPrev != null) {
                     JSONObject json = new JSONObject(respPrev);
                     JSONArray results = json.optJSONArray("results");
@@ -672,12 +675,16 @@ if (apiKey.isEmpty()) {
                     }
                 }
 
-                // ── PWH/PWL — bougie weekly précédente ──
+                // PAUSE ANTI-429 (Obligatoire après le premier appel)
+                Thread.sleep(12500);
+
+                // ── 2. PWH/PWL — bougie weekly précédente ──
                 String urlWeek = "https://api.polygon.io/v2/aggs/ticker/"
                     + ticker + "/range/1/week/"
                     + dateFrom + "/" + dateTo
                     + "?adjusted=true&sort=desc&limit=2&apiKey=" + apiKey;
-                String respWeek = httpGetSimple(urlWeek);
+                String respWeek = httpGetSimple(urlWeek); // Call 2[cite: 2]
+                
                 if (respWeek != null) {
                     JSONObject json = new JSONObject(respWeek);
                     JSONArray results = json.optJSONArray("results");
@@ -698,9 +705,13 @@ if (apiKey.isEmpty()) {
                                 " L=" + String.format(Locale.US, "%.4f", pwl));
                         }
                     }
-                        }
-                Thread.sleep(1000); // 5 req/min sur plan gratuit = 12s entre appels
-                // On fait 2 appels par actif → 2s de pause suffit à rester sous 5 req/min
+                }
+                
+                // PAUSE ANTI-429 (Après le deuxième appel, sauf si c'est le tout dernier actif)
+                if (i < polygonMap.length - 1) {
+                    Thread.sleep(12500);
+                }
+                
             } catch (Exception e) {
                 Log.e(TAG, "[Polygon] Erreur " + asset + " : " + e.getMessage());
                 logToUI("❌ [Polygon] " + asset + " : " + e.getMessage());
@@ -708,7 +719,7 @@ if (apiKey.isEmpty()) {
         }
         logToUI("✅ [Polygon] " + count + " actifs chargés — PDH/PDL/PWH/PWL précis.");
     }).start();
-}
+    }
 
     private static void saveLevelToStorage(String key, String type, double value) {
         if (appContext == null || value <= 0) return;
