@@ -31,26 +31,25 @@ public class TradingViewFetcher {
     // ── Matrice Complète des 11 Actifs Macro Fonda IOF (Flux Institutionnels Centralisés) ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
         // Indices & Obligataire
-        put("SP500",   "FX:SPX500");
-        put("NASDAQ",  "FX:NAS100");
+        put("SP500",   "SPREADEX:SPX");
+        put("NASDAQ",  "SPREADEX:NDX");
         //put("US10Y",   "TVC:US10Y");
 
         // Matières Premières
         put("GOLD",    "TVC:GOLD");
         put("USOIL",   "TVC:USOIL");
 
-        // Devises (Forex Standardisé ICE/FXCM)
-        //put("EURUSD",  "FX_IDC:EURUSD");
-        //put("USDJPY",  "FX_IDC:USDJPY");
-        put("GBPUSD",  "FX_IDC:GBPUSD");
+        // Devises (Forex Standardisé ICE/FXCM)EURUSD",  "FX_IDC:EURUSD");
+        put("USDJPY",  "FX_IDC:USDJPY");
+        put("GBPUSD",  "VANTAGE:GBPUSD");
        // put("AUDUSD",  "FX_IDC:AUDUSD");
         //put("USDCAD",  "FX_IDC:USDCAD");
 
         // Crypto-actifs
-        put("BITCOIN", "BINANCE:BTCUSDT");
+      //  put("BITCOIN", "BINANCE:BTCUSDT");
     }};
 
-    // ── Structure de données unifiée avec les 4 indicateurs + Niveaux pivots ──
+    // ── Structure de données unifiée avec les 4 indicateurs + Niv pivots ──
     public static class TVMarketData {
         public final String symbol;
         public final double price;
