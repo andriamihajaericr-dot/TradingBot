@@ -565,10 +565,113 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
         });
     }
 
-    public static void fetchPreviousLevels() {
-        loadLevelsFromStorage(); //[cite: 1]
-        logToUI("🏛️ [TV Pivots] Niveaux du stockage local injectés. Relais automatique pris par le flux graphique temps réel."); //[cite: 1]
+public static void fetchPreviousLevels() {
+    loadLevelsFromStorage();
+    if (!pdhCache.isEmpty()) {
+        logToUI("✅ [TV Pivots] " + pdhCache.size() + " niveaux restaurés depuis cache.");
+        return;
     }
+    fetchFromPolygon();
+}
+
+private static void fetchFromPolygon() {
+    if (appContext == null) return;
+    String apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+        .getString("polygon_api_key", "");
+    if (apiKey.isEmpty()) {
+        logToUI("⚠️ [Polygon] Clé absente — inscris-toi sur polygon.io (gratuit).");
+        return;
+    }
+    logToUI("🔄 [Polygon] Chargement PDH/PDL/PWH/PWL...");
+
+    // Mapping actif → ticker Polygon
+    String[][] polygonMap = {
+        {"GOLD",    "C:XAUUSD"},
+        {"GBPUSD",  "C:GBPUSD"},
+        {"USDJPY",  "C:USDJPY"},
+        {"NASDAQ",  "QQQ"},
+        {"SP500",   "SPY"},
+        {"USOIL",   "C:USOILUSD"}, // WTI via Polygon
+    };
+
+    new Thread(() -> {
+        int count = 0;
+        // Calculer les dates semaine précédente
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.DAY_OF_YEAR, -7);
+        String dateFrom = new java.text.SimpleDateFormat("yyyy-MM-dd",
+            java.util.Locale.US).format(cal.getTime());
+        cal.add(java.util.Calendar.DAY_OF_YEAR, 6);
+        String dateTo = new java.text.SimpleDateFormat("yyyy-MM-dd",
+            java.util.Locale.US).format(cal.getTime());
+
+        for (String[] row : polygonMap) {
+            String asset  = row[0];
+            String ticker = row[1];
+            try {
+                // ── PDH/PDL — endpoint /prev ──
+                String urlPrev = "https://api.polygon.io/v2/aggs/ticker/"
+                    + ticker + "/prev?adjusted=true&apiKey=" + apiKey;
+                String respPrev = httpGetSimple(urlPrev);
+                if (respPrev != null) {
+                    JSONObject json = new JSONObject(respPrev);
+                    JSONArray results = json.optJSONArray("results");
+                    if (results != null && results.length() > 0) {
+                        JSONObject day = results.getJSONObject(0);
+                        double pdh = day.optDouble("h", 0);
+                        double pdl = day.optDouble("l", 0);
+                        if (pdh > 0) {
+                            pdhCache.put(asset, pdh);
+                            pdlCache.put(asset, pdl);
+                            saveLevelToStorage(asset, "pdh", pdh);
+                            saveLevelToStorage(asset, "pdl", pdl);
+                            alertFiredPDH.remove(asset);
+                            alertFiredPDL.remove(asset);
+                            count++;
+                            logToUI("✅ [PDH/PDL] " + asset +
+                                " H=" + String.format(Locale.US, "%.4f", pdh) +
+                                " L=" + String.format(Locale.US, "%.4f", pdl));
+                        }
+                    }
+                }
+
+                // ── PWH/PWL — bougie weekly précédente ──
+                String urlWeek = "https://api.polygon.io/v2/aggs/ticker/"
+                    + ticker + "/range/1/week/"
+                    + dateFrom + "/" + dateTo
+                    + "?adjusted=true&sort=desc&limit=2&apiKey=" + apiKey;
+                String respWeek = httpGetSimple(urlWeek);
+                if (respWeek != null) {
+                    JSONObject json = new JSONObject(respWeek);
+                    JSONArray results = json.optJSONArray("results");
+                    if (results != null && results.length() >= 2) {
+                        // Index 1 = semaine précédente (desc)
+                        JSONObject prevWeek = results.getJSONObject(1);
+                        double pwh = prevWeek.optDouble("h", 0);
+                        double pwl = prevWeek.optDouble("l", 0);
+                        if (pwh > 0) {
+                            pwhCache.put(asset, pwh);
+                            pwlCache.put(asset, pwl);
+                            saveLevelToStorage(asset, "pwh", pwh);
+                            saveLevelToStorage(asset, "pwl", pwl);
+                            alertFiredPWH.remove(asset);
+                            alertFiredPWL.remove(asset);
+                            logToUI("✅ [PWH/PWL] " + asset +
+                                " H=" + String.format(Locale.US, "%.4f", pwh) +
+                                " L=" + String.format(Locale.US, "%.4f", pwl));
+                        }
+                    }
+                }
+                Thread.sleep(1000); // 5 req/min sur plan gratuit = 12s entre appels
+                // On fait 2 appels par actif → 2s de pause suffit à rester sous 5 req/min
+            } catch (Exception e) {
+                Log.e(TAG, "[Polygon] Erreur " + asset + " : " + e.getMessage());
+                logToUI("❌ [Polygon] " + asset + " : " + e.getMessage());
+            }
+        }
+        logToUI("✅ [Polygon] " + count + " actifs chargés — PDH/PDL/PWH/PWL précis.");
+    }).start();
+}
 
     private static void saveLevelToStorage(String key, String type, double value) {
         if (appContext == null || value <= 0) return;
