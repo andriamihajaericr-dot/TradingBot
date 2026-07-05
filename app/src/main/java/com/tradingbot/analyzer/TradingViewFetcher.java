@@ -579,12 +579,18 @@ public static void fetchPreviousLevels() {
 
 private static void fetchFromPolygon() {
     if (appContext == null) return;
-    String apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
-        .getString("polygon_api_key", "");
-    if (apiKey.isEmpty()) {
-        logToUI("⚠️ [Polygon] Clé absente — inscris-toi sur polygon.io (gratuit).");
-        return;
-    }
+     // Réutiliser la clé TwelveData existante — l'utilisateur remplace
+// simplement sa clé TwelveData par sa clé Polygon dans l'UI
+String apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+    .getString("macro_api_key", "");
+if (apiKey.isEmpty()) {
+    apiKey = appContext.getSharedPreferences("TradingBotPrefs", Context.MODE_PRIVATE)
+        .getString("twelve_data_key", "");
+}
+if (apiKey.isEmpty()) {
+    logToUI("⚠️ [Polygon] Clé absente — saisir la clé Polygon dans le champ TwelveData.");
+    return;
+}
     logToUI("🔄 [Polygon] Chargement PDH/PDL/PWH/PWL...");
 
     // Mapping actif → ticker Polygon
