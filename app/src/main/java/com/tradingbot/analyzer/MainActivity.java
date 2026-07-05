@@ -118,46 +118,65 @@ public class MainActivity extends AppCompatActivity {
             startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
         });
 
-        testBtn.setOnClickListener(v -> {
-    addLog("🧪 [TEST] Déclenchement RECUP DONNÉES TV...");
-    new Thread(() -> {
-        try {
-            runOnUiThread(() -> addLog("📊 [TEST] Lancement TradingViewFetcher..."));
+           testBtn.setOnClickListener(v -> {
+            addLog("🧪 [TEST] Déclenchement RECUP DONNÉES TV...");
+            new Thread(() -> {
+                try {
+                    runOnUiThread(() -> addLog("📊 [TEST] Lancement TradingViewFetcher..."));
 
-            TradingViewFetcher.start(getApplicationContext());
+                    TradingViewFetcher.start(getApplicationContext());
 
-            runOnUiThread(() -> addLog("⏳ [TEST] Attente de la stabilisation du flux et des pivots (16s)..."));
-            try { Thread.sleep(16000); } catch (InterruptedException ignored) {}
+                    runOnUiThread(() -> addLog("⏳ [TEST] Attente de la stabilisation du flux et des pivots (16s)..."));
+                    try { Thread.sleep(16000); } catch (InterruptedException ignored) {}
 
-            TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
-                @Override
-                public void onDataReady(Map<String, TradingViewFetcher.TVMarketData> data) {
-                    runOnUiThread(() -> {
-                        addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
+                    TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
+                        @Override
+                        public void onDataReady(Map<String, TradingViewFetcher.TVMarketData> data) {
+                            runOnUiThread(() -> {
+                                addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
+                                
+                                StringBuilder reportBuilder = new StringBuilder();
+                                reportBuilder.append("📊 *DONNÉES TRADINGVIEW & PIVOTS INSTITUTIONNELS*\n\n");
+                                
+                                // Boucle explicite sur chaque actif pour afficher la matrice des pivots
+                                for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : data.entrySet()) {
+                                    String symbol = entry.getKey();
+                                    TradingViewFetcher.TVMarketData md = entry.getValue();
+                                    
+                                    reportBuilder.append("🔹 *").append(symbol).append("*\n")
+                                            .append("  • Daily   -> PDH: ").append(md.pdh).append(" | PDL: ").append(md.pdl).append("\n")
+                                            .append("  • Weekly  -> PWH: ").append(md.pwh).append(" | PWL: ").append(md.pwl).append("\n")
+                                            .append("  • Monthly -> PMH: ").append(md.pmh).append(" | PML: ").append(md.pml).append("\n\n");
+                                }
+                                
+                                // Intégration du reste du contexte macro global normal
+                                String contexteMacro = TradingViewFetcher.buildContexteMacroGlobal(getApplicationContext());
+                                reportBuilder.append("📝 *Contexte Macro Global :*\n").append(contexteMacro);
+                                
+                                String finalPayload = reportBuilder.toString();
+                                
+                                // Affichage complet dans la console de log de l'application
+                                addLog(finalPayload);
+                                
+                                // Envoi de la matrice complète sur Telegram
+                                NotificationService.sendTelegramSecure(
+                                    finalPayload,
+                                    getApplicationContext()
+                                );
+                            });
+                        }
                         
-                        // Appel direct de la structure centralisée native de votre Fetcher
-                        String contexteMacro = TradingViewFetcher.buildContexteMacroGlobal(getApplicationContext());
-                        
-                        addLog("📊 Données TV :\n" + contexteMacro);
-                        
-                        NotificationService.sendTelegramSecure(
-                            "📊 *DONNÉES TRADINGVIEW COMPLETES (TEST)*\n\n" + contexteMacro,
-                            getApplicationContext()
-                        );
+                        @Override
+                        public void onError(String error) {
+                            runOnUiThread(() -> addLog("❌ [TV] Erreur : " + error));
+                        }
                     });
+                } catch (Exception e) {
+                    android.util.Log.e("TradingBotTest", "Échec test complet", e);
+                    runOnUiThread(() -> addLog("❌ [TEST] Erreur : " + e.getMessage()));
                 }
-                
-                @Override
-                public void onError(String error) {
-                    runOnUiThread(() -> addLog("❌ [TV] Erreur : " + error));
-                }
-            });
-        } catch (Exception e) {
-            android.util.Log.e("TradingBotTest", "Échec test complet", e);
-            runOnUiThread(() -> addLog("❌ [TEST] Erreur : " + e.getMessage()));
-        }
-    }).start();
-});
+            }).start();
+        });
          
         exportBtn.setOnClickListener(v -> exportDatabaseToStorage());
         importBtn.setOnClickListener(v -> importDatabaseFromStorage());
