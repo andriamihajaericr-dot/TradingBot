@@ -662,6 +662,41 @@ private static void fetchFromPolygon() {
                         }
                     }
                 }
+                // ── PMH/PML — bougie mensuelle précédente ──
+// Calculer le premier et dernier jour du mois précédent
+java.util.Calendar calM = java.util.Calendar.getInstance();
+calM.add(java.util.Calendar.MONTH, -1);
+calM.set(java.util.Calendar.DAY_OF_MONTH, 1);
+String monthFrom = new java.text.SimpleDateFormat("yyyy-MM-dd",
+    java.util.Locale.US).format(calM.getTime());
+calM.set(java.util.Calendar.DAY_OF_MONTH,
+    calM.getActualMaximum(java.util.Calendar.DAY_OF_MONTH));
+String monthTo = new java.text.SimpleDateFormat("yyyy-MM-dd",
+    java.util.Locale.US).format(calM.getTime());
+
+String urlMonth = "https://api.polygon.io/v2/aggs/ticker/"
+    + ticker + "/range/1/month/"
+    + monthFrom + "/" + monthTo
+    + "?adjusted=true&sort=desc&limit=1&apiKey=" + apiKey;
+String respMonth = httpGetSimple(urlMonth);
+if (respMonth != null) {
+    JSONObject json = new JSONObject(respMonth);
+    JSONArray results = json.optJSONArray("results");
+    if (results != null && results.length() > 0) {
+        JSONObject prevMonth = results.getJSONObject(0);
+        double pmh = prevMonth.optDouble("h", 0);
+        double pml = prevMonth.optDouble("l", 0);
+        if (pmh > 0) {
+            pmhCache.put(asset, pmh);
+            pmlCache.put(asset, pml);
+            saveLevelToStorage(asset, "pmh", pmh);
+            saveLevelToStorage(asset, "pml", pml);
+            logToUI("✅ [PMH/PML] " + asset +
+                " H=" + String.format(Locale.US, "%.4f", pmh) +
+                " L=" + String.format(Locale.US, "%.4f", pml));
+        }
+    }
+}
                 Thread.sleep(1000); // 5 req/min sur plan gratuit = 12s entre appels
                 // On fait 2 appels par actif → 2s de pause suffit à rester sous 5 req/min
             } catch (Exception e) {
