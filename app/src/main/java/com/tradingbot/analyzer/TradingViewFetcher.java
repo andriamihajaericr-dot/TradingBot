@@ -111,7 +111,11 @@ public class TradingViewFetcher {
             this.timestamp     = timestamp;
         }
     }
-
+     public static void injectKeyLevels(String asset, double dh, double dl, double wh, double wl) {
+    // On laisse la méthode vide ou on log simplement.
+    // De cette façon, le WebhookServer compile, mais n'écrase pas le flux WebSocket natif.
+    Log.d("TradingViewFetcher", "📥 [Webhook] Injection ignorée pour " + asset + " (Priorité absolue au WebSocket TV).");
+     }
     private static final String PREFS_WEEKLY = "TradingBotPrefs";
 
     private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
