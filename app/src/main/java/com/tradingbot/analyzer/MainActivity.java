@@ -132,39 +132,39 @@ public class MainActivity extends AppCompatActivity {
                     TradingViewFetcher.fetchAll(new TradingViewFetcher.OnDataReadyListener() {
                         @Override
                         public void onDataReady(Map<String, TradingViewFetcher.TVMarketData> data) {
-                            runOnUiThread(() -> {
-                                addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
-                                
-                                StringBuilder reportBuilder = new StringBuilder();
-                                reportBuilder.append("📊 *DONNÉES TRADINGVIEW & PIVOTS INSTITUTIONNELS*\n\n");
-                                
-                                // Boucle explicite sur chaque actif pour afficher la matrice des pivots
-                                for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : data.entrySet()) {
-                                    String symbol = entry.getKey();
-                                    TradingViewFetcher.TVMarketData md = entry.getValue();
-                                    
-                                    reportBuilder.append("🔹 *").append(symbol).append("*\n")
-                                            .append("  • Daily   -> PDH: ").append(md.pdh).append(" | PDL: ").append(md.pdl).append("\n")
-                                            .append("  • Weekly  -> PWH: ").append(md.pwh).append(" | PWL: ").append(md.pwl).append("\n");
-                                            //.append("  • Monthly -> PMH: ").append(md.pmh).append(" | PML: ").append(md.pml).append("\n\n");
-                                }
-                                
-                                // Intégration du reste du contexte macro global normal
-                                String contexteMacro = TradingViewFetcher.buildContexteMacroGlobal(getApplicationContext());
-                                reportBuilder.append("📝 *Contexte Macro Global :*\n").append(contexteMacro);
-                                
-                                String finalPayload = reportBuilder.toString();
-                                
-                                // Affichage complet dans la console de log de l'application
-                                addLog(finalPayload);
-                                
-                                // Envoi de la matrice complète sur Telegram
-                                NotificationService.sendTelegramSecure(
-                                    finalPayload,
-                                    getApplicationContext()
-                                );
-                            });
-                        }
+    // 1. Préparation du rapport complet en arrière-plan (Background Thread)
+    StringBuilder reportBuilder = new StringBuilder();
+    reportBuilder.append("📊 *DONNÉES TRADINGVIEW & PIVOTS INSTITUTIONNELS*\n\n");
+    
+    for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : data.entrySet()) {
+        String symbol = entry.getKey();
+        TradingViewFetcher.TVMarketData md = entry.getValue();
+        
+        reportBuilder.append("🔹 *").append(symbol).append("*\n")
+                     .append("  • H4      -> P4HH: ").append(md.p4hh).append(" | P4HL: ").append(md.p4hl).append("\n")
+                     .append("  • Daily   -> PDH:  ").append(md.pdh).append(" | PDL:  ").append(md.pdl).append("\n")
+                     .append("  • Weekly  -> PWH:  ").append(md.pwh).append(" | PWL:  ").append(md.pwl).append("\n")
+                     .append("  • Monthly -> PMH:  ").append(md.pmh).append(" | PML:  ").append(md.pml).append("\n\n");
+    }
+    
+    // Intégration du contexte macro global normalisé
+    String contexteMacro = TradingViewFetcher.buildContexteMacroGlobal(getApplicationContext());
+    reportBuilder.append("📝 *Contexte Macro Global :*\n").append(contexteMacro);
+    
+    String finalPayload = reportBuilder.toString();
+    
+    // 2. Envoi des logs sur le thread principal de l'UI
+    runOnUiThread(() -> {
+        addLog("✅ [TV] Données reçues (" + data.size() + " symboles)");
+        addLog(finalPayload);
+    });
+    
+    // 3. Envoi réseau sécurisé vers Telegram (hors thread UI)
+    NotificationService.sendTelegramSecure(
+        finalPayload,
+        getApplicationContext()
+    );
+        }
                         
                         @Override
                         public void onError(String error) {
