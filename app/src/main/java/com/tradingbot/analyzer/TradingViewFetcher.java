@@ -26,7 +26,7 @@ public class TradingViewFetcher {
     private static final String TAG = "TradingViewFetcher";
     private static WebSocket activeWs;
     
-    // Suivi précis des résolutions de symboles et des sessions associées par identifiant unique
+    // Suivi des résolutions de symboles et des sessions associées par identifiant unique
     private static final Map<String, String> pendingSymbolResolution = new ConcurrentHashMap<>();
     private static final Map<String, String> pendingSymbolChartSession = new ConcurrentHashMap<>();
     
@@ -228,8 +228,8 @@ public class TradingViewFetcher {
                 pendingSymbolResolution.clear();
                 pendingSymbolChartSession.clear();
             
-                // 1. Session unifiée de flux Temps Réel (Quotes)
-                quoteSessionId = "qs_" + UUID.randomUUID().toString().substring(0, 12); // //[cite: 1]
+                // 1. Session unifiée de flux Temps Réel (Quotes)[cite: 1]
+                quoteSessionId = "qs_" + UUID.randomUUID().toString().substring(0, 12); //[cite: 1]
                 sendMessage(ws, "set_auth_token", new Object[]{"unauthorized_user_token"}); //[cite: 1]
                 sendMessage(ws, "quote_create_session", new Object[]{quoteSessionId}); //[cite: 1]
                 sendMessage(ws, "quote_set_fields", new Object[]{ //[cite: 1]
@@ -238,7 +238,7 @@ public class TradingViewFetcher {
                         "open_price", "prev_close_price"
                 });
             
-                // 2. Sessions Historiques Natives (Charts) — 1 session DÉDIÉE par timeframe et par actif[cite: 1]
+                // 2. Sessions Historiques Natives (Charts)[cite: 1]
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key); //[cite: 1]
                     varianceCalculators.putIfAbsent(key, new VarianceCalculator(5)); //[cite: 1]
@@ -246,7 +246,7 @@ public class TradingViewFetcher {
                     // Liaison au flux temps réel général[cite: 1]
                     sendMessage(ws, "quote_add_symbols", new Object[]{quoteSessionId, ticker}); //[cite: 1]
                 
-                    // ── CONFIGURATION TIMEFRAME DAILY (1 session dédiée) ──
+                    // ── CONFIGURATION TIMEFRAME DAILY ──
                     String chartSessionIdD = "cs_d_" + key + "_" + UUID.randomUUID().toString().substring(0, 8);
                     sendMessage(ws, "chart_create_session", new Object[]{chartSessionIdD, ""});
                     sendMessage(ws, "switch_timezone", new Object[]{chartSessionIdD, "America/New_York"});
@@ -258,7 +258,7 @@ public class TradingViewFetcher {
                     String symbolJsonD = "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"; //[cite: 1]
                     sendMessage(ws, "resolve_symbol", new Object[]{chartSessionIdD, symIdD, symbolJsonD}); //[cite: 1]
 
-                    // ── CONFIGURATION TIMEFRAME WEEKLY (1 session dédiée) ──
+                    // ── CONFIGURATION TIMEFRAME WEEKLY ──
                     String chartSessionIdW = "cs_w_" + key + "_" + UUID.randomUUID().toString().substring(0, 8);
                     sendMessage(ws, "chart_create_session", new Object[]{chartSessionIdW, ""});
                     sendMessage(ws, "switch_timezone", new Object[]{chartSessionIdW, "America/New_York"});
@@ -320,7 +320,7 @@ public class TradingViewFetcher {
                     JSONObject json = new JSONObject(payload);
                     String m = json.optString("m");
             
-                    // ── RÉSOLUTION DE SYMBOLE : CRÉATION DE L'UNIQUE SÉRIE AUTORISÉE PAR SESSION ──
+                    // ── RÉSOLUTION DE SYMBOLE ──
                     if ("symbol_resolved".equals(m)) { //[cite: 1]
                         JSONArray p = json.getJSONArray("p"); //[cite: 1]
                         if (p.length() > 1) { //[cite: 1]
@@ -343,11 +343,10 @@ public class TradingViewFetcher {
             
                     if ("symbol_error".equals(m) || "series_error".equals(m) || "critical_error".equals(m) || "protocol_error".equals(m)) { //[cite: 1]
                         Log.e(TAG, "[TV WS] Erreur serveur (" + m + ") : " + payload); //[cite: 1]
-                        logToUI("❌ [TV Diag] Erreur serveur (" + m + ") : " + payload);
                         return;
                     }
             
-                    // ── EXTRACTEUR HISTORIQUE DES PIVOTS ──
+                    // ── EXTRACTEUR HISTORIQUE DES PIVOTS (IMMUNISÉ DST / ANTI-DOUBLON LUNDI) ──
                     if ("timescale_update".equals(m)) { //[cite: 1]
                         JSONArray p = json.getJSONArray("p"); //[cite: 1]
                         if (p.length() > 1) { //[cite: 1]
@@ -362,17 +361,36 @@ public class TradingViewFetcher {
                                     JSONArray sArr = obj.getJSONArray("s"); //[cite: 1]
                                     if (sArr.length() >= 1) {
                                         JSONObject targetBar = null;
-                                        JSONObject lastBar = sArr.getJSONObject(sArr.length() - 1);
                                         
-                                        if (lastBar.has("v")) {
-                                            JSONArray lastV = lastBar.getJSONArray("v");
-                                            long lastBarTsSec = lastV.getLong(0);
-                                            long nowSec = System.currentTimeMillis() / 1000;
-                                            
-                                            if ((nowSec - lastBarTsSec) < 86400 && sArr.length() >= 2) {
+                                        // 🏛️ Traitement Anti-Saison & Anti-Sélection Floue du Daily
+                                        if (seriesId.startsWith("ser_d_")) {
+                                            String key = seriesId.substring(6);
+                                            JSONObject lastBar = sArr.getJSONObject(sArr.length() - 1);
+                                            if (lastBar.has("v")) {
+                                                long lastBarTsSec = lastBar.getJSONArray("v").getLong(0);
+                                                
+                                                // Comparaison calendaire native stricte sur le fuseau US (New York)
+                                                java.util.Calendar barCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("America/New_York"));
+                                                barCal.setTimeInMillis(lastBarTsSec * 1000);
+                                                
+                                                java.util.Calendar todayCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("America/New_York"));
+                                                
+                                                // Si la dernière bougie est celle d'aujourd'hui, le pivot recherché (veille) est à l'index length-2
+                                                if (barCal.get(java.util.Calendar.DAY_OF_YEAR) == todayCal.get(java.util.Calendar.DAY_OF_YEAR) && sArr.length() >= 2) {
+                                                    targetBar = sArr.getJSONObject(sArr.length() - 2);
+                                                } else {
+                                                    targetBar = lastBar;
+                                                }
+                                            }
+                                        } 
+                                        // 🏛️ Traitement Anti-Doublon du Lundi pour le Weekly
+                                        else if (seriesId.startsWith("ser_w_")) {
+                                            // Le lundi, la dernière bougie (length-1) est la semaine naissante. 
+                                            // La semaine précédente achevée est systématiquement ancrée à l'index length-2.
+                                            if (sArr.length() >= 2) {
                                                 targetBar = sArr.getJSONObject(sArr.length() - 2);
                                             } else {
-                                                targetBar = lastBar;
+                                                targetBar = sArr.getJSONObject(sArr.length() - 1);
                                             }
                                         }
                                         
@@ -588,23 +606,25 @@ public class TradingViewFetcher {
 
         new Thread(() -> {
             int count = 0;
-            java.util.Calendar calW = java.util.Calendar.getInstance();
+            // 🗺️ Forçage du fuseau horaire New York pour se prémunir des décalages d'heures d'été / d'hiver (DST)
+            java.util.TimeZone tzNY = java.util.TimeZone.getTimeZone("America/New_York");
+            
+            java.util.Calendar calW = java.util.Calendar.getInstance(tzNY);
             String dateToWeek = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(calW.getTime());
             calW.add(java.util.Calendar.DAY_OF_YEAR, -30); 
             String dateFromWeek = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(calW.getTime());
 
-            java.util.TimeZone tzMada = java.util.TimeZone.getTimeZone("GMT+3");
-            java.util.Calendar calMada = java.util.Calendar.getInstance(tzMada);
-            calMada.set(java.util.Calendar.HOUR_OF_DAY, 0);
-            calMada.set(java.util.Calendar.MINUTE, 0);
-            calMada.set(java.util.Calendar.SECOND, 0);
-            calMada.set(java.util.Calendar.MILLISECOND, 0);
-            long localTodayMidnightUTC = calMada.getTimeInMillis();
+            java.util.Calendar calNY = java.util.Calendar.getInstance(tzNY);
+            calNY.set(java.util.Calendar.HOUR_OF_DAY, 0);
+            calNY.set(java.util.Calendar.MINUTE, 0);
+            calNY.set(java.util.Calendar.SECOND, 0);
+            calNY.set(java.util.Calendar.MILLISECOND, 0);
+            long localTodayMidnightUTC = calNY.getTimeInMillis();
 
             java.text.SimpleDateFormat polySdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
-            polySdf.setTimeZone(tzMada);
-            calMada.add(java.util.Calendar.DAY_OF_YEAR, -4);
-            String dateFromH = polySdf.format(calMada.getTime());
+            polySdf.setTimeZone(tzNY);
+            calNY.add(java.util.Calendar.DAY_OF_YEAR, -4);
+            String dateFromH = polySdf.format(calNY.getTime());
             String dateToH   = polySdf.format(new java.util.Date());
 
             for (int i = 0; i < polygonMap.length; i++) {
@@ -630,7 +650,7 @@ public class TradingViewFetcher {
                             }
 
                             if (maxCandleTimeBeforeToday > 0) {
-                                java.util.Calendar calTarget = java.util.Calendar.getInstance(tzMada);
+                                java.util.Calendar calTarget = java.util.Calendar.getInstance(tzNY);
                                 calTarget.setTimeInMillis(maxCandleTimeBeforeToday);
                                 calTarget.set(java.util.Calendar.HOUR_OF_DAY, 0);
                                 calTarget.set(java.util.Calendar.MINUTE, 0);
