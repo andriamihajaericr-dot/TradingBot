@@ -824,10 +824,9 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     int convictionPercent = extrairePourcentageConviction(aiReport);
                       if (convictionPercent >= 40 || isSupremeRank) {
                             // ✅ Injection des prix live inline sur chaque ligne d'actif
-                            String enrichedReport = injectLivePrices(
+                              String enrichedReport = injectLivePrices(
                                 filteredMessage.toString().trim(),
-                                enrichedAssets,
-                                cachedMarketData
+                                enrichedAssets
                             );
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport;
                             sendTelegramSecure(finalPayload, NotificationService.this);
