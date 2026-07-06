@@ -395,10 +395,10 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialisation propre au démarrage (Nettoyé des doublons)
         if (!MACRO_API_KEY.isEmpty()) {
-            MarketDataFetcher.setApiKey(MACRO_API_KEY);
-            getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
-                .putString("twelve_data_key", MACRO_API_KEY)
-                .apply();
+            // TwelveData désactivé — clé Polygon dans macro_api_key uniquement pour TradingViewFetcher
+        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+        .putString("twelve_data_key", "")
+        .apply();
         }
 
         apiKeyInput.setText(GROQ_API_KEY);
