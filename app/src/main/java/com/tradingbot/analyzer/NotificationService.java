@@ -2385,29 +2385,22 @@ if (fluxGeo) {
                     
                     String dailyMarketSnapshot = "Données de marché indisponibles.";
                     try {
-                        List<String> twelveDataAssets = new ArrayList<>(TWELVE_DATA_ASSETS);
-                        Map<String, MarketDataFetcher.MarketData> snap = null;
-                        if (MarketDataFetcher.tryAcquireBatchSlot()) {
-                        snap = MarketDataFetcher.getMarketDataBatch(twelveDataAssets);
-                        } else {
-                        Log.w(TAG, "[DAILY] Slot Twelve Data occupé — dailyDrivers suffisant");
-                        }
-                    
-                        StringBuilder sbM = new StringBuilder("📊 COURS AU MOMENT DU RAPPORT :\n");
-                        boolean hasData = false;
-                    
-                        if (snap != null && !snap.isEmpty()) {
-                            for (String asset : twelveDataAssets) {
-                                MarketDataFetcher.MarketData d = snap.get(asset);
-                                if (d != null && d.price > 0) {
-                                    String sign = d.changePercent >= 0 ? "+" : "";
-                                    String emojiVariation = (d.changePercent > 0) ? "🟢"
-                                        : (d.changePercent < 0) ? "🔴" : "⚪";
-                                    sbM.append(asset).append(" => ")
-                                       .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
-                                           d.price, sign, d.changePercent, emojiVariation))
-                                       .append("\n");
-                                    hasData = true;
+                             // Prix depuis WebSocket TradingView — remplace MarketDataFetcher
+                    StringBuilder sbM = new StringBuilder("📊 COURS AU MOMENT DU RAPPORT :\n");
+                    boolean hasData = false;
+Map<String, TradingViewFetcher.TVMarketData> tvSnap = TradingViewFetcher.getCache();
+if (!tvSnap.isEmpty()) {
+    for (String asset : MARKET_PRICE_ASSETS) {
+        TradingViewFetcher.TVMarketData d = tvSnap.get(asset);
+        if (d != null && d.price > 0) {
+            String sign = d.changePercent >= 0 ? "+" : "";
+            String emojiVariation = (d.changePercent > 0) ? "🟢"
+                : (d.changePercent < 0) ? "🔴" : "⚪";
+            sbM.append(asset).append(" => ")
+               .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
+                   d.price, sign, d.changePercent, emojiVariation))
+               .append("\n");
+            hasData = true;
                                 }
                             }
                         }
