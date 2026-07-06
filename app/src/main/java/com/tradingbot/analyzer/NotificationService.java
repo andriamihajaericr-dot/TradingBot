@@ -600,7 +600,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     }
 
     private static String injectLivePrices(String groqReport, List<String> assets) {
-if (groqReport == null || groqReport.isEmpty() || assets == null || assets.isEmpty()) 
+    if (groqReport == null || groqReport.isEmpty() || assets == null || assets.isEmpty()) 
     return groqReport;
 
     try {
