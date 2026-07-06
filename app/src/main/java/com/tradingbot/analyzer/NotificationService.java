@@ -187,10 +187,10 @@ public class NotificationService extends NotificationListenerService {
         }
     }
     
-    //public static final List<String> TWELVE_DATA_ASSETS = Arrays.asList(
-    // "NASDAQ", "GOLD", "EURUSD", "USOIL"); // 4 actifs = 1 seul batch → 1 appel réseau
-    // TwelveData désactivé — remplacé par Polygon.io + WebSocket TradingView
-    public static final List<String> TWELVE_DATA_ASSETS = Arrays.asList();
+    // Actifs dont les prix sont disponibles via WebSocket TradingView
+    // (anciennement TwelveData — remplacé par TradingViewFetcher)
+    public static final List<String> MARKET_PRICE_ASSETS = Arrays.asList(
+    "NASDAQ", "GOLD", "USOIL", "USDJPY", "GBPUSD", "US500", "DXY", "VIX", "US10Y");
     
     @Override
     public void onListenerConnected() {
