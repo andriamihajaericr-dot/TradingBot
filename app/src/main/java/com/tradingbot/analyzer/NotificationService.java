@@ -190,7 +190,7 @@ public class NotificationService extends NotificationListenerService {
     // Actifs dont les prix sont disponibles via WebSocket TradingView
     // (anciennement TwelveData — remplacé par TradingViewFetcher)
     public static final List<String> MARKET_PRICE_ASSETS = Arrays.asList(
-    "NASDAQ", "GOLD", "USOIL", "USDJPY", "GBPUSD", "US500", "DXY", "VIX", "US10Y");
+    "NASDAQ", "GOLD", "USOIL", "USDJPY", "GBPUSD", "SP500");
     
     @Override
     public void onListenerConnected() {
