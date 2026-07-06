@@ -114,7 +114,7 @@ public class TradingViewFetcher {
     }
 
     public static void injectKeyLevels(String asset, double dh, double dl, double wh, double wl) {
-        Log.d(TAG, "📥 [Webhook] Injection de secours désactivée (Priorité WebSocket TV Temporel).");
+        Log.d(TAG, "📥 [Webhook] Injection désactivée (Priorité WebSocket TV Temporel).");
     }
 
     public interface OnDataReadyListener {
@@ -153,6 +153,49 @@ public class TradingViewFetcher {
     private static final AtomicBoolean connected = new AtomicBoolean(false);
     private static Context appContext;
     private static OkHttpClient client;
+
+    // ✨ AJOUT : Getter public exigé par NotificationService
+    public static ConcurrentHashMap<String, TVMarketData> getCache() {
+        return cache;
+    }
+
+    // ✨ AJOUT : Générateur du rapport global exigé par MainActivity
+    public static String buildContexteMacroGlobal(Context context) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
+        
+        // Ordre d'affichage standard de vos rapports
+        String[] order = {"NASDAQ", "USOIL", "USDJPY", "GOLD", "EURUSD", "SP500", "GBPUSD"};
+        
+        for (String key : order) {
+            TVMarketData data = cache.get(key);
+            if (data != null) {
+                // Gestion dynamique des décimales pour éviter les troncatures sur le Forex
+                int decimals = (key.equals("EURUSD") || key.equals("GBPUSD")) ? 5 : (key.equals("USDJPY") ? 3 : 2);
+                String fmt = "%." + decimals + "f";
+                
+                sb.append("• ").append(key).append(" : ")
+                  .append(String.format(Locale.US, fmt, data.price)).append(" (")
+                  .append(String.format(Locale.US, "%+.2f", data.changePercent)).append("%) | ")
+                  .append("Amp: ").append(String.format(Locale.US, "%.2f", data.volatilityPercent)).append("% | ")
+                  .append("Range: ").append(String.format(Locale.US, "%.0f", data.dailyRangePercent)).append("%");
+                
+                if (data.isNearHigh) {
+                    sb.append(" 🔺PrèsHaut");
+                } else if (data.isNearLow) {
+                    sb.append(" 🔻PrèsBas");
+                }
+                
+                sb.append(" | Var: ").append(String.format(Locale.US, "%.6f", data.variance))
+                  .append(" | PDH=").append(String.format(Locale.US, fmt, data.pdh))
+                  .append(" | PDL=").append(String.format(Locale.US, fmt, data.pdl))
+                  .append(" | PWH=").append(String.format(Locale.US, fmt, data.pwh))
+                  .append(" | PWL=").append(String.format(Locale.US, fmt, data.pwl))
+                  .append("\n");
+            }
+        }
+        return sb.toString();
+    }
 
     public static void rolloverDailyLevels() {
         alertFiredPDH.clear();
@@ -228,7 +271,7 @@ public class TradingViewFetcher {
                 // 2. Initialisation des Séries Temporelles de Résolution (Profondeur 50)
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
-                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(20)); // Échantillonnage 20 Ticks
+                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(20));
             
                     sendMessage(ws, "quote_add_symbols", new Object[]{quoteSessionId, ticker});
             
@@ -309,7 +352,6 @@ public class TradingViewFetcher {
                             String assetChartSessionId = pendingSymbolChartSession.remove(symId);
                             
                             if (key != null && ws != null && assetChartSessionId != null) {
-                                // Forçage de la profondeur à 50 bougies pour garantir la présence des indices historiques du lundi
                                 if (symId.startsWith("sid_d_")) {
                                     sendMessage(ws, "create_series", new Object[]{assetChartSessionId, "ser_d_" + key, "s1", symId, "D", 50});
                                 } else if (symId.startsWith("sid_w_")) {
@@ -324,7 +366,6 @@ public class TradingViewFetcher {
                         return; 
                     }
             
-                    // ── PARSEUR DE SÉRIES SECURISE CONTRE LE SYNDROME DU LUNDI CONTRE UTC+3 ──
                     if ("timescale_update".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
@@ -340,8 +381,6 @@ public class TradingViewFetcher {
                                 if (obj.has("s")) {
                                     JSONArray sArr = obj.getJSONArray("s");
                                     if (sArr.length() >= 2) {
-                                        // Règle d'or : Si la session live de la semaine est active à NY, l'élément final -1 est la bougie en cours,
-                                        // la bougie历史 close recherchée est donc strictement positionnée à l'index -2.
                                         int targetIndex = liveSessionActive ? (sArr.length() - 2) : (sArr.length() - 1);
                                         JSONObject targetBar = sArr.getJSONObject(targetIndex);
                                         
@@ -373,7 +412,6 @@ public class TradingViewFetcher {
                         return;
                     }
             
-                    // ── FLUX TEMPS RÉEL (QUOTES SÉCURISÉES) ──
                     if ("qsd".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
@@ -503,18 +541,15 @@ public class TradingViewFetcher {
         });
     }
 
-    // ── GESTIONNAIRE D'ANALYSE DU CALENDRIER DE L'ÉCHANGE (AMERICA/NEW_YORK) ──
     private static boolean isLiveBarActiveAtNewYork() {
         Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/New_York"), Locale.US);
         int day = cal.get(Calendar.DAY_OF_WEEK);
         int hour = cal.get(Calendar.HOUR_OF_DAY);
 
-        // Fermeture des marchés le week-end à New York : Du Vendredi 17h00 au Dimanche 17h00 NY Time
         if (day == Calendar.FRIDAY && hour >= 17) return false;
         if (day == Calendar.SATURDAY) return false;
         if (day == Calendar.SUNDAY && hour < 17) return false;
 
-        // Hors week-end, la bougie d'index final est obligatoirement la bougie live en cours de cotation
         return true;
     }
 
