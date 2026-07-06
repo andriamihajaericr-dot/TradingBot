@@ -42,7 +42,7 @@ public class TradingViewFetcher {
         put("USDJPY",  "FX_IDC:USDJPY");
         put("GBPUSD",  "VANTAGE:GBPUSD");
         
-        put("EURUSD",  "VANTAGE:EURUSD"
+        put("EURUSD",  "VANTAGE:EURUSD");
        // put("AUDUSD",  "FX_IDC:AUDUSD");
         //put("USDCAD",  "FX_IDC:USDCAD");
 
