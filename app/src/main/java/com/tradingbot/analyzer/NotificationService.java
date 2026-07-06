@@ -599,62 +599,65 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
         return 0;
     }
 
-    private static String injectLivePrices(String groqReport, List<String> assets,
-        Map<String, MarketDataFetcher.MarketData> cachedData) {
-    if (groqReport == null || groqReport.isEmpty() || assets == null || assets.isEmpty()) 
-        return groqReport;
+    private static String injectLivePrices(String groqReport, List<String> assets) {
+if (groqReport == null || groqReport.isEmpty() || assets == null || assets.isEmpty()) 
+    return groqReport;
 
-        try {
+    try {
+
+    // ✅ Source unique : cache WebSocket TradingView (temps réel, gratuit, sans quota).
+    // Alimenté en continu par TradingViewFetcher.start() — plus d'appel réseau Twelve Data ici.
+    Map<String, TradingViewFetcher.TVMarketData> liveDataMap = TradingViewFetcher.getCache();
+    if (liveDataMap == null || liveDataMap.isEmpty()) return groqReport;
+
+    String[] lignes = groqReport.split("\n");
+    StringBuilder reportAjuste = new StringBuilder();
+
+    for (String ligne : lignes) {
+        String ligneModifiee = ligne;
         
-        // Réutilise le cache si disponible, sinon appel réseau en dernier recours
-        Map<String, MarketDataFetcher.MarketData> liveDataMap = null;
-        if (cachedData != null && !cachedData.isEmpty()) {
-            liveDataMap = cachedData; // Cache disponible — 0 appel réseau
-        } else if (MarketDataFetcher.tryAcquireBatchSlot()) {
-            liveDataMap = MarketDataFetcher.getMarketDataBatch(assets); // Fallback réseau
-        } else {
-            Log.w(TAG, "[INJECT] Slot occupé — injectLivePrices ignoré ce cycle");
-        }
-        if (liveDataMap == null || liveDataMap.isEmpty()) return groqReport;
-
-        String[] lignes = groqReport.split("\n");
-        StringBuilder reportAjuste = new StringBuilder();
-
-        for (String ligne : lignes) {
-            String ligneModifiee = ligne;
+        for (String asset : assets) {
+            String patternStr = "^\\s*[•\\-*]?\\s*\\S*\\s*" + Pattern.quote(asset) + "\\s*:.*";
             
-            for (String asset : assets) {
-                // Regex blindée contre les légères variations de mise en forme de l'IA
-                String patternStr = "^\\s*[•\\-*]?\\s*\\S*\\s*" + Pattern.quote(asset) + "\\s*:.*";
-                
-                if (ligne.matches(patternStr)) {
-                    MarketDataFetcher.MarketData data = liveDataMap.get(asset);
-                    if (data != null && data.price > 0) {
-                        String sign = (data.changePercent >= 0) ? "+" : "";
-                        // 🛡️ Emoji vert/rouge selon le signe de la variation, pour une lecture
-                        // visuelle immédiate sur Telegram (qui ne supporte pas la couleur de texte).
-                        String emojiVariation = (data.changePercent > 0) ? "🟢"
-                            : (data.changePercent < 0) ? "🔴" : "⚪";
-                        String badgeMarche = String.format(Locale.US,
-                            " (%.4f | %s%.2f%% %s)", data.price, sign, data.changePercent, emojiVariation);
-                        // Insertion propre juste avant les deux-points explicatifs
-                        int indexColon = ligne.indexOf(":");
-                        if (indexColon != -1) {
-                            ligneModifiee = ligne.substring(0, indexColon) + badgeMarche + " :" + ligne.substring(indexColon + 1);
-                        } else {
-                            ligneModifiee = ligne + badgeMarche;
-                        }
+            if (ligne.matches(patternStr)) {
+                TradingViewFetcher.TVMarketData data = liveDataMap.get(asset);
+                if (data != null && data.price > 0) {
+                    String sign = (data.changePercent >= 0) ? "+" : "";
+                    String emojiVariation = (data.changePercent > 0) ? "🟢"
+                        : (data.changePercent < 0) ? "🔴" : "⚪";
+                    StringBuilder badgeMarche = new StringBuilder(String.format(Locale.US,
+                        " (%.4f | %s%.2f%% %s", data.price, sign, data.changePercent, emojiVariation));
+                    // 🏛️ Niveaux pivots natifs TradingView, affichés seulement s'ils sont chargés
+                    if (data.pdh > 0 || data.pdl > 0) {
+                        badgeMarche.append(" | PDH=").append(String.format(Locale.US, "%.4f", data.pdh))
+                                   .append(" PDL=").append(String.format(Locale.US, "%.4f", data.pdl));
+                        if (data.brokeAbovePDH) badgeMarche.append(" 🔺PDH");
+                        else if (data.brokeBelowPDL) badgeMarche.append(" 🔻PDL");
                     }
-                    break; // Un seul actif traitable par ligne de liste
+                    if (data.pwh > 0 || data.pwl > 0) {
+                        badgeMarche.append(" | PWH=").append(String.format(Locale.US, "%.4f", data.pwh))
+                                   .append(" PWL=").append(String.format(Locale.US, "%.4f", data.pwl));
+                        if (data.brokeAbovePWH) badgeMarche.append(" 🚀PWH");
+                        else if (data.brokeBelowPWL) badgeMarche.append(" 🔥PWL");
+                    }
+                    badgeMarche.append(")");
+                    int indexColon = ligne.indexOf(":");
+                    if (indexColon != -1) {
+                        ligneModifiee = ligne.substring(0, indexColon) + badgeMarche + " :" + ligne.substring(indexColon + 1);
+                    } else {
+                        ligneModifiee = ligne + badgeMarche;
+                    }
                 }
+                break;
             }
-            reportAjuste.append(ligneModifiee).append("\n");
         }
-        return reportAjuste.toString().trim();
-    } catch (Exception e) {
-        Log.e(TAG, "Erreur lors de l'injection des prix live", e);
-        return groqReport;
+        reportAjuste.append(ligneModifiee).append("\n");
     }
+    return reportAjuste.toString().trim();
+} catch (Exception e) {
+    Log.e(TAG, "Erreur lors de l'injection des prix live", e);
+    return groqReport;
+}
 }
 
 private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, String fingerprint, String customSystemPrompt, boolean isSupremeRank,
