@@ -47,7 +47,7 @@ public class NotificationService extends NotificationListenerService {
         return this.eventDb;
     }
     //private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>();
-    private static final String CHANNEL_ID = "trading_alerts";
+    private static final String CHANNEL_ID = "trading_alerts"; 
     // 🛡️ CORRECTIF SURVIVANCE PROCESSUS : canal séparé, silencieux, pour la notification
     // persistante du foreground service. Sans foreground, Android tuait le processus en
     // arrière-plan et réinitialisait tout l'état en RAM (cooldowns, maps, compteurs) entre
