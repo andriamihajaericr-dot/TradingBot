@@ -398,12 +398,26 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
             
                                                  if (seriesId.startsWith("ser_d_")) { //[cite: 1]
                                                     String key = seriesId.substring(6); //[cite: 1]
+                                                    Double prevPdh = pdhCache.get(key);
+                                                    Double prevPdl = pdlCache.get(key);
+                                                    if (prevPdh == null || Math.abs(prevPdh - historicalHigh) > 1e-9
+                                                            || prevPdl == null || Math.abs(prevPdl - historicalLow) > 1e-9) {
+                                                        alertFiredPDH.remove(key);
+                                                        alertFiredPDL.remove(key);
+                                                    }
                                                     pdhCache.put(key, historicalHigh); //[cite: 1]
                                                     pdlCache.put(key, historicalLow); //[cite: 1]
                                                     saveLevelToStorage(key, "pdh", historicalHigh);
                                                     saveLevelToStorage(key, "pdl", historicalLow);
                                                 } else if (seriesId.startsWith("ser_w_")) { //[cite: 1]
                                                     String key = seriesId.substring(6); //[cite: 1]
+                                                    Double prevPwh = pwhCache.get(key);
+                                                    Double prevPwl = pwlCache.get(key);
+                                                    if (prevPwh == null || Math.abs(prevPwh - historicalHigh) > 1e-9
+                                                            || prevPwl == null || Math.abs(prevPwl - historicalLow) > 1e-9) {
+                                                        alertFiredPWH.remove(key);
+                                                        alertFiredPWL.remove(key);
+                                                    }
                                                     pwhCache.put(key, historicalHigh); //[cite: 1]
                                                     pwlCache.put(key, historicalLow); //[cite: 1]
                                                     saveLevelToStorage(key, "pwh", historicalHigh);
