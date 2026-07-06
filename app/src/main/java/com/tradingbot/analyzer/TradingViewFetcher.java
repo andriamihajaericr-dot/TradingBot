@@ -40,7 +40,7 @@ public class TradingViewFetcher {
         put("USOIL",   "TVC:USOIL");
 
         // Devises (Forex)
-        put("USDJPY",  "FX_IDC:USDJPY");
+        put("USDJPY",  "VANTAGE:USDJPY");
         put("GBPUSD",  "VANTAGE:GBPUSD");
         put("EURUSD",  "VANTAGE:EURUSD");
     }};
@@ -116,6 +116,20 @@ public class TradingViewFetcher {
     // De cette façon, le WebhookServer compile, mais n'écrase pas le flux WebSocket natif.
     Log.d("TradingViewFetcher", "📥 [Webhook] Injection ignorée pour " + asset + " (Priorité absolue au WebSocket TV).");
      }
+    public interface OnDataReadyListener {
+    void onDataReady(Map<String, TVMarketData> data);
+    void onError(String error); 
+    }
+    public static void fetchAll(OnDataReadyListener listener) {
+    if (listener == null) return;
+    try {
+        // Pass an unmodifiable copy of your current memory cache to the UI
+        listener.onDataReady(java.util.Collections.unmodifiableMap(cache));
+    } catch (Exception e) {
+        listener.onError(e.getMessage());
+    }
+    }
+    
     private static final String PREFS_WEEKLY = "TradingBotPrefs";
 
     private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
