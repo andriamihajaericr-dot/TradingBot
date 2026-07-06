@@ -1749,6 +1749,8 @@ if (fluxGeo) {
         EconomicCalendarAPI.init(this);
         EventValidator.setAppContext(this); 
         serviceInstance = this;
+        // Ajouter dans onCreate() après ligne 1751 :
+        TradingViewFetcher.start(this);
         // 🛡️ Restaurer compteur tokens depuis SharedPreferences
         SharedPreferences tokenPrefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
         long savedResetTime = tokenPrefs.getLong("token_reset_time", 0L);
