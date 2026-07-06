@@ -2400,8 +2400,21 @@ if (!tvSnap.isEmpty()) {
                 : (d.changePercent < 0) ? "🔴" : "⚪";
             sbM.append(asset).append(" => ")
                .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
-                   d.price, sign, d.changePercent, emojiVariation))
-               .append("\n");
+                   d.price, sign, d.changePercent, emojiVariation));
+            // 🏛️ Niveaux pivots natifs TradingView (Daily/Weekly), affichés seulement s'ils sont chargés
+            if (d.pdh > 0 || d.pdl > 0) {
+                sbM.append(" | PDH=").append(String.format(Locale.US, "%.4f", d.pdh))
+                   .append(" PDL=").append(String.format(Locale.US, "%.4f", d.pdl));
+                if (d.brokeAbovePDH) sbM.append(" 🔺PDH");
+                else if (d.brokeBelowPDL) sbM.append(" 🔻PDL");
+            }
+            if (d.pwh > 0 || d.pwl > 0) {
+                sbM.append(" | PWH=").append(String.format(Locale.US, "%.4f", d.pwh))
+                   .append(" PWL=").append(String.format(Locale.US, "%.4f", d.pwl));
+                if (d.brokeAbovePWH) sbM.append(" 🚀PWH");
+                else if (d.brokeBelowPWL) sbM.append(" 🔥PWL");
+            }
+            sbM.append("\n");
             hasData = true;
                                 }
                             }
