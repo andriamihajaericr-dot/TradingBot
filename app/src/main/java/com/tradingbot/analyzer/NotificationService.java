@@ -3326,7 +3326,8 @@ private void registerNetworkCallback() {
   @Override
   public void onDestroy() {
     super.onDestroy();
-
+     // Ajouter dans onDestroy() ligne 3326 :
+    TradingViewFetcher.stop();
     serviceInstance = null; // ✅ Libération immédiate du singleton
 
     // 1. Demande d'arrêt simultanée et non bloquante
