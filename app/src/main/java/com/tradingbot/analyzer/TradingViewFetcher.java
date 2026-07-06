@@ -49,37 +49,51 @@ public class TradingViewFetcher {
     public static class TVMarketData {
         public final String symbol;
         public final double price;
-        public final double changePercent;      // 1. Tendance (vs Clôture)
+        public final double changePercent;      
         public final double high;
         public final double low;
         public final double open;
         public final double prevClose;
-        public final double variance;           // 2. Volatilité intraday (20 ticks)
-        public final double volatilityPercent;  // 3. Amplitude daily (High-Low %)
-        public final double dailyRangePercent;  // 4. Position dans le range (0-100%)
+        public final double variance;           
+        public final double volatilityPercent;  
+        public final double dailyRangePercent;  
         public final boolean isNearHigh;
         public final boolean isNearLow;
         
         public final double ma200;
         public final boolean aboveMA200;
         
-        // Niveaux Daily Clôturés (TradingView Charts)
+        // ⚡ Niveaux H4 Clôturés (Précédents)
+        public final double p4hh; 
+        public final double p4hl; 
+        public final boolean brokeAboveP4HH; 
+        public final boolean brokeBelowP4HL;
+
+        // Niveaux Daily Clôturés
         public final double pdh; 
         public final double pdl; 
         public final boolean brokeAbovePDH; 
         public final boolean brokeBelowPDL; 
         
-        // Niveaux Weekly Clôturés (TradingView Charts)
+        // Niveaux Weekly Clôturés
         public final double pwh; 
         public final double pwl; 
         public final boolean brokeAbovePWH; 
         public final boolean brokeBelowPWL; 
+
+        // Niveaux Monthly Clôturés
+        public final double pmh; 
+        public final double pml; 
+        public final boolean brokeAbovePMH; 
+        public final boolean brokeBelowPML; 
+        
         public final long timestamp;
 
         public TVMarketData(String symbol, double price, double changePercent,
                             double high, double low, double open, double prevClose,
-                            double variance, double ma200, double pdh, double pdl,
-                            double pwh, double pwl, long timestamp) {
+                            double variance, double ma200, double p4hh, double p4hl,
+                            double pdh, double pdl, double pwh, double pwl, 
+                            double pmh, double pml, long timestamp) {
             this.symbol        = symbol;
             this.price         = price;
             this.changePercent = changePercent;
@@ -99,6 +113,12 @@ public class TradingViewFetcher {
             this.ma200         = ma200;
             this.aboveMA200    = (ma200 > 0) && (price > ma200);
             
+            // ⚡ Initialisation H4
+            this.p4hh          = p4hh;
+            this.p4hl          = p4hl;
+            this.brokeAboveP4HH = (p4hh > 0) && (price > p4hh);
+            this.brokeBelowP4HL = (p4hl > 0) && (price < p4hl);
+
             this.pdh           = pdh;
             this.pdl           = pdl;
             this.brokeAbovePDH = (pdh > 0) && (price > pdh);
@@ -108,13 +128,18 @@ public class TradingViewFetcher {
             this.pwl           = pwl;
             this.brokeAbovePWH = (pwh > 0) && (price > pwh);
             this.brokeBelowPWL = (pwl > 0) && (price < pwl);
+
+            this.pmh           = pmh;
+            this.pml           = pml;
+            this.brokeAbovePMH = (pmh > 0) && (price > pmh);
+            this.brokeBelowPML = (pml > 0) && (price < pml);
             
             this.timestamp     = timestamp;
         }
     }
 
     public static void injectKeyLevels(String asset, double dh, double dl, double wh, double wl) {
-        Log.d(TAG, "📥 [Webhook] Injection désactivée (Priorité WebSocket TV Temporel).");
+        Log.d(TAG, "📥 [Webhook] Injection désactivée (Priorité WebSocket TV Multi-Timeframe).");
     }
 
     public interface OnDataReadyListener {
@@ -134,15 +159,28 @@ public class TradingViewFetcher {
     private static final String PREFS_WEEKLY = "TradingBotPrefs";
 
     private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
+    
+    // ⚡ Caches mémoires H4
+    private static final ConcurrentHashMap<String, Double> p4hhCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Double> p4hlCache = new ConcurrentHashMap<>();
+
     private static final ConcurrentHashMap<String, Double> pdhCache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Double> pdlCache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Double> pwhCache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Double> pwlCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Double> pmhCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Double> pmlCache = new ConcurrentHashMap<>();
     
+    // ⚡ Anti-spam d'alertes H4
+    private static final ConcurrentHashMap<String, Boolean> alertFiredP4HH = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Boolean> alertFiredP4HL = new ConcurrentHashMap<>();
+
     private static final ConcurrentHashMap<String, Boolean> alertFiredPDH = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Boolean> alertFiredPDL = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Boolean> alertFiredPWH = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Boolean> alertFiredPWL = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Boolean> alertFiredPMH = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Boolean> alertFiredPML = new ConcurrentHashMap<>();
     
     private static final AtomicBoolean isRunning = new AtomicBoolean(false);
     private static final ConcurrentHashMap<String, VarianceCalculator> varianceCalculators = new ConcurrentHashMap<>();
@@ -154,23 +192,19 @@ public class TradingViewFetcher {
     private static Context appContext;
     private static OkHttpClient client;
 
-    // ✨ AJOUT : Getter public exigé par NotificationService
     public static ConcurrentHashMap<String, TVMarketData> getCache() {
         return cache;
     }
 
-    // ✨ AJOUT : Générateur du rapport global exigé par MainActivity
     public static String buildContexteMacroGlobal(Context context) {
         StringBuilder sb = new StringBuilder();
         sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
         
-        // Ordre d'affichage standard de vos rapports
         String[] order = {"NASDAQ", "USOIL", "USDJPY", "GOLD", "EURUSD", "SP500", "GBPUSD"};
         
         for (String key : order) {
             TVMarketData data = cache.get(key);
             if (data != null) {
-                // Gestion dynamique des décimales pour éviter les troncatures sur le Forex
                 int decimals = (key.equals("EURUSD") || key.equals("GBPUSD")) ? 5 : (key.equals("USDJPY") ? 3 : 2);
                 String fmt = "%." + decimals + "f";
                 
@@ -187,10 +221,14 @@ public class TradingViewFetcher {
                 }
                 
                 sb.append(" | Var: ").append(String.format(Locale.US, "%.6f", data.variance))
+                  .append(" | P4HH=").append(String.format(Locale.US, fmt, data.p4hh))
+                  .append(" | P4HL=").append(String.format(Locale.US, fmt, data.p4hl))
                   .append(" | PDH=").append(String.format(Locale.US, fmt, data.pdh))
                   .append(" | PDL=").append(String.format(Locale.US, fmt, data.pdl))
                   .append(" | PWH=").append(String.format(Locale.US, fmt, data.pwh))
                   .append(" | PWL=").append(String.format(Locale.US, fmt, data.pwl))
+                  .append(" | PMH=").append(String.format(Locale.US, fmt, data.pmh))
+                  .append(" | PML=").append(String.format(Locale.US, fmt, data.pml))
                   .append("\n");
             }
         }
@@ -198,11 +236,15 @@ public class TradingViewFetcher {
     }
 
     public static void rolloverDailyLevels() {
+        alertFiredP4HH.clear(); // ⚡ Nettoyage H4
+        alertFiredP4HL.clear();
         alertFiredPDH.clear();
         alertFiredPDL.clear();
         alertFiredPWH.clear();
         alertFiredPWL.clear();
-        logToUI("🔄 [Anti-Spam] Réinitialisation des verrous d'alertes pivots.");
+        alertFiredPMH.clear(); 
+        alertFiredPML.clear(); 
+        logToUI("🔄 [Anti-Spam] Réinitialisation complète de tous les verrous d'alertes pivots.");
     }
 
     public static void start(Context context) {
@@ -217,7 +259,7 @@ public class TradingViewFetcher {
                 .readTimeout(15, TimeUnit.SECONDS)
                 .build();
         
-        logToUI("📡 [TV] Démarrage du pipeline TradingView Multi-Session (Alignement UTC+3).");
+        logToUI("📡 [TV] Démarrage du pipeline TradingView Multi-Session (H4, D, W, M).");
         loadLevelsFromStorage(); 
         connectWebSocket();
     }
@@ -268,18 +310,26 @@ public class TradingViewFetcher {
                         quoteSessionId, "lp", "chp", "ch", "high_price", "low_price", "open_price", "prev_close_price"
                 });
             
-                // 2. Initialisation des Séries Temporelles de Résolution (Profondeur 50)
+                // 2. Initialisation des Séries Temporelles (H4, Daily, Weekly, Monthly)
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
                     varianceCalculators.putIfAbsent(key, new VarianceCalculator(20));
             
                     sendMessage(ws, "quote_add_symbols", new Object[]{quoteSessionId, ticker});
             
+                    // ⚡ Session Chart H4 (Utilise "240" minutes pour l'API TV)
+                    String chartSessionIdH4 = "cs_h4_" + key + "_" + UUID.randomUUID().toString().substring(0, 8);
+                    sendMessage(ws, "chart_create_session", new Object[]{chartSessionIdH4, ""});
+                    sendMessage(ws, "switch_timezone", new Object[]{chartSessionIdH4, "America/New_York"});
+                    String symIdH4 = "sid_h4_" + key; 
+                    pendingSymbolResolution.put(symIdH4, key);
+                    pendingSymbolChartSession.put(symIdH4, chartSessionIdH4);
+                    sendMessage(ws, "resolve_symbol", new Object[]{chartSessionIdH4, symIdH4, "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"});
+
                     // Session Chart Daily
                     String chartSessionIdD = "cs_d_" + key + "_" + UUID.randomUUID().toString().substring(0, 8);
                     sendMessage(ws, "chart_create_session", new Object[]{chartSessionIdD, ""});
                     sendMessage(ws, "switch_timezone", new Object[]{chartSessionIdD, "America/New_York"});
-
                     String symIdD = "sid_d_" + key; 
                     pendingSymbolResolution.put(symIdD, key);
                     pendingSymbolChartSession.put(symIdD, chartSessionIdD);
@@ -289,13 +339,21 @@ public class TradingViewFetcher {
                     String chartSessionIdW = "cs_w_" + key + "_" + UUID.randomUUID().toString().substring(0, 8);
                     sendMessage(ws, "chart_create_session", new Object[]{chartSessionIdW, ""});
                     sendMessage(ws, "switch_timezone", new Object[]{chartSessionIdW, "America/New_York"});
-
                     String symIdW = "sid_w_" + key; 
                     pendingSymbolResolution.put(symIdW, key);
                     pendingSymbolChartSession.put(symIdW, chartSessionIdW);
                     sendMessage(ws, "resolve_symbol", new Object[]{chartSessionIdW, symIdW, "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"});
+
+                    // Session Chart Monthly
+                    String chartSessionIdM = "cs_m_" + key + "_" + UUID.randomUUID().toString().substring(0, 8);
+                    sendMessage(ws, "chart_create_session", new Object[]{chartSessionIdM, ""});
+                    sendMessage(ws, "switch_timezone", new Object[]{chartSessionIdM, "America/New_York"});
+                    String symIdM = "sid_m_" + key; 
+                    pendingSymbolResolution.put(symIdM, key);
+                    pendingSymbolChartSession.put(symIdM, chartSessionIdM);
+                    sendMessage(ws, "resolve_symbol", new Object[]{chartSessionIdM, symIdM, "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"});
                 }
-                logToUI("📥 [TV WS] Pipeline initialisé. Synchronisation des pivots isolée de votre heure locale...");
+                logToUI("📥 [TV WS] Pipeline initialisé. Synchronisation H4, D, W, M opérationnelle.");
             }
 
             @Override
@@ -352,18 +410,19 @@ public class TradingViewFetcher {
                             String assetChartSessionId = pendingSymbolChartSession.remove(symId);
                             
                             if (key != null && ws != null && assetChartSessionId != null) {
-                                if (symId.startsWith("sid_d_")) {
+                                if (symId.startsWith("sid_h4_")) {
+                                    // ⚡ Enregistrement de la série H4 ("240" minutes)
+                                    sendMessage(ws, "create_series", new Object[]{assetChartSessionId, "ser_h4_" + key, "s1", symId, "240", 50});
+                                } else if (symId.startsWith("sid_d_")) {
                                     sendMessage(ws, "create_series", new Object[]{assetChartSessionId, "ser_d_" + key, "s1", symId, "D", 50});
                                 } else if (symId.startsWith("sid_w_")) {
                                     sendMessage(ws, "create_series", new Object[]{assetChartSessionId, "ser_w_" + key, "s1", symId, "W", 50});
+                                } else if (symId.startsWith("sid_m_")) {
+                                    sendMessage(ws, "create_series", new Object[]{assetChartSessionId, "ser_m_" + key, "s1", symId, "M", 50});
                                 }
                             }
                         }
                         return;
-                    }
-            
-                    if ("symbol_error".equals(m) || "series_error".equals(m) || "critical_error".equals(m)) {
-                        return; 
                     }
             
                     if ("timescale_update".equals(m)) {
@@ -390,7 +449,14 @@ public class TradingViewFetcher {
                                                 double historicalHigh = vArr.getDouble(2);
                                                 double historicalLow  = vArr.getDouble(3);
             
-                                                if (seriesId.startsWith("ser_d_")) {
+                                                if (seriesId.startsWith("ser_h4_")) {
+                                                    // ⚡ Extraction H4 (Longueur de prefixe = 7)
+                                                    String key = seriesId.substring(7);
+                                                    p4hhCache.put(key, historicalHigh);
+                                                    p4hlCache.put(key, historicalLow);
+                                                    saveLevelToStorage(key, "p4hh", historicalHigh);
+                                                    saveLevelToStorage(key, "p4hl", historicalLow);
+                                                } else if (seriesId.startsWith("ser_d_")) {
                                                     String key = seriesId.substring(6);
                                                     pdhCache.put(key, historicalHigh);
                                                     pdlCache.put(key, historicalLow);
@@ -402,6 +468,12 @@ public class TradingViewFetcher {
                                                     pwlCache.put(key, historicalLow);
                                                     saveLevelToStorage(key, "pwh", historicalHigh);
                                                     saveLevelToStorage(key, "pwl", historicalLow);
+                                                } else if (seriesId.startsWith("ser_m_")) {
+                                                    String key = seriesId.substring(6);
+                                                    pmhCache.put(key, historicalHigh);
+                                                    pmlCache.put(key, historicalLow);
+                                                    saveLevelToStorage(key, "pmh", historicalHigh);
+                                                    saveLevelToStorage(key, "pml", historicalLow);
                                                 }
                                             }
                                         }
@@ -441,14 +513,19 @@ public class TradingViewFetcher {
                                         variance = calc.getVariance();
                                     }
             
-                                    double pdh = pdhCache.getOrDefault(key, 0.0);
-                                    double pdl = pdlCache.getOrDefault(key, 0.0);
-                                    double pwh = pwhCache.getOrDefault(key, 0.0);
-                                    double pwl = pwlCache.getOrDefault(key, 0.0);
+                                    // Extraction de tous les paliers du cache
+                                    double p4hh = p4hhCache.getOrDefault(key, 0.0);
+                                    double p4hl = p4hlCache.getOrDefault(key, 0.0);
+                                    double pdh  = pdhCache.getOrDefault(key, 0.0);
+                                    double pdl  = pdlCache.getOrDefault(key, 0.0);
+                                    double pwh  = pwhCache.getOrDefault(key, 0.0);
+                                    double pwl  = pwlCache.getOrDefault(key, 0.0);
+                                    double pmh  = pmhCache.getOrDefault(key, 0.0);
+                                    double pml  = pmlCache.getOrDefault(key, 0.0);
             
                                     TVMarketData newData = new TVMarketData(
                                             key, price, change, high, low, open, prevClose,
-                                            variance, 0.0, pdh, pdl, pwh, pwl,
+                                            variance, 0.0, p4hh, p4hl, pdh, pdl, pwh, pwl, pmh, pml,
                                             System.currentTimeMillis()
                                     );
                                     cache.put(key, newData);
@@ -476,9 +553,12 @@ public class TradingViewFetcher {
                 Long last = lastAlertTime.get(key);
                 if (last == null || (now - last) > ALERT_COOLDOWN_MS) {
                     if (data.isNearHigh || data.isNearLow) {
+                        int decimals = (key.equals("EURUSD") || key.equals("GBPUSD")) ? 5 : (key.equals("USDJPY") ? 3 : 2);
+                        String fmt = "%." + decimals + "f";
+
                         StringBuilder sb = new StringBuilder();
                         sb.append("📊 *").append(key).append(data.isNearHigh ? "* 🔺 Approche du *plus haut du jour*\n\n" : "* 🔻 Approche du *plus bas du jour*\n\n");
-                        sb.append("🔹 *PRIX ACTUEL* : `").append(String.format(Locale.US, "%.4f", data.price)).append("`\n\n");
+                        sb.append("🔹 *PRIX ACTUEL* : `").append(String.format(Locale.US, fmt, data.price)).append("`\n\n");
                         sb.append("📈 *LES 4 INDICATEURS TEMPS RÉEL :*\n");
                         sb.append("• 1. Variation : `").append(String.format(Locale.US, "%+.2f", data.changePercent)).append("%` (vs Clôture)\n");
                         sb.append("• 2. Volatilité Tick (20t) : `").append(String.format(Locale.US, "%.6f", data.variance)).append("` (Variance)\n");
@@ -486,15 +566,22 @@ public class TradingViewFetcher {
                         sb.append("• 4. Position Range : `").append(String.format(Locale.US, "%.1f", data.dailyRangePercent)).append("%` (0=Bas, 100=Haut)\n\n");
                         
                         sb.append("🏛️ *NIVEAUX PIVOTS CLÔTURÉS (TradingView) :*\n");
-                        sb.append("• *Daily Precedent* : ").append(data.pdh > 0 ? "PDH = `" + String.format(Locale.US, "%.4f", data.pdh) + "` | PDL = `" + String.format(Locale.US, "%.4f", data.pdl) + "`\n" : "⚠️ En attente du flux graphique...\n");
-                        sb.append("• *Week Precedente* : ").append(data.pwh > 0 ? "PWH = `" + String.format(Locale.US, "%.4f", data.pwh) + "` | PWL = `" + String.format(Locale.US, "%.4f", data.pwl) + "`\n" : "⚠️ En attente du flux graphique...\n");
+                        // ⚡ Affichage H4 dans l'alerte d'approche globale
+                        sb.append("• *H4 Precedent* : ").append(data.p4hh > 0 ? "P4HH = `" + String.format(Locale.US, fmt, data.p4hh) + "` | P4HL = `" + String.format(Locale.US, fmt, data.p4hl) + "`\n" : "⚠️ En attente du flux graphique H4...\n");
+                        sb.append("• *Daily Precedent* : ").append(data.pdh > 0 ? "PDH = `" + String.format(Locale.US, fmt, data.pdh) + "` | PDL = `" + String.format(Locale.US, fmt, data.pdl) + "`\n" : "⚠️ En attente du flux graphique...\n");
+                        sb.append("• *Week Precedente* : ").append(data.pwh > 0 ? "PWH = `" + String.format(Locale.US, fmt, data.pwh) + "` | PWL = `" + String.format(Locale.US, fmt, data.pwl) + "`\n" : "⚠️ En attente du flux graphique...\n");
+                        sb.append("• *Month Precedent* : ").append(data.pmh > 0 ? "PMH = `" + String.format(Locale.US, fmt, data.pmh) + "` | PML = `" + String.format(Locale.US, fmt, data.pml) + "`\n" : "⚠️ En attente du flux graphique...\n");
 
-                        if (data.brokeAbovePDH || data.brokeBelowPDL || data.brokeAbovePWH || data.brokeBelowPWL) {
+                        if (data.brokeAboveP4HH || data.brokeBelowP4HL || data.brokeAbovePDH || data.brokeBelowPDL || data.brokeAbovePWH || data.brokeBelowPWL || data.brokeAbovePMH || data.brokeBelowPML) {
                             sb.append("\n⚡ *Statut Cassure Niveaux Vrais :*");
+                            if (data.brokeAboveP4HH) sb.append(" 🧭[Breakout H4]");
+                            if (data.brokeBelowP4HL) sb.append(" 📉[Breakdown H4]");
                             if (data.brokeAbovePDH) sb.append(" 🔺[Breakout PDH]");
                             if (data.brokeBelowPDL) sb.append(" 🔻[Breakdown PDL]");
                             if (data.brokeAbovePWH) sb.append(" 🚀[Breakout PWH]");
                             if (data.brokeBelowPWL) sb.append(" 🔥[Breakdown PWL]");
+                            if (data.brokeAbovePMH) sb.append(" 🌌[Breakout PMH]");
+                            if (data.brokeBelowPML) sb.append(" ⚡[Breakdown PML]");
                             sb.append("\n");
                         }
 
@@ -503,6 +590,17 @@ public class TradingViewFetcher {
                     }
                 }
 
+                // ⚡ Triggers immédiats (Anti-spam par booléen) pour les niveaux H4
+                if (data.brokeAboveP4HH && !Boolean.TRUE.equals(alertFiredP4HH.get(key))) {
+                    alertFiredP4HH.put(key, true);
+                    NotificationService.sendTelegramSecure("🧭 *" + key + "* — Cassure Intraday du *Previous 4H High* (`" + data.price + "`)", appContext);
+                }
+                if (data.brokeBelowP4HL && !Boolean.TRUE.equals(alertFiredP4HL.get(key))) {
+                    alertFiredP4HL.put(key, true);
+                    NotificationService.sendTelegramSecure("📉 *" + key + "* — Cassure Intraday du *Previous 4H Low* (`" + data.price + "`)", appContext);
+                }
+
+                // Autres cassures
                 if (data.brokeAbovePDH && !Boolean.TRUE.equals(alertFiredPDH.get(key))) {
                     alertFiredPDH.put(key, true);
                     NotificationService.sendTelegramSecure("🔺 *" + key + "* — Cassure réelle du *Previous Day High* (`" + data.price + "`)", appContext);
@@ -518,6 +616,14 @@ public class TradingViewFetcher {
                 if (data.brokeBelowPWL && !Boolean.TRUE.equals(alertFiredPWL.get(key))) {
                     alertFiredPWL.put(key, true);
                     NotificationService.sendTelegramSecure("🔥 *" + key + "* — Breakdown validé du *Previous Week Low* (`" + data.price + "`) !", appContext);
+                }
+                if (data.brokeAbovePMH && !Boolean.TRUE.equals(alertFiredPMH.get(key))) {
+                    alertFiredPMH.put(key, true);
+                    NotificationService.sendTelegramSecure("🌌 *" + key + "* — Macro Breakout du *Previous Month High* (`" + data.price + "`) !! Zone institutionnelle majeure franchie.", appContext);
+                }
+                if (data.brokeBelowPML && !Boolean.TRUE.equals(alertFiredPML.get(key))) {
+                    alertFiredPML.put(key, true);
+                    NotificationService.sendTelegramSecure("⚡ *" + key + "* — Macro Breakdown du *Previous Month Low* (`" + data.price + "`) !! Zone institutionnelle majeure enfoncée.", appContext);
                 }
             }
 
@@ -569,19 +675,29 @@ public class TradingViewFetcher {
         SharedPreferences prefs = appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE);
         for (String key : SYMBOL_MAP.keySet()) {
             try {
-                double savedPdh = Double.parseDouble(prefs.getString("pdh_" + key, "0"));
-                double savedPdl = Double.parseDouble(prefs.getString("pdl_" + key, "0"));
-                double savedPwh = Double.parseDouble(prefs.getString("pwh_" + key, "0"));
-                double savedPwl = Double.parseDouble(prefs.getString("pwl_" + key, "0"));
+                // ⚡ Restauration H4 locale
+                double savedP4hh = Double.parseDouble(prefs.getString("p4hh_" + key, "0"));
+                double savedP4hl = Double.parseDouble(prefs.getString("p4hl_" + key, "0"));
 
-                if (savedPdh > 0) pdhCache.put(key, savedPdh);
-                if (savedPdl > 0) pdlCache.put(key, savedPdl);
-                if (savedPwh > 0) pwhCache.put(key, savedPwh);
-                if (savedPwl > 0) pwlCache.put(key, savedPwl);
+                double savedPdh  = Double.parseDouble(prefs.getString("pdh_" + key, "0"));
+                double savedPdl  = Double.parseDouble(prefs.getString("pdl_" + key, "0"));
+                double savedPwh  = Double.parseDouble(prefs.getString("pwh_" + key, "0"));
+                double savedPwl  = Double.parseDouble(prefs.getString("pwl_" + key, "0"));
+                double savedPmh  = Double.parseDouble(prefs.getString("pmh_" + key, "0"));
+                double savedPml  = Double.parseDouble(prefs.getString("pml_" + key, "0"));
+
+                if (savedP4hh > 0) p4hhCache.put(key, savedP4hh);
+                if (savedP4hl > 0) p4hlCache.put(key, savedP4hl);
+                if (savedPdh > 0)  pdhCache.put(key, savedPdh);
+                if (savedPdl > 0)  pdlCache.put(key, savedPdl);
+                if (savedPwh > 0)  pwhCache.put(key, savedPwh);
+                if (savedPwl > 0)  pwlCache.put(key, savedPwl);
+                if (savedPmh > 0)  pmhCache.put(key, savedPmh);
+                if (savedPml > 0)  pmlCache.put(key, savedPml);
             } catch (NumberFormatException ignored) {}
         }
-        if (!pdhCache.isEmpty()) {
-            logToUI("📦 [Fonda Local Storage] Réintégration de " + pdhCache.size() + " structures pivots.");
+        if (!p4hhCache.isEmpty() || !pdhCache.isEmpty()) {
+            logToUI("📦 [Fonda Local Storage] Réintégration complète de la cartographie pivot (H4, H, W, M).");
         }
     }
 
