@@ -1539,7 +1539,7 @@ if (fluxGeo) {
                         List<String> twelveFiltered = new ArrayList<>();
                         for (String a : enrichedAssets) {
                             // Limiter aux 4 actifs core — évite les batches supplémentaires sur événements riches
-                            if (TWELVE_DATA_ASSETS.contains(a)) twelveFiltered.add(a);
+                            if (MARKET_PRICE_ASSETS.contains(a)) twelveFiltered.add(a);
                             if (twelveFiltered.size() >= 4) break; // Cap strict à 4 actifs = 1 batch max
                         }
                         // tryAcquireBatchSlot — évite les appels simultanés
@@ -1683,7 +1683,7 @@ if (fluxGeo) {
         // Filtrer uniquement les 6 actifs Twelve Data — assets complet va à Groq
         List<String> twelveAssets = new ArrayList<>();
         for (String asset : assets) {
-            if (TWELVE_DATA_ASSETS.contains(asset)) {
+            if (MARKET_PRICE_ASSETS.contains(asset)) {
                 twelveAssets.add(asset);
             }
         }
