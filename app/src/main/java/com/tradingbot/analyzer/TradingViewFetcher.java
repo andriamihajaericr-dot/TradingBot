@@ -6,10 +6,11 @@ import android.content.SharedPreferences;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-import java.util.Collections;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -24,12 +25,12 @@ import okhttp3.WebSocketListener;
 public class TradingViewFetcher {
 
     private static final String TAG = "TradingViewFetcher";
-    private static WebSocket activeWs;
+    private static WebSocket webSocket;
     
     private static final Map<String, String> pendingSymbolResolution = new ConcurrentHashMap<>();
     private static final Map<String, String> pendingSymbolChartSession = new ConcurrentHashMap<>();
     
-    // ── Matrice des Actifs Fonda IOF (Flux Alignés sur vos Graphiques) ──
+    // ── Matrice des Actifs Fonda IOF ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
         // Indices
         put("NASDAQ",  "SPREADEX:NDX");
@@ -111,23 +112,23 @@ public class TradingViewFetcher {
             this.timestamp     = timestamp;
         }
     }
-     public static void injectKeyLevels(String asset, double dh, double dl, double wh, double wl) {
-    // On laisse la méthode vide ou on log simplement.
-    // De cette façon, le WebhookServer compile, mais n'écrase pas le flux WebSocket natif.
-    Log.d("TradingViewFetcher", "📥 [Webhook] Injection ignorée pour " + asset + " (Priorité absolue au WebSocket TV).");
-     }
+
+    public static void injectKeyLevels(String asset, double dh, double dl, double wh, double wl) {
+        Log.d(TAG, "📥 [Webhook] Injection de secours désactivée (Priorité WebSocket TV Temporel).");
+    }
+
     public interface OnDataReadyListener {
-    void onDataReady(Map<String, TVMarketData> data);
-    void onError(String error); 
+        void onDataReady(Map<String, TVMarketData> data);
+        void onError(String error); 
     }
+
     public static void fetchAll(OnDataReadyListener listener) {
-    if (listener == null) return;
-    try {
-        // Pass an unmodifiable copy of your current memory cache to the UI
-        listener.onDataReady(java.util.Collections.unmodifiableMap(cache));
-    } catch (Exception e) {
-        listener.onError(e.getMessage());
-    }
+        if (listener == null) return;
+        try {
+            listener.onDataReady(java.util.Collections.unmodifiableMap(cache));
+        } catch (Exception e) {
+            listener.onError(e.getMessage());
+        }
     }
     
     private static final String PREFS_WEEKLY = "TradingBotPrefs";
@@ -152,19 +153,18 @@ public class TradingViewFetcher {
     private static final AtomicBoolean connected = new AtomicBoolean(false);
     private static Context appContext;
     private static OkHttpClient client;
-    private static WebSocket webSocket;
 
     public static void rolloverDailyLevels() {
         alertFiredPDH.clear();
         alertFiredPDL.clear();
         alertFiredPWH.clear();
         alertFiredPWL.clear();
-        logToUI("🔄 [Anti-Spam] Réinitialisation des déclencheurs d'alertes pivots pour la nouvelle session.");
+        logToUI("🔄 [Anti-Spam] Réinitialisation des verrous d'alertes pivots.");
     }
 
     public static void start(Context context) {
         if (isRunning.getAndSet(true)) {
-            logToUI("⏳ [TV] Déjà en cours.");
+            logToUI("⏳ [TV] Déjà en exécution.");
             return;
         }
         appContext = context.getApplicationContext();
@@ -174,7 +174,7 @@ public class TradingViewFetcher {
                 .readTimeout(15, TimeUnit.SECONDS)
                 .build();
         
-        logToUI("📡 [TV] Démarrage du pipeline 100% TradingView Exclusif.");
+        logToUI("📡 [TV] Démarrage du pipeline TradingView Multi-Session (Alignement UTC+3).");
         loadLevelsFromStorage(); 
         connectWebSocket();
     }
@@ -204,20 +204,20 @@ public class TradingViewFetcher {
                 .header("Origin", "https://www.tradingview.com")
                 .build();
 
-        webSocket = client.newWebSocket(request, new WebSocketListener() {
+        client.newWebSocket(request, new WebSocketListener() {
             private String quoteSessionId;
 
             @Override
             public void onOpen(WebSocket ws, Response response) {
-                activeWs = ws;
-                logToUI("✅ [TV WS] Canal connecté.");
+                webSocket = ws;
+                logToUI("✅ [TV WS] Canal réseau connecté.");
                 connected.set(true);
                 isConnecting.set(false);
                 cache.clear();
                 pendingSymbolResolution.clear();
                 pendingSymbolChartSession.clear();
             
-                // 1. Initialisation Session Temps Réel (Quotes)
+                // 1. Initialisation Flux Temps Réel Principal
                 quoteSessionId = "qs_" + UUID.randomUUID().toString().substring(0, 12);
                 sendMessage(ws, "set_auth_token", new Object[]{"unauthorized_user_token"});
                 sendMessage(ws, "quote_create_session", new Object[]{quoteSessionId});
@@ -225,15 +225,14 @@ public class TradingViewFetcher {
                         quoteSessionId, "lp", "chp", "ch", "high_price", "low_price", "open_price", "prev_close_price"
                 });
             
-                // 2. Initialisation Sessions Graphiques Dédiées (Charts) pour Extraire les Pivots
+                // 2. Initialisation des Séries Temporelles de Résolution (Profondeur 50)
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key);
-                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(5));
-                
-                    // Liaison flux temps réel principal
+                    varianceCalculators.putIfAbsent(key, new VarianceCalculator(20)); // Échantillonnage 20 Ticks
+            
                     sendMessage(ws, "quote_add_symbols", new Object[]{quoteSessionId, ticker});
-                
-                    // ── Session Graphique Daily ──
+            
+                    // Session Chart Daily
                     String chartSessionIdD = "cs_d_" + key + "_" + UUID.randomUUID().toString().substring(0, 8);
                     sendMessage(ws, "chart_create_session", new Object[]{chartSessionIdD, ""});
                     sendMessage(ws, "switch_timezone", new Object[]{chartSessionIdD, "America/New_York"});
@@ -243,7 +242,7 @@ public class TradingViewFetcher {
                     pendingSymbolChartSession.put(symIdD, chartSessionIdD);
                     sendMessage(ws, "resolve_symbol", new Object[]{chartSessionIdD, symIdD, "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"});
 
-                    // ── Session Graphique Weekly ──
+                    // Session Chart Weekly
                     String chartSessionIdW = "cs_w_" + key + "_" + UUID.randomUUID().toString().substring(0, 8);
                     sendMessage(ws, "chart_create_session", new Object[]{chartSessionIdW, ""});
                     sendMessage(ws, "switch_timezone", new Object[]{chartSessionIdW, "America/New_York"});
@@ -253,7 +252,7 @@ public class TradingViewFetcher {
                     pendingSymbolChartSession.put(symIdW, chartSessionIdW);
                     sendMessage(ws, "resolve_symbol", new Object[]{chartSessionIdW, symIdW, "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"});
                 }
-                logToUI("📥 [TV WS] Pipeline configuré à 100%. Synchronisation des niveaux pivots en cours...");
+                logToUI("📥 [TV WS] Pipeline initialisé. Synchronisation des pivots isolée de votre heure locale...");
             }
 
             @Override
@@ -277,7 +276,7 @@ public class TradingViewFetcher {
                     int endPayload = startPayload + length;
                     if (endPayload > text.length()) break;
                     String payload = text.substring(startPayload, endPayload);
-                    processJsonPayload(payload);
+                    processJsonPayload(ws, payload);
                     idx = endPayload;
                 }
             }
@@ -292,17 +291,16 @@ public class TradingViewFetcher {
                     String payload = msg.toString();
                     ws.send("~m~" + payload.length() + "~m~" + payload);
                 } catch (Exception e) {
-                    Log.e(TAG, "[TV WS] Erreur envoi message", e);
+                    Log.e(TAG, "[TV WS] Erreur envoi", e);
                 }
             }
 
-            private void processJsonPayload(String payload) {
+            private void processJsonPayload(WebSocket ws, String payload) {
                 try {
                     if (!payload.startsWith("{")) return;
                     JSONObject json = new JSONObject(payload);
                     String m = json.optString("m");
             
-                    // ── LIAISON ET INSTANCIATION DES SÉRIES TEMPORELLES ──
                     if ("symbol_resolved".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
@@ -310,12 +308,13 @@ public class TradingViewFetcher {
                             String key = pendingSymbolResolution.remove(symId);
                             String assetChartSessionId = pendingSymbolChartSession.remove(symId);
                             
-                            if (key != null && activeWs != null && assetChartSessionId != null) {
-                                    if (symId.startsWith("sid_d_")) {
-                                        sendMessage(activeWs, "create_series", new Object[]{assetChartSessionId, "ser_d_" + key, "s1", symId, "D", 3});
-                                    } else if (symId.startsWith("sid_w_")) {
-                                        sendMessage(activeWs, "create_series", new Object[]{assetChartSessionId, "ser_w_" + key, "s1", symId, "W", 3});
-                                    }
+                            if (key != null && ws != null && assetChartSessionId != null) {
+                                // Forçage de la profondeur à 50 bougies pour garantir la présence des indices historiques du lundi
+                                if (symId.startsWith("sid_d_")) {
+                                    sendMessage(ws, "create_series", new Object[]{assetChartSessionId, "ser_d_" + key, "s1", symId, "D", 50});
+                                } else if (symId.startsWith("sid_w_")) {
+                                    sendMessage(ws, "create_series", new Object[]{assetChartSessionId, "ser_w_" + key, "s1", symId, "W", 50});
+                                }
                             }
                         }
                         return;
@@ -325,65 +324,28 @@ public class TradingViewFetcher {
                         return; 
                     }
             
-                    // ── PARSEUR DE PIVOTS SÉCURISÉ (ANTI-DST & ANTI-DOUBLON LUNDI) ──
+                    // ── PARSEUR DE SÉRIES SECURISE CONTRE LE SYNDROME DU LUNDI CONTRE UTC+3 ──
                     if ("timescale_update".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
                             JSONObject seriesData = p.getJSONObject(1);
                             java.util.Iterator<String> keys = seriesData.keys();
             
+                            boolean liveSessionActive = isLiveBarActiveAtNewYork();
+
                             while (keys.hasNext()) {
                                 String seriesId = keys.next();
                                 JSONObject obj = seriesData.getJSONObject(seriesId);
             
                                 if (obj.has("s")) {
                                     JSONArray sArr = obj.getJSONArray("s");
-                                    if (sArr.length() >= 1) {
-                                        JSONObject targetBar = null;
+                                    if (sArr.length() >= 2) {
+                                        // Règle d'or : Si la session live de la semaine est active à NY, l'élément final -1 est la bougie en cours,
+                                        // la bougie历史 close recherchée est donc strictement positionnée à l'index -2.
+                                        int targetIndex = liveSessionActive ? (sArr.length() - 2) : (sArr.length() - 1);
+                                        JSONObject targetBar = sArr.getJSONObject(targetIndex);
                                         
-                                        // Traitement Daily Sécurisé Calendaire (New York DST)
-                                        if (seriesId.startsWith("ser_d_")) {
-                                            String key = seriesId.substring(6);
-                                            JSONObject lastBar = sArr.getJSONObject(sArr.length() - 1);
-                                            if (lastBar.has("v")) {
-                                                long lastBarTsSec = lastBar.getJSONArray("v").getLong(0);
-                                                
-                                                java.util.Calendar barCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("America/New_York"));
-                                                barCal.setTimeInMillis(lastBarTsSec * 1000);
-                                                java.util.Calendar todayCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("America/New_York"));
-                                                
-                                                if (barCal.get(java.util.Calendar.DAY_OF_YEAR) == todayCal.get(java.util.Calendar.DAY_OF_YEAR) && sArr.length() >= 2) {
-                                                    targetBar = sArr.getJSONObject(sArr.length() - 2);
-                                                } else {
-                                                    targetBar = lastBar;
-                                                }
-                                            }
-                                        } 
-                                        // Traitement Weekly Sécurisé Calendaire (Filtre dynamique de la semaine)
-                                        else if (seriesId.startsWith("ser_w_")) {
-                                            String key = seriesId.substring(6);
-                                            JSONObject lastBar = sArr.getJSONObject(sArr.length() - 1);
-                                            if (lastBar.has("v") && sArr.length() >= 2) {
-                                                long lastBarTsSec = lastBar.getJSONArray("v").getLong(0);
-                                                
-                                                java.util.Calendar barCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("America/New_York"));
-                                                barCal.setTimeInMillis(lastBarTsSec * 1000);
-                                                int barWeek = barCal.get(java.util.Calendar.WEEK_OF_YEAR);
-                                                
-                                                java.util.Calendar currentCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("America/New_York"));
-                                                int currentWeek = currentCal.get(java.util.Calendar.WEEK_OF_YEAR);
-                                                
-                                                if (barWeek == currentWeek) {
-                                                    targetBar = sArr.getJSONObject(sArr.length() - 2);
-                                                } else {
-                                                    targetBar = lastBar;
-                                                }
-                                            } else {
-                                                targetBar = lastBar;
-                                            }
-                                        }
-                                        
-                                        if (targetBar != null && targetBar.has("v")) {
+                                        if (targetBar.has("v")) {
                                             JSONArray vArr = targetBar.getJSONArray("v");
                                             if (vArr.length() >= 4) {
                                                 double historicalHigh = vArr.getDouble(2);
@@ -411,7 +373,7 @@ public class TradingViewFetcher {
                         return;
                     }
             
-                    // ── FLUX TRADINGVIEW TEMPS RÉEL (QUOTES) ──
+                    // ── FLUX TEMPS RÉEL (QUOTES SÉCURISÉES) ──
                     if ("qsd".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
@@ -452,22 +414,19 @@ public class TradingViewFetcher {
                                             System.currentTimeMillis()
                                     );
                                     cache.put(key, newData);
-            
                                     checkAndAlert(key, newData);
                                 }
                             }
                         }
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "[TV WS] Erreur parse JSON", e);
+                    Log.e(TAG, "[TV WS] Erreur traitement JSON", e);
                 }
             }
 
             private String getKeyFromTicker(String ticker) {
                 for (Map.Entry<String, String> entry : SYMBOL_MAP.entrySet()) {
-                    if (ticker.equals(entry.getValue())) {
-                        return entry.getKey();
-                    }
+                    if (ticker.equals(entry.getValue())) return entry.getKey();
                 }
                 return null;
             }
@@ -488,12 +447,12 @@ public class TradingViewFetcher {
                         sb.append("• 3. Amplitude Daily : `").append(String.format(Locale.US, "%.2f", data.volatilityPercent)).append("%` (High-Low)\n");
                         sb.append("• 4. Position Range : `").append(String.format(Locale.US, "%.1f", data.dailyRangePercent)).append("%` (0=Bas, 100=Haut)\n\n");
                         
-                        sb.append("🏛️ *NIVEAUX PIVOTS (Natifs TradingView) :*\n");
-                        sb.append("• *Daily* : ").append(data.pdh > 0 ? "PDH = `" + String.format(Locale.US, "%.4f", data.pdh) + "` | PDL = `" + String.format(Locale.US, "%.4f", data.pdl) + "`\n" : "⚠️ Analyse du flux graphique...\n");
-                        sb.append("• *Weekly* : ").append(data.pwh > 0 ? "PWH = `" + String.format(Locale.US, "%.4f", data.pwh) + "` | PWL = `" + String.format(Locale.US, "%.4f", data.pwl) + "`\n" : "⚠️ Analyse du flux graphique...\n");
+                        sb.append("🏛️ *NIVEAUX PIVOTS CLÔTURÉS (TradingView) :*\n");
+                        sb.append("• *Daily Precedent* : ").append(data.pdh > 0 ? "PDH = `" + String.format(Locale.US, "%.4f", data.pdh) + "` | PDL = `" + String.format(Locale.US, "%.4f", data.pdl) + "`\n" : "⚠️ En attente du flux graphique...\n");
+                        sb.append("• *Week Precedente* : ").append(data.pwh > 0 ? "PWH = `" + String.format(Locale.US, "%.4f", data.pwh) + "` | PWL = `" + String.format(Locale.US, "%.4f", data.pwl) + "`\n" : "⚠️ En attente du flux graphique...\n");
 
                         if (data.brokeAbovePDH || data.brokeBelowPDL || data.brokeAbovePWH || data.brokeBelowPWL) {
-                            sb.append("\n⚡ *Statut de cassure :*");
+                            sb.append("\n⚡ *Statut Cassure Niveaux Vrais :*");
                             if (data.brokeAbovePDH) sb.append(" 🔺[Breakout PDH]");
                             if (data.brokeBelowPDL) sb.append(" 🔻[Breakdown PDL]");
                             if (data.brokeAbovePWH) sb.append(" 🚀[Breakout PWH]");
@@ -508,19 +467,19 @@ public class TradingViewFetcher {
 
                 if (data.brokeAbovePDH && !Boolean.TRUE.equals(alertFiredPDH.get(key))) {
                     alertFiredPDH.put(key, true);
-                    NotificationService.sendTelegramSecure("🔺 *" + key + "* — Cassure du *Previous Day High* (`" + data.price + "`)", appContext);
+                    NotificationService.sendTelegramSecure("🔺 *" + key + "* — Cassure réelle du *Previous Day High* (`" + data.price + "`)", appContext);
                 }
                 if (data.brokeBelowPDL && !Boolean.TRUE.equals(alertFiredPDL.get(key))) {
                     alertFiredPDL.put(key, true);
-                    NotificationService.sendTelegramSecure("🔻 *" + key + "* — Cassure du *Previous Day Low* (`" + data.price + "`)", appContext);
+                    NotificationService.sendTelegramSecure("🔻 *" + key + "* — Cassure réelle du *Previous Day Low* (`" + data.price + "`)", appContext);
                 }
                 if (data.brokeAbovePWH && !Boolean.TRUE.equals(alertFiredPWH.get(key))) {
                     alertFiredPWH.put(key, true);
-                    NotificationService.sendTelegramSecure("🚀 *" + key + "* — Breakout *Previous Week High* (`" + data.price + "`) !", appContext);
+                    NotificationService.sendTelegramSecure("🚀 *" + key + "* — Breakout validé du *Previous Week High* (`" + data.price + "`) !", appContext);
                 }
                 if (data.brokeBelowPWL && !Boolean.TRUE.equals(alertFiredPWL.get(key))) {
                     alertFiredPWL.put(key, true);
-                    NotificationService.sendTelegramSecure("🔥 *" + key + "* — Breakdown *Previous Week Low* (`" + data.price + "`) !", appContext);
+                    NotificationService.sendTelegramSecure("🔥 *" + key + "* — Breakdown validé du *Previous Week Low* (`" + data.price + "`) !", appContext);
                 }
             }
 
@@ -533,7 +492,7 @@ public class TradingViewFetcher {
                 connected.set(false);
                 isConnecting.set(false);
                 cache.clear();
-                logToUI("🔴 [TV WS] Déconnecté. Reconnexion automatique dans 5s...");
+                logToUI("🔴 [TV WS] Connexion perdue. Reconnexion automatique dans 5s...");
                 if (isRunning.get()) {
                     new Thread(() -> {
                         try { TimeUnit.SECONDS.sleep(5); } catch (InterruptedException ignored) {}
@@ -544,6 +503,21 @@ public class TradingViewFetcher {
         });
     }
 
+    // ── GESTIONNAIRE D'ANALYSE DU CALENDRIER DE L'ÉCHANGE (AMERICA/NEW_YORK) ──
+    private static boolean isLiveBarActiveAtNewYork() {
+        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/New_York"), Locale.US);
+        int day = cal.get(Calendar.DAY_OF_WEEK);
+        int hour = cal.get(Calendar.HOUR_OF_DAY);
+
+        // Fermeture des marchés le week-end à New York : Du Vendredi 17h00 au Dimanche 17h00 NY Time
+        if (day == Calendar.FRIDAY && hour >= 17) return false;
+        if (day == Calendar.SATURDAY) return false;
+        if (day == Calendar.SUNDAY && hour < 17) return false;
+
+        // Hors week-end, la bougie d'index final est obligatoirement la bougie live en cours de cotation
+        return true;
+    }
+
     private static void saveLevelToStorage(String key, String type, double value) {
         if (appContext == null || value <= 0) return;
         try {
@@ -551,7 +525,7 @@ public class TradingViewFetcher {
             editor.putString(type + "_" + key, String.valueOf(value));
             editor.apply();
         } catch (Exception e) {
-            Log.e(TAG, "Erreur persistance SharedPreferences pour " + key, e);
+            Log.e(TAG, "Erreur cache local pour " + key, e);
         }
     }
 
@@ -572,63 +546,50 @@ public class TradingViewFetcher {
             } catch (NumberFormatException ignored) {}
         }
         if (!pdhCache.isEmpty()) {
-            logToUI("📦 [Fonda Storage] " + pdhCache.size() + " structures de pivots restaurées localement au démarrage.");
+            logToUI("📦 [Fonda Local Storage] Réintégration de " + pdhCache.size() + " structures pivots.");
         }
+    }
+
+    private static void logToUI(String message) {
+        Log.d(TAG, message);
     }
 
     private static class VarianceCalculator {
-        private final int period; private final double[] window;
-        private int index = 0; private int count = 0; private double sum = 0; private double sumSq = 0;
-        public VarianceCalculator(int period) { this.period = period; this.window = new double[period]; }
+        private final int period;
+        private final double[] window;
+        private int index = 0;
+        private int count = 0;
+        private double sum = 0;
+        private double sumSq = 0;
+
+        public VarianceCalculator(int period) {
+            this.period = period;
+            this.window = new double[period];
+        }
+
         public synchronized void addPrice(double price) {
             if (count < period) {
-                window[count] = price; sum += price; sumSq += price * price; count++;
+                window[count] = price;
+                sum += price;
+                sumSq += price * price;
+                count++;
             } else {
-                double old = window[index]; sum -= old; sumSq -= old * old;
-                window[index] = price; sum += price; sumSq += price * price;
+                double old = window[index];
+                sum -= old;
+                sumSq -= old * old;
+                
+                window[index] = price;
+                sum += price;
+                sumSq += price * price;
                 index = (index + 1) % period;
             }
         }
+
         public synchronized double getVariance() {
-            if (count < 2) return 0;
-            int n = Math.min(count, period);
-            double mean = sum / n; return (sumSq / n) - (mean * mean);
+            if (count < 2) return 0.0;
+            double mean = sum / count;
+            double variance = (sumSq / count) - (mean * mean);
+            return variance < 0 ? 0.0 : variance;
         }
-    }
-
-    public static Map<String, TVMarketData> getCache() { return Collections.unmodifiableMap(cache); }
-
-    public static String buildContexteMacroGlobal(Context ctx) {
-        if (cache.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder();
-        sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
-
-        for (String key : SYMBOL_MAP.keySet()) {
-            TVMarketData d = cache.get(key);
-            if (d != null) {
-                String formatPrice = (key.equals("GBPUSD") || key.equals("EURUSD")) ? "%.5f" : (key.equals("USDJPY") ? "%.3f" : "%.2f");
-                sb.append("• ").append(key).append(" : ")
-                  .append(String.format(Locale.US, formatPrice, d.price))
-                  .append(" (").append(String.format(Locale.US, "%+.2f", d.changePercent)).append("%)")
-                  .append(" | Amp: ").append(String.format(Locale.US, "%.2f", d.volatilityPercent)).append("%")
-                  .append(" | Range: ").append(String.format(Locale.US, "%.0f", d.dailyRangePercent)).append("%")
-                  .append(d.isNearHigh ? " 🔺PrèsHaut" : d.isNearLow ? " 🔻PrèsBas" : "")
-                  .append(" | Var: ").append(String.format(Locale.US, "%.6f", d.variance))
-                  .append(d.pdh > 0 ? " | PDH=" + String.format(Locale.US, formatPrice, d.pdh) : "")
-                  .append(d.pdl > 0 ? " | PDL=" + String.format(Locale.US, formatPrice, d.pdl) : "")
-                  .append(d.brokeAbovePDH ? " 🔺Breakout PDH" : d.brokeBelowPDL ? " 🔻Breakdown PDL" : "")
-                  .append(d.pwh > 0 ? " | PWH=" + String.format(Locale.US, formatPrice, d.pwh) : "")
-                  .append(d.pwl > 0 ? " | PWL=" + String.format(Locale.US, formatPrice, d.pwl) : "")
-                  .append(d.brokeAbovePWH ? " 🚀Breakout PWH" : d.brokeBelowPWL ? " 🔥Breakdown PWL" : "")
-                  .append("\n");
-            }
-        }
-        String regimeFed = ctx.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE).getString("fed_regime", "PAUSE HAWKISH | CPI 4.2%");
-        sb.append("\n🏦 RÉGIME FED : ").append(regimeFed).append("\n");
-        return sb.toString();
-    }
-
-    private static void logToUI(String msg) {
-        if (MainActivity.instance != null) { MainActivity.instance.addLog(msg); }
     }
 }
