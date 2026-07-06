@@ -30,19 +30,20 @@ public class TradingViewFetcher {
     private static final Map<String, String> pendingSymbolChartSession = new ConcurrentHashMap<>();
     
     // ── Matrice des Actifs Fonda IOF (Flux Alignés sur vos Graphiques) ──
+    // ── Matrice des Actifs Fonda IOF (Flux Alignés sur vos Graphiques) ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
         // Indices
-        put("NASDAQ",  "SPREADEX:NDX");[cite: 1]
-        put("SP500",   "SPREADEX:SPX");[cite: 1]
+        put("NASDAQ",  "SPREADEX:NDX"); //[cite: 1]
+        put("SP500",   "SPREADEX:SPX"); //[cite: 1]
 
         // Matières Premières
-        put("GOLD",    "TVC:GOLD");[cite: 1]
-        put("USOIL",   "TVC:USOIL");[cite: 1]
+        put("GOLD",    "TVC:GOLD"); //[cite: 1]
+        put("USOIL",   "TVC:USOIL"); //[cite: 1]
 
         // Devises (Forex)
-        put("USDJPY",  "FX_IDC:USDJPY");[cite: 1]
-        put("GBPUSD",  "VANTAGE:GBPUSD");[cite: 1]
-        put("EURUSD",  "VANTAGE:EURUSD");[cite: 1]
+        put("USDJPY",  "VANTAGE:USDJPY"); //[cite: 1]
+        put("GBPUSD",  "VANTAGE:GBPUSD"); //[cite: 1]
+        put("EURUSD",  "VANTAGE:EURUSD"); //[cite: 1]
     }};
 
     public static class TVMarketData {
