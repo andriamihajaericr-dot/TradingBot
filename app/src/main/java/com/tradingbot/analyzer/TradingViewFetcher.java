@@ -396,7 +396,7 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
                                                 double historicalHigh = vArr.getDouble(2); //[cite: 1]
                                                 double historicalLow  = vArr.getDouble(3); //[cite: 1]
             
-                                                if (seriesId.startsWith("ser_d_")) { //[cite: 1]
+                                                 if (seriesId.startsWith("ser_d_")) { //[cite: 1]
                                                     String key = seriesId.substring(6); //[cite: 1]
                                                     pdhCache.put(key, historicalHigh); //[cite: 1]
                                                     pdlCache.put(key, historicalLow); //[cite: 1]
