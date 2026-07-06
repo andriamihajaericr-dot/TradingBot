@@ -347,8 +347,11 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
                             String symId = p.getString(1); //[cite: 1]
                             String key = pendingSymbolResolution.remove(symId); //[cite: 1]
                             if (key != null && activeWs != null) { //[cite: 1]
+                                logToUI("🔎 [TV Diag] Symbole résolu : " + key + " (" + symId + ") → création des séries D/W.");
                                 sendMessage(activeWs, "create_series", new Object[]{chartSessionId, "ser_d_" + key, "s1", symId, "D", 3}); //[cite: 1]
                                 sendMessage(activeWs, "create_series", new Object[]{chartSessionId, "ser_w_" + key, "s1", symId, "W", 3}); //[cite: 1]
+                            } else {
+                                logToUI("⚠️ [TV Diag] symbol_resolved reçu pour " + symId + " mais clé introuvable (déjà consommée ou WS inactif).");
                             }
                         }
                         return;
@@ -356,6 +359,7 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
             
                     if ("symbol_error".equals(m) || "series_error".equals(m) || "critical_error".equals(m) || "protocol_error".equals(m)) { //[cite: 1]
                         Log.e(TAG, "[TV WS] Erreur serveur (" + m + ") : " + payload); //[cite: 1]
+                        logToUI("❌ [TV Diag] Erreur serveur (" + m + ") : " + payload);
                         return;
                     }
             
@@ -395,6 +399,8 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
                                             if (vArr.length() >= 4) { //[cite: 1]
                                                 double historicalHigh = vArr.getDouble(2); //[cite: 1]
                                                 double historicalLow  = vArr.getDouble(3); //[cite: 1]
+                                                logToUI("✅ [TV Diag] " + seriesId + " → H=" + String.format(Locale.US, "%.4f", historicalHigh)
+                                                        + " L=" + String.format(Locale.US, "%.4f", historicalLow) + " (" + sArr.length() + " barres reçues)");
             
                                                  if (seriesId.startsWith("ser_d_")) { //[cite: 1]
                                                     String key = seriesId.substring(6); //[cite: 1]
@@ -423,9 +429,17 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
                                                     saveLevelToStorage(key, "pwh", historicalHigh);
                                                     saveLevelToStorage(key, "pwl", historicalLow);
                                                 }
+                                            } else {
+                                                logToUI("⚠️ [TV Diag] " + seriesId + " → barre reçue mais champ 'v' incomplet (" + vArr.length() + " valeurs).");
                                             }
+                                        } else {
+                                            logToUI("⚠️ [TV Diag] " + seriesId + " → aucune barre exploitable (targetBar null ou sans 'v').");
                                         }
+                                    } else {
+                                        logToUI("⚠️ [TV Diag] " + seriesId + " → tableau 's' vide (0 barre reçue de TradingView).");
                                     }
+                                } else {
+                                    logToUI("⚠️ [TV Diag] " + seriesId + " → timescale_update sans champ 's' (mise à jour incrémentale ou format inattendu).");
                                 }
                             }
                         }
