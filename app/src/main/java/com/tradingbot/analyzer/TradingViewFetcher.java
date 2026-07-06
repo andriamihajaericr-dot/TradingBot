@@ -26,6 +26,9 @@ public class TradingViewFetcher {
     private static final String TAG = "TradingViewFetcher";
     private static WebSocket activeWs;
     private static final Map<String, String> pendingSymbolResolution = new ConcurrentHashMap<>();
+    // 🔑 Une chart_session dédiée par actif — TradingView limite le nombre de séries (create_series)
+    // par session anonyme ; partager une session unique entre 7 actifs (14 séries) dépasse cette limite.
+    private static final Map<String, String> pendingSymbolChartSession = new ConcurrentHashMap<>();
     
     // ── Matrice Complète des 11 Actifs Macro Fonda IOF (Flux Institutionnels Centralisés) ──
     private static final Map<String, String> SYMBOL_MAP = new HashMap<String, String>() {{
@@ -247,7 +250,6 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
 
         webSocket = client.newWebSocket(request, new WebSocketListener() {
             private String quoteSessionId;
-            private String chartSessionId;
 
             @Override
             public void onOpen(WebSocket ws, Response response) {
@@ -256,6 +258,8 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
                 connected.set(true);
                 isConnecting.set(false);
                 cache.clear();
+                pendingSymbolResolution.clear();
+                pendingSymbolChartSession.clear();
             
                 // 1. Session de prix Temps Réel (Quotes)[cite: 1]
                 quoteSessionId = "qs_" + UUID.randomUUID().toString().substring(0, 12); //[cite: 1]
@@ -267,13 +271,11 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
                         "open_price", "prev_close_price"
                 });
             
-                // 2. Session Historique Native (Charts)[cite: 1]
-                chartSessionId = "cs_" + UUID.randomUUID().toString().substring(0, 12); //[cite: 1]
-                sendMessage(ws, "chart_create_session", new Object[]{chartSessionId, ""}); //[cite: 1]
-                
-                // 🔥 ALIGNEMENT TIMEZONE : Calcule les bougies quotidiennes sur la clôture officielle de New York
-                sendMessage(ws, "switch_timezone", new Object[]{chartSessionId, "America/New_York"});
-            
+                // 2. Session Historique Native (Charts) — UNE session dédiée par actif.
+                // TradingView limite le nombre de séries (create_series) autorisées par session
+                // anonyme ; une session unique partagée entre 7 actifs (14 séries D+W) dépasse
+                // cette limite et fait planter TOUTE la session (critical_error → unknown_session_id
+                // en cascade sur les create_series suivants).
                 int idCounter = 1;
                 for (String key : SYMBOL_MAP.keySet()) {
                     String ticker = SYMBOL_MAP.get(key); //[cite: 1]
@@ -282,16 +284,22 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
                     // Flux de cotations en temps réel[cite: 1]
                     sendMessage(ws, "quote_add_symbols", new Object[]{quoteSessionId, ticker}); //[cite: 1]
                 
-                    // Flux Graphique Historique (Enrobage JSON requis)[cite: 1]
+                    // Flux Graphique Historique (Enrobage JSON requis) — session dédiée pour cet actif
+                    String chartSessionId = "cs_" + key + "_" + UUID.randomUUID().toString().substring(0, 8);
+                    sendMessage(ws, "chart_create_session", new Object[]{chartSessionId, ""});
+                    // 🔥 ALIGNEMENT TIMEZONE : Calcule les bougies quotidiennes sur la clôture officielle de New York
+                    sendMessage(ws, "switch_timezone", new Object[]{chartSessionId, "America/New_York"});
+
                     String symId = "sym_" + idCounter; //[cite: 1]
                     pendingSymbolResolution.put(symId, key); //[cite: 1]
+                    pendingSymbolChartSession.put(symId, chartSessionId);
                     
                     String symbolJson = "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"; //[cite: 1]
                     sendMessage(ws, "resolve_symbol", new Object[]{chartSessionId, symId, symbolJson}); //[cite: 1]
                     idCounter++;
                 }
             
-                logToUI("📥 [TV WS] Flux temps réel et sessions pivots TradingView initialisés."); //[cite: 1]
+                logToUI("📥 [TV WS] Flux temps réel et " + SYMBOL_MAP.size() + " sessions pivots dédiées TradingView initialisées."); //[cite: 1]
             }
 
             @Override
@@ -346,10 +354,11 @@ public static void injectKeyLevels(String asset, double pdh, double pdl,
                         if (p.length() > 1) { //[cite: 1]
                             String symId = p.getString(1); //[cite: 1]
                             String key = pendingSymbolResolution.remove(symId); //[cite: 1]
-                            if (key != null && activeWs != null) { //[cite: 1]
+                            String assetChartSessionId = pendingSymbolChartSession.remove(symId);
+                            if (key != null && activeWs != null && assetChartSessionId != null) { //[cite: 1]
                                 logToUI("🔎 [TV Diag] Symbole résolu : " + key + " (" + symId + ") → création des séries D/W.");
-                                sendMessage(activeWs, "create_series", new Object[]{chartSessionId, "ser_d_" + key, "s1", symId, "D", 3}); //[cite: 1]
-                                sendMessage(activeWs, "create_series", new Object[]{chartSessionId, "ser_w_" + key, "s1", symId, "W", 3}); //[cite: 1]
+                                sendMessage(activeWs, "create_series", new Object[]{assetChartSessionId, "ser_d_" + key, "s1", symId, "D", 3}); //[cite: 1]
+                                sendMessage(activeWs, "create_series", new Object[]{assetChartSessionId, "ser_w_" + key, "s1", symId, "W", 3}); //[cite: 1]
                             } else {
                                 logToUI("⚠️ [TV Diag] symbol_resolved reçu pour " + symId + " mais clé introuvable (déjà consommée ou WS inactif).");
                             }
