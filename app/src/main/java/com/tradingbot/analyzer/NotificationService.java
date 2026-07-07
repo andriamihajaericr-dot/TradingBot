@@ -442,7 +442,32 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "• 🛢️ USOIL : [direction] | [justification ≤10 mots]\n" +
     "• 🇯🇵 USDJPY : [direction] | [justification ≤10 mots]\n" +
     "• 🇬🇧 GBPUSD : [direction] | [justification ≤10 mots]\n" +
-    "🏁 FLUX DOMINANT : [FLUX EXACT ISSUE DES MATRICES]";
+    "🏁 FLUX DOMINANT : [FLUX EXACT ISSUE DES MATRICES]\n\n" +
+
+"══════════════════════════════════════════════════════\n" +
+"CORRÉLATION TECHNIQUE / FONDAMENTAL\n" +
+"══════════════════════════════════════════════════════\n" +
+"Le contexte marché fourni contient un [VERDICT TECHNIQUE] par actif.\n" +
+"Tu DOIS l'intégrer dans ton analyse selon ces règles :\n\n" +
+"RÈGLE 1 — CONFLUENCE ✅\n" +
+"Si [VERDICT TECHNIQUE] ✅ ET driver fondamental dans la même direction :\n" +
+"→ Mentionner la confluence dans le FAIT MARQUANT.\n" +
+"→ Élever la conviction de 10 à 15 points.\n" +
+"→ Exemple : '[BOS] Impulsion Haussière ✅ confirmée + OPEC coupe production → CONFLUENCE haussière sur USOIL, conviction élevée.'\n\n" +
+"RÈGLE 2 — DIVERGENCE ⚠️\n" +
+"Si [VERDICT TECHNIQUE] ✅ ET driver fondamental dans la direction opposée :\n" +
+"→ Signaler la divergence explicitement dans le FAIT MARQUANT.\n" +
+"→ Réduire la conviction de 15 à 20 points.\n" +
+"→ Exemple : '[BOS] Expansion Baissière ✅ sur GOLD MAIS driver SUPRÊME hawkish → DIVERGENCE, attente résolution.'\n\n" +
+"RÈGLE 3 — TECHNIQUE IGNORÉ\n" +
+"Si [VERDICT TECHNIQUE] ⚠️ Signal suspect (flux gelé) :\n" +
+"→ Ignorer le verdict technique.\n" +
+"→ Appliquer uniquement la matrice fondamentale.\n" +
+"→ Exemple : '[BOS] suspect flux gelé → signal technique ignoré, fondamental prime.'\n\n" +
+"RÈGLE 4 — NEUTRE CONFIRMÉ\n" +
+"Si [FAIR VALUE ZONE] ET fondamental neutre ou ambigu :\n" +
+"→ Actif en attente de catalyseur, ne pas forcer de direction.\n" +
+"→ Mentionner uniquement si pertinent pour la cohérence du rapport.\n";
 
     private static final String DAILY_SYSTEM_PROMPT =
     "Tu es Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
