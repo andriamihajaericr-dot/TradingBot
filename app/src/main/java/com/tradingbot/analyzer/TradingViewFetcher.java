@@ -223,42 +223,42 @@ public class TradingViewFetcher {
     }
 
     public static String buildContexteMacroGlobal(Context context) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("═══ CONTEXTE MACRO GLOBAL TEMPS RÉEL ═══\n");
-        
-        String[] order = {"NASDAQ", "USOIL", "USDJPY", "GOLD", "EURUSD", "SP500", "GBPUSD"};
-        
-        for (String key : order) {
-            TVMarketData data = cache.get(key);
-            if (data != null) {
-                int decimals = (key.equals("EURUSD") || key.equals("GBPUSD")) ? 5 : (key.equals("USDJPY") ? 3 : 2);
-                String fmt = "%." + decimals + "f";
-                
-                sb.append("• ").append(key).append(" : ")
-                  .append(String.format(Locale.US, fmt, data.price)).append(" (")
-                  .append(String.format(Locale.US, "%+.2f", data.changePercent)).append("%) | ")
-                  .append("Amp: ").append(String.format(Locale.US, "%.2f", data.volatilityPercent)).append("% | ")
-                  .append("Range: ").append(String.format(Locale.US, "%.0f", data.dailyRangePercent)).append("%");
-                
-                if (data.isNearHigh) {
-                    sb.append(" 🔺PrèsHaut");
-                } else if (data.isNearLow) {
-                    sb.append(" 🔻PrèsBas");
-                }
-                
-                sb.append(" | Var: ").append(String.format(Locale.US, "%.6f", data.variance))
-                  .append(" | P4HH=").append(String.format(Locale.US, fmt, data.p4hh))
-                  .append(" | P4HL=").append(String.format(Locale.US, fmt, data.p4hl))
-                  .append(" | PDH=").append(String.format(Locale.US, fmt, data.pdh))
-                  .append(" | PDL=").append(String.format(Locale.US, fmt, data.pdl))
-                  .append(" | PWH=").append(String.format(Locale.US, fmt, data.pwh))
-                  .append(" | PWL=").append(String.format(Locale.US, fmt, data.pwl))
-                  .append(" | PMH=").append(String.format(Locale.US, fmt, data.pmh))
-                  .append(" | PML=").append(String.format(Locale.US, fmt, data.pml))
-                  .append("\n");
-            }
+    StringBuilder sb = new StringBuilder();
+    sb.append("═══ CONTEXTE MARCHÉ TEMPS RÉEL ═══\n\n");
+
+    sb.append("CONSIGNE ANALYTIQUE PRIORITAIRE :\n");
+    sb.append("Chaque actif ci-dessous contient un [VERDICT TECHNIQUE] issu de l'analyse\n");
+    sb.append("structurelle temps réel (BOS, Liquidity Sweep, Premium/Discount, Fair Value).\n");
+    sb.append("Tu DOIS croiser ce verdict avec le driver fondamental détecté et conclure :\n");
+    sb.append("→ CONFLUENCE ✅ : technique ET fondamental alignés → signal prioritaire, conviction maximale\n");
+    sb.append("→ DIVERGENCE ⚠️ : technique et fondamental opposés → signaler le conflit explicitement\n");
+    sb.append("→ NEUTRE 🟡   : verdict suspect (flux gelé) OU fondamental ambigu → observation uniquement\n\n");
+    sb.append("RÈGLE DE CORRÉLATION :\n");
+    sb.append("- [BOS] ✅ Institutionnel confirmé + fondamental aligné → CONFLUENCE, conviction élevée\n");
+    sb.append("- [BOS] ⚠️ Signal suspect (flux gelé) + fondamental fort → fondamental prime, technique ignoré\n");
+    sb.append("- [BOS] ✅ + fondamental opposé → DIVERGENCE à signaler dans le FAIT MARQUANT\n");
+    sb.append("- [LIQUIDITY SWEEP] ✅ + flux refuge fondamental → setup institutionnel haute probabilité\n");
+    sb.append("- [FAIR VALUE ZONE] + fondamental neutre → pas de signal, marché en attente\n\n");
+
+    String[] order = {"NASDAQ", "USOIL", "USDJPY", "GOLD", "EURUSD", "SP500", "GBPUSD"};
+
+    for (String key : order) {
+        TVMarketData data = cache.get(key);
+        if (data != null) {
+            int decimals = (key.equals("EURUSD") || key.equals("GBPUSD")) ? 5 : (key.equals("USDJPY") ? 3 : 2);
+            String fmt = "%." + decimals + "f";
+
+            // ── Bloc actif : verdict technique + niveaux structurels ──
+            sb.append("▶ ").append(key).append("\n");
+            sb.append("  [VERDICT TECHNIQUE] ").append(buildTechnicalInterpretation(key, data)).append("\n");
+            sb.append("  [NIVEAUX CLÉS] ");
+            sb.append("H4[").append(String.format(Locale.US, fmt, data.p4hh)).append("/").append(String.format(Locale.US, fmt, data.p4hl)).append("] ");
+            sb.append("D[").append(String.format(Locale.US, fmt, data.pdh)).append("/").append(String.format(Locale.US, fmt, data.pdl)).append("] ");
+            sb.append("W[").append(String.format(Locale.US, fmt, data.pwh)).append("/").append(String.format(Locale.US, fmt, data.pwl)).append("] ");
+            sb.append("M[").append(String.format(Locale.US, fmt, data.pmh)).append("/").append(String.format(Locale.US, fmt, data.pml)).append("]\n\n");
         }
-        return sb.toString();
+    }
+    return sb.toString();
     }
     
     /**
