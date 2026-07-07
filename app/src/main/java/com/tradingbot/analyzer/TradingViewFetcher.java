@@ -759,16 +759,16 @@ public class TradingViewFetcher {
                         int decimals = (key.equals("EURUSD") || key.equals("GBPUSD")) ? 5 : (key.equals("USDJPY") ? 3 : 2);
                         String fmt = "%." + decimals + "f";
 
-                        StringBuilder sb = new StringBuilder();
-                        sb.append("📊 *").append(key).append(data.isNearHigh ? "* 🔺 Approche du *plus haut du jour*\n\n" : "* 🔻 Approche du *plus bas du jour*\n\n");
-                        sb.append("🔹 *PRIX ACTUEL* : `").append(String.format(Locale.US, fmt, data.price)).append("` (`").append(String.format(Locale.US, "%+.2f", data.changePercent)).append("%`)\n\n");
-
-                        // 🧠 Remplace le dump brut des 4 indicateurs + pivots + tags de cassure
-                        // par le verdict qualitatif déterministe du moteur d'interprétation.
-                        sb.append("↳ ").append(TradingViewFetcher.buildTechnicalInterpretation(key, data)).append("\n");
-
-                        NotificationService.sendTelegramSecure(sb.toString(), appContext);
-                        lastAlertTime.put(key, now);
+                           StringBuilder sb = new StringBuilder();
+763                        sb.append("📊 *").append(key).append(data.isNearHigh ? "* 🔺 Approche du *plus haut du jour*\n\n" : "* 🔻 Approche du *plus bas du jour*\n\n");
+764                        sb.append("↳ ").append(buildTechnicalInterpretation(key, data)).append("\n\n");
+765                        sb.append("🔹 `").append(String.format(Locale.US, fmt, data.price)).append("` (").append(String.format(Locale.US, "%+.2f", data.changePercent)).append("%) | Range : ").append(String.format(Locale.US, "%.2f", data.volatilityPercent)).append("%\n");
+766                        sb.append("📐 ");
+767                        if (data.pdh > 0) sb.append("PDH `").append(String.format(Locale.US, fmt, data.pdh)).append("` | PDL `").append(String.format(Locale.US, fmt, data.pdl)).append("` | ");
+768                        if (data.pwh > 0) sb.append("PWH `").append(String.format(Locale.US, fmt, data.pwh)).append("` | PWL `").append(String.format(Locale.US, fmt, data.pwl)).append("`");
+769                        sb.append("\n");
+770                        NotificationService.sendTelegramSecure(sb.toString(), appContext);
+771                        lastAlertTime.put(key, now);
                     }
                 }
 
