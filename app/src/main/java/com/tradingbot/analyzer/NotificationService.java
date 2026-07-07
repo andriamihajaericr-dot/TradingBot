@@ -3369,8 +3369,10 @@ private void registerNetworkCallback() {
     }
 
     // 3. Arrêt simplifié de MarketDataFetcher (gestion des erreurs interne)
-    TradingViewFetcher.shutdownExecutor();
-
+    if (TradingViewFetcher.getInstance(this) != null) {
+        // Ajustez le nom de la méthode selon ce qui est codé dans votre TradingViewFetcher
+        TradingViewFetcher.getInstance(this).disconnectWebSocket(); 
+    }
     // 4. Fermeture sécurisée de la base de données
     if (eventDb != null) {
         eventDb.close(); 
