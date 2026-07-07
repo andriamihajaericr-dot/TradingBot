@@ -1531,36 +1531,39 @@ if (fluxGeo) {
 // 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
 // ✅ CORRECTION : renommer la variable String pour éviter le conflit avec la Map
 String marketSnapshotString = "Marché non analysé.";
-// ✅ Aligné sur le modèle interne de TradingViewFetcher
-java.util.Map<String, TradingViewFetcher.MarketData> batchSnapshot = null;
+          // ✅ Source unique : cache WebSocket TradingView (temps réel, gratuit, sans quota).
+java.util.Map<String, TradingViewFetcher.TVMarketData> batchSnapshot = null;
 try {
-    // Filtrer uniquement les 6 actifs Twelve Data parmi enrichedAssets
+    // Filtrer uniquement les actifs suivis par TradingView parmi enrichedAssets
     List<String> twelveFiltered = new ArrayList<>();
     for (String a : enrichedAssets) {
-        // Limiter aux 4 actifs core — évite les batches supplémentaires sur événements riches
+        // Limiter aux 4 actifs core — conserve le même plafond qu'avant
         if (MARKET_PRICE_ASSETS.contains(a)) twelveFiltered.add(a);
-        if (twelveFiltered.size() >= 4) break; // Cap strict à 4 actifs = 1 batch max
+        if (twelveFiltered.size() >= 4) break; // Cap strict à 4 actifs
     }
-    // ✅ tryAcquireBatchSlot via TradingViewFetcher
-    if (!twelveFiltered.isEmpty() && TradingViewFetcher.tryAcquireBatchSlot()) {
-        batchSnapshot = TradingViewFetcher.getMarketDataBatch(twelveFiltered);
+    if (!twelveFiltered.isEmpty()) {
+        java.util.Map<String, TradingViewFetcher.TVMarketData> liveCache = TradingViewFetcher.getCache();
+        batchSnapshot = new java.util.HashMap<>();
+        for (String a : twelveFiltered) {
+            TradingViewFetcher.TVMarketData d = liveCache.get(a);
+            if (d != null) batchSnapshot.put(a, d);
+        }
     } else {
-        Log.w(TAG, "[BATCH] Slot occupé ou aucun actif Twelve Data — cache LKV utilisé");
+        Log.w(TAG, "[SNAPSHOT] Aucun actif suivi par TradingView parmi les actifs enrichis — snapshot ignoré");
     }
     if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
         StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
         boolean premierActif = true;
-
+             
         // ✅ Utilisation du type de données TradingViewFetcher pour l'itération du snapshot
-        for (java.util.Map.Entry<String, TradingViewFetcher.MarketData> entry : batchSnapshot.entrySet()) {
-            TradingViewFetcher.MarketData mData = entry.getValue();
+        for (java.util.Map.Entry<String, TradingViewFetcher.TVMarketData> entry : batchSnapshot.entrySet()) {
+            TradingViewFetcher.TVMarketData mData = entry.getValue();
             
             // 🛡️ MULTI-PROTECTION : Filtrage préventif des valeurs nulles ou prix aberrants (<= 0)
             if (mData == null || mData.price <= 0) {
                 Log.w(TAG, "Snapshot - Actif ignoré car données invalides ou nulles : " + entry.getKey());
                 continue; 
             }
-
             // ✂️ SUPPRESSION DU SÉPARATEUR DE FIN : Ajouté uniquement avant les éléments suivants
             if (!premierActif) {
                 sb.append(" | ");
