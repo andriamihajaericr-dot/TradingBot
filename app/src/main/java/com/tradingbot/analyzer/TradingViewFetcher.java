@@ -199,6 +199,14 @@ public class TradingViewFetcher {
     private static final ConcurrentHashMap<String, Boolean> alertFiredPWL = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Boolean> alertFiredPMH = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Boolean> alertFiredPML = new ConcurrentHashMap<>();
+    // ⚡ Anti-burst : empêche de traiter l'état déjà cassé au démarrage comme une cassure "en direct"
+    private static final ConcurrentHashMap<String, Boolean> alertBaselineSet = new ConcurrentHashMap<>();
+
+    // ⚡ Mémoire de contact PDH/PDL : permet de détecter un reversal H4 même si le prix
+    // s'est déjà éloigné du niveau au moment où la bougie H4 se clôture (ex: reconnexion tardive).
+    private static final ConcurrentHashMap<String, Long> lastPdlTouchTime = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Long> lastPdhTouchTime = new ConcurrentHashMap<>();
+    private static final long TOUCH_MEMORY_WINDOW_MS = 45 * 60 * 1000; // 45 minutes
     
     private static final AtomicBoolean isRunning = new AtomicBoolean(false);
     private static final ConcurrentHashMap<String, VarianceCalculator> varianceCalculators = new ConcurrentHashMap<>();
