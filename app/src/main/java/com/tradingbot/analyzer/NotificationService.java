@@ -655,7 +655,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
 }
 }
 private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, String fingerprint, String customSystemPrompt, boolean isSupremeRank,
-    Map<String, TradingViewFetcher.MarketData> cachedMarketData) { // ✅ Alignement sur le cache TradingView
+    Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) { // ✅ Alignement sur le cache WebSocket TradingView (Twelve Data n'est plus utilisé)
     
     final String systemPrompt = (customSystemPrompt != null && !customSystemPrompt.isEmpty())
        ? customSystemPrompt
