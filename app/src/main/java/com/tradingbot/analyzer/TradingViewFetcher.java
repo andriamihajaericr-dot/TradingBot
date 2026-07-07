@@ -375,7 +375,7 @@ public class TradingViewFetcher {
                     sendMessage(ws, "resolve_symbol", new Object[]{chartSessionIdM, symIdM, "={\"symbol\":\"" + ticker + "\",\"adjustment\":\"splits\"}"});
                 }
                 logToUI("📥 [TV WS] Pipeline initialisé. Synchronisation H4, D, W, M opérationnelle.");
-            }
+             }
 
             @Override
             public void onMessage(WebSocket ws, String text) {
