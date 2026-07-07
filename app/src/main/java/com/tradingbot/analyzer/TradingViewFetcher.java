@@ -260,6 +260,72 @@ public class TradingViewFetcher {
         }
         return sb.toString();
     }
+    
+
+    /**
+     * 🧠 MOTEUR D'INTERPRÉTATION QUANTITATIVE (DÉTERMINISTE)
+     * Évalue l'état de la structure de marché via l'alignement des pivots multi-timeframes,
+     * la distribution des zones de liquidité (Premium/Discount) et l'Order Flow H4.
+     * Sans appel réseau — Résolution instantanée basée sur le cache LKV.
+     */
+    public static String buildTechnicalInterpretation(String key, TVMarketData data) {
+        long now = System.currentTimeMillis();
+
+        // 1️⃣ Détection des Ruptures de Structure Majeures (Priorité HTF > LTF)
+        String structureLevel = null;
+        String structureVector = null;
+
+        if (data.brokeAbovePMH)       { structureLevel = "PMH (Monthly High)"; structureVector = "Impulsion Haussière"; }
+        else if (data.brokeBelowPML) { structureLevel = "PML (Monthly Low)";  structureVector = "Expansion Baissière"; }
+        else if (data.brokeAbovePWH) { structureLevel = "PWH (Weekly High)";  structureVector = "Impulsion Haussière"; }
+        else if (data.brokeBelowPWL) { structureLevel = "PWL (Weekly Low)";   structureVector = "Expansion Baissière"; }
+        else if (data.brokeAbovePDH) { structureLevel = "PDH (Daily High)";   structureVector = "Impulsion Haussière"; }
+        else if (data.brokeBelowPDL) { structureLevel = "PDL (Daily Low)";    structureVector = "Expansion Baissière"; }
+        else if (data.brokeAboveP4HH){ structureLevel = "P4HH (H4 High)";     structureVector = "Accélération Intra-day"; }
+        else if (data.brokeBelowP4HL){ structureLevel = "P4HL (H4 Low)";      structureVector = "Pression Intra-day"; }
+
+        // 2️⃣ Analyse de la mémoire des zones de liquidité (Fenêtre de validité : 45 min)
+        Long pdlTouch = lastPdlTouchTime.get(key);
+        Long pdhTouch = lastPdhTouchTime.get(key);
+        boolean isPdlLiquiditySwept = pdlTouch != null && (now - pdlTouch) <= TOUCH_MEMORY_WINDOW_MS;
+        boolean isPdhLiquiditySwept = pdhTouch != null && (now - pdhTouch) <= TOUCH_MEMORY_WINDOW_MS;
+        boolean hasH4BullishAbsorption = Boolean.TRUE.equals(alertFiredH4BullishRev.get(key));
+        boolean hasH4BearishAbsorption = Boolean.TRUE.equals(alertFiredH4BearishRev.get(key));
+
+        // 🛑 BRANCHEMENT A : Traitement des Ruptures Structurelles Établies (BOS)
+        if (structureLevel != null) {
+            String verdict = String.format(Locale.US, "[BOS] %s confirmée sur %s — Alignement de l'Order Flow institutionnel.",
+                structureVector, structureLevel);
+
+            if (Math.abs(data.changePercent) < 0.5) {
+                verdict += String.format(Locale.US, " Écart de rendement initial mineur (%+.2f%%), anomalie potentielle de pricing.",
+                    data.changePercent);
+            }
+            return verdict;
+        }
+
+        // 🛑 BRANCHEMENT B : Traitement des Absorptions Institutionnelles (Liquidity Sweeps / Reversals)
+        if (hasH4BullishAbsorption && isPdlLiquiditySwept) {
+            return "[LIQUIDITY SWEEP] Capture de liquidité validée sous le PDL suivie d'une absorption acheteuse (H4 Reversal). Retournement technique en cours sous la structure supérieure.";
+        }
+        if (hasH4BearishAbsorption && isPdhLiquiditySwept) {
+            return "[LIQUIDITY SWEEP] Capture de liquidité validée au-dessus du PDH suivie d'une absorption vendeuse (H4 Reversal). Retournement technique en cours sous la structure supérieure.";
+        }
+
+        // 🛑 BRANCHEMENT C : Modélisation de la Distribution du Range Journalier (Auction Theory)
+        if (data.isNearHigh) {
+            return String.format(Locale.US, "[PREMIUM ZONE] Prix localisé aux bornes extrêmes du range journalier (Distribution : %.0f%%). Test de résistance algorithmique, acceptation structurelle non confirmée.",
+                data.dailyRangePercent);
+        }
+        if (data.isNearLow) {
+            return String.format(Locale.US, "[DISCOUNT ZONE] Prix localisé aux bornes extrêmes du range journalier (Accumulation : %.0f%%). Test de support algorithmique, acceptation structurelle non confirmée.",
+                data.dailyRangePercent);
+        }
+
+        // 🛑 BRANCHEMENT D : Équilibre Algorithmique (Mean Reversion / Fair Value)
+        return String.format(Locale.US, "[FAIR VALUE ZONE] Oscillation en zone de neutralité macroéconomique (Range Central : %.0f%%). Équilibre temporaire de l'Order Flow à %+.2f%%.",
+            data.dailyRangePercent, data.changePercent);
+    }
 
     public static void rolloverDailyLevels() {
         alertFiredP4HH.clear(); 
