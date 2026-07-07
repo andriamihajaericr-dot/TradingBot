@@ -870,15 +870,16 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                         + "\n\n";
                                 }
                                 // 2. Prix LKV cache
-                                if (cachedMarketData != null && !cachedMarketData.isEmpty()) {
-                                StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
-                                for (Map.Entry<String, MarketDataFetcher.MarketData> e : cachedMarketData.entrySet()) {
-                                    prixLkv.append(e.getKey()).append(" : ")
-                                           .append(String.format(Locale.US, "%.4f", e.getValue().price))
-                                           .append("\n");
-                                }
-                                contexteFallback += prixLkv.toString() + "\n";
-                                }
+                                   if (cachedMarketData != null && !cachedMarketData.isEmpty()) {
+                                   StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
+                                   // ✅ Type aligné sur le nouveau cache de TradingViewFetcher :
+                                   for (Map.Entry<String, TradingViewFetcher.TVMarketData> e : cachedMarketData.entrySet()) {
+                                   prixLkv.append(e.getKey()).append(" : ")
+                                   .append(String.format(java.util.Locale.US, "%.4f", e.getValue().price))
+                                   .append("\n");
+                                    }
+                                   contexteFallback += prixLkv.toString() + "\n";
+                                   }
                              // 3. Flux dominant sauvegardé
                                 String dernierFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
                                     .getString("last_dominant_flow", null);
