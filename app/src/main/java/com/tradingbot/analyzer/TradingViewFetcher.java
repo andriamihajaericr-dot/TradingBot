@@ -844,15 +844,15 @@ public class TradingViewFetcher {
                         String fmt = "%." + decimals + "f";
 
                            StringBuilder sb = new StringBuilder();
-763                        sb.append("📊 *").append(key).append(data.isNearHigh ? "* 🔺 Approche du *plus haut du jour*\n\n" : "* 🔻 Approche du *plus bas du jour*\n\n");
-764                        sb.append("↳ ").append(buildTechnicalInterpretation(key, data)).append("\n\n");
-765                        sb.append("🔹 `").append(String.format(Locale.US, fmt, data.price)).append("` (").append(String.format(Locale.US, "%+.2f", data.changePercent)).append("%) | Range : ").append(String.format(Locale.US, "%.2f", data.volatilityPercent)).append("%\n");
-766                        sb.append("📐 ");
-767                        if (data.pdh > 0) sb.append("PDH `").append(String.format(Locale.US, fmt, data.pdh)).append("` | PDL `").append(String.format(Locale.US, fmt, data.pdl)).append("` | ");
-768                        if (data.pwh > 0) sb.append("PWH `").append(String.format(Locale.US, fmt, data.pwh)).append("` | PWL `").append(String.format(Locale.US, fmt, data.pwl)).append("`");
-769                        sb.append("\n");
-770                        NotificationService.sendTelegramSecure(sb.toString(), appContext);
-771                        lastAlertTime.put(key, now);
+                           sb.append("📊 *").append(key).append(data.isNearHigh ? "* 🔺 Approche du *plus haut du jour*\n\n" : "* 🔻 Approche du *plus bas du jour*\n\n");
+                           sb.append("↳ ").append(buildTechnicalInterpretation(key, data)).append("\n\n");
+                           sb.append("🔹 `").append(String.format(Locale.US, fmt, data.price)).append("` (").append(String.format(Locale.US, "%+.2f", data.changePercent)).append("%) | Range : ").append(String.format(Locale.US, "%.2f", data.volatilityPercent)).append("%\n");
+                           sb.append("📐 ");
+                           if (data.pdh > 0) sb.append("PDH `").append(String.format(Locale.US, fmt, data.pdh)).append("` | PDL `").append(String.format(Locale.US, fmt, data.pdl)).append("` | ");
+                           if (data.pwh > 0) sb.append("PWH `").append(String.format(Locale.US, fmt, data.pwh)).append("` | PWL `").append(String.format(Locale.US, fmt, data.pwl)).append("`");
+                           sb.append("\n");
+                           NotificationService.sendTelegramSecure(sb.toString(), appContext);
+                          lastAlertTime.put(key, now);
                     }
                 }
 
