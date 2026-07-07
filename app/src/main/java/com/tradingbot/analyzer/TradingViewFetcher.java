@@ -272,6 +272,9 @@ public class TradingViewFetcher {
         alertFiredPWL.clear();
         alertFiredPMH.clear(); 
         alertFiredPML.clear(); 
+        alertBaselineSet.clear(); // ⚡ Réarme le mécanisme anti-burst pour les nouveaux niveaux du jour
+        lastPdlTouchTime.clear();
+        lastPdhTouchTime.clear();
         logToUI("🔄 [Anti-Spam] Réinitialisation complète de tous les verrous d'alertes pivots et reversals.");
     }
 
