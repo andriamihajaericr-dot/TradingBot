@@ -873,7 +873,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                    if (cachedMarketData != null && !cachedMarketData.isEmpty()) {
                                    StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
                                    // ✅ Type aligné sur le nouveau cache de TradingViewFetcher :
-                                   for (Map.Entry<String, TradingViewFetcher.TVMarketData> e : cachedMarketData.entrySet()) {
+                                   for (Map.Entry<String, TradingViewFetcher.MarketData> e : cachedMarketData.entrySet()) {
                                    prixLkv.append(e.getKey()).append(" : ")
                                    .append(String.format(java.util.Locale.US, "%.4f", e.getValue().price))
                                    .append("\n");
