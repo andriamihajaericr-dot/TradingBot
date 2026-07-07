@@ -761,31 +761,11 @@ public class TradingViewFetcher {
 
                         StringBuilder sb = new StringBuilder();
                         sb.append("📊 *").append(key).append(data.isNearHigh ? "* 🔺 Approche du *plus haut du jour*\n\n" : "* 🔻 Approche du *plus bas du jour*\n\n");
-                        sb.append("🔹 *PRIX ACTUEL* : `").append(String.format(Locale.US, fmt, data.price)).append("`\n\n");
-                        sb.append("📈 *LES 4 INDICATEURS TEMPS RÉEL :*\n");
-                        sb.append("• 1. Variation : `").append(String.format(Locale.US, "%+.2f", data.changePercent)).append("%` (vs Clôture)\n");
-                        sb.append("• 2. Volatilité Tick (20t) : `").append(String.format(Locale.US, "%.6f", data.variance)).append("` (Variance)\n");
-                        sb.append("• 3. Amplitude Daily : `").append(String.format(Locale.US, "%.2f", data.volatilityPercent)).append("%` (High-Low)\n");
-                        sb.append("• 4. Position Range : `").append(String.format(Locale.US, "%.1f", data.dailyRangePercent)).append("%` (0=Bas, 100=Haut)\n\n");
-                        
-                        sb.append("🏛️ *NIVEAUX PIVOTS CLÔTURÉS (TradingView) :*\n");
-                        sb.append("• *H4 Precedent* : ").append(data.p4hh > 0 ? "P4HH = `" + String.format(Locale.US, fmt, data.p4hh) + "` | P4HL = `" + String.format(Locale.US, fmt, data.p4hl) + "`\n" : "⚠️ En attente du flux graphique H4...\n");
-                        sb.append("• *Daily Precedent* : ").append(data.pdh > 0 ? "PDH = `" + String.format(Locale.US, fmt, data.pdh) + "` | PDL = `" + String.format(Locale.US, fmt, data.pdl) + "`\n" : "⚠️ En attente du flux graphique...\n");
-                        sb.append("• *Week Precedente* : ").append(data.pwh > 0 ? "PWH = `" + String.format(Locale.US, fmt, data.pwh) + "` | PWL = `" + String.format(Locale.US, fmt, data.pwl) + "`\n" : "⚠️ En attente du flux graphique...\n");
-                        sb.append("• *Month Precedent* : ").append(data.pmh > 0 ? "PMH = `" + String.format(Locale.US, fmt, data.pmh) + "` | PML = `" + String.format(Locale.US, fmt, data.pml) + "`\n" : "⚠️ En attente du flux graphique...\n");
+                        sb.append("🔹 *PRIX ACTUEL* : `").append(String.format(Locale.US, fmt, data.price)).append("` (`").append(String.format(Locale.US, "%+.2f", data.changePercent)).append("%`)\n\n");
 
-                        if (data.brokeAboveP4HH || data.brokeBelowP4HL || data.brokeAbovePDH || data.brokeBelowPDL || data.brokeAbovePWH || data.brokeBelowPWL || data.brokeAbovePMH || data.brokeBelowPML) {
-                            sb.append("\n⚡ *Statut Cassure Niveaux Vrais :*");
-                            if (data.brokeAboveP4HH) sb.append(" 🧭[Breakout H4]");
-                            if (data.brokeBelowP4HL) sb.append(" 📉[Breakdown H4]");
-                            if (data.brokeAbovePDH) sb.append(" 🔺[Breakout PDH]");
-                            if (data.brokeBelowPDL) sb.append(" 🔻[Breakdown PDL]");
-                            if (data.brokeAbovePWH) sb.append(" 🚀[Breakout PWH]");
-                            if (data.brokeBelowPWL) sb.append(" 🔥[Breakdown PWL]");
-                            if (data.brokeAbovePMH) sb.append(" 🌌[Breakout PMH]");
-                            if (data.brokeBelowPML) sb.append(" ⚡[Breakdown PML]");
-                            sb.append("\n");
-                        }
+                        // 🧠 Remplace le dump brut des 4 indicateurs + pivots + tags de cassure
+                        // par le verdict qualitatif déterministe du moteur d'interprétation.
+                        sb.append("↳ ").append(TradingViewFetcher.buildTechnicalInterpretation(key, data)).append("\n");
 
                         NotificationService.sendTelegramSecure(sb.toString(), appContext);
                         lastAlertTime.put(key, now);
