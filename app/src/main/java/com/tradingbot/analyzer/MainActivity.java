@@ -367,10 +367,7 @@ public class MainActivity extends AppCompatActivity {
         TELEGRAM_CHAT_ID = c;
 
         // Propager la clé aux modules dépendants (Nettoyé des doublons)
-        MarketDataFetcher.setApiKey(m);
-        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
-            .putString("twelve_data_key", m)
-            .apply();
+        
 
         Toast.makeText(this, "✅ Clés sauvegardées !", Toast.LENGTH_SHORT).show();
         addLog("✅ Configuration des clés API mise à jour. Lancement des services...");
