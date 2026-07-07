@@ -271,95 +271,102 @@ public class TradingViewFetcher {
     if (data == null) return "[DATA INDISPONIBLE] Flux TradingView non initialisé.";
     long now = System.currentTimeMillis();
 
-    // ─── Qualification des 4 indicateurs temps réel ───────────────────────
+    // ─── Qualification des 4 indicateurs ───────────────────────────────────
     boolean fluxGele     = data.variance < 0.000001;
     boolean fluxActif    = data.variance > 0.0001;
     boolean momentumFort = Math.abs(data.changePercent) >= 1.0;
     boolean momentumNul  = Math.abs(data.changePercent) < 0.05;
     boolean rangExplosif = data.volatilityPercent >= 1.0;
     boolean rangComprime = data.volatilityPercent < 0.3;
-    boolean positionBas  = data.dailyRangePercent <= 15.0;
-    boolean positionHaut = data.dailyRangePercent >= 85.0;
 
-    // Suffixe dynamique construit à partir des 4 indicateurs
     String suffixe = buildSuffixe(fluxGele, fluxActif, momentumFort, momentumNul, rangExplosif, rangComprime, data);
 
-    // 1️⃣ Détection des Ruptures de Structure Majeures (Priorité HTF > LTF)
-    String structureLevel = null;
+    // ─── Décimales selon actif ──────────────────────────────────────────────
+    int dec = (key.equals("EURUSD") || key.equals("GBPUSD")) ? 5 : (key.equals("USDJPY") ? 3 : 2);
+    String fmt = "%." + dec + "f";
+
+    // 1️⃣ Détection BOS (Priorité HTF > LTF)
+    String structureLevel  = null;
     String structureVector = null;
+    double niveauCasse     = 0;
 
-    if (data.brokeAbovePMH)        { structureLevel = "PMH (Monthly High)"; structureVector = "Impulsion Haussière"; }
-    else if (data.brokeBelowPML)  { structureLevel = "PML (Monthly Low)";  structureVector = "Expansion Baissière"; }
-    else if (data.brokeAbovePWH)  { structureLevel = "PWH (Weekly High)";  structureVector = "Impulsion Haussière"; }
-    else if (data.brokeBelowPWL)  { structureLevel = "PWL (Weekly Low)";   structureVector = "Expansion Baissière"; }
-    else if (data.brokeAbovePDH)  { structureLevel = "PDH (Daily High)";   structureVector = "Impulsion Haussière"; }
-    else if (data.brokeBelowPDL)  { structureLevel = "PDL (Daily Low)";    structureVector = "Expansion Baissière"; }
-    else if (data.brokeAboveP4HH) { structureLevel = "P4HH (H4 High)";     structureVector = "Accélération Intra-day"; }
-    else if (data.brokeBelowP4HL) { structureLevel = "P4HL (H4 Low)";      structureVector = "Pression Intra-day"; }
+    if      (data.brokeAbovePMH)  { structureLevel = "PMH"; structureVector = "Impulsion Haussière";    niveauCasse = data.pmh; }
+    else if (data.brokeBelowPML)  { structureLevel = "PML"; structureVector = "Expansion Baissière";    niveauCasse = data.pml; }
+    else if (data.brokeAbovePWH)  { structureLevel = "PWH"; structureVector = "Impulsion Haussière";    niveauCasse = data.pwh; }
+    else if (data.brokeBelowPWL)  { structureLevel = "PWL"; structureVector = "Expansion Baissière";    niveauCasse = data.pwl; }
+    else if (data.brokeAbovePDH)  { structureLevel = "PDH"; structureVector = "Impulsion Haussière";    niveauCasse = data.pdh; }
+    else if (data.brokeBelowPDL)  { structureLevel = "PDL"; structureVector = "Expansion Baissière";    niveauCasse = data.pdl; }
+    else if (data.brokeAboveP4HH) { structureLevel = "P4HH"; structureVector = "Accélération Intra-day"; niveauCasse = data.p4hh; }
+    else if (data.brokeBelowP4HL) { structureLevel = "P4HL"; structureVector = "Pression Intra-day";   niveauCasse = data.p4hl; }
 
-    // 2️⃣ Mémoire des zones de liquidité (fenêtre 45 min)
+    // 2️⃣ Mémoire liquidité (45 min)
     Long pdlTouch = lastPdlTouchTime.get(key);
     Long pdhTouch = lastPdhTouchTime.get(key);
-    boolean isPdlLiquiditySwept = pdlTouch != null && (now - pdlTouch) <= TOUCH_MEMORY_WINDOW_MS;
-    boolean isPdhLiquiditySwept = pdhTouch != null && (now - pdhTouch) <= TOUCH_MEMORY_WINDOW_MS;
+    boolean isPdlLiquiditySwept  = pdlTouch != null && (now - pdlTouch) <= TOUCH_MEMORY_WINDOW_MS;
+    boolean isPdhLiquiditySwept  = pdhTouch != null && (now - pdhTouch) <= TOUCH_MEMORY_WINDOW_MS;
     boolean hasH4BullishAbsorption = Boolean.TRUE.equals(alertFiredH4BullishRev.get(key));
     boolean hasH4BearishAbsorption = Boolean.TRUE.equals(alertFiredH4BearishRev.get(key));
 
-    // 🛑 BRANCHE A : Ruptures Structurelles (BOS) — enrichies par les 4 indicateurs
+    // 🛑 BRANCHE A — BOS
     if (structureLevel != null) {
+        String niveauStr = String.format(Locale.US, fmt, niveauCasse);
         String confirmation = fluxGele
-            ? " ⚠️ Non confirmé — variance nulle, flux gelé."
+            ? "⚠️ Signal suspect"
             : fluxActif && momentumFort && rangExplosif
-                ? " ✅ Pleinement confirmé — flux actif, momentum fort, amplitude explosive."
+                ? "✅ Institutionnel confirmé"
                 : fluxActif
-                    ? " ✅ Flux actif détecté."
-                    : " ⚠️ Flux faible — confirmation partielle.";
-        return String.format(Locale.US, "[BOS] %s confirmée sur %s — Alignement de l'Order Flow institutionnel.%s%s",
-            structureVector, structureLevel, confirmation, suffixe);
+                    ? "🟡 Partiellement confirmé"
+                    : "⚠️ Flux faible";
+        return String.format("[BOS] %s au-dessus du %s %s %s%s",
+            structureVector, structureLevel, niveauStr, confirmation, suffixe);
     }
 
-    // 🛑 BRANCHE B : Liquidity Sweeps — enrichis par les 4 indicateurs
+    // 🛑 BRANCHE B — Liquidity Sweep
     if (hasH4BullishAbsorption && isPdlLiquiditySwept) {
+        String niveauStr = String.format(Locale.US, fmt, data.pdl);
         String force = momentumNul || fluxGele
-            ? " ⚠️ Absorption faible — momentum absent, attente confirmation tick."
-            : " ✅ Absorption active.";
-        return "[LIQUIDITY SWEEP] Capture sous PDL + H4 Reversal Bullish." + force + suffixe;
+            ? "⚠️ Absorption faible"
+            : "✅ Absorption active";
+        return String.format("[LIQUIDITY SWEEP] Capture de liquidité sous PDL %s + H4 Reversal Bullish. %s%s",
+            niveauStr, force, suffixe);
     }
     if (hasH4BearishAbsorption && isPdhLiquiditySwept) {
+        String niveauStr = String.format(Locale.US, fmt, data.pdh);
         String force = momentumNul || fluxGele
-            ? " ⚠️ Absorption faible — momentum absent, attente confirmation tick."
-            : " ✅ Absorption active.";
-        return "[LIQUIDITY SWEEP] Capture au-dessus PDH + H4 Reversal Bearish." + force + suffixe;
+            ? "⚠️ Absorption faible"
+            : "✅ Absorption active";
+        return String.format("[LIQUIDITY SWEEP] Capture de liquidité au-dessus PDH %s + H4 Reversal Bearish. %s%s",
+            niveauStr, force, suffixe);
     }
 
-    // 🛑 BRANCHE C : Premium / Discount — cohérence Position Range vs isNearHigh/Low
+    // 🛑 BRANCHE C — Premium / Discount
     if (data.isNearHigh) {
-        String contexte = rangComprime
-            ? String.format(Locale.US, " Range comprimé (%.2f%%) — extension limitée attendue.", data.volatilityPercent)
-            : momentumFort
-                ? String.format(Locale.US, " Momentum fort (%+.2f%%) — risque de continuation.", data.changePercent)
-                : " Momentum faible — probabilité de rejet élevée.";
-        return String.format(Locale.US, "[PREMIUM ZONE] Position Range %.0f%% — Test de résistance algorithmique.%s%s",
-            data.dailyRangePercent, contexte, suffixe);
+        String niveauStr = String.format(Locale.US, fmt, data.pdh);
+        String contexte = momentumFort
+            ? "risque de continuation au-delà du PDH " + niveauStr
+            : "probabilité de rejet sur PDH " + niveauStr;
+        return String.format("[PREMIUM ZONE] Test de résistance sur PDH %s — %s%s",
+            niveauStr, contexte, suffixe);
     }
     if (data.isNearLow) {
-        String contexte = rangComprime
-            ? String.format(Locale.US, " Range comprimé (%.2f%%) — extension limitée attendue.", data.volatilityPercent)
-            : momentumFort
-                ? String.format(Locale.US, " Momentum fort (%+.2f%%) — risque de continuation baissière.", data.changePercent)
-                : " Momentum absent — probabilité de rebond algorithmique.";
-        return String.format(Locale.US, "[DISCOUNT ZONE] Position Range %.0f%% — Test de support algorithmique.%s%s",
-            data.dailyRangePercent, contexte, suffixe);
+        String niveauStr = String.format(Locale.US, fmt, data.pdl);
+        String contexte = momentumFort
+            ? "risque de continuation baissière sous PDL " + niveauStr
+            : "probabilité de rebond sur PDL " + niveauStr;
+        return String.format("[DISCOUNT ZONE] Test de support sur PDL %s — %s%s",
+            niveauStr, contexte, suffixe);
     }
 
-    // 🛑 BRANCHE D : Fair Value — enrichie par les 4 indicateurs
+    // 🛑 BRANCHE D — Fair Value
     String etat = fluxGele && momentumNul
-        ? "Marché en attente de catalyseur — variance et momentum nuls."
+        ? "marché en attente de catalyseur"
         : rangExplosif
-            ? String.format(Locale.US, "Amplitude explosive (%.2f%%) en zone centrale — risque de faux signal.", data.volatilityPercent)
-            : String.format(Locale.US, "Équilibre temporaire de l'Order Flow à %+.2f%%.", data.changePercent);
-    return String.format(Locale.US, "[FAIR VALUE ZONE] Range Central %.0f%%. %s%s",
-        data.dailyRangePercent, etat, suffixe);
+            ? "amplitude explosive sans direction claire — risque de faux signal"
+            : "équilibre temporaire entre acheteurs et vendeurs";
+    return String.format("[FAIR VALUE ZONE] Entre PDL %s et PDH %s — %s%s",
+        String.format(Locale.US, fmt, data.pdl),
+        String.format(Locale.US, fmt, data.pdh),
+        etat, suffixe);
 }
 
 // Suffixe commun aux 4 branches — résumé chiffré des indicateurs pour traçabilité
