@@ -601,7 +601,31 @@ public class TradingViewFetcher {
             private void checkAndAlert(String key, TVMarketData data) {
                 if (appContext == null) return;
                 long now = System.currentTimeMillis();
+                if (!Boolean.TRUE.equals(alertBaselineSet.get(key))) {
+                    alertFiredP4HH.put(key, data.brokeAboveP4HH);
+                    alertFiredP4HL.put(key, data.brokeBelowP4HL);
+                    alertFiredPDH.put(key, data.brokeAbovePDH);
+                    alertFiredPDL.put(key, data.brokeBelowPDL);
+                    alertFiredPWH.put(key, data.brokeAbovePWH);
+                    alertFiredPWL.put(key, data.brokeBelowPWL);
+                    alertFiredPMH.put(key, data.brokeAbovePMH);
+                    alertFiredPML.put(key, data.brokeBelowPML);
+                    lastAlertTime.put(key, now); // évite aussi le spam immédiat "Approche Haut/Bas"
 
+                    // 🕒 Si on se reconnecte alors que le prix est déjà sur la zone PDL/PDH,
+                    // on enregistre quand même le contact pour que la fenêtre de reversal fonctionne.
+                    double toleranceZoneBaseline = 0.15 / 100.0;
+                    if (data.pdl > 0 && Math.abs(data.price - data.pdl) <= (data.pdl * toleranceZoneBaseline)) {
+                        lastPdlTouchTime.put(key, now);
+                    }
+                    if (data.pdh > 0 && Math.abs(data.price - data.pdh) <= (data.pdh * toleranceZoneBaseline)) {
+                        lastPdhTouchTime.put(key, now);
+                    }
+
+                    alertBaselineSet.put(key, true);
+                    logToUI("🛡️ [Anti-Burst] " + key + " — Baseline armée silencieusement (0 notif rétroactive).");
+                    return;
+                }
                 // ── MOTEUR DE DÉTECTION LOCAL : CONTACT + REVERSAL H4 ──
                 double toleranceZone = 0.15 / 100.0; // Zone de tolérance à 0.15% du niveau
                 Candle[] h4Candles = h4CandlesCache.get(key);
