@@ -46,6 +46,21 @@ public class TradingViewFetcher {
         put("EURUSD",  "VANTAGE:EURUSD");
     }};
 
+    // Structure interne pour l'analyse algorithmique des bougies H4
+    public static class Candle {
+        public double open;
+        public double high;
+        public double low;
+        public double close;
+
+        public Candle(double open, double high, double low, double close) {
+            this.open = open;
+            this.high = high;
+            this.low = low;
+            this.close = close;
+        }
+    }
+
     public static class TVMarketData {
         public final String symbol;
         public final double price;
@@ -160,9 +175,10 @@ public class TradingViewFetcher {
 
     private static final ConcurrentHashMap<String, TVMarketData> cache = new ConcurrentHashMap<>();
     
-    // ⚡ Caches mémoires H4
+    // ⚡ Caches mémoires Niveaux et Bougies H4
     private static final ConcurrentHashMap<String, Double> p4hhCache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Double> p4hlCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Candle[]> h4CandlesCache = new ConcurrentHashMap<>();
 
     private static final ConcurrentHashMap<String, Double> pdhCache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Double> pdlCache = new ConcurrentHashMap<>();
@@ -171,9 +187,11 @@ public class TradingViewFetcher {
     private static final ConcurrentHashMap<String, Double> pmhCache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Double> pmlCache = new ConcurrentHashMap<>();
     
-    // ⚡ Anti-spam d'alertes H4
+    // ⚡ Anti-spam d'alertes H4 et Reversals
     private static final ConcurrentHashMap<String, Boolean> alertFiredP4HH = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Boolean> alertFiredP4HL = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Boolean> alertFiredH4BullishRev = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Boolean> alertFiredH4BearishRev = new ConcurrentHashMap<>();
 
     private static final ConcurrentHashMap<String, Boolean> alertFiredPDH = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Boolean> alertFiredPDL = new ConcurrentHashMap<>();
@@ -236,15 +254,17 @@ public class TradingViewFetcher {
     }
 
     public static void rolloverDailyLevels() {
-        alertFiredP4HH.clear(); // ⚡ Nettoyage H4
+        alertFiredP4HH.clear(); 
         alertFiredP4HL.clear();
+        alertFiredH4BullishRev.clear();
+        alertFiredH4BearishRev.clear();
         alertFiredPDH.clear();
         alertFiredPDL.clear();
         alertFiredPWH.clear();
         alertFiredPWL.clear();
         alertFiredPMH.clear(); 
         alertFiredPML.clear(); 
-        logToUI("🔄 [Anti-Spam] Réinitialisation complète de tous les verrous d'alertes pivots.");
+        logToUI("🔄 [Anti-Spam] Réinitialisation complète de tous les verrous d'alertes pivots et reversals.");
     }
 
     public static void start(Context context) {
@@ -274,6 +294,7 @@ public class TradingViewFetcher {
         }
         client = null;
         cache.clear();
+        h4CandlesCache.clear();
         varianceCalculators.clear();
         lastAlertTime.clear();
         logToUI("🛑 [TV] Fetcher arrêté.");
@@ -411,7 +432,6 @@ public class TradingViewFetcher {
                             
                             if (key != null && ws != null && assetChartSessionId != null) {
                                 if (symId.startsWith("sid_h4_")) {
-                                    // ⚡ Enregistrement de la série H4 ("240" minutes)
                                     sendMessage(ws, "create_series", new Object[]{assetChartSessionId, "ser_h4_" + key, "s1", symId, "240", 50});
                                 } else if (symId.startsWith("sid_d_")) {
                                     sendMessage(ws, "create_series", new Object[]{assetChartSessionId, "ser_d_" + key, "s1", symId, "D", 50});
@@ -445,17 +465,33 @@ public class TradingViewFetcher {
                                         
                                         if (targetBar.has("v")) {
                                             JSONArray vArr = targetBar.getJSONArray("v");
-                                            if (vArr.length() >= 4) {
+                                            if (vArr.length() >= 5) {
                                                 double historicalHigh = vArr.getDouble(2);
                                                 double historicalLow  = vArr.getDouble(3);
             
                                                 if (seriesId.startsWith("ser_h4_")) {
-                                                    // ⚡ Extraction H4 (Longueur de prefixe = 7)
                                                     String key = seriesId.substring(7);
                                                     p4hhCache.put(key, historicalHigh);
                                                     p4hlCache.put(key, historicalLow);
                                                     saveLevelToStorage(key, "p4hh", historicalHigh);
                                                     saveLevelToStorage(key, "p4hl", historicalLow);
+                                                    
+                                                    // ⚡ Extraction de c1 et c2 H4 pour le moteur de Reversal local
+                                                    if (sArr.length() >= 3) {
+                                                        int c1Index = liveSessionActive ? (sArr.length() - 2) : (sArr.length() - 1);
+                                                        int c2Index = c1Index - 1;
+                                                        
+                                                        if (c2Index >= 0) {
+                                                            JSONArray v1 = sArr.getJSONObject(c1Index).getJSONArray("v");
+                                                            JSONArray v2 = sArr.getJSONObject(c2Index).getJSONArray("v");
+                                                            
+                                                            if (v1.length() >= 5 && v2.length() >= 5) {
+                                                                Candle c1 = new Candle(v1.getDouble(1), v1.getDouble(2), v1.getDouble(3), v1.getDouble(4));
+                                                                Candle c2 = new Candle(v2.getDouble(1), v2.getDouble(2), v2.getDouble(3), v2.getDouble(4));
+                                                                h4CandlesCache.put(key, new Candle[]{c1, c2});
+                                                            }
+                                                        }
+                                                    }
                                                 } else if (seriesId.startsWith("ser_d_")) {
                                                     String key = seriesId.substring(6);
                                                     pdhCache.put(key, historicalHigh);
@@ -513,7 +549,6 @@ public class TradingViewFetcher {
                                         variance = calc.getVariance();
                                     }
             
-                                    // Extraction de tous les paliers du cache
                                     double p4hh = p4hhCache.getOrDefault(key, 0.0);
                                     double p4hl = p4hlCache.getOrDefault(key, 0.0);
                                     double pdh  = pdhCache.getOrDefault(key, 0.0);
@@ -550,6 +585,54 @@ public class TradingViewFetcher {
                 if (appContext == null) return;
                 long now = System.currentTimeMillis();
 
+                // ── MOTEUR DE DÉTECTION LOCAL : CONTACT + REVERSAL H4 ──
+                double toleranceZone = 0.15 / 100.0; // Zone de tolérance à 0.15% du niveau
+                Candle[] h4Candles = h4CandlesCache.get(key);
+
+                if (h4Candles != null && h4Candles.length >= 2) {
+                    Candle c1 = h4Candles[0];
+                    Candle c2 = h4Candles[1];
+
+                    // Variables d'analyse du Reversal (Logique Mathématique Pine Script originale)
+                    boolean isBull1 = c1.close >= c1.open;
+                    boolean isBear1 = c1.close < c1.open;
+                    boolean isBull2 = c2.close >= c2.open;
+                    boolean isBear2 = c2.close < c2.open;
+
+                    boolean b1_englobe_b2 = (c1.high >= c2.high) && (c1.low <= c2.low);
+                    boolean b2_englobe_b1 = (c2.high >= c1.high) && (c2.low <= c1.low);
+
+                    boolean englobanteBearishTrap = isBear2 && isBull1 && b2_englobe_b1;
+                    boolean englobanteBullishTrap = isBull2 && isBear1 && b2_englobe_b1;
+
+                    // Scénario A : Daily Low touché -> Attente Reversal Bullish H4
+                    if (data.pdl > 0 && Math.abs(data.price - data.pdl) <= (data.pdl * toleranceZone)) {
+                        boolean isBullishH4Rev = isBear2 && isBull1 && (c1.low > c2.low || b1_englobe_b2) && !englobanteBearishTrap;
+                        
+                        if (isBullishH4Rev && !Boolean.TRUE.equals(alertFiredH4BullishRev.get(key))) {
+                            alertFiredH4BullishRev.put(key, true);
+                            String msg = "⚡ *[FONDA IOF]* — *" + key + "*\n" +
+                                         "🔻 Zone *Previous Day Low* touchée (`" + String.format(Locale.US, "%.4f", data.pdl) + "`)\n" +
+                                         "✅ *Confirmation : Reversal Bullish H4 validé* à `" + String.format(Locale.US, "%.4f", data.price) + "` !";
+                            NotificationService.sendTelegramSecure(msg, appContext);
+                        }
+                    }
+
+                    // Scénario B : Daily High touché -> Attente Reversal Bearish H4
+                    if (data.pdh > 0 && Math.abs(data.price - data.pdh) <= (data.pdh * toleranceZone)) {
+                        boolean isBearishH4Rev = isBull2 && isBear1 && (c1.high < c2.high || b1_englobe_b2) && !englobanteBullishTrap;
+                        
+                        if (isBearishH4Rev && !Boolean.TRUE.equals(alertFiredH4BearishRev.get(key))) {
+                            alertFiredH4BearishRev.put(key, true);
+                            String msg = "⚡ *[FONDA IOF]* — *" + key + "*\n" +
+                                         "🔺 Zone *Previous Day High* touchée (`" + String.format(Locale.US, "%.4f", data.pdh) + "`)\n" +
+                                         "🚨 *Confirmation : Reversal Bearish H4 validé* à `" + String.format(Locale.US, "%.4f", data.price) + "` !";
+                            NotificationService.sendTelegramSecure(msg, appContext);
+                        }
+                    }
+                }
+
+                // ── ALERTES CLASSIQUES TEMPS RÉEL D'APPROCHE (COOLDOWN 5 MIN) ──
                 Long last = lastAlertTime.get(key);
                 if (last == null || (now - last) > ALERT_COOLDOWN_MS) {
                     if (data.isNearHigh || data.isNearLow) {
@@ -566,7 +649,6 @@ public class TradingViewFetcher {
                         sb.append("• 4. Position Range : `").append(String.format(Locale.US, "%.1f", data.dailyRangePercent)).append("%` (0=Bas, 100=Haut)\n\n");
                         
                         sb.append("🏛️ *NIVEAUX PIVOTS CLÔTURÉS (TradingView) :*\n");
-                        // ⚡ Affichage H4 dans l'alerte d'approche globale
                         sb.append("• *H4 Precedent* : ").append(data.p4hh > 0 ? "P4HH = `" + String.format(Locale.US, fmt, data.p4hh) + "` | P4HL = `" + String.format(Locale.US, fmt, data.p4hl) + "`\n" : "⚠️ En attente du flux graphique H4...\n");
                         sb.append("• *Daily Precedent* : ").append(data.pdh > 0 ? "PDH = `" + String.format(Locale.US, fmt, data.pdh) + "` | PDL = `" + String.format(Locale.US, fmt, data.pdl) + "`\n" : "⚠️ En attente du flux graphique...\n");
                         sb.append("• *Week Precedente* : ").append(data.pwh > 0 ? "PWH = `" + String.format(Locale.US, fmt, data.pwh) + "` | PWL = `" + String.format(Locale.US, fmt, data.pwl) + "`\n" : "⚠️ En attente du flux graphique...\n");
@@ -590,7 +672,7 @@ public class TradingViewFetcher {
                     }
                 }
 
-                // ⚡ Triggers immédiats (Anti-spam par booléen) pour les niveaux H4
+                // Triggers immédiats (Anti-spam par booléen) pour les cassures pures
                 if (data.brokeAboveP4HH && !Boolean.TRUE.equals(alertFiredP4HH.get(key))) {
                     alertFiredP4HH.put(key, true);
                     NotificationService.sendTelegramSecure("🧭 *" + key + "* — Cassure Intraday du *Previous 4H High* (`" + data.price + "`)", appContext);
@@ -599,8 +681,6 @@ public class TradingViewFetcher {
                     alertFiredP4HL.put(key, true);
                     NotificationService.sendTelegramSecure("📉 *" + key + "* — Cassure Intraday du *Previous 4H Low* (`" + data.price + "`)", appContext);
                 }
-
-                // Autres cassures
                 if (data.brokeAbovePDH && !Boolean.TRUE.equals(alertFiredPDH.get(key))) {
                     alertFiredPDH.put(key, true);
                     NotificationService.sendTelegramSecure("🔺 *" + key + "* — Cassure réelle du *Previous Day High* (`" + data.price + "`)", appContext);
@@ -675,7 +755,6 @@ public class TradingViewFetcher {
         SharedPreferences prefs = appContext.getSharedPreferences(PREFS_WEEKLY, Context.MODE_PRIVATE);
         for (String key : SYMBOL_MAP.keySet()) {
             try {
-                // ⚡ Restauration H4 locale
                 double savedP4hh = Double.parseDouble(prefs.getString("p4hh_" + key, "0"));
                 double savedP4hl = Double.parseDouble(prefs.getString("p4hl_" + key, "0"));
 
