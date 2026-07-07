@@ -1585,7 +1585,7 @@ try {
             marketSnapshotString = sb.toString();
         }
     } else {
-        marketSnapshotString = "Données de marché indisponibles (Twelve Data hors-ligne ou limite atteinte).";
+        marketSnapshotString = "Données de marché indisponibles (cache WebSocket TradingView vide).";
     }
 } catch (Exception e) {
     Log.e(TAG, "Échec de la génération du snapshot marché", e);
