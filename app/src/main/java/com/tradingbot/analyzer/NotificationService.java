@@ -1679,7 +1679,7 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
     
         if (assets != null && !assets.isEmpty()) {
         blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
-    
+
         // Filtrer uniquement les 6 actifs Twelve Data — assets complet va à Groq
         List<String> twelveAssets = new ArrayList<>();
         for (String asset : assets) {
