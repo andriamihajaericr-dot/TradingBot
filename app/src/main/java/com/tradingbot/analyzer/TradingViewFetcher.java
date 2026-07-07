@@ -3,7 +3,6 @@ package com.tradingbot.analyzer;
 import android.content.Context;
 import android.util.Log;
 import android.content.SharedPreferences;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.Calendar;
