@@ -1525,95 +1525,96 @@ if (fluxGeo) {
                       else {
                       Log.w(TAG, "[DATABASE] ⚠️ ÉCHEC saveEvent pour '" + title + "' (fingerprint=" + fingerprint + ") — doublon déjà connu ou erreur SQLite.");
                       }
+                        // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
+// 9️⃣ Enrichissement dynamique du Prompt Système IA
+// 9️⃣ ENRICHISSEMENT MARKET DATA & PROMPT IA (Pipeline Intégré)
+// 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
+// ✅ CORRECTION : renommer la variable String pour éviter le conflit avec la Map
+String marketSnapshotString = "Marché non analysé.";
+// ✅ Aligné sur le modèle interne de TradingViewFetcher
+java.util.Map<String, TradingViewFetcher.MarketData> batchSnapshot = null;
+try {
+    // Filtrer uniquement les 6 actifs Twelve Data parmi enrichedAssets
+    List<String> twelveFiltered = new ArrayList<>();
+    for (String a : enrichedAssets) {
+        // Limiter aux 4 actifs core — évite les batches supplémentaires sur événements riches
+        if (MARKET_PRICE_ASSETS.contains(a)) twelveFiltered.add(a);
+        if (twelveFiltered.size() >= 4) break; // Cap strict à 4 actifs = 1 batch max
+    }
+    // ✅ tryAcquireBatchSlot via TradingViewFetcher
+    if (!twelveFiltered.isEmpty() && TradingViewFetcher.tryAcquireBatchSlot()) {
+        batchSnapshot = TradingViewFetcher.getMarketDataBatch(twelveFiltered);
+    } else {
+        Log.w(TAG, "[BATCH] Slot occupé ou aucun actif Twelve Data — cache LKV utilisé");
+    }
+    if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
+        StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
+        boolean premierActif = true;
 
-                    // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
-                    // 9️⃣ Enrichissement dynamique du Prompt Système IA
-                    // 9️⃣ ENRICHISSEMENT MARKET DATA & PROMPT IA (Pipeline Intégré)
-                    // 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
-                      // ✅ CORRECTION : renommer la variable String pour éviter le conflit avec la Map
-                    String marketSnapshotString = "Marché non analysé.";
-                    java.util.Map<String, MarketDataFetcher.MarketData> batchSnapshot = null;
-                    try {
-                        // Filtrer uniquement les 6 actifs Twelve Data parmi enrichedAssets
-                        List<String> twelveFiltered = new ArrayList<>();
-                        for (String a : enrichedAssets) {
-                            // Limiter aux 4 actifs core — évite les batches supplémentaires sur événements riches
-                            if (MARKET_PRICE_ASSETS.contains(a)) twelveFiltered.add(a);
-                            if (twelveFiltered.size() >= 4) break; // Cap strict à 4 actifs = 1 batch max
-                        }
-                        // tryAcquireBatchSlot — évite les appels simultanés
-                        if (!twelveFiltered.isEmpty() && MarketDataFetcher.tryAcquireBatchSlot()) {
-                            batchSnapshot = MarketDataFetcher.getMarketDataBatch(twelveFiltered);
-                        } else {
-                            Log.w(TAG, "[BATCH] Slot occupé ou aucun actif Twelve Data — cache LKV utilisé");
-                        }
-                        if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
-                            StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
-                            boolean premierActif = true;
-                    
-                            for (java.util.Map.Entry<String, MarketDataFetcher.MarketData> entry : batchSnapshot.entrySet()) {
-                                MarketDataFetcher.MarketData mData = entry.getValue();
-                                
-                                // 🛡️ MULTI-PROTECTION : Filtrage préventif des valeurs nulles ou prix aberrants (<= 0)
-                                if (mData == null || mData.price <= 0) {
-                                    Log.w(TAG, "Snapshot - Actif ignoré car données invalides ou nulles : " + entry.getKey());
-                                    continue; 
-                                }
-                    
-                                // ✂️ SUPPRESSION DU SÉPARATEUR DE FIN : Ajouté uniquement avant les éléments suivants
-                                if (!premierActif) {
-                                    sb.append(" | ");
-                                }
-                                premierActif = false;
-                    
-                                String sign = (mData.changePercent >= 0) ? "+" : "";
-                                String emojiVariation = (mData.changePercent > 0) ? "🟢"
-                                    : (mData.changePercent < 0) ? "🔴" : "⚪";
-                                sb.append(entry.getKey())
-                                  .append(" => ")
-                                  .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)", mData.price, sign, mData.changePercent, emojiVariation));
-                            }
-                    
-                            // Vérification finale au cas où TOUS les actifs auraient été rejetés par le filtre de sécurité
-                            if (premierActif) {
-                                marketSnapshotString = "Données de marché indisponibles (aucun prix valide extrait).";
-                            } else {
-                                marketSnapshotString = sb.toString();
-                            }
-                        } else {
-                            marketSnapshotString = "Données de marché indisponibles (Twelve Data hors-ligne ou limite atteinte).";
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Échec de la génération du snapshot marché", e);
-                        marketSnapshotString = "Erreur technique lors de l'acquisition des données.";
-                    }
-                    
-                    // Construction du prompt enrichi (utilise la variable String renommée)
-                    String baseSystemPrompt = SYSTEM_PROMPT;
-                    String promptAI = "📊 [CONTEXTE MARCHÉ ACTUEL] : " + marketSnapshotString + "\n\n" + baseSystemPrompt;
-                    
-                    if (ecoResult.isParsed) {
-                        promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
-                                "L'analyseur mathématique déterministe a détecté un écart type. " +
-                                "Direction recommandée : " + ecoResult.directionText + "\n\n" + promptAI;
-                    }
-                    // 🛡️ THROTTLE GÉO CIBLÉ (12 min) — seul angle mort non couvert par l'inertie macro 2h,
-                    // qui exclut volontairement les types GEO-* (cf. EventValidator.validate(), ÉTAPE 4).
-                    // Remplace l'ancien GEO_THROTTLE_MS mort de processIncomingMacroFeed(), sans réimporter
-                    // le reste de sa mécanique (rollback, etc.) devenue inutile face aux 3 autres garde-fous actifs.
-                    if (eventTypeStr.equals("GEOPOLITICAL")) {
-                        if (!isSupremeRank && (currentTime - lastGeoTime < GEO_THROTTLE_MS)) {
-                            Log.d(TAG, "[THROTTLE GÉO] Notification bloquée (12 min) - dernier choc géo il y a "
-                                    + (currentTime - lastGeoTime) / 1000 + "s");
-                            return;
-                        }
-                        lastGeoTime = currentTime;
-                    }
-                    // 🔟 Exécution finale de l'analyse cognitive LLM
-                    // Réutilise batchSnapshot déjà récupéré ligne 1103 — 0 appel réseau supplémentaire
-                    boolean forceSend = isSupremeRank || (validationResult != null && validationResult.isCalendarIntercept);
-                    processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, forceSend, batchSnapshot);
-                    } catch (Exception e) {
+        // ✅ Utilisation du type de données TradingViewFetcher pour l'itération du snapshot
+        for (java.util.Map.Entry<String, TradingViewFetcher.MarketData> entry : batchSnapshot.entrySet()) {
+            TradingViewFetcher.MarketData mData = entry.getValue();
+            
+            // 🛡️ MULTI-PROTECTION : Filtrage préventif des valeurs nulles ou prix aberrants (<= 0)
+            if (mData == null || mData.price <= 0) {
+                Log.w(TAG, "Snapshot - Actif ignoré car données invalides ou nulles : " + entry.getKey());
+                continue; 
+            }
+
+            // ✂️ SUPPRESSION DU SÉPARATEUR DE FIN : Ajouté uniquement avant les éléments suivants
+            if (!premierActif) {
+                sb.append(" | ");
+            }
+            premierActif = false;
+
+            String sign = (mData.changePercent >= 0) ? "+" : "";
+            String emojiVariation = (mData.changePercent > 0) ? "🟢"
+                : (mData.changePercent < 0) ? "🔴" : "⚪";
+            sb.append(entry.getKey())
+              .append(" => ")
+              .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)", mData.price, sign, mData.changePercent, emojiVariation));
+        }
+
+        // Vérification finale au cas où TOUS les actifs auraient été rejetés par le filtre de sécurité
+        if (premierActif) {
+            marketSnapshotString = "Données de marché indisponibles (aucun prix valide extrait).";
+        } else {
+            marketSnapshotString = sb.toString();
+        }
+    } else {
+        marketSnapshotString = "Données de marché indisponibles (Twelve Data hors-ligne ou limite atteinte).";
+    }
+} catch (Exception e) {
+    Log.e(TAG, "Échec de la génération du snapshot marché", e);
+    marketSnapshotString = "Erreur technique lors de l'acquisition des données.";
+}
+
+// Construction du prompt enrichi (utilise la variable String renommée)
+String baseSystemPrompt = SYSTEM_PROMPT;
+String promptAI = "📊 [CONTEXTE MARCHÉ ACTUEL] : " + marketSnapshotString + "\n\n" + baseSystemPrompt;
+
+if (ecoResult.isParsed) {
+    promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
+            "L'analyseur mathématique déterministe a détecté un écart type. " +
+            "Direction recommandée : " + ecoResult.directionText + "\n\n" + promptAI;
+}
+// 🛡️ THROTTLE GÉO CIBLÉ (12 min) — seul angle mort non couvert par l'inertie macro 2h,
+// qui exclut volontairement les types GEO-* (cf. EventValidator.validate(), ÉTAPE 4).
+// Remplace l'ancien GEO_THROTTLE_MS mort de processIncomingMacroFeed(), sans réimporter
+// le reste de sa mécanique (rollback, etc.) devenue inutile face aux 3 autres garde-fous actifs.
+if (eventTypeStr.equals("GEOPOLITICAL")) {
+    if (!isSupremeRank && (currentTime - lastGeoTime < GEO_THROTTLE_MS)) {
+        Log.d(TAG, "[THROTTLE GÉO] Notification bloquée (12 min) - dernier choc géo il y a "
+                + (currentTime - lastGeoTime) / 1000 + "s");
+        return;
+    }
+    lastGeoTime = currentTime;
+}
+// 🔟 Exécution finale de l'analyse cognitive LLM
+// Réutilise batchSnapshot déjà récupéré ligne 1103 — 0 appel réseau supplémentaire
+boolean forceSend = isSupremeRank || (validationResult != null && validationResult.isCalendarIntercept);
+processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, forceSend, batchSnapshot);
+                   } catch (Exception e) {
                         Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
                     }
                 }
