@@ -610,7 +610,6 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     for (String ligne : lignes) {
         String ligneModifiee = ligne;
         String verdictTechnique = null;
-
         for (String asset : assets) {
             String patternStr = "^\\s*[•\\-*]?\\s*\\S*\\s*" + Pattern.quote(asset) + "\\s*:.*";
             
