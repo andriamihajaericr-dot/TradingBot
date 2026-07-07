@@ -186,7 +186,7 @@ public class TradingViewFetcher {
     private static final ConcurrentHashMap<String, Double> pwlCache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Double> pmhCache = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Double> pmlCache = new ConcurrentHashMap<>();
-    
+     
     // ⚡ Anti-spam d'alertes H4 et Reversals
     private static final ConcurrentHashMap<String, Boolean> alertFiredP4HH = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Boolean> alertFiredP4HL = new ConcurrentHashMap<>();
