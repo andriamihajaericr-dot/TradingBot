@@ -1699,7 +1699,7 @@ for (String asset : twelveAssets) {
     TradingViewFetcher.TVMarketData d = liveCache.get(asset);
     if (d != null) batchPrices.put(asset, d);
 }
-    for (String asset : twelveAssets) {
+        for (String asset : twelveAssets) {
         TradingViewFetcher.TVMarketData data = batchPrices.get(asset);
         if (data != null && data.price > 0) {
                     // 🛡️ HARMONISATION : 🟢/🔴/⚪ remplace 📈/📉 pour rester cohérent avec
@@ -1709,6 +1709,10 @@ for (String asset : twelveAssets) {
                         : (data.changePercent < 0) ? "🔴" : "⚪";
                     String formatPrix = (data.price > 1000) ? "\n%s %s : *%,.2f* (%+.2f%%)" : "\n%s %s : *%.5f* (%+.2f%%)";
                     blocPrix.append(String.format(Locale.US, formatPrix, tendance, asset, data.price, data.changePercent));
+
+                    // 🧠 Verdict quantitatif institutionnel — structure, liquidité, Order Flow
+                    String verdict = TradingViewFetcher.buildTechnicalInterpretation(asset, data);
+                    blocPrix.append("\n   _").append(verdict).append("_");
                 } else {
                     blocPrix.append("\n🔸 ").append(asset).append(" : (Cours indisponible)");
                 }
