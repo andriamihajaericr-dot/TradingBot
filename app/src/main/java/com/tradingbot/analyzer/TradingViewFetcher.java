@@ -729,12 +729,12 @@ public class TradingViewFetcher {
 
                 // Triggers immédiats (Anti-spam par booléen) pour les cassures pures
                 if (data.brokeAboveP4HH && !Boolean.TRUE.equals(alertFiredP4HH.get(key))) {
-                    alertFiredP4HH.put(key, true);
-                    NotificationService.sendTelegramSecure("🧭 *" + key + "* — Cassure Intraday du *Previous 4H High* (`" + data.price + "`)", appContext);
+                   alertFiredP4HH.put(key, true);
+                   NotificationService.sendTelegramSecure("🧭 *" + key + "* — Cassure du *Previous High H4* (`" + data.price + "`)", appContext);
                 }
                 if (data.brokeBelowP4HL && !Boolean.TRUE.equals(alertFiredP4HL.get(key))) {
-                    alertFiredP4HL.put(key, true);
-                    NotificationService.sendTelegramSecure("📉 *" + key + "* — Cassure Intraday du *Previous 4H Low* (`" + data.price + "`)", appContext);
+                   alertFiredP4HL.put(key, true);
+                   NotificationService.sendTelegramSecure("📉 *" + key + "* — Cassure du *Previous Low H4* (`" + data.price + "`)", appContext);
                 }
                 if (data.brokeAbovePDH && !Boolean.TRUE.equals(alertFiredPDH.get(key))) {
                     alertFiredPDH.put(key, true);
