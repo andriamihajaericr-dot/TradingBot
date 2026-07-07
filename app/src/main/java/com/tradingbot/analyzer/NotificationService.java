@@ -1695,11 +1695,11 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
             if (batchPrices == null) batchPrices = new java.util.HashMap<>();
         } else {
             // Slot occupé — utilise le cache LKV existant sans appel réseau
-            Log.w(TAG, "[TWELVE DATA] Slot occupé — cache LKV utilisé pour ce flux");
+            Log.w(TAG, "[TV DATA] Slot occupé — cache LKV utilisé pour ce flux");
             batchPrices = new java.util.HashMap<>();
         }
             for (String asset : twelveAssets) {
-                MarketDataFetcher.MarketData data = batchPrices.get(asset);
+                TradingViewFetcher.MarketData data = batchPrices.get(asset);
                 if (data != null && data.price > 0) {
                     // 🛡️ HARMONISATION : 🟢/🔴/⚪ remplace 📈/📉 pour rester cohérent avec
                     // les autres points d'affichage de prix (choc macro, snapshot Daily,
