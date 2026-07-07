@@ -363,18 +363,46 @@ public class TradingViewFetcher {
 }
 
 // Suffixe commun aux 4 branches — résumé chiffré des indicateurs pour traçabilité
-private static String buildSuffixe(boolean fluxGele, boolean fluxActif, boolean momentumFort,
+ private static String buildSuffixe(boolean fluxGele, boolean fluxActif, boolean momentumFort,
         boolean momentumNul, boolean rangExplosif, boolean rangComprime, TVMarketData data) {
-    StringBuilder s = new StringBuilder("\n  📊 ");
-    s.append(fluxGele  ? "⚫ Flux gelé"   : fluxActif ? "🟢 Flux actif" : "🟡 Flux faible");
-    s.append(" | Vol : ").append(String.format(Locale.US, "%.6f", data.variance));
-    s.append(" | Δ : ").append(String.format(Locale.US, "%+.2f%%", data.changePercent));
-    s.append(rangExplosif ? " 🔥" : rangComprime ? " 🧊" : "");
-    s.append(" | Range : ").append(String.format(Locale.US, "%.2f%%", data.volatilityPercent));
-    s.append(" | Pos : ").append(String.format(Locale.US, "%.1f%%", data.dailyRangePercent));
-    return s.toString();
-}
+    StringBuilder s = new StringBuilder();
 
+    // ── Interprétation de l'amplitude journalière ──
+    String lectureRange = rangExplosif
+        ? String.format(Locale.US, "expansion journalière de %.2f%% confirmant la rupture", data.volatilityPercent)
+        : rangComprime
+            ? String.format(Locale.US, "amplitude journalière de %.2f%% indiquant un marché compressé", data.volatilityPercent)
+            : String.format(Locale.US, "amplitude journalière modérée de %.2f%%", data.volatilityPercent);
+
+    // ── Interprétation du momentum ──
+    String lectureMomentum = momentumFort
+        ? String.format(Locale.US, "momentum de %+.2f%% validant la pression directionnelle", data.changePercent)
+        : momentumNul
+            ? String.format(Locale.US, "momentum nul à %.2f%% insuffisant pour valider le mouvement", data.changePercent)
+            : String.format(Locale.US, "momentum de %+.2f%% insuffisant pour valider la rupture", data.changePercent);
+
+    // ── Interprétation du flux tick ──
+    String lectureFlux = fluxGele
+        ? "marché gelé sans activité tick"
+        : fluxActif
+            ? "flux institutionnel dominant"
+            : "flux faible en attente d'activation";
+
+    // ── Niveau suivant pertinent selon position dans le range ──
+    String niveauSuivant = "";
+    if (data.dailyRangePercent >= 85.0 && data.pwh > 0) {
+        int dec = (data.pwh < 10) ? 5 : 2;
+        niveauSuivant = String.format(Locale.US, ", résistance hebdomadaire suivante PWH %." + dec + "f", data.pwh);
+    } else if (data.dailyRangePercent <= 15.0 && data.pwl > 0) {
+        int dec = (data.pwl < 10) ? 5 : 2;
+        niveauSuivant = String.format(Locale.US, ", prochain support clé PWL %." + dec + "f en cas de rupture", data.pwl);
+    }
+
+    s.append(lectureRange).append(", ").append(lectureMomentum)
+     .append(", ").append(lectureFlux).append(niveauSuivant).append(".");
+
+    return " — " + s; 
+   }
     public static void rolloverDailyLevels() {
         alertFiredP4HH.clear(); 
         alertFiredP4HL.clear();
