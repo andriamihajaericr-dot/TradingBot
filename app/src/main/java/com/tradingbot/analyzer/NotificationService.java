@@ -654,14 +654,14 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     return groqReport;
 }
 }
-
 private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, String fingerprint, String customSystemPrompt, boolean isSupremeRank,
-    Map<String, MarketDataFetcher.MarketData> cachedMarketData){// ← AJOUT
+    Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) { // ✅ Alignement sur le cache TradingView
+    
     final String systemPrompt = (customSystemPrompt != null && !customSystemPrompt.isEmpty())
        ? customSystemPrompt
-       : SYSTEM_PROMPT
-    ;
-    // 2. Génération dynamique de l'horodatage actuel au format de Madagascar (EAT)
+       : SYSTEM_PROMPT;
+       
+    // Génération dynamique de l'horodatage actuel au format de Madagascar (EAT)
     java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
     sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
     String currentMadaTime = sdf.format(new java.util.Date());
@@ -669,7 +669,6 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
     // Sécurisation anti-NullPointerException de la liste des actifs
     String assetsString = (enrichedAssets != null) ? enrichedAssets.toString() : "[]";
 
-    // ✅ CORRECTION 1 : Rendre 'userContent' FINAL pour permettre sa lecture sécurisée dans le Thread d'arrière-plan
     final String userContent = "CONTEXTE TEMPOREL : " + currentMadaTime + "\n"
             + "SOURCE DE LA NEWS : " + sourceName + "\n"
             + "TITRE : " + title + "\n"
@@ -689,6 +688,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             try {
                 List<String> historique = db.obtenirTexteEvenementsRecents();
                 String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
+                
                 // Vérifier et réinitialiser le compteur à minuit UTC
                 long nowUtc = System.currentTimeMillis();
                 long midnightUtc = (nowUtc / 86400000L + 1) * 86400000L;
@@ -698,39 +698,37 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     if (MainActivity.instance != null)
                         MainActivity.instance.addLog("🔄 [TOKEN] Compteur TPD réinitialisé (minuit UTC).");
                 }
+                
                 // Vérifier budget restant
-                    int used = dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                int used = dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
                 getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
                     .putInt("daily_tokens_used", used)
                     .putLong("token_reset_time", tokenResetTime)
                     .apply();
                 
-                JSONObject jsonPayload;
+                JSONObject jsonPayload = new JSONObject();
+                
                 if (used > TOKEN_BUDGET_DAILY) {
                     Log.w(TAG, "[TOKEN] Budget TPD épuisé (" + used + ") — bascule directe fallback.");
                     if (MainActivity.instance != null)
                         MainActivity.instance.addLog("⚠️ [TOKEN] Budget 90k atteint — fallback préventif.");
-                    // Forcer directement le modèle fallback sans attendre le 429
-                    jsonPayload = new JSONObject();
+                    
                     jsonPayload.put("model", GROQ_MODEL_FALLBACK);
                     jsonPayload.put("temperature", 0.0);
                     jsonPayload.put("max_tokens", 600);
-                // Injecter rappel format strict dans le system prompt du fallback
-                JSONArray msgsFb = jsonPayload.getJSONArray("messages");
-                JSONObject sysMsgFb = msgsFb.getJSONObject(0);
-                String sysContentFb = sysMsgFb.getString("content");
-                sysMsgFb.put("content", sysContentFb +
-                    "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
-                    "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
-                    "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n" +
-                    "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'");
+                    
+                    // ✅ CORRECTION DU CRASH : On injecte le rappel de format directement dans la variable String du prompt
+                    promptFinal += "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
+                                   "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
+                                   "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n" +
+                                   "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'";
                 } else {
-                    jsonPayload = new JSONObject();
                     jsonPayload.put("model", GROQ_MODEL);
                     jsonPayload.put("temperature", 0.02);
                     jsonPayload.put("max_tokens", 600);
                 }
     
+                // Construction propre et sécurisée des messages JSON
                 JSONArray messages = new JSONArray();
                 messages.put(new JSONObject().put("role", "system").put("content", promptFinal));
                 messages.put(new JSONObject().put("role", "user").put("content", userContent));
@@ -757,6 +755,9 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     os.write(input, 0, input.length);
                     os.flush();
                 }
+                
+                // ... Suite de ton code (lecture de la réponse, etc.)
+
     
                 int status = conn.getResponseCode();
                 if (status == java.net.HttpURLConnection.HTTP_OK) {
