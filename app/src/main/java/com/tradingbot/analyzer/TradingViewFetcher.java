@@ -831,7 +831,7 @@ public class TradingViewFetcher {
             } catch (NumberFormatException ignored) {}
         }
         if (!p4hhCache.isEmpty() || !pdhCache.isEmpty()) {
-            logToUI("📦 [Fonda Local Storage] Réintégration complète de la cartographie pivot (H4, H, W, M).");
+            logToUI("📦 [Fonda Local Storage] Réintégration complète de la cartographie pivot (H4, D, W, M).");
         }
     }
 
