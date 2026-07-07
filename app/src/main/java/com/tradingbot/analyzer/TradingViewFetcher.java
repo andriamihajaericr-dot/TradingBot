@@ -261,7 +261,6 @@ public class TradingViewFetcher {
         return sb.toString();
     }
     
-
     /**
      * 🧠 MOTEUR D'INTERPRÉTATION QUANTITATIVE (DÉTERMINISTE)
      * Évalue l'état de la structure de marché via l'alignement des pivots multi-timeframes,
