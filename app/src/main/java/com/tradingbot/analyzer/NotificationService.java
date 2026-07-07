@@ -286,68 +286,63 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
             Log.e(TAG, "Erreur parsing prévisions", e);
         }
     }
-    
     private void checkForecastDivergence() {
-        if (lastForecast.isEmpty()) return;
-        List<String> assets = new ArrayList<>(lastForecast.keySet());
-        if (!MarketDataFetcher.tryAcquireBatchSlot()) {
-        Log.w(TAG, "[DIVERGENCE] Slot Twelve Data occupé — vérification divergence ignorée ce cycle");
-        return;
-        }
-        Map<String, Double> currentPrices = MarketDataFetcher.getPrices(assets);
-        long now = System.currentTimeMillis();
-    
-        for (Map.Entry<String, PrevailingDirection> entry : lastForecast.entrySet()) {
-            String asset = entry.getKey();
-            PrevailingDirection forecast = entry.getValue();
-            Double currentPrice = currentPrices.get(asset);
-            
-            if (currentPrice == null || currentPrice <= 0) continue;
-    
-            // 1. Vérification atomique du cooldown
-            // On utilise 'compute' pour garantir que l'accès et la mise à jour sont liés
-            final boolean[] canAlert = {false};
-            lastAlertsSent.compute(asset, (k, lastTime) -> {
-                if (lastTime == null || (now - lastTime) >= ALERT_COOLDOWN_MS) {
-                    canAlert[0] = true;
-                    return now; // Met à jour le timestamp
-                }
-                return lastTime; // Trop tôt, ne change pas le timestamp
-            });
-    
-            if (!canAlert[0]) continue;
-    
-            // 2. Calcul de la variation
-            double changePercent = (currentPrice - forecast.referencePrice) / forecast.referencePrice * 100.0;
-            boolean contradiction = (forecast.direction.equals("BULLISH") && changePercent < -DIVERGENCE_THRESHOLD) ||
-                                    (forecast.direction.equals("BEARISH") && changePercent > DIVERGENCE_THRESHOLD);
-    
-            if (contradiction) {
-                Log.w(TAG, "Divergence détectée pour " + asset + " : " + changePercent + "%");
-    
-                // 3. Déclenchement du scan — protégé par le même slot anti-429 que le reste
-                // du pipeline (PreMarketScanner.scan() fait son propre appel getMarketDataBatch()
-                // qui n'était pas couvert par le tryAcquireBatchSlot() de la ligne 240 ci-dessus).
-                if (MarketDataFetcher.tryAcquireBatchSlot()) {
-                    MarketDataFetcher.PreMarketScanner.scan(new MarketDataFetcher.PreMarketScanner.PreMarketCallback() {
-                        @Override
-                        public void onAlerte(String rapport, boolean isChoc) {
-                            String alerteDiv = "🔄 *ALERTE DIVERGENCE MARCHÉ*\n" +
-                                               "Actif : " + asset + " (" + String.format("%.2f", changePercent) + "%)\n" +
-                                               "Nouvelle analyse pré-market :\n" + rapport;
-                            sendTelegramSecure(alerteDiv, NotificationService.this);
-                        }
-                    });
-                } else {
-                    Log.w(TAG, "[DIVERGENCE] Slot Twelve Data occupé — scan pré-market ignoré ce cycle pour " + asset);
-                }
-    
-                // 4. On supprime la prévision pour arrêter le monitoring sur cet actif 
-                // tant qu'une nouvelle analyse IA (pipeline complet) n'a pas rafraîchi la donnée.
-                lastForecast.remove(asset);
+    if (lastForecast.isEmpty()) return;
+    long now = System.currentTimeMillis();
+
+    // Récupération instantanée du cache temps réel TradingView
+    java.util.concurrent.ConcurrentHashMap<String, TradingViewFetcher.TVMarketData> tvCache = TradingViewFetcher.getCache();
+    if (tvCache.isEmpty()) return;
+
+    // Utilisation d'un itérateur pour pouvoir supprimer l'élément en toute sécurité pendant le parcours
+    java.util.Iterator<Map.Entry<String, PrevailingDirection>> iterator = lastForecast.entrySet().iterator();
+
+    while (iterator.hasNext()) {
+        Map.Entry<String, PrevailingDirection> entry = iterator.next();
+        String asset = entry.getKey();
+        PrevailingDirection forecast = entry.getValue();
+
+        // Extraction de la structure de données TV pour cet actif
+        TradingViewFetcher.TVMarketData tvData = tvCache.get(asset);
+        if (tvData == null || tvData.price <= 0) continue;
+
+        // 1. Vérification atomique du cooldown (Inchangé, optimal)
+        final boolean[] canAlert = {false};
+        lastAlertsSent.compute(asset, (k, lastTime) -> {
+            if (lastTime == null || (now - lastTime) >= ALERT_COOLDOWN_MS) {
+                canAlert[0] = true;
+                return now; // Met à jour le timestamp de l'alerte
             }
+            return lastTime; // Trop tôt
+        });
+
+        if (!canAlert[0]) continue;
+
+        // 2. Calcul de la variation par rapport au prix de référence du forecast
+        double changePercent = (tvData.price - forecast.referencePrice) / forecast.referencePrice * 100.0;
+        
+        boolean contradiction = (forecast.direction.equals("BULLISH") && changePercent < -DIVERGENCE_THRESHOLD) ||
+                                (forecast.direction.equals("BEARISH") && changePercent > DIVERGENCE_THRESHOLD);
+
+        if (contradiction) {
+            Log.w(TAG, "⚡ [DIVERGENCE] Contradiction détectée pour " + asset + " : " + changePercent + "%");
+
+            // 3. Génération instantanée du rapport Global Macro (sans aucune requête HTTP / sans slot)
+            String rapportGlobalRealTime = TradingViewFetcher.buildContexteMacroGlobal(NotificationService.this);
+
+            String alerteDiv = "🔄 *ALERTE DIVERGENCE MARCHÉ*\n" +
+                               "Actif : *" + asset + "* (" + String.format(java.util.Locale.US, "%+.2f", changePercent) + "%)\n" +
+                               "Flux directionnel initial : *" + forecast.direction + "*\n\n" +
+                               "📊 *Nouvelle cartographie temps réel :*\n" + rapportGlobalRealTime;
+
+            sendTelegramSecure(alerteDiv, NotificationService.this);
+
+            // 4. Suppression de la prévision via l'itérateur pour stopper le monitoring de cet actif
+            // jusqu'à ce que le pipeline IA génère un nouveau forecast rafraîchi
+            iterator.remove();
         }
     }
+   }
     
     private static final String SYSTEM_PROMPT =
     "══════════════════════════════════════════════════════\n" +
