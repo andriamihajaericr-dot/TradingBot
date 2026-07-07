@@ -607,10 +607,10 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
 
     String[] lignes = groqReport.split("\n");
     StringBuilder reportAjuste = new StringBuilder();
-
     for (String ligne : lignes) {
         String ligneModifiee = ligne;
-        
+        String verdictTechnique = null;
+
         for (String asset : assets) {
             String patternStr = "^\\s*[•\\-*]?\\s*\\S*\\s*" + Pattern.quote(asset) + "\\s*:.*";
             
@@ -642,11 +642,18 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
                     } else {
                         ligneModifiee = ligne + badgeMarche;
                     }
+
+                    // 🧠 Verdict quantitatif institutionnel — même moteur que lors des chocs macro,
+                    // garantit une lecture technique cohérente entre rapports périodiques et alertes temps réel.
+                    verdictTechnique = TradingViewFetcher.buildTechnicalInterpretation(asset, data);
                 }
                 break;
             }
         }
         reportAjuste.append(ligneModifiee).append("\n");
+        if (verdictTechnique != null) {
+            reportAjuste.append("   _").append(verdictTechnique).append("_\n");
+        }
     }
     return reportAjuste.toString().trim();
 } catch (Exception e) {
