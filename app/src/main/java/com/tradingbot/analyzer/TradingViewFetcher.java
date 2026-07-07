@@ -419,11 +419,17 @@ public class TradingViewFetcher {
 
             private void processJsonPayload(WebSocket ws, String payload) {
                 try {
-                    if (!payload.startsWith("{")) return;
-                    JSONObject json = new JSONObject(payload);
-                    String m = json.optString("m");
-            
-                    if ("symbol_resolved".equals(m)) {
+                       if (!payload.startsWith("{")) return;
+                      JSONObject json = new JSONObject(payload);
+                      String m = json.optString("m");
+
+                     if ("critical_error".equals(m) || "protocol_error".equals(m) || "study_error".equals(m)) {
+                     Log.e(TAG, "🔴 [TV WS] Erreur serveur : " + payload);
+                     logToUI("🔴 [TV WS] Erreur serveur TradingView (" + m + ") — voir Logcat");
+                      return;
+                     }
+
+                       if ("symbol_resolved".equals(m)) {
                         JSONArray p = json.getJSONArray("p");
                         if (p.length() > 1) {
                             String symId = p.getString(1);
