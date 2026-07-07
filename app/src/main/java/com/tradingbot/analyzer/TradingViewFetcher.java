@@ -793,37 +793,41 @@ public class TradingViewFetcher {
                 }
 
                 // Triggers immédiats (Anti-spam par booléen) pour les cassures pures
+                int decimalsAlert = (key.equals("EURUSD") || key.equals("GBPUSD")) ? 5 : (key.equals("USDJPY") ? 3 : 2);
+                String fmtAlert = "%." + decimalsAlert + "f";
+                String prixFormate = String.format(Locale.US, fmtAlert, data.price);
+
                 if (data.brokeAboveP4HH && !Boolean.TRUE.equals(alertFiredP4HH.get(key))) {
                    alertFiredP4HH.put(key, true);
-                   NotificationService.sendTelegramSecure("🧭 *" + key + "* — Cassure du *Previous High H4* (`" + data.price + "`)", appContext);
+                   NotificationService.sendTelegramSecure("🧭 *" + key + "* — Cassure du *Previous High H4* (`" + prixFormate + "`)", appContext);
                 }
                 if (data.brokeBelowP4HL && !Boolean.TRUE.equals(alertFiredP4HL.get(key))) {
                    alertFiredP4HL.put(key, true);
-                   NotificationService.sendTelegramSecure("📉 *" + key + "* — Cassure du *Previous Low H4* (`" + data.price + "`)", appContext);
+                   NotificationService.sendTelegramSecure("📉 *" + key + "* — Cassure du *Previous Low H4* (`" + prixFormate + "`)", appContext);
                 }
                 if (data.brokeAbovePDH && !Boolean.TRUE.equals(alertFiredPDH.get(key))) {
                     alertFiredPDH.put(key, true);
-                    NotificationService.sendTelegramSecure("🔺 *" + key + "* — Cassure réelle du *Previous Day High* (`" + data.price + "`)", appContext);
+                    NotificationService.sendTelegramSecure("🔺 *" + key + "* — Cassure réelle du *Previous Day High* (`" + prixFormate + "`)", appContext);
                 }
                 if (data.brokeBelowPDL && !Boolean.TRUE.equals(alertFiredPDL.get(key))) {
                     alertFiredPDL.put(key, true);
-                    NotificationService.sendTelegramSecure("🔻 *" + key + "* — Cassure réelle du *Previous Day Low* (`" + data.price + "`)", appContext);
+                    NotificationService.sendTelegramSecure("🔻 *" + key + "* — Cassure réelle du *Previous Day Low* (`" + prixFormate + "`)", appContext);
                 }
                 if (data.brokeAbovePWH && !Boolean.TRUE.equals(alertFiredPWH.get(key))) {
                     alertFiredPWH.put(key, true);
-                    NotificationService.sendTelegramSecure("🚀 *" + key + "* — Breakout validé du *Previous Week High* (`" + data.price + "`) !", appContext);
+                    NotificationService.sendTelegramSecure("🚀 *" + key + "* — Breakout validé du *Previous Week High* (`" + prixFormate + "`) !", appContext);
                 }
                 if (data.brokeBelowPWL && !Boolean.TRUE.equals(alertFiredPWL.get(key))) {
                     alertFiredPWL.put(key, true);
-                    NotificationService.sendTelegramSecure("🔥 *" + key + "* — Breakdown validé du *Previous Week Low* (`" + data.price + "`) !", appContext);
+                    NotificationService.sendTelegramSecure("🔥 *" + key + "* — Breakdown validé du *Previous Week Low* (`" + prixFormate + "`) !", appContext);
                 }
                 if (data.brokeAbovePMH && !Boolean.TRUE.equals(alertFiredPMH.get(key))) {
                     alertFiredPMH.put(key, true);
-                    NotificationService.sendTelegramSecure("🌌 *" + key + "* — Macro Breakout du *Previous Month High* (`" + data.price + "`) !! Zone institutionnelle majeure franchie.", appContext);
+                    NotificationService.sendTelegramSecure("🌌 *" + key + "* — Macro Breakout du *Previous Month High* (`" + prixFormate + "`) !! Zone institutionnelle majeure franchie.", appContext);
                 }
                 if (data.brokeBelowPML && !Boolean.TRUE.equals(alertFiredPML.get(key))) {
                     alertFiredPML.put(key, true);
-                    NotificationService.sendTelegramSecure("⚡ *" + key + "* — Macro Breakdown du *Previous Month Low* (`" + data.price + "`) !! Zone institutionnelle majeure enfoncée.", appContext);
+                    NotificationService.sendTelegramSecure("⚡ *" + key + "* — Macro Breakdown du *Previous Month Low* (`" + prixFormate + "`) !! Zone institutionnelle majeure enfoncée.", appContext);
                 }
             }
 
