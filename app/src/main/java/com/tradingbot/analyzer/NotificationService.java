@@ -1675,7 +1675,7 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
         StringBuilder blocPrix = new StringBuilder();
     
         // Déclaré ici — accessible partout dans le try ET le catch
-        java.util.Map<String, MarketDataFetcher.MarketData> batchPrices = null;
+        java.util.Map<String, TradingViewFetcher.MarketData> batchPrices = null;
     
         if (assets != null && !assets.isEmpty()) {
         blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
@@ -1690,8 +1690,8 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
     
         if (!twelveAssets.isEmpty()) {
         // tryAcquireBatchSlot() est synchronized — un seul thread obtient le slot
-        if (MarketDataFetcher.tryAcquireBatchSlot()) {
-            batchPrices = MarketDataFetcher.getMarketDataBatch(twelveAssets);
+        if (TradingViewFetcher.tryAcquireBatchSlot()) {
+            batchPrices = TradingViewFetcher.getMarketDataBatch(twelveAssets);
             if (batchPrices == null) batchPrices = new java.util.HashMap<>();
         } else {
             // Slot occupé — utilise le cache LKV existant sans appel réseau
