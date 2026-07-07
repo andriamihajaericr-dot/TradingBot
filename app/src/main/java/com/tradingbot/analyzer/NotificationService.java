@@ -1678,32 +1678,30 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
         StringBuilder blocPrix = new StringBuilder();
     
         // Déclaré ici — accessible partout dans le try ET le catch
-        java.util.Map<String, TradingViewFetcher.MarketData> batchPrices = null;
-    
-        if (assets != null && !assets.isEmpty()) {
-        blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
+java.util.Map<String, TradingViewFetcher.TVMarketData> batchPrices = null;
 
-        // Filtrer uniquement les 6 actifs Twelve Data — assets complet va à Groq
-        List<String> twelveAssets = new ArrayList<>();
-        for (String asset : assets) {
-            if (MARKET_PRICE_ASSETS.contains(asset)) {
-                twelveAssets.add(asset);
-            }
-        }
-    
-        if (!twelveAssets.isEmpty()) {
-        // tryAcquireBatchSlot() est synchronized — un seul thread obtient le slot
-        if (TradingViewFetcher.tryAcquireBatchSlot()) {
-            batchPrices = TradingViewFetcher.getMarketDataBatch(twelveAssets);
-            if (batchPrices == null) batchPrices = new java.util.HashMap<>();
-        } else {
-            // Slot occupé — utilise le cache LKV existant sans appel réseau
-            Log.w(TAG, "[TV DATA] Slot occupé — cache LKV utilisé pour ce flux");
-            batchPrices = new java.util.HashMap<>();
-        }
-            for (String asset : twelveAssets) {
-                TradingViewFetcher.MarketData data = batchPrices.get(asset);
-                if (data != null && data.price > 0) {
+if (assets != null && !assets.isEmpty()) {
+blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
+
+// Filtrer uniquement les actifs suivis par TradingView — assets complet va à Groq
+List<String> twelveAssets = new ArrayList<>();
+for (String asset : assets) {
+    if (MARKET_PRICE_ASSETS.contains(asset)) {
+        twelveAssets.add(asset);
+    }
+}
+
+if (!twelveAssets.isEmpty()) {
+// ✅ Lecture directe du cache WebSocket TradingView — plus de slot/quota à gérer
+java.util.Map<String, TradingViewFetcher.TVMarketData> liveCache = TradingViewFetcher.getCache();
+batchPrices = new java.util.HashMap<>();
+for (String asset : twelveAssets) {
+    TradingViewFetcher.TVMarketData d = liveCache.get(asset);
+    if (d != null) batchPrices.put(asset, d);
+}
+    for (String asset : twelveAssets) {
+        TradingViewFetcher.TVMarketData data = batchPrices.get(asset);
+        if (data != null && data.price > 0) {
                     // 🛡️ HARMONISATION : 🟢/🔴/⚪ remplace 📈/📉 pour rester cohérent avec
                     // les autres points d'affichage de prix (choc macro, snapshot Daily,
                     // injectLivePrices) — un seul code visuel partout dans le bot.
