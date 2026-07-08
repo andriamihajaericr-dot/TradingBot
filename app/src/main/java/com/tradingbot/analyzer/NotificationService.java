@@ -1853,7 +1853,11 @@ for (String asset : twelveAssets) {
                     EventValidator.preloadCalendar();
                     lastAlertsSent.clear();
                     Log.d(TAG, "[MAINTENANCE] Cooldowns d'alertes réinitialisés.");
-                    
+
+                    // Réinitialisation des verrous d'alertes pivots pour la nouvelle journée
+                    TradingViewFetcher.rolloverDailyLevels();
+                    Log.d(TAG, "[MAINTENANCE] Rollover pivots déclenché — alertFiredPDH/PDL/P4H/PWH/PWL/PMH/PML réarmés.");
+
                 } catch (Exception e) {
                     Log.e(TAG, "[MAINTENANCE] Erreur lors de la maintenance à minuit", e);
                 } finally {
