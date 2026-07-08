@@ -721,13 +721,22 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
                 
                 // Vérifier et réinitialiser le compteur à minuit UTC
+                // Vérifier et réinitialiser le compteur à minuit MADA (UTC+3)
+                // Aligné sur la maintenance de minuit pour éviter le décalage de 3h
                 long nowUtc = System.currentTimeMillis();
-                long midnightUtc = (nowUtc / 86400000L + 1) * 86400000L;
                 if (nowUtc >= tokenResetTime) {
+                    java.util.Calendar madaMidnightCal = java.util.Calendar.getInstance(
+                        java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
+                    madaMidnightCal.setTimeInMillis(nowUtc);
+                    madaMidnightCal.add(java.util.Calendar.DAY_OF_MONTH, 1);
+                    madaMidnightCal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+                    madaMidnightCal.set(java.util.Calendar.MINUTE, 0);
+                    madaMidnightCal.set(java.util.Calendar.SECOND, 0);
+                    madaMidnightCal.set(java.util.Calendar.MILLISECOND, 0);
                     dailyTokensUsed.set(0);
-                    tokenResetTime = midnightUtc;
+                    tokenResetTime = madaMidnightCal.getTimeInMillis();
                     if (MainActivity.instance != null)
-                        MainActivity.instance.addLog("🔄 [TOKEN] Compteur TPD réinitialisé (minuit UTC).");
+                        MainActivity.instance.addLog("🔄 [TOKEN] Compteur TPD réinitialisé (minuit Madagascar).");
                 }
                 
                 // Vérifier budget restant
