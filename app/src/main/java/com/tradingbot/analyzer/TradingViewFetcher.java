@@ -840,7 +840,7 @@ if (pdhTouchedRecently) {
         NotificationService.sendTelegramSecure(msg, appContext);
     }
  }
-}
+
 
                 // ── ALERTES CLASSIQUES TEMPS RÉEL D'APPROCHE (COOLDOWN 5 MIN) ──
                 Long last = lastAlertTime.get(key);
