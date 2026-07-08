@@ -800,6 +800,18 @@ boolean pdlTouchedRecently = pdlTouch != null && (now - pdlTouch) <= TOUCH_MEMOR
 
 Long pdhTouch = lastPdhTouchTime.get(key);
 boolean pdhTouchedRecently = pdhTouch != null && (now - pdhTouch) <= TOUCH_MEMORY_WINDOW_MS;
+ Candle[] h4Candles = h4CandlesCache.get(key);
+if (h4Candles != null && h4Candles.length >= 2 && h4Candles[0] != null && h4Candles[1] != null) {
+    Candle c1 = h4Candles[0];  // bougie H4 la plus récente
+    Candle c2 = h4Candles[1];  // bougie H4 précédente
+
+    boolean isBull1 = c1.close > c1.open;
+    boolean isBear1 = c1.close < c1.open;
+    boolean isBull2 = c2.close > c2.open;
+    boolean isBear2 = c2.close < c2.open;
+
+    boolean englobanteBearishTrap = isBear2 && c2.open >= c1.close && c2.close <= c1.open;
+    boolean englobanteBullishTrap = isBull2 && c2.open <= c1.close && c2.close >= c1.open;
 
 // Scénario A — Reversal Bullish H4 après contact PDL
 if (pdlTouchedRecently) {
