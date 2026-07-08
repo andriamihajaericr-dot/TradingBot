@@ -841,20 +841,7 @@ if (pdhTouchedRecently) {
         NotificationService.sendTelegramSecure(msg, appContext);
     }
  }
-
-                // Scénario B : Daily High touché (à l'instant OU dans les 45 dernières min) -> Attente Reversal Bearish H4
-                if (pdhTouchedRecently) {
-                    boolean isBearishH4Rev = isBull2 && isBear1 && (c1.high < c2.high || b1_englobe_b2) && !englobanteBullishTrap;
-                    
-                    if (isBearishH4Rev && !Boolean.TRUE.equals(alertFiredH4BearishRev.get(key))) {
-                        alertFiredH4BearishRev.put(key, true);
-                        String msg = "⚡ *[FONDA IOF]* — *" + key + "*\n" +
-                                     "🔺 Zone *Previous Day High* touchée (`" + String.format(Locale.US, "%.4f", data.pdh) + "`)\n" +
-                                     "🚨 *Confirmation : Reversal Bearish H4 validé* à `" + String.format(Locale.US, "%.4f", data.price) + "` !";
-                        NotificationService.sendTelegramSecure(msg, appContext);
-                    }
-                }
-                }
+}
 
                 // ── ALERTES CLASSIQUES TEMPS RÉEL D'APPROCHE (COOLDOWN 5 MIN) ──
                 Long last = lastAlertTime.get(key);
