@@ -775,51 +775,70 @@ public class TradingViewFetcher {
                     return;
                 }
                 // ── MOTEUR DE DÉTECTION LOCAL : CONTACT + REVERSAL H4 ──
-                double toleranceZone = 0.15 / 100.0; // Zone de tolérance à 0.15% du niveau
-                Candle[] h4Candles = h4CandlesCache.get(key);
+                  // ── Fix 1 : tolérance élargie à 0.30% pour capturer approche + cassure légère ──
+double toleranceZone = 0.30 / 100.0;
 
-                if (h4Candles != null && h4Candles.length >= 2) {
-                    Candle c1 = h4Candles[0];
-                    Candle c2 = h4Candles[1];
+// ── Fix 3 : contact PDL enregistré si prix DANS la zone OU EN DESSOUS (cassure) ──
+// Cas 1 : prix dans la zone ±0.30% au-dessus du PDL (approche)
+// Cas 2 : prix en dessous du PDL mais pas plus de 0.30% sous lui (cassure légère + retour)
+if (data.pdl > 0) {
+    boolean touchApproche = data.price >= data.pdl && Math.abs(data.price - data.pdl) <= (data.pdl * toleranceZone);
+    boolean touchCassure  = data.price < data.pdl  && Math.abs(data.price - data.pdl) <= (data.pdl * toleranceZone);
+    if (touchApproche || touchCassure) {
+        lastPdlTouchTime.put(key, now);
+    }
+}
+if (data.pdh > 0) {
+    boolean touchApproche = data.price <= data.pdh && Math.abs(data.price - data.pdh) <= (data.pdh * toleranceZone);
+    boolean touchCassure  = data.price > data.pdh  && Math.abs(data.price - data.pdh) <= (data.pdh * toleranceZone);
+    if (touchApproche || touchCassure) {
+        lastPdhTouchTime.put(key, now);
+    }
+}
 
-                    // Variables d'analyse du Reversal (Logique Mathématique Pine Script originale)
-                    boolean isBull1 = c1.close >= c1.open;
-                    boolean isBear1 = c1.close < c1.open;
-                    boolean isBull2 = c2.close >= c2.open;
-                    boolean isBear2 = c2.close < c2.open;
+Long pdlTouch = lastPdlTouchTime.get(key);
+boolean pdlTouchedRecently = pdlTouch != null && (now - pdlTouch) <= TOUCH_MEMORY_WINDOW_MS;
 
-                    boolean b1_englobe_b2 = (c1.high >= c2.high) && (c1.low <= c2.low);
-                    boolean b2_englobe_b1 = (c2.high >= c1.high) && (c2.low <= c1.low);
+Long pdhTouch = lastPdhTouchTime.get(key);
+boolean pdhTouchedRecently = pdhTouch != null && (now - pdhTouch) <= TOUCH_MEMORY_WINDOW_MS;
 
-                    boolean englobanteBearishTrap = isBear2 && isBull1 && b2_englobe_b1;
-                    boolean englobanteBullishTrap = isBull2 && isBear1 && b2_englobe_b1;
+// Scénario A — Reversal Bullish H4 après contact PDL
+if (pdlTouchedRecently) {
+    // ── Fix 4 : conditions assouplies ──
+    // c2 = bougie H4 baissière (descente vers PDL)
+    // c1 = bougie H4 haussière (reversal — peut avoir un wick bas sous c2)
+    // On supprime c1.low > c2.low : un spike bas suivi de clôture haussière = reversal valide
+    boolean isBullishH4Rev = isBear2 && isBull1
+        && (c1.close > c2.close)         // la bougie de reversal clôture au-dessus de la précédente
+        && (c1.close > c1.open)          // clôture haussière confirmée
+        && !englobanteBearishTrap;       // pas un piège bearish
 
-                      // 🕒 Mise à jour de la mémoire de contact — à CHAQUE tick, indépendamment du reversal
-                if (data.pdl > 0 && Math.abs(data.price - data.pdl) <= (data.pdl * toleranceZone)) {
-                    lastPdlTouchTime.put(key, now);
-                }
-                if (data.pdh > 0 && Math.abs(data.price - data.pdh) <= (data.pdh * toleranceZone)) {
-                    lastPdhTouchTime.put(key, now);
-                }
+    if (isBullishH4Rev && !Boolean.TRUE.equals(alertFiredH4BullishRev.get(key))) {
+        alertFiredH4BullishRev.put(key, true);
+        String msg = "⚡ *[FONDA IOF]* — *" + key + "*\n" +
+                     "🔻 Zone *Previous Day Low* touchée (`" + String.format(Locale.US, "%.4f", data.pdl) + "`)\n" +
+                     "✅ *Confirmation : Reversal Bullish H4 validé* à `" + String.format(Locale.US, "%.4f", data.price) + "` !";
+        NotificationService.sendTelegramSecure(msg, appContext);
+    }
+}
 
-                Long pdlTouch = lastPdlTouchTime.get(key);
-                boolean pdlTouchedRecently = pdlTouch != null && (now - pdlTouch) <= TOUCH_MEMORY_WINDOW_MS;
+// Scénario B — Reversal Bearish H4 après contact PDH
+if (pdhTouchedRecently) {
+    // c2 = bougie H4 haussière (montée vers PDH)
+    // c1 = bougie H4 baissière (reversal — peut avoir un wick haut au-dessus de c2)
+    boolean isBearishH4Rev = isBull2 && isBear1
+        && (c1.close < c2.close)         // la bougie de reversal clôture en dessous de la précédente
+        && (c1.close < c1.open)          // clôture baissière confirmée
+        && !englobanteBullishTrap;       // pas un piège bullish
 
-                Long pdhTouch = lastPdhTouchTime.get(key);
-                boolean pdhTouchedRecently = pdhTouch != null && (now - pdhTouch) <= TOUCH_MEMORY_WINDOW_MS;
-
-                // Scénario A : Daily Low touché (à l'instant OU dans les 45 dernières min) -> Attente Reversal Bullish H4
-                if (pdlTouchedRecently) {
-                    boolean isBullishH4Rev = isBear2 && isBull1 && (c1.low > c2.low || b1_englobe_b2) && !englobanteBearishTrap;
-                    
-                    if (isBullishH4Rev && !Boolean.TRUE.equals(alertFiredH4BullishRev.get(key))) {
-                        alertFiredH4BullishRev.put(key, true);
-                        String msg = "⚡ *[FONDA IOF]* — *" + key + "*\n" +
-                                     "🔻 Zone *Previous Day Low* touchée (`" + String.format(Locale.US, "%.4f", data.pdl) + "`)\n" +
-                                     "✅ *Confirmation : Reversal Bullish H4 validé* à `" + String.format(Locale.US, "%.4f", data.price) + "` !";
-                        NotificationService.sendTelegramSecure(msg, appContext);
-                    }
-                }
+    if (isBearishH4Rev && !Boolean.TRUE.equals(alertFiredH4BearishRev.get(key))) {
+        alertFiredH4BearishRev.put(key, true);
+        String msg = "⚡ *[FONDA IOF]* — *" + key + "*\n" +
+                     "🔺 Zone *Previous Day High* touchée (`" + String.format(Locale.US, "%.4f", data.pdh) + "`)\n" +
+                     "🚨 *Confirmation : Reversal Bearish H4 validé* à `" + String.format(Locale.US, "%.4f", data.price) + "` !";
+        NotificationService.sendTelegramSecure(msg, appContext);
+    }
+ }
 
                 // Scénario B : Daily High touché (à l'instant OU dans les 45 dernières min) -> Attente Reversal Bearish H4
                 if (pdhTouchedRecently) {
