@@ -915,15 +915,26 @@ if (data.brokeBelowPML && !Boolean.TRUE.equals(alertFiredPML.get(key))) {
     }
 
     private static boolean isLiveBarActiveAtNewYork() {
-        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/New_York"), Locale.US);
-        int day = cal.get(Calendar.DAY_OF_WEEK);
-        int hour = cal.get(Calendar.HOUR_OF_DAY);
+    Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/New_York"), Locale.US);
+    int day  = cal.get(Calendar.DAY_OF_WEEK);
+    int hour = cal.get(Calendar.HOUR_OF_DAY);
+    int min  = cal.get(Calendar.MINUTE);
 
-        if (day == Calendar.FRIDAY && hour >= 17) return false;
-        if (day == Calendar.SATURDAY) return false;
-        if (day == Calendar.SUNDAY && hour < 17) return false;
+    // Week-end : samedi fermé toute la journée
+    if (day == Calendar.SATURDAY) return false;
 
-        return true;
+    // Dimanche : marché fermé avant 17h00 New York (réouverture Forex/Futures)
+    if (day == Calendar.SUNDAY && hour < 17) return false;
+
+    // Vendredi :
+    // - Forex / Futures (GOLD, USOIL, USDJPY, GBPUSD, EURUSD) → clôture 17h00 NY
+    // - Indices (NASDAQ, SP500) → clôture 16h00 NY
+    // On utilise 16h00 comme seuil conservateur pour couvrir les deux cas.
+    // La bougie live de 16h-17h sur Forex/Futures reste valide mais on la traite
+    // comme clôturée → lecture sur l'avant-dernière bougie = comportement sûr.
+    if (day == Calendar.FRIDAY && (hour > 16 || (hour == 16 && min >= 0))) return false;
+
+    return true;
     }
 
     private static void saveLevelToStorage(String key, String type, double value) {
