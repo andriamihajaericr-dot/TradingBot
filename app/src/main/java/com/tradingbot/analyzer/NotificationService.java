@@ -1065,9 +1065,14 @@ if (fluxGeo) {
             "📤 Ancien flux : *" + ancienFlux + "*\n" +
             "📥 Nouveau flux : *" + nouveauFlux + "*\n" +
             "⚡ Source : " + sourceName + "\n" +
-            "🕒 " + new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss",
-                java.util.Locale.FRANCE)
-                .format(new java.util.Date());
+            "🕒 " + new java.util.function.Supplier<String>() {
+                public String get() {
+                    java.text.SimpleDateFormat sdfAlerte = new java.text.SimpleDateFormat(
+                        "dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
+                    sdfAlerte.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
+                    return sdfAlerte.format(new java.util.Date());
+                }
+            }.get();
         sendTelegramSecure(alerteChangement, NotificationService.this);
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("🔄 [RÉGIME] " + ancienFlux + " → " + nouveauFlux);
