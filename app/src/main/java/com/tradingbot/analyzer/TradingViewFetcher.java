@@ -34,7 +34,6 @@ public class TradingViewFetcher {
         // Indices
         put("NASDAQ",  "SPREADEX:NDX");
         put("SP500",   "SPREADEX:SPX");
-
         // Matières Premières
         put("GOLD",    "TVC:GOLD");
         put("USOIL",   "TVC:USOIL");
