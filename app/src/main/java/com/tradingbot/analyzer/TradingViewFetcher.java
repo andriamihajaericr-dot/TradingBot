@@ -812,7 +812,6 @@ if (pdlTouchedRecently) {
     boolean isBullishH4Rev = isBear2 && isBull1
     && (c1.high > c2.high)
     && !englobanteBearishTrap;
-
     if (isBullishH4Rev && !Boolean.TRUE.equals(alertFiredH4BullishRev.get(key))) {
         alertFiredH4BullishRev.put(key, true);
         String msg = "⚡ *[FONDA IOF]* — *" + key + "*\n" +
