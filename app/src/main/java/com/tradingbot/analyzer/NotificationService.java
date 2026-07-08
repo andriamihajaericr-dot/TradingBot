@@ -1674,22 +1674,31 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
      * Évite les appels Twelve Data inutiles la nuit ou le week-end.
      */
     private static boolean isMarketHours() {
-        java.util.Calendar utc = java.util.Calendar.getInstance(
-            java.util.TimeZone.getTimeZone("UTC"));
-        int dow  = utc.get(java.util.Calendar.DAY_OF_WEEK);
-        int hour = utc.get(java.util.Calendar.HOUR_OF_DAY);
-        int min  = utc.get(java.util.Calendar.MINUTE);
-        int totalMin = hour * 60 + min;
-    
-        // Week-end → fermé
-        if (dow == java.util.Calendar.SATURDAY ||
-            dow == java.util.Calendar.SUNDAY) return false;
-    
-        // Session Londres  : 08h00–17h00 UTC (480–1020 min)
-        // Session New York : 13h30–21h00 UTC (810–1260 min)
-        return (totalMin >= 480 && totalMin <= 1020) ||
-               (totalMin >= 810 && totalMin <= 1260);
-       }
+        long nowMs = System.currentTimeMillis();
+
+        // ── Session Londres — heure locale Europe/London (DST-safe : GMT en hiver, BST+1 en été)
+        java.util.Calendar lon = java.util.Calendar.getInstance(
+            java.util.TimeZone.getTimeZone("Europe/London"));
+        lon.setTimeInMillis(nowMs);
+        int dowLon = lon.get(java.util.Calendar.DAY_OF_WEEK);
+        if (dowLon == java.util.Calendar.SATURDAY ||
+            dowLon == java.util.Calendar.SUNDAY) return false;
+        int lonMin = lon.get(java.util.Calendar.HOUR_OF_DAY) * 60
+                   + lon.get(java.util.Calendar.MINUTE);
+        // 08h00–17h00 heure locale Londres (couvre GMT hiver et BST été automatiquement)
+        boolean londonOpen = (lonMin >= 480 && lonMin <= 1020);
+
+        // ── Session New York — heure locale America/New_York (DST-safe : EST hiver, EDT+1 été)
+        java.util.Calendar ny = java.util.Calendar.getInstance(
+            java.util.TimeZone.getTimeZone("America/New_York"));
+        ny.setTimeInMillis(nowMs);
+        int nyMin = ny.get(java.util.Calendar.HOUR_OF_DAY) * 60
+                  + ny.get(java.util.Calendar.MINUTE);
+        // 09h30–21h00 heure locale New York (couvre EST hiver et EDT été automatiquement)
+        boolean newYorkOpen = (nyMin >= 570 && nyMin <= 1260);
+
+        return londonOpen || newYorkOpen;
+     }
     
           public static void sendToGroqAndTelegram(String source, String title, String body, List<String> assets, Context context) {
             if (context == null) return;
