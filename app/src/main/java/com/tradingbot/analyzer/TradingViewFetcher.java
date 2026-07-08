@@ -286,16 +286,17 @@ public class TradingViewFetcher {
     // 1️⃣ Détection BOS (Priorité HTF > LTF)
     String structureLevel  = null;
     String structureVector = null;
+    String structurePrep   = null; // préposition liée au sens de la cassure (au-dessus / en dessous)
     double niveauCasse     = 0;
 
-    if      (data.brokeAbovePMH)  { structureLevel = "PMH"; structureVector = "Impulsion Haussière";    niveauCasse = data.pmh; }
-    else if (data.brokeBelowPML)  { structureLevel = "PML"; structureVector = "Expansion Baissière";    niveauCasse = data.pml; }
-    else if (data.brokeAbovePWH)  { structureLevel = "PWH"; structureVector = "Impulsion Haussière";    niveauCasse = data.pwh; }
-    else if (data.brokeBelowPWL)  { structureLevel = "PWL"; structureVector = "Expansion Baissière";    niveauCasse = data.pwl; }
-    else if (data.brokeAbovePDH)  { structureLevel = "PDH"; structureVector = "Impulsion Haussière";    niveauCasse = data.pdh; }
-    else if (data.brokeBelowPDL)  { structureLevel = "PDL"; structureVector = "Expansion Baissière";    niveauCasse = data.pdl; }
-    else if (data.brokeAboveP4HH) { structureLevel = "P4HH"; structureVector = "Accélération Intra-day"; niveauCasse = data.p4hh; }
-    else if (data.brokeBelowP4HL) { structureLevel = "P4HL"; structureVector = "Pression Intra-day";   niveauCasse = data.p4hl; }
+    if      (data.brokeAbovePMH)  { structureLevel = "PMH"; structureVector = "Impulsion Haussière";    structurePrep = "au-dessus du"; niveauCasse = data.pmh; }
+    else if (data.brokeBelowPML)  { structureLevel = "PML"; structureVector = "Expansion Baissière";    structurePrep = "en dessous du"; niveauCasse = data.pml; }
+    else if (data.brokeAbovePWH)  { structureLevel = "PWH"; structureVector = "Impulsion Haussière";    structurePrep = "au-dessus du"; niveauCasse = data.pwh; }
+    else if (data.brokeBelowPWL)  { structureLevel = "PWL"; structureVector = "Expansion Baissière";    structurePrep = "en dessous du"; niveauCasse = data.pwl; }
+    else if (data.brokeAbovePDH)  { structureLevel = "PDH"; structureVector = "Impulsion Haussière";    structurePrep = "au-dessus du"; niveauCasse = data.pdh; }
+    else if (data.brokeBelowPDL)  { structureLevel = "PDL"; structureVector = "Expansion Baissière";    structurePrep = "en dessous du"; niveauCasse = data.pdl; }
+    else if (data.brokeAboveP4HH) { structureLevel = "P4HH"; structureVector = "Accélération Intra-day"; structurePrep = "au-dessus du"; niveauCasse = data.p4hh; }
+    else if (data.brokeBelowP4HL) { structureLevel = "P4HL"; structureVector = "Pression Intra-day";   structurePrep = "en dessous du"; niveauCasse = data.p4hl; }
 
     // 2️⃣ Mémoire liquidité (45 min)
     Long pdlTouch = lastPdlTouchTime.get(key);
@@ -315,8 +316,8 @@ public class TradingViewFetcher {
                 : fluxActif
                     ? "🟡 Partiellement confirmé"
                     : "⚠️ Flux faible";
-        return String.format("[BOS] %s au-dessus du %s %s %s%s",
-            structureVector, structureLevel, niveauStr, confirmation, suffixe);
+        return String.format("[BOS] %s %s %s %s %s%s",
+            structureVector, structurePrep, structureLevel, niveauStr, confirmation, suffixe);
     }
 
     // 🛑 BRANCHE B — Liquidity Sweep
@@ -394,13 +395,20 @@ public class TradingViewFetcher {
             : "flux faible en attente d'activation";
 
     // ── Niveau suivant pertinent selon position dans le range ──
+    // Cascade PDH → PWH → PMH (résistance) / PDL → PWL → PML (support) :
+    // un niveau déjà cassé bascule en support/résistance et n'est plus proposé
+    // comme "prochain" niveau — on cherche le premier niveau supérieur non cassé.
     String niveauSuivant = "";
-    if (data.dailyRangePercent >= 85.0 && data.pwh > 0) {
-        int dec = (data.pwh < 10) ? 5 : 2;
-        niveauSuivant = String.format(Locale.US, ", résistance hebdomadaire suivante PWH %." + dec + "f", data.pwh);
-    } else if (data.dailyRangePercent <= 15.0 && data.pwl > 0) {
-        int dec = (data.pwl < 10) ? 5 : 2;
-        niveauSuivant = String.format(Locale.US, ", prochain support clé PWL %." + dec + "f en cas de rupture", data.pwl);
+    if (data.dailyRangePercent >= 85.0) {
+        String next = findNextResistance(data);
+        niveauSuivant = (next != null)
+            ? ", résistance suivante " + next
+            : ", aucune résistance majeure identifiée au-delà";
+    } else if (data.dailyRangePercent <= 15.0) {
+        String next = findNextSupport(data);
+        niveauSuivant = (next != null)
+            ? ", prochain support clé " + next + " en cas de rupture"
+            : ", aucun support majeur identifié en dessous";
     }
 
     s.append(lectureRange).append(", ").append(lectureMomentum)
@@ -408,6 +416,31 @@ public class TradingViewFetcher {
 
     return " — " + s; 
    }
+
+    // ── Cascade de niveaux : renvoie le premier niveau non cassé au-dessus du prix ──
+    // (PDH → PWH → PMH). Si un niveau est déjà cassé, il a basculé en support et
+    // n'est plus une résistance valide, donc on passe au niveau supérieur suivant.
+    private static String findNextResistance(TVMarketData data) {
+        if (!data.brokeAbovePDH && data.pdh > 0) return "PDH " + String.format(Locale.US, decFmt(data.pdh), data.pdh);
+        if (!data.brokeAbovePWH && data.pwh > 0) return "PWH " + String.format(Locale.US, decFmt(data.pwh), data.pwh);
+        if (!data.brokeAbovePMH && data.pmh > 0) return "PMH " + String.format(Locale.US, decFmt(data.pmh), data.pmh);
+        return null;
+    }
+
+    // ── Cascade symétrique pour le support (PDL → PWL → PML) ──
+    private static String findNextSupport(TVMarketData data) {
+        if (!data.brokeBelowPDL && data.pdl > 0) return "PDL " + String.format(Locale.US, decFmt(data.pdl), data.pdl);
+        if (!data.brokeBelowPWL && data.pwl > 0) return "PWL " + String.format(Locale.US, decFmt(data.pwl), data.pwl);
+        if (!data.brokeBelowPML && data.pml > 0) return "PML " + String.format(Locale.US, decFmt(data.pml), data.pml);
+        return null;
+    }
+
+    // ── Format décimal adaptatif : 5 décimales pour les paires forex (valeur < 10), 2 sinon ──
+    private static String decFmt(double val) {
+        int dec = (val > 0 && val < 10) ? 5 : 2;
+        return "%." + dec + "f";
+    }
+
     public static void rolloverDailyLevels() {
         alertFiredP4HH.clear(); 
         alertFiredP4HL.clear();
