@@ -808,10 +808,11 @@ if (pdlTouchedRecently) {
     // c2 = bougie H4 baissière (descente vers PDL)
     // c1 = bougie H4 haussière (reversal — peut avoir un wick bas sous c2)
     // On supprime c1.low > c2.low : un spike bas suivi de clôture haussière = reversal valide
+    // pas un piège bearish
+    // Bullish : c2 rouge → c1 verte dont le HIGH casse le HIGH de c2
     boolean isBullishH4Rev = isBear2 && isBull1
-        && (c1.close > c2.close)         // la bougie de reversal clôture au-dessus de la précédente
-        && (c1.close > c1.open)          // clôture haussière confirmée
-        && !englobanteBearishTrap;       // pas un piège bearish
+    && (c1.high > c2.high)
+    && !englobanteBearishTrap;
 
     if (isBullishH4Rev && !Boolean.TRUE.equals(alertFiredH4BullishRev.get(key))) {
         alertFiredH4BullishRev.put(key, true);
@@ -826,10 +827,12 @@ if (pdlTouchedRecently) {
 if (pdhTouchedRecently) {
     // c2 = bougie H4 haussière (montée vers PDH)
     // c1 = bougie H4 baissière (reversal — peut avoir un wick haut au-dessus de c2)
+    // pas un piège bullish
+    
+    // Bearish : c2 verte → c1 rouge dont le LOW casse le LOW de c2
     boolean isBearishH4Rev = isBull2 && isBear1
-        && (c1.close < c2.close)         // la bougie de reversal clôture en dessous de la précédente
-        && (c1.close < c1.open)          // clôture baissière confirmée
-        && !englobanteBullishTrap;       // pas un piège bullish
+    && (c1.low < c2.low)
+    && !englobanteBullishTrap;
 
     if (isBearishH4Rev && !Boolean.TRUE.equals(alertFiredH4BearishRev.get(key))) {
         alertFiredH4BearishRev.put(key, true);
