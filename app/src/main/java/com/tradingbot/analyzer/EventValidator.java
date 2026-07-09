@@ -139,13 +139,25 @@ public class EventValidator {
         }
     
         // Si dollar fort explicitement déclaré, USDJPY et GBPUSD doivent TOUS DEUX refléter un dollar fort
-        if (chocDollarExplicite && usdjpyDir != null && gbpusdDir != null) {
-            boolean usdjpyCoherent = "🟢".equals(usdjpyDir);  // dollar fort → USDJPY monte
-            boolean gbpusdCoherent = "🔴".equals(gbpusdDir);  // dollar fort → GBPUSD baisse
-            if (!usdjpyCoherent || !gbpusdCoherent) {
-                result.contradictionsCorrelation.add(
-                    "Régime dollar fort déclaré, mais USDJPY/GBPUSD n'affichent pas un dollar uniformément fort " +
-                    "(attendu USDJPY🟢 + GBPUSD🔴, obtenu USDJPY" + usdjpyDir + " + GBPUSD" + gbpusdDir + ")");
+        boolean regimeGeo = reportUpper.contains("CRISE GÉOPOLITIQUE") || reportUpper.contains("VECTEUR CIBLE : GÉO");
+    
+        if (usdjpyDir != null && gbpusdDir != null) {
+            if (chocDollarExplicite) {
+                // Régime DOLLAR (Fed, ou GÉO avec choc d'offre confirmé) → directions INVERSES obligatoires
+                boolean usdjpyCoherent = "🟢".equals(usdjpyDir);
+                boolean gbpusdCoherent = "🔴".equals(gbpusdDir);
+                if (!usdjpyCoherent || !gbpusdCoherent) {
+                    result.contradictionsCorrelation.add(
+                        "Régime DOLLAR déclaré (Fed ou choc d'offre GÉO confirmé) : USDJPY/GBPUSD devraient être INVERSES " +
+                        "(attendu USDJPY🟢 + GBPUSD🔴, obtenu USDJPY" + usdjpyDir + " + GBPUSD" + gbpusdDir + ")");
+                }
+            } else if (regimeGeo) {
+                // Régime RISK pur (GÉO sans choc d'offre confirmé) → MÊME direction obligatoire
+                if (!usdjpyDir.equals(gbpusdDir)) {
+                    result.contradictionsCorrelation.add(
+                        "Régime RISK (GÉO sans choc d'offre confirmé) : USDJPY/GBPUSD devraient être dans le MÊME sens " +
+                        "(obtenu USDJPY" + usdjpyDir + " + GBPUSD" + gbpusdDir + " — divergence non justifiée par BoJ/BoE isolé)");
+                }
             }
         }
     
@@ -163,6 +175,49 @@ public class EventValidator {
         }
     
         return result;
+    }
+    // AJOUT (nouveau bloc, après validerCoherenceRapport)
+
+    private static final String[] MOTS_CLES_ACTIFS_LEGITIMES = {
+        // Fed / USD / taux
+        "fed", "fomc", "powell", "warsh", "taux d'intérêt", "taux directeur", "cpi", "pce", "nfp", "gdp", "chômage",
+        // Géopolitique énergie/marché réellement transmissible
+        "hormuz", "ormuz", "iran", "israel", "hezbollah", "houthi", "opep", "opec", "pétrole", "gaz naturel",
+        "guerre", "frappe", "missile", "drone", "sanction", "embargo",
+        // Banques centrales majeures
+        "ecb", "bce", "boj", "banque du japon", "boe", "bank of england",
+        // Data macro classique
+        "pmi", "ism", "retail sales", "eia", "stimulus", "tarif douanier", "tariff",
+        // Marchés/entreprises à impact large
+        "nasdaq", "s&p", "sp500", "wall street", "bitcoin", "crypto", "ia", "intelligence artificielle",
+        "nvidia", "apple", "microsoft", "spacex", "ipo"
+    };
+    
+    /**
+     * 🎯 Filtre de matérialité : rejette les news qui n'ont aucun lien plausible avec les 6 actifs
+     * (ex : appel humanitaire suite à un séisme, sans lien économique/financier direct).
+     * Retourne true si la news mérite une analyse fondamentale, false si elle doit être ignorée.
+     */
+    public static boolean estMaterielPourMarche(String title, String body) {
+        if (title == null) title = "";
+        if (body == null) body = "";
+        String texte = (title + " " + body).toLowerCase(java.util.Locale.ROOT);
+    
+        for (String mot : MOTS_CLES_ACTIFS_LEGITIMES) {
+            if (texte.contains(mot)) return true;
+        }
+    
+        // ⚠️ Mots signalant explicitement un contexte humanitaire/catastrophe SANS lien marché direct
+        String[] motsHorsSujet = {
+            "programme alimentaire", "world food programme", "aide humanitaire", "assistance alimentaire",
+            "tremblement de terre", "séisme", "catastrophe naturelle", "ong", "réfugiés", "famine"
+        };
+        for (String mot : motsHorsSujet) {
+            if (texte.contains(mot)) return false; // Rejet explicite même si un mot légitime apparaît ailleurs par hasard
+        }
+    
+        // Ni mot-clé légitime ni mot-clé hors-sujet détecté : par prudence, on laisse passer mais avec confiance dégradée
+        return true;
     }
     // 🔄 ANTI-AMNÉSIE : Rechargement de la RAM depuis SQLite au démarrage du service
     // 🔄 ANTI-AMNÉSIE : Rechargement de la RAM depuis SQLite au démarrage du service
