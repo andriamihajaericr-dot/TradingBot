@@ -358,7 +358,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "RANG SECONDAIRE : PMI, ISM, Retail Sales, EIA, OPEC, Stocks pétrole, Stimulus budgétaire\n" +
     "RANG TACTIQUE : Géopolitique, Tarifs douaniers, Sentiment consommateurs, Chine, IPO, M&A, Rumeurs\n" +
     "RÈGLE : Un driver de rang supérieur écrase toujours un driver inférieur.\n" +
-    "Exception : Escalade militaire directe (Hormuz, frappes, guerre, embargo énergétique) : le régime GÉO devient prioritaire pour GOLD et USOIL.\n\n" +
+    "EXCEPTION UNIQUE (prioritaire sur la règle des 30 min et sur le rang) : un choc géopolitique avec IMPACT PHYSIQUE RÉEL et CONFIRMÉ sur l'offre d'énergie (blocage Hormuz effectif, frappe confirmée sur infrastructure pétrolière/gazière, embargo appliqué) prend le pas sur TOUS les drivers, pour LES 6 ACTIFS — pas seulement GOLD/USOIL. Une escalade verbale, une menace, ou une frappe non confirmée NE DÉCLENCHE PAS cette exception : retour à la RÈGLE normale de hiérarchie.\n\n" +
 
     "══════════════════════════════════════════════════════\n" +
     "ANTI-BRUIT & SOURCES\n" +
@@ -388,20 +388,32 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "══════════════════════════════════════════════════════\n" +
     "MATRICES DIRECTIONNELLES (↑=BULLISH, ↓=BEARISH)\n" +
     "══════════════════════════════════════════════════════\n" +
-    "HAWKISH US : USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ GBPUSD↓ USOIL= | FLUX : DOLLAR FORT\n" +
-    "DOVISH US : inverse | FLUX : DOLLAR FAIBLE\n" +
-    "GÉO escalade : USOIL↑ USDJPY↓ NASDAQ↓ SP500↓ GBPUSD↓ | FLUX : CRISE GÉOPOLITIQUE\n" +
-    "GOLD en crise GÉO Iran/Hormuz :\n" +
-    "- Attaque tanker/drone/tension SANS riposte USA confirmée → GOLD🟢 immédiat (historique : +0.8% à +1.5%)\n" +
-    "- Riposte militaire USA confirmée (frappe/bombardement/Pentagon/airstrike) → GOLD🔴 30-60min puis rebond\n" +
-    "- RÈGLE PAR DÉFAUT : si texte ne contient pas 'riposte/strike/Pentagon/airstrike/bombardement' → GOLD🟢 obligatoirement\n" +
-    "GÉO désescalade : GOLD↓ USOIL↓ NASDAQ↑ SP500↑ USDJPY↑ | FLUX : RISK-ON\n" +
+    "OBLIGATION POUR LES 6 ACTIFS : ne jamais sauter directement du driver à la direction. Toujours passer par une variable pivot explicite (sens du DOLLAR/DXY, taux réels US, appétit pour le risque, offre physique d'énergie), puis dériver CHAQUE actif de cette même variable pivot — jamais un narratif indépendant par actif pour un même événement.\n\n" +
+    
+    "HAWKISH US : USD↑ (taux réels) → USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ GBPUSD↓ USOIL= | FLUX : DOLLAR FORT\n" +
+    "DOVISH US : USD↓ → inverse | FLUX : DOLLAR FAIBLE\n\n" +
+    
+    "GÉO — CHOC GÉOPOLITIQUE ÉNERGÉTIQUE (Iran/Hormuz/Golfe) :\n" +
+    "Étape 1 (PIVOT) — Déterminer le sens du DOLLAR avant toute conclusion :\n" +
+    "  a) Choc d'OFFRE RÉEL confirmé (Hormuz bloqué, frappe sur infrastructure pétrolière/gazière) → pétrole s'envole → demande de USD pour régler les transactions énergétiques + anticipation Fed hawkish (inflation importée) → USD SE RENFORCE.\n" +
+    "  b) Escalade verbale/diplomatique SANS choc d'offre réel → pas de choc dollar → flux refuge classique (JPY/or) sans contrepoids dollar → USD stable ou légèrement plus faible.\n" +
+    "Étape 2 — GOLD se déduit du sens du dollar (Étape 1), jamais d'un mot-clé de riposte :\n" +
+    "  - Cas (a) USD renforcé par la demande pétrole → GOLD🔴 ou NEUTRE (le canal dollar-fort domine le canal refuge). Justification type : 'achats pétrole en USD renforcent le dollar, pèsent sur l'or'.\n" +
+    "  - Cas (b) pas de choc d'offre réel, dollar stable/faible → GOLD🟢 (refuge classique, pas de contrepoids).\n" +
+    "  - Riposte militaire USA confirmée EN PLUS d'un choc d'offre → USD très fort (flight-to-cash) → GOLD🔴 net, rebond possible seulement après stabilisation (30-60min).\n" +
+    "Étape 3 — Les 5 autres actifs suivent le MÊME sens du dollar déterminé en Étape 1 :\n" +
+    "  - USOIL↑ dans les deux cas (choc d'offre = hausse du prix, indépendant du canal dollar).\n" +
+    "  - USDJPY : cas (a) USD renforcé → USDJPY↑ ou neutre ; cas (b) dollar stable/faible → USDJPY↓ (yen refuge classique).\n" +
+    "  - GBPUSD : miroir de USDJPY sur l'axe dollar (USD fort → GBPUSD↓ ; dollar stable/faible → GBPUSD↓ si risk-off pur, neutre/↑ seulement si le dollar faiblit franchement).\n" +
+    "  - NASDAQ/SP500↓ dans les deux cas (risk-off + coût énergie pèse sur marges) ; si choc jugé transitoire et sans impact réel sur l'offre → impact limité, conviction FAIBLE.\n" +
+    "GÉO désescalade : le dollar revient à son régime pré-choc → GOLD↓ USOIL↓ NASDAQ↑ SP500↑ USDJPY↑ | FLUX : RISK-ON\n" +
     "EIA déficit : USOIL↑ | EIA surplus : USOIL↓\n" +
-    "TARIFS escalade : NASDAQ↓ SP500↓ USOIL↓ USDJPY↓ GOLD↑ GBPUSD↓ | FLUX : RISK-OFF\n" +
+    "TARIFS escalade : USD↑ (rapatriement de capitaux, pas de canal pétrole) → NASDAQ↓ SP500↓ USOIL↓ USDJPY↓ GOLD↑ (ici le canal refuge domine, car pas de demande pétrole en USD) GBPUSD↓ | FLUX : RISK-OFF\n" +
     "CHINE forte : USOIL↑ NASDAQ↑ SP500↑ | FLUX : RISK-ON\n" +
     "SENTIMENT faible : NASDAQ↓ SP500↓ GOLD↑ USOIL↓ | FLUX : RISK-OFF MODÉRÉ\n" +
     "IPO majeure : NASDAQ↑ SP500↑ GOLD↓ USDJPY↓ | FLUX : RISK-ON\n" +
-    "RÈGLE JUSTIFICATION : la matrice donne la DIRECTION, jamais le TEXTE. Pour chaque actif, déduis et écris le mécanisme causal exact (ex: taux/devise/refuge/corrélation) reliant le driver détecté à cet actif précis — jamais une formule générique répétée.\n\n" +
+    "RÈGLE JUSTIFICATION : la matrice donne le POINT DE DÉPART (variable pivot), jamais la conclusion automatique. Pour chaque actif, écris la chaîne causale réelle (driver → dollar/taux/risque → actif), jamais une formule générique répétée.\n\n" +
+        
     "══════════════════════════════════════════════════════\n" +
     "BANQUES CENTRALES ÉTRANGÈRES\n" +
     "══════════════════════════════════════════════════════\n" +
@@ -426,7 +438,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "Lister uniquement les actifs impactés — omettre les NEUTRE.\n" +
     "8. Pas de doubles astérisques (**) – utiliser *simple*.\n" +
     "9. VECTEUR CIBLE autorisé : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
-    "10. En cas de crise géopolitique, appliquer l'exception et mentionner \"Régime Safe-Haven\".\n\n" +
+    "10. En cas de choc géopolitique énergétique, évaluer explicitement le sens du dollar (Étape 1 de la matrice GÉO) AVANT de conclure sur GOLD. N'écrire \"Régime Safe-Haven\" que si l'Étape 1 conclut à un dollar stable/faible — sinon écrire \"Régime Dollar Fort (demande pétrole)\".\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "FORMAT DE SORTIE OBLIGATOIRE\n" +
     "══════════════════════════════════════════════════════\n" +
@@ -444,30 +456,30 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "• 🇬🇧 GBPUSD : [direction] | [justification ≤10 mots]\n" +
     "🏁 FLUX DOMINANT : [FLUX EXACT ISSUE DES MATRICES]\n\n" +
 
-"══════════════════════════════════════════════════════\n" +
-"CORRÉLATION TECHNIQUE / FONDAMENTAL\n" +
-"══════════════════════════════════════════════════════\n" +
-"Le contexte marché fourni contient un [VERDICT TECHNIQUE] par actif.\n" +
-"Tu DOIS l'intégrer dans ton analyse selon ces règles :\n\n" +
-"RÈGLE 1 — CONFLUENCE ✅\n" +
-"Si [VERDICT TECHNIQUE] ✅ ET driver fondamental dans la même direction :\n" +
-"→ Mentionner la confluence dans le FAIT MARQUANT.\n" +
-"→ Élever la conviction de 10 à 15 points.\n" +
-"→ Exemple : '[BOS] Impulsion Haussière ✅ confirmée + OPEC coupe production → CONFLUENCE haussière sur USOIL, conviction élevée.'\n\n" +
-"RÈGLE 2 — DIVERGENCE ⚠️\n" +
-"Si [VERDICT TECHNIQUE] ✅ ET driver fondamental dans la direction opposée :\n" +
-"→ Signaler la divergence explicitement dans le FAIT MARQUANT.\n" +
-"→ Réduire la conviction de 15 à 20 points.\n" +
-"→ Exemple : '[BOS] Expansion Baissière ✅ sur GOLD MAIS driver SUPRÊME hawkish → DIVERGENCE, attente résolution.'\n\n" +
-"RÈGLE 3 — TECHNIQUE IGNORÉ\n" +
-"Si [VERDICT TECHNIQUE] ⚠️ Signal suspect (flux gelé) :\n" +
-"→ Ignorer le verdict technique.\n" +
-"→ Appliquer uniquement la matrice fondamentale.\n" +
-"→ Exemple : '[BOS] suspect flux gelé → signal technique ignoré, fondamental prime.'\n\n" +
-"RÈGLE 4 — NEUTRE CONFIRMÉ\n" +
-"Si [FAIR VALUE ZONE] ET fondamental neutre ou ambigu :\n" +
-"→ Actif en attente de catalyseur, ne pas forcer de direction.\n" +
-"→ Mentionner uniquement si pertinent pour la cohérence du rapport.\n";
+    "══════════════════════════════════════════════════════\n" +
+    "CORRÉLATION TECHNIQUE / FONDAMENTAL\n" +
+    "══════════════════════════════════════════════════════\n" +
+    "Le contexte marché fourni contient un [VERDICT TECHNIQUE] par actif.\n" +
+    "Tu DOIS l'intégrer dans ton analyse selon ces règles :\n\n" +
+    "RÈGLE 1 — CONFLUENCE ✅\n" +
+    "Si [VERDICT TECHNIQUE] ✅ ET driver fondamental dans la même direction :\n" +
+    "→ Mentionner la confluence dans le FAIT MARQUANT.\n" +
+    "→ Élever la conviction de 10 à 15 points.\n" +
+    "→ Exemple : '[BOS] Impulsion Haussière ✅ confirmée + OPEC coupe production → CONFLUENCE haussière sur USOIL, conviction élevée.'\n\n" +
+    "RÈGLE 2 — DIVERGENCE ⚠️\n" +
+    "Si [VERDICT TECHNIQUE] ✅ ET driver fondamental dans la direction opposée :\n" +
+    "→ Signaler la divergence explicitement dans le FAIT MARQUANT.\n" +
+    "→ Réduire la conviction de 15 à 20 points.\n" +
+    "→ Exemple : '[BOS] Expansion Baissière ✅ sur GOLD MAIS driver SUPRÊME hawkish → DIVERGENCE, attente résolution.'\n\n" +
+    "RÈGLE 3 — TECHNIQUE IGNORÉ\n" +
+    "Si [VERDICT TECHNIQUE] ⚠️ Signal suspect (flux gelé) :\n" +
+    "→ Ignorer le verdict technique.\n" +
+    "→ Appliquer uniquement la matrice fondamentale.\n" +
+    "→ Exemple : '[BOS] suspect flux gelé → signal technique ignoré, fondamental prime.'\n\n" +
+    "RÈGLE 4 — NEUTRE CONFIRMÉ\n" +
+    "Si [FAIR VALUE ZONE] ET fondamental neutre ou ambigu :\n" +
+    "→ Actif en attente de catalyseur, ne pas forcer de direction.\n" +
+    "→ Mentionner uniquement si pertinent pour la cohérence du rapport.\n";
 
     private static final String DAILY_SYSTEM_PROMPT =
     "Tu es Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif.\n" +
@@ -861,13 +873,30 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     // APRÈS
                     if (activeSignalsCount > 0) {
                     int convictionPercent = extrairePourcentageConviction(aiReport);
-                      if (convictionPercent >= 40 || isSupremeRank) {
-                            // ✅ Injection des prix live inline sur chaque ligne d'actif
+                           // APRÈS
+                        if (convictionPercent >= 40 || isSupremeRank) {
                               String enrichedReport = injectLivePrices(
                                 filteredMessage.toString().trim(),
                                 enrichedAssets
                             );
-                            String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport;
+                        
+                            // 🎯 Validation croisée : prédiction du rapport vs mouvement RÉEL du marché
+                            EventValidator.MarketValidationResult marketCheck =
+                                EventValidator.validateAgainstRealMarket(
+                                    NotificationService.this, sourceName,
+                                    filteredMessage.toString(), cachedMarketData);
+                        
+                            int fiabilite = EventValidator.getSourceReliability(sourceName);
+                            StringBuilder footer = new StringBuilder();
+                            if (!marketCheck.contradictions.isEmpty()) {
+                                footer.append("\n\n").append(marketCheck.warningLine());
+                            }
+                            if (fiabilite >= 0) {
+                                footer.append("\n📊 Fiabilité historique source \"").append(sourceName)
+                                      .append("\" : ").append(fiabilite).append("%");
+                            }
+                        
+                            String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
                             sendTelegramSecure(finalPayload, NotificationService.this);
                             // Extraire résumé directionnel pour affichage rappel inertie
                             StringBuilder impactResume = new StringBuilder();
