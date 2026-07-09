@@ -942,6 +942,12 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 footer.append("\n\n🔢 *Alerte lecture chiffrée* : ").append(String.join(" | ", anomaliesChiffres));
                             }
                         
+                            String anomaliePhase = EventValidator.verifierPhaseChocGeo(NotificationService.this, filteredMessage.toString());
+                            if (anomaliePhase != null) {
+                                Log.w(TAG, "⚠️ [PHASE CHOC GÉO] " + anomaliePhase);
+                                footer.append("\n\n⏱️ *Alerte phase temporelle* : ").append(anomaliePhase);
+                            }
+                        
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
                             sendTelegramSecure(finalPayload, NotificationService.this);
                             // Extraire résumé directionnel pour affichage rappel inertie
