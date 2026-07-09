@@ -3480,10 +3480,6 @@ private void registerNetworkCallback() {
                 "(Étape 1 de la matrice GÉO) avant de conclure sur GOLD — jamais de refuge automatique.\n\n";
             return alerteFlash + promptDeBase;
         }
-    
-        return promptDeBase;
-    }
-    
         // Sinon, on renvoie le prompt standard (la hiérarchie normale s'applique)
         return promptDeBase;
     }
