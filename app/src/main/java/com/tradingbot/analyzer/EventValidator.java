@@ -379,6 +379,36 @@ public class EventValidator {
                 return "";
         }
     }
+ 
+    private static final String[] MOTS_TENDANCE_INSTALLEE = {"tendance installée", "tendance de fond", "installé depuis", "durable"};
+    private static final String[] MOTS_SURSAUT = {"sursaut", "réaction immédiate", "réaction épidermique", "à chaud"};
+    
+    /**
+     * 🎯 Vérifie que le rapport généré ne contredit pas la phase réelle calculée en Java
+     * (ex: rapport parle de "tendance installée" alors que le choc dure depuis 12 minutes).
+     * Retourne une anomalie (String) ou null si cohérent / non applicable.
+     */
+    public static synchronized String verifierPhaseChocGeo(Context context, String reportText) {
+        String phase = getPhaseChocGeo(context);
+        if (phase.equals(PHASE_INACTIF) || reportText == null) return null;
+    
+        String texteLower = reportText.toLowerCase(java.util.Locale.ROOT);
+    
+        if (phase.equals(PHASE_SURSAUT)) {
+            for (String mot : MOTS_TENDANCE_INSTALLEE) {
+                if (texteLower.contains(mot)) {
+                    return "Rapport évoque une 'tendance installée' alors que Java calcule un SURSAUT (< 1h depuis le premier choc confirmé)";
+                }
+            }
+        } else if (phase.equals(PHASE_TENDANCE_INSTALLEE)) {
+            for (String mot : MOTS_SURSAUT) {
+                if (texteLower.contains(mot)) {
+                    return "Rapport évoque un 'sursaut/réaction immédiate' alors que Java calcule une TENDANCE_INSTALLÉE (≥24h)";
+                }
+            }
+        }
+        return null;
+    }
     /**
      * Modifie l'état du régime de guerre (Sauvegarde persistante instantanée et Thread-Safe)
      */
