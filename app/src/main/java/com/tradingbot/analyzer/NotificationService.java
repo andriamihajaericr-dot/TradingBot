@@ -431,7 +431,10 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "5. USDJPY BULLISH → flux ne dit pas YEN FORT.\n" +
     "6. CORRÉLATION USDJPY/GBPUSD :\n" +
     "   - Régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires : USDJPY↑ = GBPUSD↓ et inversement.\n" +
-    "   - Régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire : les deux baissent en risk-off, les deux montent en risk-on.\n" +
+    "   - Régime GÉO avec choc d'offre RÉEL CONFIRMÉ (Étape 1a de la matrice GÉO, dollar renforcé par demande pétrole) " +
+    "     → traiter COMME un Régime DOLLAR : directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓).\n" +
+    "   - Régime RISK pur (GÉO SANS choc d'offre confirmé — simple tension verbale —, ou risk-off/risk-on général) " +
+    "     → même direction obligatoire : les deux baissent en risk-off, les deux montent en risk-on.\n" +
     "   - Divergence autorisée UNIQUEMENT si BoJ seul (GBPUSD neutre) ou BoE seul (USDJPY neutre).\n" +
     "7. Chaque actif : direction + mécanisme causal précis ≤8 mots. INTERDIT : 'pas de lien direct', 'même raisonnement', 'comme pour'.\n" +
     "DIRECTION OBLIGATOIRE : utiliser exclusivement 🟢 pour BULLISH, 🔴 pour BEARISH, NEUTRE pour neutre. Interdit d'écrire 'BULLISH', 'BEARISH', '↑', '↓', '='.\n" +
@@ -902,6 +905,14 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                             if (fiabilite >= 0) {
                                 footer.append("\n📊 Fiabilité historique source \"").append(sourceName)
                                       .append("\" : ").append(fiabilite).append("%");
+                            }
+                        
+                            // 🎯 Validation de cohérence interne : 6 actifs, texte/emoji, corrélation GOLD/USDJPY/GBPUSD
+                            EventValidator.CoherenceRapportResult coherence =
+                                EventValidator.validerCoherenceRapport(filteredMessage.toString());
+                            if (!coherence.estValide()) {
+                                Log.w(TAG, "⚠️ [COHÉRENCE] Rapport incohérent détecté (" + sourceName + ") : " + coherence.resume());
+                                footer.append("\n\n🔎 *Contrôle qualité* : ").append(coherence.resume());
                             }
                         
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
