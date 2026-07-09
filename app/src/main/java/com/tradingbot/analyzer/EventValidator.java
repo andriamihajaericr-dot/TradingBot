@@ -28,7 +28,142 @@ public class EventValidator {
         return recentFingerprints;
     }
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
-
+    // ============================================================
+    // 🎯 COHÉRENCE INTERNE DU RAPPORT — 6 actifs, texte/emoji, corrélation dollar
+    // ============================================================
+    private static final String[] SIX_ACTIFS_OBLIGATOIRES = {
+        "NASDAQ", "SP500", "GOLD", "USOIL", "USDJPY", "GBPUSD"
+    };
+    
+    private static final String[] MOTS_HAUSSE = {
+        "hausse", "augmentation", "monter", "monte", "renforce", "renforcé",
+        "s'envole", "grimpe", "progresse", "rebond", "dépasse"
+    };
+    private static final String[] MOTS_BAISSE = {
+        "baisse", "diminution", "chute", "recule", "affaiblit", "affaibli",
+        "perte de valeur", "pèse sur", "s'effondre", "en dessous"
+    };
+    
+    /** 🧪 Résultat complet de la validation de cohérence d'un rapport */
+    public static class CoherenceRapportResult {
+        public final List<String> actifsManquants = new ArrayList<>();
+        public final List<String> contradictionsTexteEmoji = new ArrayList<>();
+        public final List<String> contradictionsCorrelation = new ArrayList<>();
+        public final List<String> autoReferenceFlux = new ArrayList<>();
+    
+        public boolean estValide() {
+            return actifsManquants.isEmpty() && contradictionsTexteEmoji.isEmpty()
+                    && contradictionsCorrelation.isEmpty() && autoReferenceFlux.isEmpty();
+        }
+    
+        public String resume() {
+            StringBuilder sb = new StringBuilder();
+            if (!actifsManquants.isEmpty())
+                sb.append("⚠️ Actifs manquants: ").append(String.join(", ", actifsManquants)).append(". ");
+            if (!contradictionsTexteEmoji.isEmpty())
+                sb.append("⚠️ Texte/emoji: ").append(String.join(" | ", contradictionsTexteEmoji)).append(". ");
+            if (!contradictionsCorrelation.isEmpty())
+                sb.append("⚠️ Corrélation dollar: ").append(String.join(" | ", contradictionsCorrelation)).append(". ");
+            if (!autoReferenceFlux.isEmpty())
+                sb.append("⚠️ Flux auto-référencé: ").append(String.join(" | ", autoReferenceFlux)).append(". ");
+            return sb.toString().trim();
+        }
+    }
+    
+    /**
+     * 🎯 Validation complète : 6 actifs obligatoires, contradiction texte/emoji ligne par ligne,
+     * et cohérence de corrélation GOLD (inverse USD) / USDJPY (direct USD) / GBPUSD (inverse USD).
+     */
+    public static CoherenceRapportResult validerCoherenceRapport(String reportText) {
+        CoherenceRapportResult result = new CoherenceRapportResult();
+        if (reportText == null || reportText.isEmpty()) return result;
+    
+        String reportUpper = reportText.toUpperCase(java.util.Locale.ROOT);
+    
+        // 1️⃣ Présence des 6 actifs obligatoires
+        for (String actif : SIX_ACTIFS_OBLIGATOIRES) {
+            if (!reportUpper.contains(actif)) {
+                result.actifsManquants.add(actif);
+            }
+        }
+    
+        // 2️⃣ Contradiction texte/emoji, ligne par ligne + capture direction par actif
+        Map<String, String> directionParActif = new java.util.LinkedHashMap<>();
+        for (String ligneBrute : reportText.split("\n")) {
+            String ligne = ligneBrute.trim();
+            if (!ligne.startsWith("•")) continue;
+    
+            String actifDetecte = null;
+            String ligneUpper = ligne.toUpperCase(java.util.Locale.ROOT);
+            for (String actif : SIX_ACTIFS_OBLIGATOIRES) {
+                if (ligneUpper.contains(actif)) { actifDetecte = actif; break; }
+            }
+            if (actifDetecte == null) continue;
+    
+            boolean emojiHausse = ligne.contains("🟢");
+            boolean emojiBaisse = ligne.contains("🔴");
+            if (!emojiHausse && !emojiBaisse) continue;
+            directionParActif.put(actifDetecte, emojiHausse ? "🟢" : "🔴");
+    
+            String ligneLower = ligne.toLowerCase(java.util.Locale.ROOT);
+            boolean texteHausse = false, texteBaisse = false;
+            for (String mot : MOTS_HAUSSE) if (ligneLower.contains(mot)) { texteHausse = true; break; }
+            for (String mot : MOTS_BAISSE) if (ligneLower.contains(mot)) { texteBaisse = true; break; }
+    
+            if (emojiHausse && texteBaisse && !texteHausse) {
+                result.contradictionsTexteEmoji.add(actifDetecte + " : emoji 🟢 mais texte annonce une baisse");
+            }
+            if (emojiBaisse && texteHausse && !texteBaisse) {
+                result.contradictionsTexteEmoji.add(actifDetecte + " : emoji 🔴 mais texte annonce une hausse");
+            }
+        }
+    
+        // 3️⃣ Corrélation GOLD (inverse USD) / USDJPY (direct USD) / GBPUSD (inverse USD)
+        String goldDir   = directionParActif.get("GOLD");
+        String usdjpyDir = directionParActif.get("USDJPY");
+        String gbpusdDir = directionParActif.get("GBPUSD");
+    
+        boolean chocDollarExplicite = reportUpper.contains("USD RENFORC")
+                || reportUpper.contains("DOLLAR FORT") || reportUpper.contains("FLIGHT-TO-CASH")
+                || reportUpper.contains("DOLLAR RENFORC");
+    
+        // GOLD et USDJPY doivent normalement être opposés (l'un inverse-USD, l'autre direct-USD)
+        if (goldDir != null && usdjpyDir != null) {
+            boolean memesSens = goldDir.equals(usdjpyDir);
+            if (memesSens && !chocDollarExplicite) {
+                result.contradictionsCorrelation.add(String.format(
+                    "GOLD %s et USDJPY %s dans le même sens sans justification explicite d'un choc dollar (Étape 1) — " +
+                    "GOLD (inverse USD) et USDJPY (direct USD) devraient être opposés",
+                    goldDir, usdjpyDir));
+            }
+        }
+    
+        // Si dollar fort explicitement déclaré, USDJPY et GBPUSD doivent TOUS DEUX refléter un dollar fort
+        if (chocDollarExplicite && usdjpyDir != null && gbpusdDir != null) {
+            boolean usdjpyCoherent = "🟢".equals(usdjpyDir);  // dollar fort → USDJPY monte
+            boolean gbpusdCoherent = "🔴".equals(gbpusdDir);  // dollar fort → GBPUSD baisse
+            if (!usdjpyCoherent || !gbpusdCoherent) {
+                result.contradictionsCorrelation.add(
+                    "Régime dollar fort déclaré, mais USDJPY/GBPUSD n'affichent pas un dollar uniformément fort " +
+                    "(attendu USDJPY🟢 + GBPUSD🔴, obtenu USDJPY" + usdjpyDir + " + GBPUSD" + gbpusdDir + ")");
+            }
+        }
+    
+        // 4️⃣ Flux qui se justifie par lui-même au lieu du contenu de la news
+        String reportLower = reportText.toLowerCase(java.util.Locale.ROOT);
+        String[] motsAutoReference = {
+            "cohérent avec le flux précédent", "cohérent avec le driver dominant",
+            "maintenu, car", "flux précédent", "conformément au régime précédent"
+        };
+        for (String motCle : motsAutoReference) {
+            if (reportLower.contains(motCle)) {
+                result.autoReferenceFlux.add(
+                    "Le FLUX DOMINANT se justifie par lui-même/le régime précédent au lieu du contenu de la news actuelle (phrase : \"" + motCle + "\")");
+            }
+        }
+    
+        return result;
+    }
     // 🔄 ANTI-AMNÉSIE : Rechargement de la RAM depuis SQLite au démarrage du service
     // 🔄 ANTI-AMNÉSIE : Rechargement de la RAM depuis SQLite au démarrage du service
     public static void hydrateFromDatabase(Context context) {
