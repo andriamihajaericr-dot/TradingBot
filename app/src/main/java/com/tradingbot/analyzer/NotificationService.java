@@ -3355,60 +3355,84 @@ private void registerNetworkCallback() {
     // Méthode 2 — version avec prompt personnalisé (séparée, au même niveau)
     public String construirePromptFinalAvecPrompt(String evenementActuel,
                 List<String> historiqueRecent, String basePrompt) {
-            boolean alerteGéoMajeure = false;
-            String[] motsClesCrise = {
-                "hormuz", "ormuz", "détroit d'hormuz", "strait of hormuz",
-                "iran", "israel", "hezbollah", "houthi", "frappe militaire",
-                "airstrike", "missile", "drone attack", "riposte", "escalade",
-                "blocus", "blockade", "raid", "invasion"
+            boolean chocReelConfirme = false;
+            boolean simpleMentionGeo = false;
+    
+            // ⚠️ Mots qui confirment un IMPACT PHYSIQUE RÉEL sur l'offre d'énergie ou une action militaire actée
+            String[] motsClesConfirmation = {
+                "hormuz bloqué", "détroit d'hormuz bloqué", "strait of hormuz blocked",
+                "embargo appliqué", "coupure des exportations", "arrêt de la production",
+                "raffinerie touchée", "raffinerie frappée", "frappe confirmée",
+                "riposte militaire", "riposte confirmée", "frappe américaine",
+                "bombardement confirmé", "airstrike confirmed", "blocus effectif"
             };
+            // ℹ️ Mentions géopolitiques SANS confirmation d'impact réel (contexte seulement, ne force rien)
+            String[] motsClesMentionSimple = {
+                "hormuz", "ormuz", "iran", "israel", "hezbollah", "houthi",
+                "escalade", "tension", "menace", "pourrait", "risque de", "invasion"
+            };
+    
             String toutLeTexte = (evenementActuel != null ? evenementActuel.toLowerCase() : "");
             if (historiqueRecent != null) {
                 for (String hist : historiqueRecent) {
                     if (hist != null) toutLeTexte += " " + hist.toLowerCase();
                 }
             }
-            for (String mot : motsClesCrise) {
-                if (toutLeTexte.contains(mot)) { alerteGéoMajeure = true; break; }
+            for (String mot : motsClesConfirmation) {
+                if (toutLeTexte.contains(mot)) { chocReelConfirme = true; break; }
             }
+            for (String mot : motsClesMentionSimple) {
+                if (toutLeTexte.contains(mot)) { simpleMentionGeo = true; break; }
+            }
+    
             String directiveDeCrise = "";
-            if (alerteGéoMajeure) {
+            if (chocReelConfirme) {
                 directiveDeCrise =
-                    "⚠️ [ALERTE SYSTÈME : RÉGIME DE MARCHÉ EN MODE CRISE GÉOPOLITIQUE ACTIF]. " +
-                    "Appliquer immédiatement la CONTRAINTE 10.\n\n";
+                    "⚠️ [ALERTE SYSTÈME : CHOC D'OFFRE RÉEL CONFIRMÉ DÉTECTÉ]. " +
+                    "Appliquer l'EXCEPTION UNIQUE de la section HIÉRARCHIE (impact sur les 6 actifs) et la CONTRAINTE 10 " +
+                    "en évaluant le sens du dollar (Étape 1 de la matrice GÉO) avant de conclure sur GOLD.\n\n";
+            } else if (simpleMentionGeo) {
+                directiveDeCrise =
+                    "ℹ️ [CONTEXTE : mention géopolitique détectée SANS confirmation d'impact physique réel]. " +
+                    "Ne PAS appliquer l'exception de hiérarchie automatiquement — traiter selon le rang normal " +
+                    "(TACTIQUE), sauf si un autre driver de la note confirme un choc d'offre réel.\n\n";
             }
             // ✅ Utilise basePrompt (contient le guidage mathématique si présent)
             return directiveDeCrise + basePrompt;
     }
 
      // Méthode de vérification géographique des mots-clés
-     public String construirePromptQuotidienSystem(String registreDeLaJournee, String promptDeBase) {
-        boolean alerteGéoMajeure = false;
-        
-        // Liste enrichie des mots-clés de crise
-        String[] motsClesCrise = {
-            "hormuz", "ormuz", "détroit d'hormuz", "strait of hormuz",
-            "iran", "israel", "hezbollah", "houthi", "frappe militaire", 
-            "airstrike", "missile", "drone attack", "riposte", "escalade", 
-            "blocus", "blockade", "raid", "invasion"
+    public String construirePromptQuotidienSystem(String registreDeLaJournee, String promptDeBase) {
+        boolean chocReelConfirme = false;
+    
+        // ⚠️ Uniquement des mots qui confirment un impact physique réel sur 24h, pas une simple mention de pays
+        String[] motsClesConfirmation = {
+            "hormuz bloqué", "détroit d'hormuz bloqué", "strait of hormuz blocked",
+            "embargo appliqué", "coupure des exportations", "arrêt de la production",
+            "raffinerie touchée", "raffinerie frappée", "frappe confirmée",
+            "riposte militaire", "riposte confirmée", "frappe américaine",
+            "bombardement confirmé", "airstrike confirmed", "blocus effectif"
         };
     
         String toutLeTexte = (registreDeLaJournee != null) ? registreDeLaJournee.toLowerCase() : "";
-        for (String mot : motsClesCrise) {
+        for (String mot : motsClesConfirmation) {
             if (toutLeTexte.contains(mot)) {
-                alerteGéoMajeure = true;
+                chocReelConfirme = true;
                 break;
             }
         }
     
-        // Si un mot-clé de crise est détecté, on injecte une directive d'activation en tête de prompt
-        if (alerteGéoMajeure) {
+        if (chocReelConfirme) {
             String alerteFlash = 
-                "⚠️ [ALERTE SYSTÈME CRITIQUE : EXCEPTION DE CRISE ACTIVE].\n" +
-                "Le registre des dernières 24h fait état d'une ESCALADE MILITAIRE DIRECTE ou d'une MENACE SUR L'OFFRE (notamment Hormuz).\n" +
-                "CONSIGNE : Tu te trouves dans le cas d'exception absolue décrit à la section GÉOPOLITIQUE. Active immédiatement la matrice géopolitique prioritaire (Régime de dominance géopolitique sur l'inflation) pour l'alignement des 6 actifs et le fait marquant.\n\n";
+                "⚠️ [ALERTE SYSTÈME CRITIQUE : CHOC D'OFFRE RÉEL CONFIRMÉ SUR 24H].\n" +
+                "Le registre des dernières 24h fait état d'un IMPACT PHYSIQUE CONFIRMÉ sur l'offre d'énergie ou d'une action militaire actée.\n" +
+                "CONSIGNE : Applique l'EXCEPTION UNIQUE (section HIÉRARCHIE) pour les 6 actifs, en évaluant d'abord le sens du dollar " +
+                "(Étape 1 de la matrice GÉO) avant de conclure sur GOLD — jamais de refuge automatique.\n\n";
             return alerteFlash + promptDeBase;
         }
+    
+        return promptDeBase;
+    }
     
         // Sinon, on renvoie le prompt standard (la hiérarchie normale s'applique)
         return promptDeBase;
