@@ -67,7 +67,7 @@ public class NotificationService extends NotificationListenerService {
     private volatile long lastGeoTime = 0;
     // 🛡️ Compteur tokens Groq — protection quota TPD 100k/jour
     private static final int TOKEN_BUDGET_DAILY = 90000; // marge 10k de sécurité
-    private static final int TOKEN_ESTIMATE_PER_CALL = 1500; // estimation moyenne input+output
+    private static final int TOKEN_ESTIMATE_PER_CALL = 4000; // estimation moyenne input+output
     private static final AtomicInteger dailyTokensUsed = new AtomicInteger(0);
     private static long tokenResetTime = 0L; // minuit UTC du jour courant
     // Seuil minimal de prix pour considérer la donnée comme valide
@@ -773,7 +773,15 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     promptFinal += "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
                                    "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
                                    "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n" +
-                                   "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'";
+                                   "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'\n\n" +
+                                   "CHECKLIST OBLIGATOIRE GOLD/GÉO (à appliquer avant d'écrire GOLD) :\n" +
+                                   "ÉTAPE A — Le texte contient-il une preuve d'un choc d'offre RÉEL et CONFIRMÉ ?\n" +
+                                   "  (mots attendus : 'bloqué', 'fermé', 'frappe confirmée', 'embargo appliqué', 'coupure exportations', " +
+                                   "'raffinerie touchée', 'arrêt production', 'riposte', 'frappe américaine', 'bombardement')\n" +
+                                   "  → SI OUI (choc réel confirmé) : USD renforcé par demande pétrole ⇒ GOLD🔴 ou NEUTRE | USDJPY neutre/🟢 | GBPUSD🔴\n" +
+                                   "  → SI NON (menace/discours/'pourrait'/'risque de'/tension verbale seulement) : dollar stable/faible ⇒ GOLD🟢 | USDJPY🔴 | GBPUSD🔴\n" +
+                                   "ÉTAPE B — USOIL🟢 et NASDAQ🔴/SP500🔴 dans LES DEUX cas (choc d'offre = prix pétrole ↑ + risk-off actions).\n" +
+                                   "INTERDIT : écrire GOLD🟢 sans avoir vérifié l'ÉTAPE A. Jamais de règle par défaut automatique.";
                 } else {
                     jsonPayload.put("model", GROQ_MODEL);
                     jsonPayload.put("temperature", 0.02);
@@ -1014,40 +1022,18 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     }
     }
     // Seuil conviction plus élevé sur fallback — modèle léger moins fiable
-    
-boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
-if (fluxGeo) {
-    String fb = filteredFb.toString();
-    String fbLower = fallbackReport.toLowerCase();
-    // Détection riposte militaire USA — bilingue
-    boolean ripposteUSA =
-        fbLower.contains("riposte")
-        || fbLower.contains("frappe américaine")
-        || fbLower.contains("frappe militaire")
-        || fbLower.contains("trump ordonne")
-        || fbLower.contains("offensive américaine")
-        || fbLower.contains("bombardement")
-        || fbLower.contains("us strike")
-        || fbLower.contains("us attack")
-        || fbLower.contains("military response")
-        || fbLower.contains("pentagon")
-        || fbLower.contains("airstrike")
-        || fbLower.contains("air strike")
-        || fbLower.contains("missile strike")
-        || fbLower.contains("trump orders")
-        || fbLower.contains("retaliati")
-        || fbLower.contains("u.s. military")
-        || fbLower.contains("us military")
-        || fbLower.contains("american forces")
-        || fbLower.contains("armed response");
-    // GOLD : refuge sauf si riposte USA active (dollar domine)
-    if (!ripposteUSA)
-        fb = fb.replaceAll("(• 🏆 GOLD\\s*:\\s*)🔴", "$1🟢");
-    // USOIL/USDCAD/AUDUSD : toujours haussiers en crise GÉO
-    // USOIL : toujours haussier en crise GÉO
-    if (fb.contains("USOIL : 🔴"))  fb = fb.replace("• 🛢️ USOIL : 🔴",  "• 🛢️ USOIL : 🟢");
-    filteredFb = new StringBuilder(fb);
-     }
+  
+    boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
+    if (fluxGeo) {
+        // ✅ Le prompt fallback applique désormais lui-même la chaîne dollar (Étape 1/2/3).
+        // On ne force plus GOLD/USOIL en 🟢 — on laisse la sortie du modèle telle quelle
+        // pour respecter le raisonnement dollar-fort vs refuge.
+        if (fallbackReport.contains("USOIL : 🔴") && !fallbackReport.toLowerCase().contains("surplus")) {
+            // Garde uniquement un garde-fou soft : log si USOIL baisse malgré un choc d'offre confirmé, sans écraser
+            Log.w(TAG, "[FALLBACK] USOIL 🔴 en régime GÉO — à vérifier manuellement (pas de correction automatique).");
+        }
+    }
+
     int convFb = extrairePourcentageConviction(fallbackReport);
     // Vérifier cohérence vecteur/flux — rejeter si contradiction
     boolean vecteurGeo = fallbackReport.contains("VECTEUR CIBLE : GÉO") || fallbackReport.contains("VECTEUR CIBLE : GÉOPOLITIQUE");
