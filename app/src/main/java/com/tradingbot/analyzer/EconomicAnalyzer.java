@@ -34,20 +34,34 @@ public class EconomicAnalyzer {
      * Point d'entrée principal avec détection de la devise
      */
     public static EvaluationResult analyserEvenement(String title, String text) {
-    // 1. PATCH PRIORITÉ MAXIMALE : KEVIN WARSH
-    String combinedCheck = (title + " " + text).toUpperCase(Locale.ROOT);
+   String combinedCheck = (title + " " + text).toUpperCase(Locale.ROOT);
     if (combinedCheck.contains("WARSH")) {
+        // ⚠️ Mots confirmant un VRAI contenu de politique monétaire (pas une simple mention du nom)
+        String[] motsContenuPolitiqueMonetaire = {
+            "HAWKISH", "DOVISH", "TAUX", "RATE", "RESTRICTIF", "RESTRICTIVE", "ACCOMMODANT",
+            "INFLATION", "PRIX TROP ÉLEVÉS", "PRICES TOO HIGH", "HIKE", "CUT", "POLITIQUE MONÉTAIRE"
+        };
+        boolean contenuReelDetecte = false;
+        for (String mot : motsContenuPolitiqueMonetaire) {
+            if (combinedCheck.contains(mot)) { contenuReelDetecte = true; break; }
+        }
+    
         EvaluationResult warshResult = new EvaluationResult();
         warshResult.isParsed = true;
-        warshResult.deviation = 10; // Force un signal directionnel maximal (usage interne, hors échelle SQL)
-        // ⚠️ Plafonné à 5 (et non 10) : EventDatabase.driver_weight teste une égalité stricte "= 5"
-        // pour la rétention longue durée (45j) et le registre mensuel des piliers macro.
-        // Une valeur > 5 ne correspondrait à AUCUNE des conditions de purge ("< 5" ni "= 5") et
-        // l'événement resterait en base indéfiniment, hors de toute logique de rétention voulue.
-        warshResult.weight = 5; // Rang Suprême — aligné sur le palier maximal reconnu par EventDatabase
-        warshResult.directionText = "HAWKISH"; // Par défaut, Warsh est traité comme restrictif
-        warshResult.marketImpact = "HIGH_PRIORITY_FOMC_SIGNAL";
-        Log.e(TAG, "🚀 Signal prioritaire détecté : KEVIN WARSH. Bypass du parsing.");
+        // ✅ Priorité d'ATTENTION conservée (on veut toujours remonter les news Warsh en haut de pile)
+        // mais la DIRECTION n'est plus forcée en HAWKISH sans contenu réel.
+        warshResult.weight = contenuReelDetecte ? 5 : 3; // rang réduit si simple mention (nomination, etc.)
+        if (contenuReelDetecte) {
+            warshResult.deviation = 10;
+            warshResult.directionText = "HAWKISH";
+            warshResult.marketImpact = "HIGH_PRIORITY_FOMC_SIGNAL";
+            Log.e(TAG, "🚀 Signal prioritaire détecté : KEVIN WARSH avec contenu de politique monétaire confirmé.");
+        } else {
+            warshResult.deviation = 0;
+            warshResult.directionText = "NEUTRE";
+            warshResult.marketImpact = "WARSH_MENTION_SANS_CONTENU_POLITIQUE";
+            Log.w(TAG, "ℹ️ Mention de WARSH sans contenu de politique monétaire détecté (ex: nomination) — pas de biais HAWKISH forcé.");
+        }
         return warshResult;
     }
         EvaluationResult result = new EvaluationResult();
