@@ -27,7 +27,130 @@ public class EventValidator {
     public static Map<String, Long> getRecentFingerprints() {
         return recentFingerprints;
     }
+    // APRÈS
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
+
+    // ============================================================
+    // 🎯 FIABILITÉ DES SOURCES — Prédiction (🟢/🔴) vs Marché RÉEL
+    // ============================================================
+    private static final String RELIABILITY_PREFS = "SourceReliabilityPrefs";
+    private static final Map<String, Integer> sourceHits  = new ConcurrentHashMap<>();
+    private static final Map<String, Integer> sourceTotal = new ConcurrentHashMap<>();
+
+    /**
+     * 🔄 Recharge les scores de fiabilité par source depuis le stockage local
+     */
+    public static void hydrateSourceReliability(Context context) {
+        if (context == null) return;
+        try {
+            android.content.SharedPreferences prefs = context.getApplicationContext()
+                    .getSharedPreferences(RELIABILITY_PREFS, Context.MODE_PRIVATE);
+            Map<String, ?> all = prefs.getAll();
+            sourceHits.clear();
+            sourceTotal.clear();
+            for (Map.Entry<String, ?> e : all.entrySet()) {
+                if (!(e.getValue() instanceof Integer)) continue;
+                String key = e.getKey();
+                int val = (Integer) e.getValue();
+                if (key.endsWith("_hits"))  sourceHits.put(key.substring(0, key.length() - 5), val);
+                if (key.endsWith("_total")) sourceTotal.put(key.substring(0, key.length() - 6), val);
+            }
+            Log.d(TAG, "📦 [FIABILITÉ SOURCES] " + sourceTotal.size() + " sources restaurées.");
+        } catch (Exception e) {
+            Log.e(TAG, "⚠️ Échec du rechargement de la fiabilité des sources", e);
+        }
+    }
+
+    private static String normaliserSource(String source) {
+        if (source == null) return "inconnu";
+        return source.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
+    }
+
+    private static void persistSourceScore(Context context, String source, boolean correct) {
+        String key = normaliserSource(source);
+        sourceTotal.merge(key, 1, Integer::sum);
+        sourceHits.merge(key, correct ? 1 : 0, Integer::sum);
+
+        Context targetContext = (context != null) ? context : appContext;
+        if (targetContext == null) return;
+        try {
+            targetContext.getApplicationContext().getSharedPreferences(RELIABILITY_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt(key + "_hits",  sourceHits.getOrDefault(key, 0))
+                    .putInt(key + "_total", sourceTotal.getOrDefault(key, 0))
+                    .apply();
+        } catch (Exception e) {
+            Log.e(TAG, "⚠️ Échec sauvegarde score fiabilité pour " + key, e);
+        }
+    }
+
+    /**
+     * 📊 Taux de fiabilité historique d'une source (0-100), -1 si échantillon insuffisant (<3)
+     */
+    public static int getSourceReliability(String source) {
+        String key = normaliserSource(source);
+        int total = sourceTotal.getOrDefault(key, 0);
+        if (total < 3) return -1;
+        int hits = sourceHits.getOrDefault(key, 0);
+        return (int) Math.round((hits * 100.0) / total);
+    }
+
+    /** 🧪 Résultat de la validation d'un rapport contre les prix réels */
+    public static class MarketValidationResult {
+        public int checked = 0;
+        public int matched = 0;
+        public final List<String> contradictions = new ArrayList<>();
+
+        public String warningLine() {
+            if (contradictions.isEmpty()) return "";
+            return "⚠️ *CONTRADICTION MARCHÉ RÉEL* : " + String.join(" | ", contradictions);
+        }
+    }
+
+    /**
+     * 🎯 Compare chaque signal directionnel (🟢/🔴) du rapport IA au mouvement RÉEL
+     * du marché (cache TradingView) et met à jour le score de fiabilité de la source.
+     * Ex : rapport dit "GOLD 🟢" mais GOLD est réellement à -0.35% → contradiction, source pénalisée.
+     */
+    public static MarketValidationResult validateAgainstRealMarket(
+            Context context, String source, String reportText,
+            Map<String, TradingViewFetcher.TVMarketData> livePrices) {
+
+        MarketValidationResult result = new MarketValidationResult();
+        if (reportText == null || livePrices == null || livePrices.isEmpty()) return result;
+
+        for (String line : reportText.split("\n")) {
+            String trimmed = line.trim();
+            if (!trimmed.startsWith("•")) continue;
+            boolean predictedBullish = trimmed.contains("🟢");
+            boolean predictedBearish = trimmed.contains("🔴");
+            if (!predictedBullish && !predictedBearish) continue;
+
+            String upperLine = trimmed.toUpperCase(java.util.Locale.ROOT);
+            for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : livePrices.entrySet()) {
+                String asset = entry.getKey();
+                if (!upperLine.contains(asset.toUpperCase(java.util.Locale.ROOT))) continue;
+                TradingViewFetcher.TVMarketData data = entry.getValue();
+                if (data == null || data.changePercent == 0.0) continue;
+
+                boolean realBullish = data.changePercent > 0;
+                boolean predictionCorrect = (predictedBullish == realBullish);
+
+                result.checked++;
+                if (predictionCorrect) {
+                    result.matched++;
+                } else {
+                    result.contradictions.add(String.format(java.util.Locale.US,
+                            "%s prévu %s / réel %+.2f%%", asset,
+                            predictedBullish ? "🟢" : "🔴", data.changePercent));
+                }
+                persistSourceScore(context, source, predictionCorrect);
+                break;
+            }
+        }
+        return result;
+    }
+
     // ============================================================
     // 🎯 COHÉRENCE INTERNE DU RAPPORT — 6 actifs, texte/emoji, corrélation dollar
     // ============================================================
