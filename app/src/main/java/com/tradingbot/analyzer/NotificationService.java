@@ -417,8 +417,10 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "══════════════════════════════════════════════════════\n" +
     "BANQUES CENTRALES ÉTRANGÈRES\n" +
     "══════════════════════════════════════════════════════\n" +
-    "BoJ dovish → USDJPY↑ ; BoJ hawkish → USDJPY↓\n" +
-    "BoE dovish → GBPUSD↓ ; BoE hawkish → GBPUSD↑\n" +
+    "HAWKISH_BOJ → USDJPY↓ (yen se renforce) | DOVISH_BOJ → USDJPY↑\n" +
+    "HAWKISH_BOE → GBPUSD↑ (livre se renforce) | DOVISH_BOE → GBPUSD↓\n" +
+    "HAWKISH_ECB → EURUSD contextuel↑ (USD relativement plus faible face à l'euro) → calibrer GBPUSD légèrement ↑ " +
+    "(corrélation EUR/GBP) SEULEMENT si aucun driver BoE propre ce jour-là | DOVISH_ECB → inverse\n" +
     "EURUSD (CONTEXTE UNIQUEMENT) : EURUSD n'est pas un actif suivi. Si une donnée BCE/zone euro est fournie en contexte, utilise-la uniquement pour calibrer la cohérence directionnelle de GBPUSD (corrélation EUR/GBP), sans jamais l'afficher comme ligne séparée dans le rapport.\n" +
     "RÈGLE ABSOLUE : NASDAQ, SP500, GOLD, USOIL = NEUTRE pour toute news étrangère (sauf choc global explicite ou driver énergie/géo simultané).\n\n" +
     "══════════════════════════════════════════════════════\n" +
@@ -440,7 +442,14 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "DIRECTION OBLIGATOIRE : utiliser exclusivement 🟢 pour BULLISH, 🔴 pour BEARISH, NEUTRE pour neutre. Interdit d'écrire 'BULLISH', 'BEARISH', '↑', '↓', '='.\n" +
     "Lister uniquement les actifs impactés — omettre les NEUTRE.\n" +
     "8. Pas de doubles astérisques (**) – utiliser *simple*.\n" +
-    "9. VECTEUR CIBLE autorisé : HAWKISH, DOVISH, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
+    "9. VECTEUR CIBLE autorisé : HAWKISH_US, DOVISH_US, HAWKISH_ECB, DOVISH_ECB, HAWKISH_BOJ, DOVISH_BOJ, " +
+    "HAWKISH_BOE, DOVISH_BOE, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
+    "9bis. ROUTAGE OBLIGATOIRE : si le driver concerne la Fed/US → HAWKISH_US/DOVISH_US (matrice \"HAWKISH US\"). " +
+    "Si le driver concerne BCE/ECB/zone euro/PMI européen → HAWKISH_ECB/DOVISH_ECB. " +
+    "Si BoJ/Japon → HAWKISH_BOJ/DOVISH_BOJ. Si BoE/UK → HAWKISH_BOE/DOVISH_BOE. " +
+    "Pour CES 6 DERNIERS TAGS (toute banque centrale NON-Fed) : appliquer OBLIGATOIREMENT la section " +
+    "\"BANQUES CENTRALES ÉTRANGÈRES\" et la RÈGLE ABSOLUE (NASDAQ, SP500, GOLD, USOIL = NEUTRE, non listés, " +
+    "sauf choc global explicite) — NE JAMAIS appliquer la matrice \"HAWKISH US\"/\"DOVISH US\" à une banque centrale étrangère.\n" +
     "10. En cas de choc géopolitique énergétique, évaluer explicitement le sens du dollar (Étape 1 de la matrice GÉO) AVANT de conclure sur GOLD. N'écrire \"Régime Safe-Haven\" que si l'Étape 1 conclut à un dollar stable/faible — sinon écrire \"Régime Dollar Fort (demande pétrole)\".\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "FORMAT DE SORTIE OBLIGATOIRE\n" +
@@ -714,7 +723,19 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
 
     // Sécurisation anti-NullPointerException de la liste des actifs
     String assetsString = (enrichedAssets != null) ? enrichedAssets.toString() : "[]";
+ 
+    // APRÈS (version sûre, avec garde-fou isSupremeRank/calendrier)
+    if (!isSupremeRank && !EventValidator.estMaterielPourMarche(title, body)) {
+        // ⚠️ Garde-fou : isSupremeRank couvre aussi les événements de calendrier déjà validés
+        // (isCalendarIntercept) — on ne filtre JAMAIS un événement déjà pré-qualifié en amont,
+        // uniquement les news brutes non classées, pour éviter de perdre un vrai signal SUPRÊME.
+        Log.w(TAG, "🚫 [FILTRE PERTINENCE] News jugée sans lien matériel avec les 6 actifs — appel IA annulé : " + title);
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("🚫 [FILTRE] News hors-sujet ignorée : " + title);
+        return;
+    }
 
+    
     final String userContent = "CONTEXTE TEMPOREL : " + currentMadaTime + "\n"
             + "SOURCE DE LA NEWS : " + sourceName + "\n"
             + "TITRE : " + title + "\n"
@@ -913,6 +934,12 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                             if (!coherence.estValide()) {
                                 Log.w(TAG, "⚠️ [COHÉRENCE] Rapport incohérent détecté (" + sourceName + ") : " + coherence.resume());
                                 footer.append("\n\n🔎 *Contrôle qualité* : ").append(coherence.resume());
+                            }
+                        
+                            List<String> anomaliesChiffres = EventValidator.verifierActualVsForecast(body + " " + filteredMessage.toString());
+                            if (!anomaliesChiffres.isEmpty()) {
+                                Log.w(TAG, "⚠️ [ACTUAL/FORECAST] " + String.join(" | ", anomaliesChiffres));
+                                footer.append("\n\n🔢 *Alerte lecture chiffrée* : ").append(String.join(" | ", anomaliesChiffres));
                             }
                         
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
