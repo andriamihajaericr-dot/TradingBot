@@ -3428,7 +3428,13 @@ private void registerNetworkCallback() {
                 directiveDeCrise =
                     "⚠️ [ALERTE SYSTÈME : CHOC D'OFFRE RÉEL CONFIRMÉ DÉTECTÉ]. " +
                     "Appliquer l'EXCEPTION UNIQUE de la section HIÉRARCHIE (impact sur les 6 actifs) et la CONTRAINTE 10 " +
-                    "en évaluant le sens du dollar (Étape 1 de la matrice GÉO) avant de conclure sur GOLD.\n\n";
+                    "en évaluant le sens du dollar (Étape 1 de la matrice GÉO) avant de conclure sur GOLD.\n";
+    
+                String phaseTexte = EventValidator.getPhaseChocGeoTexte(NotificationService.this); // ✅ Context correct (méthode d'instance)
+                if (!phaseTexte.isEmpty()) {
+                    directiveDeCrise += phaseTexte + "\n";
+                }
+                directiveDeCrise += "\n";
             } else if (simpleMentionGeo) {
                 directiveDeCrise =
                     "ℹ️ [CONTEXTE : mention géopolitique détectée SANS confirmation d'impact physique réel]. " +
