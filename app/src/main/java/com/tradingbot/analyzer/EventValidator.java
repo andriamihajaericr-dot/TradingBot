@@ -43,6 +43,50 @@ public class EventValidator {
         "baisse", "diminution", "chute", "recule", "affaiblit", "affaibli",
         "perte de valeur", "pèse sur", "s'effondre", "en dessous"
     };
+
+   private static final java.util.regex.Pattern PATTERN_ACTUAL_VS_FORECAST = java.util.regex.Pattern.compile(
+        "(-?\\d+[.,]\\d+|-?\\d+)\\s*(?:\\(FORECAST\\s*(-?\\d+[.,]\\d+|-?\\d+)|\\(PREVISION[S]?\\s*(-?\\d+[.,]\\d+|-?\\d+))",
+        java.util.regex.Pattern.CASE_INSENSITIVE);
+    
+    private static final String[] MOTS_QUALIFIENT_DEPASSEMENT = {"dépassé", "dépasse", "au-dessus", "au dessus", "supérieur"};
+    private static final String[] MOTS_QUALIFIENT_MANQUE = {"en dessous", "inférieur", "manqué", "raté", "sous les"};
+    
+    /**
+     * 🎯 Vérifie la cohérence entre le verdict textuel ("a dépassé les prévisions") et les chiffres
+     * réellement cités dans le texte (actual vs forecast), pour éviter une lecture inversée (ex: 44 < 44.2
+     * qualifié à tort de "dépassement").
+     */
+    public static List<String> verifierActualVsForecast(String texte) {
+        List<String> anomalies = new ArrayList<>();
+        if (texte == null) return anomalies;
+    
+        java.util.regex.Matcher m = PATTERN_ACTUAL_VS_FORECAST.matcher(texte);
+        while (m.find()) {
+            try {
+                double actual = Double.parseDouble(m.group(1).replace(",", "."));
+                String forecastStr = m.group(2) != null ? m.group(2) : m.group(3);
+                if (forecastStr == null) continue;
+                double forecast = Double.parseDouble(forecastStr.replace(",", "."));
+    
+                String texteLower = texte.toLowerCase(java.util.Locale.ROOT);
+                boolean ditDepassement = false, ditManque = false;
+                for (String mot : MOTS_QUALIFIENT_DEPASSEMENT) if (texteLower.contains(mot)) { ditDepassement = true; break; }
+                for (String mot : MOTS_QUALIFIENT_MANQUE) if (texteLower.contains(mot)) { ditManque = true; break; }
+    
+                if (ditDepassement && actual < forecast) {
+                    anomalies.add(String.format(java.util.Locale.US,
+                        "Texte dit 'dépassé les prévisions' mais Actual %.2f < Forecast %.2f (c'est un MANQUÉ, pas un dépassement)",
+                        actual, forecast));
+                }
+                if (ditManque && actual > forecast) {
+                    anomalies.add(String.format(java.util.Locale.US,
+                        "Texte dit 'en dessous des prévisions' mais Actual %.2f > Forecast %.2f (c'est un DÉPASSEMENT, pas un manqué)",
+                        actual, forecast));
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+        return anomalies;
+    }
     
     /** 🧪 Résultat complet de la validation de cohérence d'un rapport */
     public static class CoherenceRapportResult {
