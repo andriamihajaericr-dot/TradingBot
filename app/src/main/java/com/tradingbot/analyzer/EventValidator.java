@@ -393,6 +393,7 @@ public class EventValidator {
         
         // 🌍 Étape A : Restaurer le régime géopolitique de guerre
         hydrateWarRegime(context);
+        hydrateSourceReliability(context);
         
         try {
             android.database.sqlite.SQLiteDatabase db = EventDatabase.getInstance(context).getReadableDatabase();
