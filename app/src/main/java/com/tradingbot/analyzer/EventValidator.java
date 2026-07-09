@@ -309,35 +309,95 @@ public class EventValidator {
     private static final String PREFS_NAME = "BotWarRegimePrefs";
     private static final String KEY_WAR_ACTIVE = "war_regime_active";
     private static final String KEY_WAR_TIMESTAMP = "war_activation_timestamp";
-
+    private static final String KEY_WAR_FIRST_TRIGGER = "war_first_trigger_timestamp"; // ✅ Nouveau : début réel du choc
+    
     private static volatile boolean isWarRegimeActive = false;
     private static volatile long lastWarShockTimestamp = 0;
+    private static volatile long firstWarShockTimestamp = 0; // ✅ Ne se réinitialise QUE quand le régime repasse à false
     private static final long WAR_REGIME_TTL_MS = 36 * 60 * 60 * 1000L; // 36 Heures de validité automatique avant extinction
+    
+    // ✅ Seuils de classification de la durée du choc géopolitique
+    private static final long SEUIL_SURSAUT_MS = 60 * 60 * 1000L;          // < 1h  : réaction algo/headline
+    private static final long SEUIL_CHOC_ACTIF_MS = 24 * 60 * 60 * 1000L;  // 1h-24h : choc confirmé toujours actif
+    // >= 24h : TENDANCE_INSTALLÉE
 
     /**
      * 🔄 Hydrate le régime de guerre depuis le stockage local (SharedPreferences) au réveil du bot
      */
-    public static void hydrateWarRegime(Context context) {
+   public static void hydrateWarRegime(Context context) {
         if (context == null) return;
         try {
             android.content.SharedPreferences prefs = context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             synchronized (EventValidator.class) {
                 isWarRegimeActive = prefs.getBoolean(KEY_WAR_ACTIVE, false);
                 lastWarShockTimestamp = prefs.getLong(KEY_WAR_TIMESTAMP, 0);
+                firstWarShockTimestamp = prefs.getLong(KEY_WAR_FIRST_TRIGGER, 0); // ✅
             }
             Log.d(TAG, "📦 [HYDRATATION GÉOPOLITIQUE] Régime de guerre restauré depuis le disque : " + isWarRegimeActive);
         } catch (Exception e) {
             Log.e(TAG, "⚠️ Échec du rechargement du régime de guerre", e);
         }
     }
-
+    
+    /** 🕒 Classification de la phase du choc géopolitique, basée sur le PREMIER déclenchement confirmé */
+    public static final String PHASE_SURSAUT = "SURSAUT";
+    public static final String PHASE_CHOC_ACTIF = "CHOC_ACTIF";
+    public static final String PHASE_TENDANCE_INSTALLEE = "TENDANCE_INSTALLEE";
+    public static final String PHASE_INACTIF = "INACTIF";
+    
+    public static synchronized String getPhaseChocGeo(Context context) {
+        if (!isWarRegimeActive(context) || firstWarShockTimestamp == 0) {
+            return PHASE_INACTIF;
+        }
+        long dureeEcoulee = System.currentTimeMillis() - firstWarShockTimestamp;
+        if (dureeEcoulee < SEUIL_SURSAUT_MS) return PHASE_SURSAUT;
+        if (dureeEcoulee < SEUIL_CHOC_ACTIF_MS) return PHASE_CHOC_ACTIF;
+        return PHASE_TENDANCE_INSTALLEE;
+    }
+    
+    /** 📝 Texte prêt à injecter dans le prompt, avec la durée exacte en heures/minutes */
+    public static synchronized String getPhaseChocGeoTexte(Context context) {
+        String phase = getPhaseChocGeo(context);
+        if (phase.equals(PHASE_INACTIF)) return "";
+    
+        long dureeMin = (System.currentTimeMillis() - firstWarShockTimestamp) / 60000L;
+        long heures = dureeMin / 60;
+        long minutes = dureeMin % 60;
+        String dureeStr = heures > 0 ? heures + "h" + String.format(java.util.Locale.US, "%02d", minutes) : minutes + "min";
+    
+        switch (phase) {
+            case PHASE_SURSAUT:
+                return "⏱️ Choc géopolitique confirmé depuis " + dureeStr + " (phase SURSAUT) — réaction encore possiblement " +
+                       "algorithmique/émotionnelle, risque de retournement ('sell the news') plus élevé, nuancer la conviction.";
+            case PHASE_CHOC_ACTIF:
+                return "⏱️ Choc géopolitique confirmé depuis " + dureeStr + " (phase CHOC_ACTIF) — la réaction initiale " +
+                       "s'est stabilisée, traiter comme un régime confirmé mais pas encore une tendance de fond.";
+            case PHASE_TENDANCE_INSTALLEE:
+                return "⏱️ Choc géopolitique confirmé depuis " + dureeStr + " (phase TENDANCE_INSTALLÉE) — traiter comme " +
+                       "une tendance de fond installée, pas un sursaut ponctuel.";
+            default:
+                return "";
+        }
+    }
     /**
      * Modifie l'état du régime de guerre (Sauvegarde persistante instantanée et Thread-Safe)
      */
-    public static synchronized void setWarRegime(Context context, boolean active) {
+   public static synchronized void setWarRegime(Context context, boolean active) {
+        long maintenant = System.currentTimeMillis();
+    
+        if (active) {
+            // ✅ On ne fixe le PREMIER déclenchement que s'il n'y en a pas déjà un en cours
+            // (c-à-d régime inactif jusqu'ici, ou compteur jamais initialisé)
+            if (!isWarRegimeActive || firstWarShockTimestamp == 0) {
+                firstWarShockTimestamp = maintenant;
+            }
+            lastWarShockTimestamp = maintenant; // ✅ Toujours rafraîchi (comportement TTL inchangé)
+        } else {
+            lastWarShockTimestamp = 0;
+            firstWarShockTimestamp = 0; // ✅ Reset uniquement à la vraie désactivation (ceasefire/TTL)
+        }
         isWarRegimeActive = active;
-        lastWarShockTimestamp = active ? System.currentTimeMillis() : 0;
-
+    
         Context targetContext = (context != null) ? context : appContext;
         if (targetContext != null) {
             try {
@@ -345,7 +405,8 @@ public class EventValidator {
                        .edit()
                        .putBoolean(KEY_WAR_ACTIVE, isWarRegimeActive)
                        .putLong(KEY_WAR_TIMESTAMP, lastWarShockTimestamp)
-                       .apply(); // Écriture asynchrone non-bloquante sur le disque
+                       .putLong(KEY_WAR_FIRST_TRIGGER, firstWarShockTimestamp) // ✅
+                       .apply();
             } catch (Exception e) {
                 Log.e(TAG, "⚠️ Échec de sauvegarde persistante du régime de guerre", e);
             }
