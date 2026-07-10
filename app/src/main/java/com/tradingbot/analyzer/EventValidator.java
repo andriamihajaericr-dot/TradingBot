@@ -301,7 +301,24 @@ public class EventValidator {
                 result.contradictionsTexteEmoji.add(actifDetecte + " : emoji 🔴 mais texte annonce une hausse");
             }
         }
-    
+        // AJOUT (dans validerCoherenceRapport, juste après la boucle des lignes • qui remplit directionParActif)
+
+        // Vérification fine GBPUSD : "livre/pound se renforce" doit être 🟢, jamais 🔴 (même si "baisse du dollar" apparaît dans la même phrase)
+        for (String ligneBrute : reportText.split("\n")) {
+            String ligne = ligneBrute.trim();
+            if (!ligne.toUpperCase(java.util.Locale.ROOT).contains("GBPUSD")) continue;
+            String ligneLower = ligne.toLowerCase(java.util.Locale.ROOT);
+            boolean livreSeRenforce = (ligneLower.contains("livre") || ligneLower.contains("pound") || ligneLower.contains("sterling"))
+                    && (ligneLower.contains("renforce") || ligneLower.contains("hausse") || ligneLower.contains("monte"));
+            boolean livreBaisse = (ligneLower.contains("livre") || ligneLower.contains("pound") || ligneLower.contains("sterling"))
+                    && (ligneLower.contains("affaiblit") || ligneLower.contains("baisse de la livre") || ligneLower.contains("chute"));
+            if (livreSeRenforce && ligne.contains("🔴")) {
+                result.contradictionsTexteEmoji.add("GBPUSD : texte dit 'la livre se renforce' mais emoji 🔴 (devrait être 🟢)");
+            }
+            if (livreBaisse && ligne.contains("🟢")) {
+                result.contradictionsTexteEmoji.add("GBPUSD : texte dit 'la livre s'affaiblit' mais emoji 🟢 (devrait être 🔴)");
+            }
+        }
         // 3️⃣ Corrélation GOLD (inverse USD) / USDJPY (direct USD) / GBPUSD (inverse USD)
         String goldDir   = directionParActif.get("GOLD");
         String usdjpyDir = directionParActif.get("USDJPY");
@@ -325,13 +342,13 @@ public class EventValidator {
         }
     
         // GOLD et USDJPY doivent normalement être opposés (l'un inverse-USD, l'autre direct-USD)
-        if (goldDir != null && usdjpyDir != null) {
+       if (goldDir != null && usdjpyDir != null) {
             boolean memesSens = goldDir.equals(usdjpyDir);
-            if (memesSens && !chocDollarExplicite) {
+            if (memesSens) {
                 result.contradictionsCorrelation.add(String.format(
-                    "GOLD %s et USDJPY %s dans le même sens sans justification explicite d'un choc dollar (Étape 1) — " +
-                    "GOLD (inverse USD) et USDJPY (direct USD) devraient être opposés",
-                    goldDir, usdjpyDir));
+                    "GOLD %s et USDJPY %s dans le même sens (%s) — " +
+                    "GOLD (inverse USD) et USDJPY (direct USD) devraient TOUJOURS être opposés, quel que soit le régime dollar",
+                    goldDir, usdjpyDir, chocDollarExplicite ? "régime dollar fort détecté" : "régime refuge/sans choc dollar"));
             }
         }
     
@@ -361,10 +378,7 @@ public class EventValidator {
         
         // 3️⃣bis Corrélation USOIL / choc d'offre confirmé — un choc d'offre doit faire monter USOIL, pas baisser
         String usoilDir = directionParActif.get("USOIL");
-        boolean chocOffreMentionne = reportLower0(reportText).contains("choc d'offre")
-                || reportLower0(reportText).contains("choc d’offre")
-                || reportLower0(reportText).contains("infrastructure pétrolière")
-                || reportLower0(reportText).contains("infrastructure gazière");
+        boolean chocOffreMentionne = chocDollarExplicite; // ✅ Réutilise la même détection élargie (point 1) — un seul vocabulaire, cohérent partout
         if (chocOffreMentionne && "🔴".equals(usoilDir)) {
             result.contradictionsCorrelation.add(
                 "USOIL🔴 alors qu'un 'choc d'offre confirmé' est mentionné dans le rapport — " +
