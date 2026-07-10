@@ -307,9 +307,22 @@ public class EventValidator {
         String usdjpyDir = directionParActif.get("USDJPY");
         String gbpusdDir = directionParActif.get("GBPUSD");
     
-        boolean chocDollarExplicite = reportUpper.contains("USD RENFORC")
-                || reportUpper.contains("DOLLAR FORT") || reportUpper.contains("FLIGHT-TO-CASH")
-                || reportUpper.contains("DOLLAR RENFORC");
+       
+        // ✅ Détection indépendante du choc réel confirmé — basée sur le CONTENU de la news (FAIT MARQUANT),
+        // pas sur ce que le modèle a choisi d'écrire comme mécanisme. Reprend/élargit les mots-clés de
+        // chocReelConfirme (NotificationService) pour que le validateur ne dépende jamais de la bonne
+        // volonté du modèle à nommer explicitement "dollar fort".
+        String[] motsChocOffreReelElargis = {
+            "usd renforc", "dollar fort", "flight-to-cash", "dollar renforc",
+            "raffinerie touchée", "raffinerie frappée", "attaque confirmée", "drone attack", "drones",
+            "frappe confirmée", "frappe militaire", "bombardement", "incendie", "perte de production",
+            "production perdue", "infrastructure pétrolière touchée", "infrastructure gazière touchée",
+            "embargo appliqué", "coupure des exportations", "arrêt de la production", "riposte militaire"
+        };
+        boolean chocDollarExplicite = false;
+        for (String mot : motsChocOffreReelElargis) {
+            if (reportLower0(reportText).contains(mot)) { chocDollarExplicite = true; break; }
+        }
     
         // GOLD et USDJPY doivent normalement être opposés (l'un inverse-USD, l'autre direct-USD)
         if (goldDir != null && usdjpyDir != null) {
