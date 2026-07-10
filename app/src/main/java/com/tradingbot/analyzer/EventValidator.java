@@ -352,29 +352,42 @@ public class EventValidator {
             }
         }
     
-        // Si dollar fort explicitement déclaré, USDJPY et GBPUSD doivent TOUS DEUX refléter un dollar fort
         boolean regimeGeo = reportUpper.contains("CRISE GÉOPOLITIQUE") || reportUpper.contains("VECTEUR CIBLE : GÉO");
+        // ✅ Élargi : la Contrainte #6 couvre "risk-off/risk-on général", pas seulement le GÉO
+        boolean regimeRiskGeneral = regimeGeo || reportUpper.contains("RISK-OFF") || reportUpper.contains("RISK-ON");
+        // ✅ Un driver Fed pur (HAWKISH_US/DOVISH_US) est TOUJOURS un régime DOLLAR — même sans mot-clé pétrole/géo dans le texte
+        boolean regimeDollarFort = chocDollarExplicite
+                || reportUpper.contains("VECTEUR CIBLE : HAWKISH_US") || reportUpper.contains("VECTEUR CIBLE: HAWKISH_US");
+        boolean regimeDollarFaible = reportUpper.contains("VECTEUR CIBLE : DOVISH_US") || reportUpper.contains("VECTEUR CIBLE: DOVISH_US");
     
         if (usdjpyDir != null && gbpusdDir != null) {
-            if (chocDollarExplicite) {
-                // Régime DOLLAR (Fed, ou GÉO avec choc d'offre confirmé) → directions INVERSES obligatoires
+            if (regimeDollarFort) {
+                // Dollar fort (Fed hawkish, ou choc d'offre GÉO confirmé) → USDJPY🟢 / GBPUSD🔴 obligatoire
                 boolean usdjpyCoherent = "🟢".equals(usdjpyDir);
                 boolean gbpusdCoherent = "🔴".equals(gbpusdDir);
                 if (!usdjpyCoherent || !gbpusdCoherent) {
                     result.contradictionsCorrelation.add(
-                        "Régime DOLLAR déclaré (Fed ou choc d'offre GÉO confirmé) : USDJPY/GBPUSD devraient être INVERSES " +
+                        "Régime DOLLAR FORT (Fed hawkish ou choc d'offre GÉO confirmé) : USDJPY/GBPUSD devraient être INVERSES " +
                         "(attendu USDJPY🟢 + GBPUSD🔴, obtenu USDJPY" + usdjpyDir + " + GBPUSD" + gbpusdDir + ")");
                 }
-            } else if (regimeGeo) {
-                // Régime RISK pur (GÉO sans choc d'offre confirmé) → MÊME direction obligatoire
+            } else if (regimeDollarFaible) {
+                // Dollar faible (Fed dovish) → USDJPY🔴 / GBPUSD🟢 obligatoire (sens inverse du cas précédent)
+                boolean usdjpyCoherent = "🔴".equals(usdjpyDir);
+                boolean gbpusdCoherent = "🟢".equals(gbpusdDir);
+                if (!usdjpyCoherent || !gbpusdCoherent) {
+                    result.contradictionsCorrelation.add(
+                        "Régime DOLLAR FAIBLE (Fed dovish) : USDJPY/GBPUSD devraient être INVERSES dans l'autre sens " +
+                        "(attendu USDJPY🔴 + GBPUSD🟢, obtenu USDJPY" + usdjpyDir + " + GBPUSD" + gbpusdDir + ")");
+                }
+            } else if (regimeRiskGeneral) {
+                // Régime RISK pur (GÉO sans choc d'offre confirmé, ou risk-off/risk-on général type TARIFS) → MÊME direction
                 if (!usdjpyDir.equals(gbpusdDir)) {
                     result.contradictionsCorrelation.add(
-                        "Régime RISK (GÉO sans choc d'offre confirmé) : USDJPY/GBPUSD devraient être dans le MÊME sens " +
+                        "Régime RISK (GÉO/risk-off/risk-on général) sans choc dollar : USDJPY/GBPUSD devraient être dans le MÊME sens " +
                         "(obtenu USDJPY" + usdjpyDir + " + GBPUSD" + gbpusdDir + " — divergence non justifiée par BoJ/BoE isolé)");
                 }
             }
-        }
-    
+        }    
         
         // 3️⃣bis Corrélation USOIL / choc d'offre confirmé — un choc d'offre doit faire monter USOIL, pas baisser
         String usoilDir = directionParActif.get("USOIL");
