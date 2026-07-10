@@ -362,7 +362,16 @@ public class EventValidator {
             if (reportLower.contains(motCle)) {
                 result.autoReferenceFlux.add(
                     "Le FLUX DOMINANT se justifie par lui-même/le régime précédent au lieu du contenu de la news actuelle (phrase : \"" + motCle + "\")");
+                break; // évite les doublons si plusieurs motifs matchent la même phrase
             }
+        }
+        // ✅ Détection robuste avec mots intercalés (ex: "cohérente avec le flux RISK-OFF précédent")
+        java.util.regex.Pattern patternAutoRefSouple = java.util.regex.Pattern.compile(
+            "coh[ée]rent[e]?\\s+avec\\s+le\\s+flux\\s+[\\wÀ-ÿ-]*\\s*précédent", java.util.regex.Pattern.CASE_INSENSITIVE);
+        if (patternAutoRefSouple.matcher(reportText).find() && result.autoReferenceFlux.isEmpty()) {
+            result.autoReferenceFlux.add(
+                "Le FAIT MARQUANT lui-même justifie la news par le flux précédent au lieu d'un mécanisme propre " +
+                "(ex: 'cohérente avec le flux RISK-OFF précédent')");
         }
     
         return result;
@@ -394,7 +403,73 @@ public class EventValidator {
         return "VECTEUR CIBLE : GÉO déclaré mais aucun mot-clé géopolitique réel détecté dans le texte " +
                "(pays, conflit, militaire, sanction...) — probable mislabeling d'une news non-géopolitique (ex: compliance interne).";
     }
-
+   private static final String[] VECTEURS_BANQUE_ETRANGERE = {
+        "HAWKISH_ECB", "DOVISH_ECB", "HAWKISH_BOJ", "DOVISH_BOJ", "HAWKISH_BOE", "DOVISH_BOE"
+    };
+    private static final String[] ACTIFS_US_INTERDITS_ETRANGER = { "NASDAQ", "SP500", "GOLD", "USOIL" };
+    private static final String[] MOTS_CHOC_GLOBAL_EXPLICITE = {
+        "choc global", "crise systémique", "contagion", "récession mondiale confirmée"
+    };
+    
+    /**
+     * 🎯 Vérifie la RÈGLE ABSOLUE : NASDAQ/SP500/GOLD/USOIL doivent être NEUTRES (absents) sur un driver
+     * de banque centrale étrangère (ECB/BoJ/BoE), sauf choc global explicitement mentionné.
+     */
+    public static List<String> verifierNeutraliteActifsUSSurBanqueEtrangere(String reportText) {
+        List<String> violations = new ArrayList<>();
+        if (reportText == null) return violations;
+    
+        String reportUpper = reportText.toUpperCase(java.util.Locale.ROOT);
+        boolean estBanqueEtrangere = false;
+        for (String vecteur : VECTEURS_BANQUE_ETRANGERE) {
+            if (reportUpper.contains("VECTEUR CIBLE : " + vecteur) || reportUpper.contains("VECTEUR CIBLE: " + vecteur)) {
+                estBanqueEtrangere = true;
+                break;
+            }
+        }
+        if (!estBanqueEtrangere) return violations;
+    
+        String reportLower = reportLower0(reportText);
+        for (String mot : MOTS_CHOC_GLOBAL_EXPLICITE) {
+            if (reportLower.contains(mot)) return violations; // choc global explicite : exception valide
+        }
+    
+        for (String actif : ACTIFS_US_INTERDITS_ETRANGER) {
+            // On cherche une ligne "• emoji ACTIF :" pour cet actif précis
+            if (reportUpper.matches("(?s).*•[^\\n]*" + actif + "[^\\n]*(🟢|🔴).*")) {
+                violations.add(actif + " listé sur un driver de banque centrale étrangère — devrait être NEUTRE/absent " +
+                        "(RÈGLE ABSOLUE) sauf choc global explicite");
+            }
+        }
+        return violations;
+    }
+    
+    /**
+     * 🎯 Détecte une contamination causale : un driver de banque centrale étrangère qui justifie
+     * un impact via un mécanisme "la Fed" (aucun canal de transmission direct plausible).
+     */
+    public static String verifierContaminationCausaleFed(String reportText) {
+        if (reportText == null) return null;
+        String reportUpper = reportText.toUpperCase(java.util.Locale.ROOT);
+    
+        boolean estBanqueEtrangere = false;
+        for (String vecteur : VECTEURS_BANQUE_ETRANGERE) {
+            if (reportUpper.contains("VECTEUR CIBLE : " + vecteur) || reportUpper.contains("VECTEUR CIBLE: " + vecteur)) {
+                estBanqueEtrangere = true;
+                break;
+            }
+        }
+        if (!estBanqueEtrangere) return null;
+    
+        String reportLower = reportLower0(reportText);
+        if (reportLower.contains("position de la fed") || reportLower.contains("politique de la fed")
+                || reportLower.contains("la fed pour") || reportLower.contains("renforce la fed")) {
+            return "Driver de banque centrale ÉTRANGÈRE (ECB/BoJ/BoE) mais la justification invoque un mécanisme " +
+                   "'la Fed' — aucun canal de transmission causal direct plausible entre une donnée étrangère isolée " +
+                   "et la politique de la Fed.";
+        }
+        return null;
+    }
     private static final String[] MOTS_CLES_ACTIFS_LEGITIMES = {
         // Fed / USD / taux
         "fed", "fomc", "powell", "warsh", "taux d'intérêt", "taux directeur", "cpi", "pce", "nfp", "gdp", "chômage",
