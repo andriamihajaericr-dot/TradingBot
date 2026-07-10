@@ -406,9 +406,10 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "  - USDJPY : cas (a) USD renforcé → USDJPY↑ ou neutre ; cas (b) dollar stable/faible → USDJPY↓ (yen refuge classique).\n" +
     "  - GBPUSD : miroir de USDJPY sur l'axe dollar (USD fort → GBPUSD↓ ; dollar stable/faible → GBPUSD↓ si risk-off pur, neutre/↑ seulement si le dollar faiblit franchement).\n" +
     "  - NASDAQ/SP500↓ dans les deux cas (risk-off + coût énergie pèse sur marges) ; si choc jugé transitoire et sans impact réel sur l'offre → impact limité, conviction FAIBLE.\n" +
-    "GÉO désescalade : le dollar revient à son régime pré-choc → GOLD↓ USOIL↓ NASDAQ↑ SP500↑ USDJPY↑ | FLUX : RISK-ON\n" +
+    "GÉO désescalade : le dollar revient à son régime pré-choc → GOLD↓ USOIL↓ NASDAQ↑ SP500↑ USDJPY↑ GBPUSD↑ (même sens que USDJPY, régime RISK-ON) | FLUX : RISK-ON\n" +
     "EIA déficit : USOIL↑ | EIA surplus : USOIL↓\n" +
-    "TARIFS escalade : USD↑ (rapatriement de capitaux, pas de canal pétrole) → NASDAQ↓ SP500↓ USOIL↓ USDJPY↓ GOLD↑ (ici le canal refuge domine, car pas de demande pétrole en USD) GBPUSD↓ | FLUX : RISK-OFF\n" +
+    "TARIFS escalade : Risk-off pur, PAS de choc dollar net (pas de canal pétrole/USD) → NASDAQ↓ SP500↓ USOIL↓ " +
+    "USDJPY↓ (yen refuge classique) GOLD↑ (canal refuge domine) GBPUSD↓ (même sens que USDJPY, régime RISK) | FLUX : RISK-OFF\n" +
     "CHINE forte : USOIL↑ NASDAQ↑ SP500↑ | FLUX : RISK-ON\n" +
     "SENTIMENT faible : NASDAQ↓ SP500↓ GOLD↑ USOIL↓ | FLUX : RISK-OFF MODÉRÉ\n" +
     "IPO majeure : NASDAQ↑ SP500↑ GOLD↓ USDJPY↓ | FLUX : RISK-ON\n" +
@@ -456,7 +457,11 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "d'une banque ou société) même si son nom apparaît à côté d'un contexte géopolitique par ailleurs — " +
     "classer plutôt en LIQUIDITÉ ou HAWKISH_US/DOVISH_US selon le mécanisme réel, ou ignorer si aucun lien matériel " +
     "avec les 6 actifs.\n" +
-    "10. En cas de choc géopolitique énergétique, évaluer explicitement le sens du dollar (Étape 1 de la matrice GÉO) AVANT de conclure sur GOLD. N'écrire \"Régime Safe-Haven\" que si l'Étape 1 conclut à un dollar stable/faible — sinon écrire \"Régime Dollar Fort (demande pétrole)\".\n\n" +
+    "10. En cas de choc géopolitique énergétique, évaluer explicitement le sens du dollar (Étape 1 de la matrice GÉO) AVANT de conclure sur GOLD. N'écrire \"Régime Safe-Haven\" que si l'Étape 1 conclut à un dollar stable/faible — sinon écrire \"Régime Dollar Fort (demande pétrole)\".\n" +
+    "11. INTERDIT : justifier le FLUX DOMINANT ou un FAIT MARQUANT par le régime précédent lui-même (phrases interdites : " +
+    "\"cohérent avec le flux précédent\", \"maintenu, car\", \"cohérent avec le driver dominant\"). " +
+    "Chaque FLUX DOMINANT doit se justifier UNIQUEMENT par le contenu de la news actuelle, même si la conclusion finale " +
+    "est la même que le régime précédent.\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "FORMAT DE SORTIE OBLIGATOIRE\n" +
     "══════════════════════════════════════════════════════\n" +
