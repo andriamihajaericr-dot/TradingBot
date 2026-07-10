@@ -802,7 +802,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     
                     jsonPayload.put("model", GROQ_MODEL_FALLBACK);
                     jsonPayload.put("temperature", 0.0);
-                    jsonPayload.put("max_tokens", 600);
+                    jsonPayload.put("max_tokens", 900);
                     
                     // ✅ CORRECTION DU CRASH : On injecte le rappel de format directement dans la variable String du prompt
                     promptFinal += "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
@@ -820,7 +820,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 } else {
                     jsonPayload.put("model", GROQ_MODEL);
                     jsonPayload.put("temperature", 0.02);
-                    jsonPayload.put("max_tokens", 600);
+                    jsonPayload.put("max_tokens", 900);
                 }
     
                 // Construction propre et sécurisée des messages JSON
@@ -1015,7 +1015,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 try {
                                     jsonPayload.put("model", GROQ_MODEL_FALLBACK);
                                     jsonPayload.put("temperature", 0.0);
-                                    jsonPayload.put("max_tokens", 600);
+                                    jsonPayload.put("max_tokens", 900);
                                     String contexteFallback = "";
                                     try {
                                 List<String> historiqueDb = db.obtenirTexteEvenementsRecents();
