@@ -249,9 +249,24 @@ public class EventValidator {
     
         String reportUpper = reportText.toUpperCase(java.util.Locale.ROOT);
     
-        // 1️⃣ Présence des 6 actifs obligatoires
+       // 1️⃣ Présence des 6 actifs obligatoires — SAUF omission légitime (banque centrale étrangère sans choc global)
+        boolean neutraliteLegitime = false;
+        for (String vecteur : VECTEURS_BANQUE_ETRANGERE) {
+            if (reportUpper.contains("VECTEUR CIBLE : " + vecteur) || reportUpper.contains("VECTEUR CIBLE: " + vecteur)) {
+                String reportLowerCheck = reportLower0(reportText);
+                boolean chocGlobal = false;
+                for (String mot : MOTS_CHOC_GLOBAL_EXPLICITE) {
+                    if (reportLowerCheck.contains(mot)) { chocGlobal = true; break; }
+                }
+                neutraliteLegitime = !chocGlobal;
+                break;
+            }
+        }
+    
         for (String actif : SIX_ACTIFS_OBLIGATOIRES) {
-            if (!reportUpper.contains(actif)) {
+            boolean estActifExempteBanqueEtrangere = neutraliteLegitime &&
+                    (actif.equals("NASDAQ") || actif.equals("SP500") || actif.equals("GOLD") || actif.equals("USOIL"));
+            if (!reportUpper.contains(actif) && !estActifExempteBanqueEtrangere) {
                 result.actifsManquants.add(actif);
             }
         }
