@@ -965,10 +965,17 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 footer.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutralite));
                             }
                         
+                           // APRÈS
                             String contaminationFed = EventValidator.verifierContaminationCausaleFed(filteredMessage.toString());
                             if (contaminationFed != null) {
                                 Log.w(TAG, "⚠️ [CONTAMINATION CAUSALE] " + contaminationFed);
                                 footer.append("\n\n🔗 *Alerte mécanisme causal* : ").append(contaminationFed);
+                            }
+                        
+                            List<String> duplications = EventValidator.verifierJustificationsDupliquees(filteredMessage.toString());
+                            if (!duplications.isEmpty()) {
+                                Log.w(TAG, "⚠️ [JUSTIFICATIONS DUPLIQUÉES] " + String.join(" | ", duplications));
+                                footer.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplications));
                             }
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
                             sendTelegramSecure(finalPayload, NotificationService.this);
