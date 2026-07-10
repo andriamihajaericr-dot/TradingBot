@@ -376,11 +376,12 @@ public class EventValidator {
     
         return result;
     }
-   
-   private static final String[] MOTS_GEO_LEGITIMES = {
-        "iran", "israel", "hormuz", "ormuz", "ukraine", "russie", "russia", "guerre", "war",
-        "frappe", "missile", "drone", "militaire", "military", "sanction", "embargo",
-        "otan", "nato", "hezbollah", "houthi", "conflit", "invasion", "cessez-le-feu", "trêve", "treve"
+  
+    private static final String[] MOTS_GEO_LEGITIMES = {
+        "iran", "israel", "hormuz", "ormuz", "ukrain", "russ" /* couvre russe/russie/russia */,
+        "guerre", "war", "frappe", "missile", "drone", "militair", "military", "sanction", "embargo",
+        "otan", "nato", "hezbollah", "houthi", "conflit", "invasion", "cessez-le-feu", "trêve", "treve",
+        "chine" /* tensions Taïwan/mer de Chine */, "taiwan", "corée du nord", "north korea"
     };
     
     /**
@@ -469,6 +470,59 @@ public class EventValidator {
                    "et la politique de la Fed.";
         }
         return null;
+    }
+
+     /**
+     * 🎯 Détecte les justifications quasi identiques copiées entre plusieurs actifs
+     * (viole la RÈGLE JUSTIFICATION existante : chaque actif doit avoir un mécanisme causal propre).
+     * Basé sur un score de similarité simple (mots communs / mots totaux) entre les segments de justification.
+     */
+    public static List<String> verifierJustificationsDupliquees(String reportText) {
+        List<String> duplications = new ArrayList<>();
+        if (reportText == null) return duplications;
+    
+        Map<String, String> justifParActif = new java.util.LinkedHashMap<>();
+        for (String ligneBrute : reportText.split("\n")) {
+            String ligne = ligneBrute.trim();
+            if (!ligne.startsWith("•")) continue;
+            int pipeIdx = ligne.indexOf('|');
+            if (pipeIdx < 0) continue;
+            String justif = ligne.substring(pipeIdx + 1).trim();
+    
+            String ligneUpper = ligne.toUpperCase(java.util.Locale.ROOT);
+            for (String actif : SIX_ACTIFS_OBLIGATOIRES) {
+                if (ligneUpper.contains(actif)) {
+                    justifParActif.put(actif, justif);
+                    break;
+                }
+            }
+        }
+    
+        List<String> actifs = new ArrayList<>(justifParActif.keySet());
+        for (int i = 0; i < actifs.size(); i++) {
+            for (int j = i + 1; j < actifs.size(); j++) {
+                String a = justifParActif.get(actifs.get(i)).toLowerCase(java.util.Locale.ROOT);
+                String b = justifParActif.get(actifs.get(j)).toLowerCase(java.util.Locale.ROOT);
+                double similarite = similariteMots(a, b);
+                if (similarite >= 0.70) { // 70%+ de mots communs = quasi copié-collé
+                    duplications.add(actifs.get(i) + " et " + actifs.get(j) +
+                            " ont des justifications quasi identiques (similarité " +
+                            Math.round(similarite * 100) + "%) — mécanisme non différencié par actif");
+                }
+            }
+        }
+        return duplications;
+    }
+    
+    private static double similariteMots(String a, String b) {
+        java.util.Set<String> motsA = new java.util.HashSet<>(java.util.Arrays.asList(a.split("\\s+")));
+        java.util.Set<String> motsB = new java.util.HashSet<>(java.util.Arrays.asList(b.split("\\s+")));
+        if (motsA.isEmpty() || motsB.isEmpty()) return 0.0;
+        java.util.Set<String> intersection = new java.util.HashSet<>(motsA);
+        intersection.retainAll(motsB);
+        java.util.Set<String> union = new java.util.HashSet<>(motsA);
+        union.addAll(motsB);
+        return union.isEmpty() ? 0.0 : (double) intersection.size() / union.size();
     }
     private static final String[] MOTS_CLES_ACTIFS_LEGITIMES = {
         // Fed / USD / taux
