@@ -450,6 +450,12 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "Pour CES 6 DERNIERS TAGS (toute banque centrale NON-Fed) : appliquer OBLIGATOIREMENT la section " +
     "\"BANQUES CENTRALES ÉTRANGÈRES\" et la RÈGLE ABSOLUE (NASDAQ, SP500, GOLD, USOIL = NEUTRE, non listés, " +
     "sauf choc global explicite) — NE JAMAIS appliquer la matrice \"HAWKISH US\"/\"DOVISH US\" à une banque centrale étrangère.\n" +
+    "9ter. VECTEUR CIBLE = GÉO est RÉSERVÉ aux événements géopolitiques réels : conflits armés, tensions inter-États, " +
+    "sanctions internationales, terrorisme, accords/ruptures diplomatiques majeures. " +
+    "NE JAMAIS classer en GÉO une décision interne d'entreprise (compliance, RH, gouvernance, politique commerciale " +
+    "d'une banque ou société) même si son nom apparaît à côté d'un contexte géopolitique par ailleurs — " +
+    "classer plutôt en LIQUIDITÉ ou HAWKISH_US/DOVISH_US selon le mécanisme réel, ou ignorer si aucun lien matériel " +
+    "avec les 6 actifs.\n" +
     "10. En cas de choc géopolitique énergétique, évaluer explicitement le sens du dollar (Étape 1 de la matrice GÉO) AVANT de conclure sur GOLD. N'écrire \"Régime Safe-Haven\" que si l'Étape 1 conclut à un dollar stable/faible — sinon écrire \"Régime Dollar Fort (demande pétrole)\".\n\n" +
     "══════════════════════════════════════════════════════\n" +
     "FORMAT DE SORTIE OBLIGATOIRE\n" +
@@ -941,14 +947,18 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 Log.w(TAG, "⚠️ [ACTUAL/FORECAST] " + String.join(" | ", anomaliesChiffres));
                                 footer.append("\n\n🔢 *Alerte lecture chiffrée* : ").append(String.join(" | ", anomaliesChiffres));
                             }
-                        
                             String anomaliePhase = EventValidator.verifierPhaseChocGeo(NotificationService.this, filteredMessage.toString());
                             if (anomaliePhase != null) {
                                 Log.w(TAG, "⚠️ [PHASE CHOC GÉO] " + anomaliePhase);
                                 footer.append("\n\n⏱️ *Alerte phase temporelle* : ").append(anomaliePhase);
                             }
                         
-                            String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
+                            String anomalieVecteurGeo = EventValidator.verifierVecteurGeoPertinent(filteredMessage.toString());
+                            if (anomalieVecteurGeo != null) {
+                                Log.w(TAG, "⚠️ [VECTEUR GÉO] " + anomalieVecteurGeo);
+                                footer.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeo);
+                            }
+                                                    String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
                             sendTelegramSecure(finalPayload, NotificationService.this);
                             // Extraire résumé directionnel pour affichage rappel inertie
                             StringBuilder impactResume = new StringBuilder();
