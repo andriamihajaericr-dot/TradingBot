@@ -236,7 +236,9 @@ public class EventValidator {
             return sb.toString().trim();
         }
     }
-    
+     private static String reportLower0(String s) {
+        return s == null ? "" : s.toLowerCase(java.util.Locale.ROOT);
+    }
     /**
      * 🎯 Validation complète : 6 actifs obligatoires, contradiction texte/emoji ligne par ligne,
      * et cohérence de corrélation GOLD (inverse USD) / USDJPY (direct USD) / GBPUSD (inverse USD).
@@ -328,6 +330,28 @@ public class EventValidator {
             }
         }
     
+        
+        // 3️⃣bis Corrélation USOIL / choc d'offre confirmé — un choc d'offre doit faire monter USOIL, pas baisser
+        String usoilDir = directionParActif.get("USOIL");
+        boolean chocOffreMentionne = reportLower0(reportText).contains("choc d'offre")
+                || reportLower0(reportText).contains("choc d’offre")
+                || reportLower0(reportText).contains("infrastructure pétrolière")
+                || reportLower0(reportText).contains("infrastructure gazière");
+        if (chocOffreMentionne && "🔴".equals(usoilDir)) {
+            result.contradictionsCorrelation.add(
+                "USOIL🔴 alors qu'un 'choc d'offre confirmé' est mentionné dans le rapport — " +
+                "un choc d'offre (frappe/blocage) doit normalement faire MONTER le prix du pétrole (USOIL🟢), pas baisser");
+        }
+    
+        // 3️⃣ter Règle par défaut USDJPY en régime RISK-OFF pur (sans choc dollar) : le yen doit se renforcer (USDJPY🔴)
+        boolean regimeRiskOffPur = (reportUpper.contains("RISK-OFF") || regimeGeo) && !chocDollarExplicite;
+        boolean driverBojMentionne = reportUpper.contains("BOJ") || reportUpper.contains("BANQUE DU JAPON");
+        if (regimeRiskOffPur && "🟢".equals(usdjpyDir) && !driverBojMentionne) {
+            result.contradictionsCorrelation.add(
+                "USDJPY🟢 en régime RISK-OFF pur sans choc dollar ni driver BoJ explicite — " +
+                "le yen devrait se renforcer comme refuge classique (USDJPY🔴 attendu)");
+        }
+    
         // 4️⃣ Flux qui se justifie par lui-même au lieu du contenu de la news
         String reportLower = reportText.toLowerCase(java.util.Locale.ROOT);
         String[] motsAutoReference = {
@@ -343,7 +367,33 @@ public class EventValidator {
     
         return result;
     }
-    // AJOUT (nouveau bloc, après validerCoherenceRapport)
+   
+   private static final String[] MOTS_GEO_LEGITIMES = {
+        "iran", "israel", "hormuz", "ormuz", "ukraine", "russie", "russia", "guerre", "war",
+        "frappe", "missile", "drone", "militaire", "military", "sanction", "embargo",
+        "otan", "nato", "hezbollah", "houthi", "conflit", "invasion", "cessez-le-feu", "trêve", "treve"
+    };
+    
+    /**
+     * 🎯 Vérifie que le VECTEUR CIBLE : GÉO déclaré est justifié par un vrai contenu géopolitique
+     * dans le FAIT MARQUANT — évite le mislabeling (ex: décision de compliance interne d'une banque
+     * classée à tort comme GÉO).
+     */
+    public static String verifierVecteurGeoPertinent(String reportText) {
+        if (reportText == null) return null;
+        String reportUpper = reportText.toUpperCase(java.util.Locale.ROOT);
+        if (!reportUpper.contains("VECTEUR CIBLE : GÉO") && !reportUpper.contains("VECTEUR CIBLE: GÉO")) {
+            return null; // pas de vecteur GÉO déclaré, rien à vérifier
+        }
+    
+        String reportLower = reportLower0(reportText);
+        for (String mot : MOTS_GEO_LEGITIMES) {
+            if (reportLower.contains(mot)) return null; // légitime, un vrai mot-clé géopolitique est présent
+        }
+    
+        return "VECTEUR CIBLE : GÉO déclaré mais aucun mot-clé géopolitique réel détecté dans le texte " +
+               "(pays, conflit, militaire, sanction...) — probable mislabeling d'une news non-géopolitique (ex: compliance interne).";
+    }
 
     private static final String[] MOTS_CLES_ACTIFS_LEGITIMES = {
         // Fed / USD / taux
