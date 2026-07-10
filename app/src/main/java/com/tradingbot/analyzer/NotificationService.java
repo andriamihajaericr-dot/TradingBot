@@ -958,7 +958,19 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 Log.w(TAG, "⚠️ [VECTEUR GÉO] " + anomalieVecteurGeo);
                                 footer.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeo);
                             }
-                                                    String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
+                        
+                            List<String> violationsNeutralite = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(filteredMessage.toString());
+                            if (!violationsNeutralite.isEmpty()) {
+                                Log.w(TAG, "⚠️ [NEUTRALITÉ US] " + String.join(" | ", violationsNeutralite));
+                                footer.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutralite));
+                            }
+                        
+                            String contaminationFed = EventValidator.verifierContaminationCausaleFed(filteredMessage.toString());
+                            if (contaminationFed != null) {
+                                Log.w(TAG, "⚠️ [CONTAMINATION CAUSALE] " + contaminationFed);
+                                footer.append("\n\n🔗 *Alerte mécanisme causal* : ").append(contaminationFed);
+                            }
+                            String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
                             sendTelegramSecure(finalPayload, NotificationService.this);
                             // Extraire résumé directionnel pour affichage rappel inertie
                             StringBuilder impactResume = new StringBuilder();
