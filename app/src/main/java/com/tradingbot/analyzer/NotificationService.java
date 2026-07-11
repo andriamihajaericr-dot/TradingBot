@@ -428,6 +428,9 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "CONTRAINTES ABSOLUES\n" +
     "══════════════════════════════════════════════════════\n" +
     "1. Analyser uniquement les actifs impactés par le driver. Omettre les actifs NEUTRE — ne pas les lister.\n" +
+    "1bis. Si AUCUN actif n'est significativement impacté (proposition non confirmée, pas de choc réel, impact négligeable), " +
+    "la section IMPACTS ACQUISITION ne doit JAMAIS rester vide : écrire une seule ligne " +
+    "'• ⚪ AUCUN IMPACT SIGNIFICATIF | [raison ≤10 mots]' à la place des 6 lignes normales.\n" +
     "2. NASDAQ = SP500 (même direction).\n" +
     "3. Un seul 📢 dans toute la réponse.\n" +
     "4. USDJPY BEARISH → flux ne dit pas DOLLAR FORT.\n" +
