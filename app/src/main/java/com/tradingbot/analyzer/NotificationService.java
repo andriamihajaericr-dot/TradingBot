@@ -568,12 +568,12 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "DICTIONNAIRE MÉCANISMES PAR ACTIF (utiliser exclusivement ces termes) :\n" +
    "NASDAQ : re-pricing multiple croissance | compression valorisation tech | risk appetite dégradé\n" +
     "SP500 : prime de risque equity élargie | flux risk-off vers obligations | révision bénéfices à la baisse\n" +
-    "GOLD : défaut GÉO Iran/Hormuz = GOLD🟢 refuge | riposte USA confirmée = GOLD🔴 court terme | taux réels négatifs soutiennent\n" +
+    "GOLD : choc offre confirmé = dollar fort pèse sur l'or | escalade verbale seule = refuge classique soutient | taux réels négatifs soutiennent\n" +
     "USOIL : prime offre Hormuz activée | stocks EIA inférieurs attentes | demande Chine révisée\n" +
     "USDJPY : désengagement carry trade JPY | flux refuge compressent le cross | différentiel BoJ-Fed déterminant\n" +
     "CORRÉLATION USDJPY/GBPUSD : " +
-    "En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
-    "En régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire (les deux baissent en risk-off, les deux montent en risk-on). " +
+    "Régime DOLLAR (Fed HAWKISH/DOVISH_US, OU GÉO avec choc offre confirmé) → INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
+    "Régime RISK (GÉO sans choc confirmé, risk-off/risk-on général) → MÊME direction obligatoire. " +
     "Divergence possible UNIQUEMENT si BoJ seul (neutre GBPUSD) ou BoE seul (neutre USDJPY).\n" +
     "GBPUSD : contexte macro UK détériore GBP | BoE diverge de la Fed | risk-off comprime les paires risquées | corrélation EURUSD confirme la direction\n" +
     "FORMAT STRICT :\n" +
@@ -581,7 +581,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "🚨 [SOURCE]\n" +
     "🕒 [Date/Heure Madagascar]\n" +
     "📊 CONVICTION : [JAUGE] XX%\n" +
-    "🎯 VECTEUR CIBLE : [HAWKISH/DOVISH/GÉO/TARIFS/CHINE/LIQUIDITÉ]\n" +
+    "🎯 VECTEUR CIBLE : [HAWKISH_US/DOVISH_US/HAWKISH_ECB/DOVISH_ECB/HAWKISH_BOJ/DOVISH_BOJ/HAWKISH_BOE/DOVISH_BOE/GÉO/TARIFS/CHINE/LIQUIDITÉ]\n" +
     "📢 [FAIT MARQUANT : identifier clairement le driver dominant et l'arbitrage éventuel]\n" +
     "--- IMPACTS ACQUISITION ---\n" +
     "• 💻 NASDAQ : [🟢/🔴/NEUTRE] | [mécanisme ≤8 mots]\n" +
