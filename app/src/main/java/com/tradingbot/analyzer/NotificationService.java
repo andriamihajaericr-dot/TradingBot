@@ -1115,6 +1115,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         }
     }
 
+           // APRÈS
     int convFb = extrairePourcentageConviction(fallbackReport);
     // Vérifier cohérence vecteur/flux — rejeter si contradiction
     boolean vecteurGeo = fallbackReport.contains("VECTEUR CIBLE : GÉO") || fallbackReport.contains("VECTEUR CIBLE : GÉOPOLITIQUE");
@@ -1126,7 +1127,45 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("⚪ [FALLBACK] Contradiction régime — ignoré.");
     } else if (convFb >= 55 || (isSupremeRank && convFb >= 45)) {
-        sendTelegramSecure("⚡ *[ANALYSE FONDAMENTALE]* " + filteredFb.toString().trim(), NotificationService.this);
+        // 🎯 Contrôle qualité fallback — même batterie de 8 checks que le chemin principal,
+        // appliquée sur filteredFb (variable propre au fallback) au lieu de filteredMessage.
+        StringBuilder footerFb = new StringBuilder();
+
+        EventValidator.MarketValidationResult marketCheckFb =
+            EventValidator.validateAgainstRealMarket(NotificationService.this, sourceName, filteredFb.toString(), cachedMarketData);
+        int fiabiliteFb = EventValidator.getSourceReliability(sourourceName);
+        if (!marketCheckFb.contradictions.isEmpty()) footerFb.append("\n\n").append(marketCheckFb.warningLine());
+        if (fiabiliteFb >= 0) footerFb.append("\n📊 Fiabilité source \"").append(sourceName).append("\" : ").append(fiabiliteFb).append("%");
+
+        EventValidator.CoherenceRapportResult coherenceFb = EventValidator.validerCoherenceRapport(filteredFb.toString());
+        if (!coherenceFb.estValide()) {
+            Log.w(TAG, "⚠️ [FALLBACK COHÉRENCE] " + coherenceFb.resume());
+            footerFb.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceFb.resume());
+        }
+
+        List<String> anomaliesChiffresFb = EventValidator.verifierActualVsForecast(filteredFb.toString());
+        if (!anomaliesChiffresFb.isEmpty()) footerFb.append("\n\n🔢 *Alerte lecture chiffrée* : ").append(String.join(" | ", anomaliesChiffresFb));
+
+        String anomaliePhaseFb = EventValidator.verifierPhaseChocGeo(NotificationService.this, filteredFb.toString());
+        if (anomaliePhaseFb != null) footerFb.append("\n\n⏱️ *Alerte phase temporelle* : ").append(anomaliePhaseFb);
+
+        String anomalieVecteurGeoFb = EventValidator.verifierVecteurGeoPertinent(filteredFb.toString());
+        if (anomalieVecteurGeoFb != null) footerFb.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoFb);
+
+        List<String> violationsNeutraliteFb = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(filteredFb.toString());
+        if (!violationsNeutraliteFb.isEmpty()) footerFb.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteFb));
+
+        String contaminationFedFb = EventValidator.verifierContaminationCausaleFed(filteredFb.toString());
+        if (contaminationFedFb != null) footerFb.append("\n\n🔗 *Alerte mécanisme causal* : ").append(contaminationFedFb);
+
+        List<String> duplicationsFb = EventValidator.verifierJustificationsDupliquees(filteredFb.toString());
+        if (!duplicationsFb.isEmpty()) footerFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsFb));
+
+        EventValidator.CroisementTechniqueResult croisementTechFb =
+            EventValidator.verifierCroisementTechnique(filteredFb.toString(), cachedMarketData);
+        if (!croisementTechFb.estValide()) footerFb.append("\n\n📉 *Alerte marché réel* : ").append(croisementTechFb.resume());
+
+        sendTelegramSecure("⚡ *[ANALYSE FONDAMENTALE]* " + filteredFb.toString().trim() + footerFb, NotificationService.this);
     } else {
         Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — ignoré.");
         if (MainActivity.instance != null)
