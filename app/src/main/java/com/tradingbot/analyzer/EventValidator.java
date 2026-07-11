@@ -401,6 +401,49 @@ public static CroisementTechniqueResult verifierCroisementTechnique(
                 result.contradictionsTexteEmoji.add("GBPUSD : texte dit 'la livre s'affaiblit' mais emoji 🟢 (devrait être 🔴)");
             }
         }
+        // AJOUT (juste après le bloc "livreSeRenforce"/"livreBaisse" existant, ligne ~396)
+
+    // Pattern refuge : "refuge classique"/"valeur refuge" est TOUJOURS haussier par nature —
+    // emoji 🔴 sur une ligne qui invoque le refuge = contradiction directe, peu importe le régime dollar.
+    for (String ligneBrute : reportText.split("\n")) {
+        String ligne = ligneBrute.trim();
+        if (!ligne.startsWith("•")) continue;
+        String ligneLowerRefuge = ligne.toLowerCase(java.util.Locale.ROOT);
+        boolean invoqueRefuge = false;
+        for (String mot : MOTS_REFUGE) {
+            if (ligneLowerRefuge.contains(mot)) { invoqueRefuge = true; break; }
+        }
+        if (invoqueRefuge && ligne.contains("🔴")) {
+            String actifDeLaLigne = "actif";
+            String ligneUpperRefuge = ligne.toUpperCase(java.util.Locale.ROOT);
+            for (String actif : SIX_ACTIFS_OBLIGATOIRES) {
+                if (ligneUpperRefuge.contains(actif)) { actifDeLaLigne = actif; break; }
+            }
+            result.contradictionsTexteEmoji.add(actifDeLaLigne +
+                " : texte invoque 'refuge classique/valeur refuge' mais emoji 🔴 — un refuge est par nature haussier (🟢 attendu)");
+        }
+    }
+
+    // Pattern "pas d'impact direct" mais emoji directionnel quand même — devrait être NEUTRE/omis (Contrainte #1)
+    String[] motsAucunImpact = {"pas d'impact direct", "aucun impact direct", "n'a pas d'impact", "sans impact direct"};
+    for (String ligneBrute : reportText.split("\n")) {
+        String ligne = ligneBrute.trim();
+        if (!ligne.startsWith("•")) continue;
+        String ligneLowerImpact = ligne.toLowerCase(java.util.Locale.ROOT);
+        boolean ditAucunImpact = false;
+        for (String mot : motsAucunImpact) {
+            if (ligneLowerImpact.contains(mot)) { ditAucunImpact = true; break; }
+        }
+        if (ditAucunImpact && (ligne.contains("🟢") || ligne.contains("🔴"))) {
+            String actifDeLaLigne = "actif";
+            String ligneUpperImpact = ligne.toUpperCase(java.util.Locale.ROOT);
+            for (String actif : SIX_ACTIFS_OBLIGATOIRES) {
+                if (ligneUpperImpact.contains(actif)) { actifDeLaLigne = actif; break; }
+            }
+            result.contradictionsTexteEmoji.add(actifDeLaLigne +
+                " : texte dit 'pas d'impact direct' mais un emoji directionnel est quand même affiché (devrait être NEUTRE/omis, Contrainte #1)");
+        }
+    }
         // 3️⃣ Corrélation GOLD (inverse USD) / USDJPY (direct USD) / GBPUSD (inverse USD)
         String goldDir   = directionParActif.get("GOLD");
         String usdjpyDir = directionParActif.get("USDJPY");
