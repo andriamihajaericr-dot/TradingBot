@@ -532,6 +532,40 @@ public static CroisementTechniqueResult verifierCroisementTechnique(
                 "USOIL🔴 alors qu'un 'choc d'offre confirmé' est mentionné dans le rapport — " +
                 "un choc d'offre (frappe/blocage) doit normalement faire MONTER le prix du pétrole (USOIL🟢), pas baisser");
         }
+        // AJOUT corrigé (à insérer entre la ligne 534 et 536)
+
+    // ✅ Invariant matriciel : en régime GÉO pur (escalade, même non confirmée), USOIL doit rester 🟢
+    // (prime de tension), sauf désescalade explicite.
+    boolean regimeGeoPurSansChoc = regimeGeo && !chocDollarExplicite;
+    boolean deseacaladeExplicite = reportLower0(reportText).contains("désescalade") || reportLower0(reportText).contains("accord confirmé")
+            || reportLower0(reportText).contains("cessez-le-feu") || reportLower0(reportText).contains("trêve confirmée");
+    if (regimeGeoPurSansChoc && "🔴".equals(usoilDir) && !deseacaladeExplicite) {
+        result.contradictionsCorrelation.add(
+            "USOIL🔴 en régime GÉO (escalade, choc non confirmé) sans désescalade explicite — " +
+            "la matrice attend USOIL🟢 (prime de tension) dans ce cas, obtenu 🔴");
+    }
+
+    // ✅ Auto-contradiction : FAIT MARQUANT dit "escalade" mais une ligne d'actif dit "désactivée/apaisée"
+    boolean faitMarquantEscalade = reportLower0(reportText).contains("escalade");
+    String[] motsDeseacaladeLigne = {"désactivée", "désactivé", "apaisée", "apaisé", "neutralisée", "neutralisé", "levée"};
+    for (String ligneBrute : reportText.split("\n")) {
+        String ligne = ligneBrute.trim();
+        if (!ligne.startsWith("•")) continue;
+        String ligneLower = ligne.toLowerCase(java.util.Locale.ROOT);
+        boolean ligneDeseacalade = false;
+        for (String mot : motsDeseacaladeLigne) {
+            if (ligneLower.contains(mot)) { ligneDeseacalade = true; break; }
+        }
+        if (faitMarquantEscalade && ligneDeseacalade) {
+            String actifDeLaLigne = "actif";
+            String ligneUpper = ligne.toUpperCase(java.util.Locale.ROOT);
+            for (String actif : SIX_ACTIFS_OBLIGATOIRES) {
+                if (ligneUpper.contains(actif)) { actifDeLaLigne = actif; break; }
+            }
+            result.contradictionsTexteEmoji.add(actifDeLaLigne +
+                " : FAIT MARQUANT dit 'escalade' mais cette ligne invoque une désactivation/apaisement — contradiction interne");
+        }
+    }
     
         // 3️⃣ter Règle par défaut USDJPY en régime RISK-OFF pur (sans choc dollar) : le yen doit se renforcer (USDJPY🔴)
         boolean regimeRiskOffPur = (reportUpper.contains("RISK-OFF") || regimeGeo) && !chocDollarExplicite;
