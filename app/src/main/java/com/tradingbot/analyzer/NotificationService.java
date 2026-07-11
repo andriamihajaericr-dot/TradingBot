@@ -2559,11 +2559,12 @@ for (String asset : twelveAssets) {
             return false;
         }
         // =========================================================================
-
-        Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser");
-
-        // PROMPT SYSTEME STRUCTURÉ DU BRIEFING DAILY (S'exécute uniquement si dailyDrivers n'est pas vide)
-                // Utilisation du prompt compact V3 pour le Daily Report
+        Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser (avant plafonnement)");
+        final int MAX_DAILY_DRIVERS_CHARS = 20000; // ✅ ~6000 tokens, marge large avant tout risque de 413
+        if (dailyDrivers.length() > MAX_DAILY_DRIVERS_CHARS) {
+             Log.w(TAG, "[DAILY] dailyDrivers tronqué : " + dailyDrivers.length() + " → " + MAX_DAILY_DRIVERS_CHARS + " caractères");
+             dailyDrivers = dailyDrivers.substring(0, MAX_DAILY_DRIVERS_CHARS) + "\n[...tronqué, voir événements les plus récents ci-dessus...]";
+        }
         String baseSystemPrompt = DAILY_SYSTEM_PROMPT;
         // Ajout de la directive de crise géopolitique si nécessaire
         baseSystemPrompt = construirePromptQuotidienSystem(dailyDrivers, baseSystemPrompt);
