@@ -756,11 +756,12 @@ public class TradingViewFetcher {
                                     double pmh  = pmhCache.getOrDefault(key, 0.0);
                                     double pml  = pmlCache.getOrDefault(key, 0.0);
             
+                                    double volumeTick = v.optDouble("volume", 0); // ✅ expérimental — tick volume, pas un volume d'échange centralisé
                                     TVMarketData newData = new TVMarketData(
-                                            key, price, change, high, low, open, prevClose,
-                                            variance, 0.0, p4hh, p4hl, pdh, pdl, pwh, pwl, pmh, pml,
-                                            System.currentTimeMillis()
-                                    );
+                                        key, price, change, high, low, open, prevClose,
+                                        variance, 0.0, p4hh, p4hl, pdh, pdl, pwh, pwl, pmh, pml,
+                                        volumeTick, System.currentTimeMillis()
+                                        );
                                     cache.put(key, newData);
                                     checkAndAlert(key, newData);
                                 }
