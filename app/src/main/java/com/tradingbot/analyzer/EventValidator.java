@@ -743,7 +743,7 @@ public static CroisementTechniqueResult verifierCroisementTechnique(
         }
     
         // Ni mot-clé légitime ni mot-clé hors-sujet détecté : par prudence, on laisse passer mais avec confiance dégradée
-        return true;
+        return false;
     }
     // 🔄 ANTI-AMNÉSIE : Rechargement de la RAM depuis SQLite au démarrage du service
     // 🔄 ANTI-AMNÉSIE : Rechargement de la RAM depuis SQLite au démarrage du service
