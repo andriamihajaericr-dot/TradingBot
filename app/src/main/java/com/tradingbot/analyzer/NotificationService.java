@@ -2755,18 +2755,22 @@ if (connFbD.getResponseCode() == HttpURLConnection.HTTP_OK) {
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("⚠️ [DAILY] Fallback : réponse Groq trop courte, non envoyée.");
     }
+    
 } else {
-    // ✅ Cas silencieux corrigé : le fallback a aussi échoué (souvent un 2ème 429 — quota épuisé même en léger)
+    // ✅ Ne plus supposer la cause : rapporter le code HTTP réel + un libellé indicatif seulement
     String bodyErrFbD = "";
     try (BufferedReader brErrFbD = new BufferedReader(new InputStreamReader(connFbD.getErrorStream(), StandardCharsets.UTF_8))) {
         String l; StringBuilder sb = new StringBuilder();
         while ((l = brErrFbD.readLine()) != null) sb.append(l);
         bodyErrFbD = sb.toString();
     } catch (Exception ignored) {}
-    Log.e(TAG, "[DAILY] Fallback HTTP " + connFbD.getResponseCode() + " : " + bodyErrFbD);
+    int codeFbD = connFbD.getResponseCode();
+    String indication = (codeFbD == 429) ? "quota tokens épuisé"
+            : (codeFbD == 413) ? "payload trop volumineux (dailyDrivers probablement trop long)"
+            : "voir corps de réponse dans les logs";
+    Log.e(TAG, "[DAILY] Fallback HTTP " + codeFbD + " (" + indication + ") : " + bodyErrFbD);
     if (MainActivity.instance != null)
-        MainActivity.instance.addLog("❌ [DAILY] Fallback échoué (HTTP " + connFbD.getResponseCode() +
-            ") — quota probablement épuisé sur les deux modèles.");
+        MainActivity.instance.addLog("❌ [DAILY] Fallback échoué (HTTP " + codeFbD + " — " + indication + ").");
 }
 connFbD.disconnect();
                         } catch (Exception eFbD) {
