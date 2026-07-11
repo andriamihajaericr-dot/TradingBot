@@ -519,7 +519,7 @@ public class TradingViewFetcher {
                 sendMessage(ws, "set_auth_token", new Object[]{"unauthorized_user_token"});
                 sendMessage(ws, "quote_create_session", new Object[]{quoteSessionId});
                 sendMessage(ws, "quote_set_fields", new Object[]{
-                        quoteSessionId, "lp", "chp", "ch", "high_price", "low_price", "open_price", "prev_close_price"
+                   quoteSessionId, "lp", "chp", "ch", "high_price", "low_price", "open_price", "prev_close_price", "volume" // ✅ expérimental
                 });
             
                 // 2. Initialisation des Séries Temporelles (H4, Daily, Weekly, Monthly)
