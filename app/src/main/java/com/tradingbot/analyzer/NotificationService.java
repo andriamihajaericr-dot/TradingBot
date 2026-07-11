@@ -850,9 +850,6 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     os.write(input, 0, input.length);
                     os.flush();
                 }
-                
-                // ... Suite de ton code (lecture de la réponse, etc.)
-
     
                 int status = conn.getResponseCode();
                 if (status == java.net.HttpURLConnection.HTTP_OK) {
