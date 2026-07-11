@@ -2571,7 +2571,7 @@ for (String asset : twelveAssets) {
                     String systemPromptFinal = "CONTEXTE HIER (INERTIE DE MARCHÉ) : Le flux dominant de la veille était : " + lastDominantFlow + ".\n" +
                     "Si les événements actuels ne contredisent pas ce flux de manière écrasante (>70% de conviction), " +
                     "tu peux conserver la MÊME conclusion, mais tu dois quand même justifier le FAIT MARQUANT par les " +
-                    "événements RÉELS du jour analysés — jamais par la simple continuité du flux de la veille.\n\n"
+                    "événements RÉELS du jour analysés — jamais par la simple continuité du flux de la veille.\n\n" +
                         baseSystemPrompt + "\n\n" +
                         "Tu es un expert en macroéconomie. Tu dois rédiger ton rapport en terminant obligatoirement par la ligne suivante formatée de cette exacte façon :\n" +
                         "🏁 FLUX DOMINANT : [Insère ici le flux sélectionné]";
