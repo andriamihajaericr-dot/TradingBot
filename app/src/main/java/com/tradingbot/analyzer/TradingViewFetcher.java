@@ -729,7 +729,8 @@ public class TradingViewFetcher {
                                 if (key != null) {
                                     double price = v.optDouble("lp", 0);
                                     double change = v.optDouble("chp", 0);
-            
+                                    double volumeTick = v.optDouble("volume", 0);
+                                 
                                     TVMarketData existing = cache.get(key);
                                     double high      = v.optDouble("high_price",       existing != null && existing.high > 0      ? existing.high      : price);
                                     double low       = v.optDouble("low_price",        existing != null && existing.low  > 0      ? existing.low       : price);
