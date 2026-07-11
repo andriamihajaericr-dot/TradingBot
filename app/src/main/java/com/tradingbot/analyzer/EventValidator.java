@@ -233,14 +233,20 @@ public static CroisementTechniqueResult verifierCroisementTechnique(
     private static final String[] SIX_ACTIFS_OBLIGATOIRES = {
         "NASDAQ", "SP500", "GOLD", "USOIL", "USDJPY", "GBPUSD"
     };
-    
+
     private static final String[] MOTS_HAUSSE = {
         "hausse", "augmentation", "monter", "monte", "renforce", "renforcé",
-        "s'envole", "grimpe", "progresse", "rebond", "dépasse"
+        "s'envole", "grimpe", "progresse", "rebond", "dépasse",
+        "accrue", "accru", "demande accrue" // ✅ "demande accrue pour X" = X monte
     };
+       
     private static final String[] MOTS_BAISSE = {
         "baisse", "diminution", "chute", "recule", "affaiblit", "affaibli",
         "perte de valeur", "pèse sur", "s'effondre", "en dessous"
+    };
+    // ✅ Pattern refuge : toujours haussier par définition, indépendant des mots hausse/baisse littéraux
+    private static final String[] MOTS_REFUGE = {
+       "refuge classique", "valeur refuge", "safe haven", "actif refuge", "refuge sûr", "en tant que refuge"
     };
 
    private static final java.util.regex.Pattern PATTERN_ACTUAL_VS_FORECAST = java.util.regex.Pattern.compile(
