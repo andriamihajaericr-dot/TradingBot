@@ -1133,7 +1133,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
 
         EventValidator.MarketValidationResult marketCheckFb =
             EventValidator.validateAgainstRealMarket(NotificationService.this, sourceName, filteredFb.toString(), cachedMarketData);
-        int fiabiliteFb = EventValidator.getSourceReliability(sourourceName);
+        int fiabiliteFb = EventValidator.getSourceReliability(sourceName);
         if (!marketCheckFb.contradictions.isEmpty()) footerFb.append("\n\n").append(marketCheckFb.warningLine());
         if (fiabiliteFb >= 0) footerFb.append("\n📊 Fiabilité source \"").append(sourceName).append("\" : ").append(fiabiliteFb).append("%");
 
