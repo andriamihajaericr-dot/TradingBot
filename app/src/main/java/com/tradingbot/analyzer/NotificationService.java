@@ -982,6 +982,12 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 Log.w(TAG, "⚠️ [JUSTIFICATIONS DUPLIQUÉES] " + String.join(" | ", duplications));
                                 footer.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplications));
                             }
+
+                            EventValidator.CroisementTechniqueResult croisementTech = EventValidator.verifierCroisementTechnique(filteredMessage.toString(), cachedMarketData);
+                            if (!croisementTech.estValide()) {
+                             Log.w(TAG, "⚠️ [CROISEMENT TECHNIQUE] " + croisementTech.resume());
+                             footer.append("\n\n📉 *Alerte marché réel* : ").append(croisementTech.resume());
+                            }
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
                             sendTelegramSecure(finalPayload, NotificationService.this);
                             // Extraire résumé directionnel pour affichage rappel inertie
