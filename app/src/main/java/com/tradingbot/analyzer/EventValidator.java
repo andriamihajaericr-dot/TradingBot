@@ -27,7 +27,83 @@ public class EventValidator {
     public static Map<String, Long> getRecentFingerprints() {
         return recentFingerprints;
     }
-    // APRÈS
+    // AJOUT (nouvelle classe + méthode, séparée de validateAgainstRealMarket)
+
+/** 🧪 Résultat du croisement texte + technique (conviction, volatilité, cassures de niveaux) */
+public static class CroisementTechniqueResult {
+    public final List<String> anomalies = new ArrayList<>();
+    public boolean estValide() { return anomalies.isEmpty(); }
+    public String resume() {
+        return anomalies.isEmpty() ? "" : "⚠️ Croisement technique : " + String.join(" | ", anomalies);
+    }
+}
+
+private static final java.util.regex.Pattern PATTERN_CONVICTION = java.util.regex.Pattern.compile(
+    "CONVICTION\\s*:.*?(\\d{1,3})\\s*%", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+/**
+ * 🎯 Croise le rapport avec les données techniques déjà calculées par TradingViewFetcher
+ * (conviction déclarée vs ampleur réelle du mouvement, "choc confirmé" vs volatilité/cassures réelles).
+ * Utilise volatilityPercent, variance et les cassures de niveaux DÉJÀ présentes dans TVMarketData —
+ * aucune nouvelle source de données requise.
+ */
+public static CroisementTechniqueResult verifierCroisementTechnique(
+        String reportText, Map<String, TradingViewFetcher.TVMarketData> livePrices) {
+
+    CroisementTechniqueResult result = new CroisementTechniqueResult();
+    if (reportText == null || livePrices == null || livePrices.isEmpty()) return result;
+
+    // 1️⃣ Extraire la conviction déclarée
+    int convictionDeclaree = -1;
+    java.util.regex.Matcher mConv = PATTERN_CONVICTION.matcher(reportText);
+    if (mConv.find()) {
+        try { convictionDeclaree = Integer.parseInt(mConv.group(1)); } catch (NumberFormatException ignored) {}
+    }
+
+    // 2️⃣ Choc réel confirmé déclaré dans le texte (réutilise le même vocabulaire que validerCoherenceRapport)
+    boolean chocConfirmeDeclare = false;
+    String reportLower = reportLower0(reportText);
+    String[] motsChoc = {
+        "choc d'offre", "frappe confirmée", "frappe militaire", "bombardement", "attaque confirmée",
+        "embargo appliqué", "coupure des exportations", "raffinerie touchée", "raffinerie frappée"
+    };
+    for (String mot : motsChoc) {
+        if (reportLower.contains(mot)) { chocConfirmeDeclare = true; break; }
+    }
+
+    for (String ligneBrute : reportText.split("\n")) {
+        String ligne = ligneBrute.trim();
+        if (!ligne.startsWith("•")) continue;
+        String ligneUpper = ligne.toUpperCase(java.util.Locale.ROOT);
+
+        for (Map.Entry<String, TradingViewFetcher.TVMarketData> entry : livePrices.entrySet()) {
+            String asset = entry.getKey();
+            if (!ligneUpper.contains(asset.toUpperCase(java.util.Locale.ROOT))) continue;
+            TradingViewFetcher.TVMarketData data = entry.getValue();
+            if (data == null) continue;
+
+            // 3️⃣ Conviction élevée mais mouvement réel quasi nul
+            if (convictionDeclaree >= 70 && Math.abs(data.changePercent) < 0.10
+                    && (ligne.contains("🟢") || ligne.contains("🔴"))) {
+                result.anomalies.add(String.format(java.util.Locale.US,
+                    "%s : conviction déclarée %d%% mais mouvement réel quasi nul (%+.2f%%) — décalage ampleur/conviction",
+                    asset, convictionDeclaree, data.changePercent));
+            }
+
+            // 4️⃣ "Choc confirmé" déclaré mais aucune trace technique réelle (pas de cassure de niveau, volatilité normale)
+            boolean aucuneCassure = !data.brokeAbovePDH && !data.brokeBelowPDL
+                    && !data.brokeAboveP4HH && !data.brokeBelowP4HL;
+            if (chocConfirmeDeclare && aucuneCassure && data.volatilityPercent < 1.0) {
+                result.anomalies.add(String.format(java.util.Locale.US,
+                    "%s : 'choc confirmé' déclaré dans le rapport mais aucune cassure de niveau ni volatilité élevée détectée " +
+                    "(range jour %.2f%%) — le marché ne corrobore pas l'ampleur du choc décrit",
+                    asset, data.volatilityPercent));
+            }
+            break;
+        }
+    }
+    return result;
+    }
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
 
     // ============================================================
