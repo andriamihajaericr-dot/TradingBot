@@ -2871,8 +2871,13 @@ connFbD.disconnect();
             return false;
         }
         long now = System.currentTimeMillis() / 1000;
-        String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
-        if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
+String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
+final int MAX_MONTHLY_CHARS = 20000; // même seuil de sécurité que dailyDrivers, à ajuster ensemble une fois calibré
+if (monthlyRegistry != null && monthlyRegistry.length() > MAX_MONTHLY_CHARS) {
+    Log.w(TAG, "[MONTHLY] Registre tronqué : " + monthlyRegistry.length() + " → " + MAX_MONTHLY_CHARS + " caractères");
+    monthlyRegistry = monthlyRegistry.substring(0, MAX_MONTHLY_CHARS) + "\n[...tronqué...]";
+}
+if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
             Log.w(TAG, "[MONTHLY] Registre mensuel vide — rapport annulé");
             if (MainActivity.instance != null) {
                 MainActivity.instance.addLog("⚠️ [MONTHLY] Aucune donnée disponible pour le rapport mensuel");
@@ -3120,8 +3125,13 @@ public boolean generateAndSendWeeklyReport() {
         }
         long now = System.currentTimeMillis() / 1000;
         // Récupère les événements des 7 derniers jours (poids >= 2)
-        String weeklyRegistry = eventDb.getWeeklyMacroSummary(now);
-        if (weeklyRegistry == null || weeklyRegistry.isEmpty()) {
+String weeklyRegistry = eventDb.getWeeklyMacroSummary(now);
+final int MAX_WEEKLY_CHARS = 20000;
+if (weeklyRegistry != null && weeklyRegistry.length() > MAX_WEEKLY_CHARS) {
+    Log.w(TAG, "[WEEKLY] Registre tronqué : " + weeklyRegistry.length() + " → " + MAX_WEEKLY_CHARS + " caractères");
+    weeklyRegistry = weeklyRegistry.substring(0, MAX_WEEKLY_CHARS) + "\n[...tronqué...]";
+}
+if (weeklyRegistry == null || weeklyRegistry.isEmpty()) {
             Log.w(TAG, "[WEEKLY] Registre hebdo vide — rapport annulé");
             if (MainActivity.instance != null)
                 MainActivity.instance.addLog("⚠️ [WEEKLY] Aucune donnée pour le rapport hebdomadaire");
