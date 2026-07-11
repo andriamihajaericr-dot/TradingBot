@@ -2735,22 +2735,39 @@ if (!tvSnap.isEmpty()) {
                             try (OutputStream osFbD = connFbD.getOutputStream()) {
                                 osFbD.write(payload.toString().getBytes(StandardCharsets.UTF_8));
                             }
-                            if (connFbD.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                                StringBuilder rFbD = new StringBuilder();
-                                try (BufferedReader brFbD = new BufferedReader(new InputStreamReader(connFbD.getInputStream(), StandardCharsets.UTF_8))) {
-                                    String lineFbD;
-                                    while ((lineFbD = brFbD.readLine()) != null) rFbD.append(lineFbD);
-                                }
-                                String reportFbD = new JSONObject(rFbD.toString())
-                                    .getJSONArray("choices").getJSONObject(0)
-                                    .getJSONObject("message").getString("content");
-                                if (reportFbD != null && reportFbD.length() > 50) {
-                                    sendTelegramSecure("📅 *[DAILY - FALLBACK]* " + reportFbD, NotificationService.this);
-                                    if (MainActivity.instance != null)
-                                        MainActivity.instance.addLog("✅ [DAILY] Rapport envoyé via modèle léger.");
-                                }
-                            }
-                            connFbD.disconnect();
+                            
+if (connFbD.getResponseCode() == HttpURLConnection.HTTP_OK) {
+    StringBuilder rFbD = new StringBuilder();
+    try (BufferedReader brFbD = new BufferedReader(new InputStreamReader(connFbD.getInputStream(), StandardCharsets.UTF_8))) {
+        String lineFbD;
+        while ((lineFbD = brFbD.readLine()) != null) rFbD.append(lineFbD);
+    }
+    String reportFbD = new JSONObject(rFbD.toString())
+        .getJSONArray("choices").getJSONObject(0)
+        .getJSONObject("message").getString("content");
+    if (reportFbD != null && reportFbD.length() > 50) {
+        sendTelegramSecure("📅 *[DAILY - FALLBACK]* " + reportFbD, NotificationService.this);
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("✅ [DAILY] Rapport envoyé via modèle léger.");
+    } else {
+        Log.w(TAG, "[DAILY] Fallback : réponse trop courte (" + (reportFbD != null ? reportFbD.length() : 0) + " car.)");
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("⚠️ [DAILY] Fallback : réponse Groq trop courte, non envoyée.");
+    }
+} else {
+    // ✅ Cas silencieux corrigé : le fallback a aussi échoué (souvent un 2ème 429 — quota épuisé même en léger)
+    String bodyErrFbD = "";
+    try (BufferedReader brErrFbD = new BufferedReader(new InputStreamReader(connFbD.getErrorStream(), StandardCharsets.UTF_8))) {
+        String l; StringBuilder sb = new StringBuilder();
+        while ((l = brErrFbD.readLine()) != null) sb.append(l);
+        bodyErrFbD = sb.toString();
+    } catch (Exception ignored) {}
+    Log.e(TAG, "[DAILY] Fallback HTTP " + connFbD.getResponseCode() + " : " + bodyErrFbD);
+    if (MainActivity.instance != null)
+        MainActivity.instance.addLog("❌ [DAILY] Fallback échoué (HTTP " + connFbD.getResponseCode() +
+            ") — quota probablement épuisé sur les deux modèles.");
+}
+connFbD.disconnect();
                         } catch (Exception eFbD) {
                             Log.e(TAG, "[DAILY] Fallback échoué", eFbD);
                         }
