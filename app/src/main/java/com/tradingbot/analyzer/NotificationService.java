@@ -512,22 +512,27 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "SECONDAIRE : EIA,OPEC,Résultats majeurs,Big Tech,PMI hors US,PIB hors US.\n" +
     "TACTIQUE : Géopolitique,Tarifs,Chine,Michigan,Conference Board,Rumeurs.\n" +
     "DOMINANCE : le rang supérieur gagne toujours. Un driver tactique ne peut jamais annuler un driver suprême. Si conflit >40 points : suivre uniquement le driver dominant. Si conflit <20 points : FLUX MIXTE et conviction max 55%.\n" +
-    "RÈGLE FED ABSOLUE : Powell,FOMC,Minutes FOMC,Dot Plot,Futur Chair FED sont toujours des drivers SUPRÊMES. Aucune news tactique ne peut les invalider.\n" +  
-    "MOTEUR : 1-Identifier le driver principal. 2-Identifier le régime dominant. 3-Appliquer la matrice d'actifs. 4-Calculer la conviction. 5-Valider la cohérence finale.\n" +
-    "RÈGLE USD MAÎTRE : pour FED,CPI,PCE,NFP,GDP,ISM déterminer d'abord DOLLAR FORT ou DOLLAR FAIBLE avant tout autre actif.\n" +
-    "MONÉTAIRE US :\n" +
-    "HAWKISH = USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ GBPUSD↓ USOIL=\n" +
-    "DOVISH = USDJPY↓ GOLD↑ NASDAQ↑ SP500↑ GBPUSD↑ USOIL=\n" +
+      
+"RÈGLE FED ABSOLUE : Powell,FOMC,Minutes FOMC,Dot Plot,Futur Chair FED sont toujours des drivers SUPRÊMES. Aucune news tactique ne peut les invalider.\n" +
+"EXCEPTION UNIQUE : choc géo avec impact PHYSIQUE CONFIRMÉ sur offre énergie (Hormuz bloqué, frappe infra pétrole/gaz, embargo appliqué) prime sur TOUS les drivers, pour les 6 actifs. Escalade verbale/menace = PAS d'exception, hiérarchie normale.\n" +
+"MOTEUR : 1-Identifier driver principal. 2-Régime dominant. 3-Matrice d'actifs. 4-Conviction. 5-Cohérence finale.\n" +
+"RÈGLE USD MAÎTRE : pour FED,CPI,PCE,NFP,GDP,ISM,GÉO-choc-confirmé déterminer d'abord DOLLAR FORT/FAIBLE avant tout autre actif.\n" +
+"VECTEURS : HAWKISH_US,DOVISH_US,HAWKISH_ECB,DOVISH_ECB,HAWKISH_BOJ,DOVISH_BOJ,HAWKISH_BOE,DOVISH_BOE,GÉO,TARIFS,CHINE,LIQUIDITÉ.\n" +
+"MONÉTAIRE US :\n" +
+"HAWKISH_US = USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ GBPUSD↓ USOIL=\n" +
+"DOVISH_US = USDJPY↓ GOLD↑ NASDAQ↑ SP500↑ GBPUSD↑ USOIL=\n" +
 
-    "BANQUES CENTRALES ÉTRANGÈRES :\n" +
-    "BoJ HAWKISH=USDJPY↓ ; BoJ DOVISH=USDJPY↑.\n" +
-    "BoE HAWKISH=GBPUSD↑ ; BoE DOVISH=GBPUSD↓.\n" +
-    "EURUSD (CONTEXTE UNIQUEMENT, non listé) : sert uniquement à calibrer la cohérence de GBPUSD via la corrélation EUR/GBP, jamais affiché seul.\n" +
-    "NASDAQ,SP500,GOLD,USOIL neutres sauf choc global explicite ou driver énergie/géo simultané.\n" +
-    
-    "GÉOPOLITIQUE :\n" +
-    "Escalade réelle (frappe,missile,raid,embargo,Hormuz) = GOLD↑ USOIL↑ USDJPY↓ NASDAQ↓ SP500↓ GBPUSD↓.\n" +
-    "Désescalade = inverse.\n" +
+"BANQUES CENTRALES ÉTRANGÈRES (HAWKISH/DOVISH_ECB/BOJ/BOE) :\n" +
+"BoJ HAWKISH=USDJPY↓ ; DOVISH=USDJPY↑. BoE HAWKISH=GBPUSD↑ ; DOVISH=GBPUSD↓.\n" +
+"ECB HAWKISH=GBPUSD légèrement↑ (EUR/GBP) SEULEMENT si pas de driver BoE propre ; DOVISH=inverse.\n" +
+"EURUSD jamais affiché seul (contexte calibration GBPUSD uniquement).\n" +
+"RÈGLE ABSOLUE BANQUE ÉTRANGÈRE : NASDAQ,SP500,GOLD,USOIL = NEUTRE (non listés) sauf choc global explicite.\n" +
+
+"GÉOPOLITIQUE ÉNERGIE (Iran/Hormuz) — PIVOT DOLLAR obligatoire avant conclusion :\n" +
+"Choc offre RÉEL confirmé (Hormuz bloqué/frappe infra/riposte US) → USD↑ : GOLD↓ou NEUTRE USOIL↑ USDJPY↑ GBPUSD↓ NASDAQ↓ SP500↓ | FLUX DOLLAR FORT(GÉO)\n" +
+"Escalade verbale SANS choc réel → USD stable/faible : GOLD↑ USOIL↑ USDJPY↓ GBPUSD↓ NASDAQ↓ SP500↓ | FLUX RISK-OFF GÉO\n" +
+"Désescalade → USD retour pré-choc : GOLD↓ USOIL↓ USDJPY↑ GBPUSD↑ NASDAQ↑ SP500↑ | FLUX RISK-ON\n" +
+"GÉO = réservé conflits armés/tensions inter-États/sanctions/terrorisme réels — jamais une décision interne d'entreprise.\n" +
     
     "EIA déficit=USOIL↑.\n" +
     "EIA surplus=USOIL↓.\n" +
