@@ -344,12 +344,22 @@ public static CroisementTechniqueResult verifierCroisementTechnique(
                 break;
             }
         }
-    
-        for (String actif : SIX_ACTIFS_OBLIGATOIRES) {
-            boolean estActifExempteBanqueEtrangere = neutraliteLegitime &&
-                    (actif.equals("NASDAQ") || actif.equals("SP500") || actif.equals("GOLD") || actif.equals("USOIL"));
-            if (!reportUpper.contains(actif) && !estActifExempteBanqueEtrangere) {
-                result.actifsManquants.add(actif);
+         boolean aucunImpactDeclare = reportUpper.contains("AUCUN IMPACT SIGNIFICATIF");
+
+        // ✅ Cas transitoire (avant intégration du correctif 1bis, ou modèle qui n'a pas suivi la consigne) :
+        // section totalement vide (0 ligne "•" avec emoji) ET le texte explique déjà l'absence d'impact
+        // ("aucun impact", "pas de choc", "n'est pas confirmé") → traiter comme légitime aussi, pas comme un bug.
+        boolean sectionTotalementVide = !reportUpper.matches("(?s).*•[^\\n]*(🟢|🔴).*");
+        boolean texteExpliqueAbsenceImpact = reportLower0(reportText).contains("aucun impact")
+                || reportLower0(reportText).contains("pas de choc") || reportLower0(reportText).contains("n'est pas confirmé");
+
+        if (!(aucunImpactDeclare || (sectionTotalementVide && texteExpliqueAbsenceImpact))) {
+            for (String actif : SIX_ACTIFS_OBLIGATOIRES) {
+                boolean estActifExempteBanqueEtrangere = neutraliteLegitime &&
+                        (actif.equals("NASDAQ") || actif.equals("SP500") || actif.equals("GOLD") || actif.equals("USOIL"));
+                if (!reportUpper.contains(actif) && !estActifExempteBanqueEtrangere) {
+                    result.actifsManquants.add(actif);
+                }
             }
         }
     
