@@ -2560,7 +2560,7 @@ for (String asset : twelveAssets) {
         }
         // =========================================================================
         Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser (avant plafonnement)");
-        final int MAX_DAILY_DRIVERS_CHARS = 20000; // ✅ ~6000 tokens, marge large avant tout risque de 413
+        final int MAX_DAILY_DRIVERS_CHARS = 16000; // ✅ ~6000 tokens, marge large avant tout risque de 413
         if (dailyDrivers.length() > MAX_DAILY_DRIVERS_CHARS) {
              Log.w(TAG, "[DAILY] dailyDrivers tronqué : " + dailyDrivers.length() + " → " + MAX_DAILY_DRIVERS_CHARS + " caractères");
              dailyDrivers = dailyDrivers.substring(0, MAX_DAILY_DRIVERS_CHARS) + "\n[...tronqué, voir événements les plus récents ci-dessus...]";
