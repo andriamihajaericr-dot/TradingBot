@@ -2916,7 +2916,7 @@ connFbD.disconnect();
         }
         long now = System.currentTimeMillis() / 1000;
 String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
-final int MAX_MONTHLY_CHARS = 60000; // même seuil de sécurité que dailyDrivers, à ajuster ensemble une fois calibré
+final int MAX_MONTHLY_CHARS = 16000; // même seuil de sécurité que dailyDrivers, à ajuster ensemble une fois calibré
 if (monthlyRegistry != null && monthlyRegistry.length() > MAX_MONTHLY_CHARS) {
     Log.w(TAG, "[MONTHLY] Registre tronqué : " + monthlyRegistry.length() + " → " + MAX_MONTHLY_CHARS + " caractères");
     monthlyRegistry = monthlyRegistry.substring(0, MAX_MONTHLY_CHARS) + "\n[...tronqué...]";
@@ -2954,7 +2954,10 @@ if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
     "2. Toute conclusion doit être reliée à au moins un événement observé.\n" +
     "3. Hiérarchie absolue : SUPRÊME > SECONDAIRE > TACTIQUE.\n" +
     "4. Les événements de rang supérieur dominent toujours les conclusions.\n" +
-    "5. Un événement tactique ne peut jamais annuler un événement suprême.\n" +
+    "5. Un événement tactique ne peut jamais annuler un événement suprême. " +
+    "EXCEPTION : un choc géopolitique CONFIRMÉ avec impact physique réel sur l'offre énergétique " +
+    "(frappe infrastructure, blocage Hormuz effectif, embargo appliqué) peut temporairement dominer, " +
+    "pour les 6 actifs, jusqu'à normalisation — une simple tension/escalade verbale ne déclenche pas cette exception.\n" +
     "6. Si deux événements suprêmes se contredisent, signaler explicitement la divergence.\n" +
     "7. Les risques résiduels doivent provenir d'un thème déjà présent dans le registre.\n" +
     "8. Aucun actif hors liste des 6 actifs autorisés.\n" +
@@ -2969,16 +2972,16 @@ if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
     "- Chaque justification doit être factuelle : chiffre observé (ex: 'CPI 3.8% vs 3.5% attendu') ou événement nommé (ex: 'Powell hawkish FOMC mai').\n" +
     "- Longueur maximale : 10 mots.\n" +
     "- Style institutionnel obligatoire : 'prime de risque élargie', 'flight-to-quality activé', 'différentiel de taux déterminant', 'révision bénéfices à la baisse'.\n" +
-    "- NUANCE GÉO OBLIGATOIRE : défaut crise GÉO Iran/Hormuz = GOLD🟢 refuge (historique +0.8% à +1.5%). " +
-    "Riposte militaire USA confirmée uniquement = GOLD🔴 court terme. " +
-    "RÈGLE PAR DÉFAUT : sans 'riposte/strike/Pentagon' dans le texte → GOLD🟢.\n" +
+    "- NUANCE GÉO OBLIGATOIRE : GOLD dépend du sens du dollar, jamais un réflexe automatique. " +
+    "Choc d'offre CONFIRMÉ (frappe/blocage réel) → dollar renforcé (achats énergie en USD + Fed hawkish anticipée) → GOLD🔴 pèse. " +
+    "Simple tension/escalade verbale sans choc réel → refuge classique → GOLD🟢 soutient.\n" +
     "- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'contexte difficile', toute phrase sans ancrage factuel.\n\n" +                                                                    
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 6 actifs :\n" +
     "NASDAQ, SP500, GOLD, USOIL, USDJPY, GBPUSD.\n" +
     "EURUSD (CONTEXTE UNIQUEMENT, non listé) : s'il apparaît dans le registre, utilise-le uniquement pour calibrer la cohérence directionnelle de GBPUSD (corrélation EUR/GBP) — ne jamais l'afficher comme ligne séparée.\n" +
     "CORRÉLATION USDJPY/GBPUSD : " +
-    "En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
-    "En régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire (les deux baissent en risk-off, les deux montent en risk-on). " +
+    "Régime DOLLAR (Fed HAWKISH/DOVISH, OU choc d'offre géopolitique confirmé) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
+    "Régime RISK pur (GÉO sans choc confirmé, risk-off/risk-on général) → même direction obligatoire. " +
     "Divergence possible UNIQUEMENT si BoJ seul (neutre GBPUSD) ou BoE seul (neutre USDJPY).\n" +
     "Lister uniquement les actifs avec impact réel — omettre les NEUTRE.\n\n" +
     "Format OBLIGATOIRE et STRICT :\n\n" +
