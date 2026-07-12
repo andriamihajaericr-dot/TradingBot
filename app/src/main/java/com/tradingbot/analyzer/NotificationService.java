@@ -2684,11 +2684,33 @@ if (!tvSnap.isEmpty()) {
                                                              .getJSONObject(0)
                                                              .getJSONObject("message")
                                                              .getString("content");
-                    
+                        
                         if (aiResult != null && aiResult.trim().length() > 50) {
-                        sendTelegramSecure(aiResult.trim(), this);
+                        // 🎯 Contrôle qualité daily — sous-ensemble pertinent pour un rapport agrégé
+                        // (pas de validateAgainstRealMarket/getSourceReliability : pensés par source unique,
+                        // pas applicables à un rapport multi-sources agrégé sur 24h).
+                        StringBuilder footerDaily = new StringBuilder();
+
+                        EventValidator.CoherenceRapportResult coherenceDaily = EventValidator.validerCoherenceRapport(aiResult);
+                        if (!coherenceDaily.estValide()) {
+                            Log.w(TAG, "⚠️ [DAILY COHÉRENCE] " + coherenceDaily.resume());
+                            footerDaily.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceDaily.resume());
+                        }
+
+                        String anomalieVecteurGeoDaily = EventValidator.verifierVecteurGeoPertinent(aiResult);
+                        if (anomalieVecteurGeoDaily != null) footerDaily.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoDaily);
+
+                        String anomalieVecteurSurpriseDaily = EventValidator.verifierCoherenceVecteurSurprise(aiResult);
+                        if (anomalieVecteurSurpriseDaily != null) footerDaily.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseDaily);
+
+                        List<String> violationsNeutraliteDaily = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(aiResult);
+                        if (!violationsNeutraliteDaily.isEmpty()) footerDaily.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteDaily));
+
+                        List<String> duplicationsDaily = EventValidator.verifierJustificationsDupliquees(aiResult);
+                        if (!duplicationsDaily.isEmpty()) footerDaily.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsDaily));
+
+                        sendTelegramSecure(aiResult.trim() + footerDaily, this);
                         Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
-                    
                         // Parsing et persistance du flux dominant pour le lendemain
                         Pattern flowPattern = Pattern.compile("(?i)🏁\\s*FLUX\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
                         Matcher flowMatcher = flowPattern.matcher(aiResult);
