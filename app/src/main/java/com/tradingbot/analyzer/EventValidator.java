@@ -137,6 +137,41 @@ public static CroisementTechniqueResult verifierCroisementTechnique(
         }
     }
 
+private static final String[] MOTS_CONDITIONNEL_NON_CONFIRME = {
+    "pourrait indiquer", "pourrait renforcer", "pourrait entraîner", "pourrait suggérer", "semble indiquer"
+};
+private static final String[] MOTS_CONFIRMATION_REELLE = {
+    "confirmé", "confirmée", "frappe confirmée", "riposte militaire", "embargo appliqué", "bloqué"
+};
+
+/**
+ * 🎯 Détecte l'usage du raisonnement "dollar fort" (Étape 1a, choc confirmé) sur un événement
+ * explicitement conditionnel/non confirmé (Étape 1b) — mélange de deux cas incompatibles.
+ */
+public static String verifierChocDollarSurNonConfirme(String reportText) {
+    if (reportText == null) return null;
+    String reportLower = reportLower0(reportText);
+
+    boolean invoqueRaisonnementDollarFort = reportLower.contains("demande de dollars")
+            || reportLower.contains("renforcer le dollar") || reportLower.contains("dollar renforc")
+            || reportLower.contains("renforce le dollar");
+
+    boolean texteConditionnel = false;
+    for (String mot : MOTS_CONDITIONNEL_NON_CONFIRME) {
+        if (reportLower.contains(mot)) { texteConditionnel = true; break; }
+    }
+    boolean confirmationReelle = false;
+    for (String mot : MOTS_CONFIRMATION_REELLE) {
+        if (reportLower.contains(mot)) { confirmationReelle = true; break; }
+    }
+
+    if (invoqueRaisonnementDollarFort && texteConditionnel && !confirmationReelle) {
+        return "Le rapport applique le raisonnement 'dollar fort' (Étape 1a, choc confirmé) sur un événement " +
+               "explicitement conditionnel ('pourrait...') — l'Étape 1a exige un choc RÉEL CONFIRMÉ, pas une probabilité.";
+    }
+    return null;
+}
+
     private static String normaliserSource(String source) {
         if (source == null) return "inconnu";
         return source.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
