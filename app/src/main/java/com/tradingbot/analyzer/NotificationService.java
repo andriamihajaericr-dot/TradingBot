@@ -3226,24 +3226,24 @@ payload.put("temperature", 0.05);
 
     "RÈGLE DE CRISE GÉOPOLITIQUE :\n" +
     "Un événement tactique ne peut normalement pas annuler un événement suprême.\n" +
-    "Exception : en cas de choc géopolitique majeur confirmé (guerre ouverte, attaque militaire directe, fermeture d'une route énergétique stratégique, mobilisation militaire massive ou crise systémique), le régime géopolitique devient temporairement dominant et peut supplanter un driver suprême jusqu'à normalisation du marché.\n" +
-    "Si un événement géopolitique provoque un mouvement global de fuite vers les actifs refuges (GOLD, USD, JPY) et une baisse simultanée des actifs risqués (NASDAQ, SP500), alors le régime CRISE GÉOPOLITIQUE devient prioritaire.\n" +
+    "Exception : en cas de choc géopolitique majeur CONFIRMÉ avec impact physique réel (frappe sur infrastructure énergétique, blocage effectif d'Hormuz, embargo appliqué — pas une simple menace ou escalade verbale), le régime géopolitique devient temporairement dominant et peut supplanter un driver suprême jusqu'à normalisation du marché.\n" +
+    "AVANT de conclure sur GOLD dans ce régime, évaluer le sens du dollar : un choc d'offre confirmé (frappe/blocage réel) renforce généralement le dollar (achats d'énergie en USD + anticipation Fed hawkish sur l'inflation importée), ce qui PÈSE sur GOLD malgré la crise — le réflexe 'refuge automatique' ne s'applique QUE si aucun choc d'offre réel n'est confirmé (simple tension diplomatique). USD, JPY restent des refuges classiques dans les deux cas ; GOLD est le seul actif dont le sens dépend de cet arbitrage dollar.\n" +
     "Flux dominant autorisé : CRISE GÉOPOLITIQUE => priorité sur tous les autres régimes (et supplante la règle 15).\n\n" +
     "RÈGLE DE JUSTIFICATION :\n" +
     "- Chaque justification doit être factuelle : chiffre observé (ex: 'NFP +250k vs +185k attendu') ou événement nommé (ex: 'minutes FOMC hawkish').\n" +
     "- Longueur maximale : 10 mots.\n" +
     "- Style institutionnel obligatoire : 'surprise haussière NFP renforce dollar', 'flight-to-quality vers JPY et GOLD', 'prime géopolitique activée sur USOIL'.\n" +
-    "- NUANCE GÉO : défaut crise GÉO Iran/Hormuz → GOLD🟢 refuge immédiat. " +
-    "Exception riposte USA confirmée → GOLD🔴 court terme. " +
-    "Sans mot-clé militaire explicite dans le texte → GOLD🟢 par défaut.\n" +
+    "- NUANCE GÉO : GOLD dépend du sens du dollar (voir RÈGLE DE CRISE GÉOPOLITIQUE ci-dessus) — " +
+    "jamais un réflexe automatique. Choc d'offre confirmé = dollar fort pèse sur GOLD. " +
+    "Simple tension/escalade verbale sans choc réel = refuge classique soutient GOLD.\n" +
     "- INTERDIT : 'les investisseurs sont prudents', 'incertitudes économiques', 'sentiment dégradé', toute généralité sans chiffre ni source.\n\n" +                        
 
     "Tu dois impérativement analyser la dynamique globale et l'impact uniquement parmi cette liste fermée de 6 actifs :\n" +
     "NASDAQ, SP500, GOLD, USOIL, USDJPY, GBPUSD.\n" +
     "EURUSD (CONTEXTE UNIQUEMENT, non listé) : s'il apparaît dans le registre, utilise-le uniquement pour calibrer la cohérence directionnelle de GBPUSD (corrélation EUR/GBP) — ne jamais l'afficher comme ligne séparée.\n" +
     "CORRÉLATION USDJPY/GBPUSD : " +
-    "En régime DOLLAR (HAWKISH/DOVISH Fed) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
-    "En régime RISK (GÉO/risk-off/risk-on) → même direction obligatoire (les deux baissent en risk-off, les deux montent en risk-on). " +
+    "Régime DOLLAR (Fed HAWKISH/DOVISH, OU choc d'offre géopolitique confirmé) → directions INVERSES obligatoires (USDJPY↑ = GBPUSD↓). " +
+    "Régime RISK pur (GÉO sans choc confirmé, risk-off/risk-on général) → même direction obligatoire. " +
     "Divergence possible UNIQUEMENT si BoJ seul (neutre GBPUSD) ou BoE seul (neutre USDJPY).\n" +
     "Lister uniquement les actifs avec impact réel — omettre les NEUTRE.\n\n" +
     "Format OBLIGATOIRE et STRICT :\n\n" +
