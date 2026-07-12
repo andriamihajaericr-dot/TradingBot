@@ -2768,8 +2768,30 @@ if (connFbD.getResponseCode() == HttpURLConnection.HTTP_OK) {
     String reportFbD = new JSONObject(rFbD.toString())
         .getJSONArray("choices").getJSONObject(0)
         .getJSONObject("message").getString("content");
+    
     if (reportFbD != null && reportFbD.length() > 50) {
-        sendTelegramSecure("📅 *[DAILY - FALLBACK]* " + reportFbD, NotificationService.this);
+        // 🎯 Même contrôle qualité que le chemin principal daily, appliqué sur reportFbD
+        StringBuilder footerDailyFb = new StringBuilder();
+
+        EventValidator.CoherenceRapportResult coherenceDailyFb = EventValidator.validerCoherenceRapport(reportFbD);
+        if (!coherenceDailyFb.estValide()) {
+            Log.w(TAG, "⚠️ [DAILY FALLBACK COHÉRENCE] " + coherenceDailyFb.resume());
+            footerDailyFb.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceDailyFb.resume());
+        }
+
+        String anomalieVecteurGeoDailyFb = EventValidator.verifierVecteurGeoPertinent(reportFbD);
+        if (anomalieVecteurGeoDailyFb != null) footerDailyFb.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoDailyFb);
+
+        String anomalieVecteurSurpriseDailyFb = EventValidator.verifierCoherenceVecteurSurprise(reportFbD);
+        if (anomalieVecteurSurpriseDailyFb != null) footerDailyFb.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseDailyFb);
+
+        List<String> violationsNeutraliteDailyFb = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(reportFbD);
+        if (!violationsNeutraliteDailyFb.isEmpty()) footerDailyFb.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteDailyFb));
+
+        List<String> duplicationsDailyFb = EventValidator.verifierJustificationsDupliquees(reportFbD);
+        if (!duplicationsDailyFb.isEmpty()) footerDailyFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsDailyFb));
+
+        sendTelegramSecure("📅 *[DAILY - FALLBACK]* " + reportFbD + footerDailyFb, NotificationService.this);
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("✅ [DAILY] Rapport envoyé via modèle léger.");
     } else {
