@@ -737,6 +737,35 @@ public static CroisementTechniqueResult verifierCroisementTechnique(
         }
         return duplications;
     }
+
+/**
+ * 🎯 Vérifie la cohérence entre VECTEUR CIBLE (HAWKISH_US/DOVISH_US) et le sens réel de la surprise
+ * chiffrée (actual très inférieur/supérieur au forecast) — évite un NFP raté classé HAWKISH par erreur.
+ */
+public static String verifierCoherenceVecteurSurprise(String reportText) {
+    if (reportText == null) return null;
+    String reportUpper = reportText.toUpperCase(java.util.Locale.ROOT);
+    boolean estHawkishUS = reportUpper.contains("VECTEUR CIBLE : HAWKISH_US") || reportUpper.contains("VECTEUR CIBLE: HAWKISH_US");
+    boolean estDovishUS  = reportUpper.contains("VECTEUR CIBLE : DOVISH_US")  || reportUpper.contains("VECTEUR CIBLE: DOVISH_US");
+    if (!estHawkishUS && !estDovishUS) return null;
+
+    String reportLower = reportLower0(reportText);
+    boolean texteDitDecevant = reportLower.contains("décevant") || reportLower.contains("pire que le consensus")
+            || reportLower.contains("inférieur") || reportLower.contains("manqué") || reportLower.contains("gelé")
+            || reportLower.contains("sur la touche");
+    boolean texteDitSolide = reportLower.contains("solide") || reportLower.contains("dépassé les attentes")
+            || reportLower.contains("supérieur au consensus") || reportLower.contains("robuste");
+
+    if (estHawkishUS && texteDitDecevant && !texteDitSolide) {
+        return "VECTEUR CIBLE: HAWKISH_US déclaré, mais le texte décrit une donnée DÉCEVANTE/manquée (Fed 'sur la touche') " +
+               "— une donnée faible est typiquement DOVISH_US, pas HAWKISH_US. Vecteur probablement inversé.";
+    }
+    if (estDovishUS && texteDitSolide && !texteDitDecevant) {
+        return "VECTEUR CIBLE: DOVISH_US déclaré, mais le texte décrit une donnée SOLIDE/robuste " +
+               "— une donnée forte est typiquement HAWKISH_US, pas DOVISH_US. Vecteur probablement inversé.";
+    }
+    return null;
+ }
     
     private static double similariteMots(String a, String b) {
         java.util.Set<String> motsA = new java.util.HashSet<>(java.util.Arrays.asList(a.split("\\s+")));
