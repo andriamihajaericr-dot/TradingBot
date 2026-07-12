@@ -990,8 +990,14 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
 
                             EventValidator.CroisementTechniqueResult croisementTech = EventValidator.verifierCroisementTechnique(filteredMessage.toString(), cachedMarketData);
                             if (!croisementTech.estValide()) {
-                             Log.w(TAG, "⚠️ [CROISEMENT TECHNIQUE] " + croisementTech.resume());
-                             footer.append("\n\n📉 *Alerte marché réel* : ").append(croisementTech.resume());
+                                Log.w(TAG, "⚠️ [CROISEMENT TECHNIQUE] " + croisementTech.resume());
+                                footer.append("\n\n📉 *Alerte marché réel* : ").append(croisementTech.resume());
+                            }
+
+                            String chocSurNonConfirme = EventValidator.verifierChocDollarSurNonConfirme(filteredMessage.toString());
+                            if (chocSurNonConfirme != null) {
+                                Log.w(TAG, "⚠️ [DOLLAR/NON-CONFIRMÉ] " + chocSurNonConfirme);
+                                footer.append("\n\n🎯 *Alerte logique* : ").append(chocSurNonConfirme);
                             }
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
                             sendTelegramSecure(finalPayload, NotificationService.this);
