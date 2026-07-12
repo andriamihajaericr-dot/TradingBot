@@ -3148,8 +3148,25 @@ if (responseCode == 429) {
             String reportFbM = new JSONObject(rFbM.toString())
                 .getJSONArray("choices").getJSONObject(0)
                 .getJSONObject("message").getString("content");
+            
             if (reportFbM != null && reportFbM.length() > 50) {
-                sendTelegramSecure("📊 *[MONTHLY - FALLBACK]* " + reportFbM, NotificationService.this);
+                StringBuilder footerMonthlyFb = new StringBuilder();
+
+                EventValidator.CoherenceRapportResult coherenceMonthlyFb = EventValidator.validerCoherenceRapport(reportFbM);
+                if (!coherenceMonthlyFb.estValide()) {
+                    Log.w(TAG, "⚠️ [MONTHLY FALLBACK COHÉRENCE] " + coherenceMonthlyFb.resume());
+                    footerMonthlyFb.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceMonthlyFb.resume());
+                }
+                String anomalieVecteurGeoMonthlyFb = EventValidator.verifierVecteurGeoPertinent(reportFbM);
+                if (anomalieVecteurGeoMonthlyFb != null) footerMonthlyFb.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoMonthlyFb);
+                String anomalieVecteurSurpriseMonthlyFb = EventValidator.verifierCoherenceVecteurSurprise(reportFbM);
+                if (anomalieVecteurSurpriseMonthlyFb != null) footerMonthlyFb.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseMonthlyFb);
+                List<String> violationsNeutraliteMonthlyFb = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(reportFbM);
+                if (!violationsNeutraliteMonthlyFb.isEmpty()) footerMonthlyFb.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteMonthlyFb));
+                List<String> duplicationsMonthlyFb = EventValidator.verifierJustificationsDupliquees(reportFbM);
+                if (!duplicationsMonthlyFb.isEmpty()) footerMonthlyFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsMonthlyFb));
+
+                sendTelegramSecure("📊 *[MONTHLY - FALLBACK]* " + reportFbM + footerMonthlyFb, NotificationService.this);
                 if (MainActivity.instance != null)
                     MainActivity.instance.addLog("✅ [MONTHLY] Rapport envoyé via modèle léger.");
             }
@@ -3433,8 +3450,25 @@ if (responseCode == 429) {
             String reportFbW = new JSONObject(rFbW.toString())
                 .getJSONArray("choices").getJSONObject(0)
                 .getJSONObject("message").getString("content");
+            
             if (reportFbW != null && reportFbW.length() > 50) {
-                sendTelegramSecure("📆 *[WEEKLY - FALLBACK]* " + reportFbW, NotificationService.this);
+                StringBuilder footerWeeklyFb = new StringBuilder();
+
+                EventValidator.CoherenceRapportResult coherenceWeeklyFb = EventValidator.validerCoherenceRapport(reportFbW);
+                if (!coherenceWeeklyFb.estValide()) {
+                    Log.w(TAG, "⚠️ [WEEKLY FALLBACK COHÉRENCE] " + coherenceWeeklyFb.resume());
+                    footerWeeklyFb.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceWeeklyFb.resume());
+                }
+                String anomalieVecteurGeoWeeklyFb = EventValidator.verifierVecteurGeoPertinent(reportFbW);
+                if (anomalieVecteurGeoWeeklyFb != null) footerWeeklyFb.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoWeeklyFb);
+                String anomalieVecteurSurpriseWeeklyFb = EventValidator.verifierCoherenceVecteurSurprise(reportFbW);
+                if (anomalieVecteurSurpriseWeeklyFb != null) footerWeeklyFb.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseWeeklyFb);
+                List<String> violationsNeutraliteWeeklyFb = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(reportFbW);
+                if (!violationsNeutraliteWeeklyFb.isEmpty()) footerWeeklyFb.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteWeeklyFb));
+                List<String> duplicationsWeeklyFb = EventValidator.verifierJustificationsDupliquees(reportFbW);
+                if (!duplicationsWeeklyFb.isEmpty()) footerWeeklyFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsWeeklyFb));
+
+                sendTelegramSecure("📆 *[WEEKLY - FALLBACK]* " + reportFbW + footerWeeklyFb, NotificationService.this);
                 if (MainActivity.instance != null)
                     MainActivity.instance.addLog("✅ [WEEKLY] Rapport envoyé via modèle léger.");
             }
