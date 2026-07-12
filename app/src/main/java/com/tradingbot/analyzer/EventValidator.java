@@ -259,7 +259,14 @@ public static String verifierChocDollarSurNonConfirme(String reportText) {
                 break;
             }
         }
-        return result;
+    // ✅ Déduplication défensive : évite les entrées identiques (ex: clés dupliquées/différemment castées
+    // dans livePrices pour le même actif sous-jacent)
+    List<String> contradictionsDedupliquees = new ArrayList<>(new java.util.LinkedHashSet<>(result.contradictions));
+    result.contradictions.clear();
+    result.contradictions.addAll(contradictionsDedupliquees);
+
+    return result;
+    
     }
 
     // ============================================================
