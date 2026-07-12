@@ -3055,7 +3055,23 @@ if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
                 .getString("content");
 
             if (report != null && report.trim().length() > 300) {
-                String monthlyFlowLine = "📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report.trim();
+                StringBuilder footerMonthly = new StringBuilder();
+
+                EventValidator.CoherenceRapportResult coherenceMonthly = EventValidator.validerCoherenceRapport(report);
+                if (!coherenceMonthly.estValide()) {
+                    Log.w(TAG, "⚠️ [MONTHLY COHÉRENCE] " + coherenceMonthly.resume());
+                    footerMonthly.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceMonthly.resume());
+                }
+                String anomalieVecteurGeoMonthly = EventValidator.verifierVecteurGeoPertinent(report);
+                if (anomalieVecteurGeoMonthly != null) footerMonthly.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoMonthly);
+                String anomalieVecteurSurpriseMonthly = EventValidator.verifierCoherenceVecteurSurprise(report);
+                if (anomalieVecteurSurpriseMonthly != null) footerMonthly.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseMonthly);
+                List<String> violationsNeutraliteMonthly = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(report);
+                if (!violationsNeutraliteMonthly.isEmpty()) footerMonthly.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteMonthly));
+                List<String> duplicationsMonthly = EventValidator.verifierJustificationsDupliquees(report);
+                if (!duplicationsMonthly.isEmpty()) footerMonthly.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsMonthly));
+
+                String monthlyFlowLine = "📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report.trim() + footerMonthly;
                 sendTelegramSecure(monthlyFlowLine, this);
                 
                 // Mémoriser le timestamp pour le rattrapage
@@ -3173,7 +3189,7 @@ public boolean generateAndSendWeeklyReport() {
         long now = System.currentTimeMillis() / 1000;
         // Récupère les événements des 7 derniers jours (poids >= 2)
 String weeklyRegistry = eventDb.getWeeklyMacroSummary(now);
-final int MAX_WEEKLY_CHARS = 40000;
+final int MAX_WEEKLY_CHARS = 16000;
 if (weeklyRegistry != null && weeklyRegistry.length() > MAX_WEEKLY_CHARS) {
     Log.w(TAG, "[WEEKLY] Registre tronqué : " + weeklyRegistry.length() + " → " + MAX_WEEKLY_CHARS + " caractères");
     weeklyRegistry = weeklyRegistry.substring(0, MAX_WEEKLY_CHARS) + "\n[...tronqué...]";
@@ -3339,7 +3355,23 @@ payload.put("temperature", 0.05);
                 .getString("content");
 
             if (report != null && report.trim().length() > 300) {
-                sendTelegramSecure("📅 *BILAN MACRO HEBDOMADAIRE — VENDREDI*\n\n" + report.trim(), this);
+                StringBuilder footerWeekly = new StringBuilder();
+
+                EventValidator.CoherenceRapportResult coherenceWeekly = EventValidator.validerCoherenceRapport(report);
+                if (!coherenceWeekly.estValide()) {
+                    Log.w(TAG, "⚠️ [WEEKLY COHÉRENCE] " + coherenceWeekly.resume());
+                    footerWeekly.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceWeekly.resume());
+                }
+                String anomalieVecteurGeoWeekly = EventValidator.verifierVecteurGeoPertinent(report);
+                if (anomalieVecteurGeoWeekly != null) footerWeekly.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoWeekly);
+                String anomalieVecteurSurpriseWeekly = EventValidator.verifierCoherenceVecteurSurprise(report);
+                if (anomalieVecteurSurpriseWeekly != null) footerWeekly.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseWeekly);
+                List<String> violationsNeutraliteWeekly = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(report);
+                if (!violationsNeutraliteWeekly.isEmpty()) footerWeekly.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteWeekly));
+                List<String> duplicationsWeekly = EventValidator.verifierJustificationsDupliquees(report);
+                if (!duplicationsWeekly.isEmpty()) footerWeekly.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsWeekly));
+
+                sendTelegramSecure("📅 *BILAN MACRO HEBDOMADAIRE — VENDREDI*\n\n" + report.trim() + footerWeekly, this);
                 
                 getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
                     .edit()
