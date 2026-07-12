@@ -1170,7 +1170,11 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         if (!duplicationsFb.isEmpty()) footerFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsFb));
 
         EventValidator.CroisementTechniqueResult croisementTechFb =
-            EventValidator.verifierCroisementTechnique(filteredFb.toString(), cachedMarketData);
+            EventValidator.CroisementTechniqueResult croisementTechFb = EventValidator.verifierCroisementTechnique(filteredFb.toString(), cachedMarketData);
+            if (!croisementTechFb.estValide()) footerFb.append("\n\n📉 *Alerte marché réel* : ").append(croisementTechFb.resume());
+
+            String chocSurNonConfirmeFb = EventValidator.verifierChocDollarSurNonConfirme(filteredFb.toString());
+            if (chocSurNonConfirmeFb != null) footerFb.append("\n\n🎯 *Alerte logique* : ").append(chocSurNonConfirmeFb);
         if (!croisementTechFb.estValide()) footerFb.append("\n\n📉 *Alerte marché réel* : ").append(croisementTechFb.resume());
 
         sendTelegramSecure("⚡ *[ANALYSE FONDAMENTALE]* " + filteredFb.toString().trim() + footerFb, NotificationService.this);
