@@ -817,14 +817,12 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                    "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
                                    "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n" +
                                    "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'\n\n" +
-                                   "CHECKLIST OBLIGATOIRE GOLD/GÉO (à appliquer avant d'écrire GOLD) :\n" +
-                                   "ÉTAPE A — Le texte contient-il une preuve d'un choc d'offre RÉEL et CONFIRMÉ ?\n" +
-                                   "  (mots attendus : 'bloqué', 'fermé', 'frappe confirmée', 'embargo appliqué', 'coupure exportations', " +
-                                   "'raffinerie touchée', 'arrêt production', 'riposte', 'frappe américaine', 'bombardement')\n" +
-                                   "  → SI OUI (choc réel confirmé) : USD renforcé par demande pétrole ⇒ GOLD🔴 ou NEUTRE | USDJPY neutre/🟢 | GBPUSD🔴\n" +
-                                   "  → SI NON (menace/discours/'pourrait'/'risque de'/tension verbale seulement) : dollar stable/faible ⇒ GOLD🟢 | USDJPY🔴 | GBPUSD🔴\n" +
-                                   "ÉTAPE B — USOIL🟢 et NASDAQ🔴/SP500🔴 dans LES DEUX cas (choc d'offre = prix pétrole ↑ + risk-off actions).\n" +
-                                   "INTERDIT : écrire GOLD🟢 sans avoir vérifié l'ÉTAPE A. Jamais de règle par défaut automatique.";
+                                   "RAPPEL GOLD/GÉO (ne pas recalculer) :\n" +
+                                   "Si un contexte géopolitique est présent, les directions GOLD/USDJPY/GBPUSD/USOIL sont DÉJÀ IMPOSÉES " +
+                                   "par la DIRECTIVE OBLIGATOIRE en tête de ce prompt (calculée en amont, non négociable). " +
+                                   "NE PAS les redéduire toi-même à partir de mots-clés dans le texte de la news — copie EXACTEMENT " +
+                                   "les directions données par cette directive, et rédige uniquement le mécanisme causal ≤8 mots pour chacune.\n" +
+                                   "INTERDIT : ignorer la directive du haut et déduire GOLD toi-même à partir du texte.";
                 } else {
                     jsonPayload.put("model", GROQ_MODEL);
                     jsonPayload.put("temperature", 0.02);
