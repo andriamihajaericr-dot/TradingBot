@@ -3668,25 +3668,31 @@ private void registerNetworkCallback() {
             for (String mot : motsClesMentionSimple) {
                 if (toutLeTexte.contains(mot)) { simpleMentionGeo = true; break; }
             }
-    
-            String directiveDeCrise = "";
-            if (chocReelConfirme) {
-                directiveDeCrise =
-                    "⚠️ [ALERTE SYSTÈME : CHOC D'OFFRE RÉEL CONFIRMÉ DÉTECTÉ]. " +
-                    "Appliquer l'EXCEPTION UNIQUE de la section HIÉRARCHIE (impact sur les 6 actifs) et la CONTRAINTE 10 " +
-                    "en évaluant le sens du dollar (Étape 1 de la matrice GÉO) avant de conclure sur GOLD.\n";
-    
-                String phaseTexte = EventValidator.getPhaseChocGeoTexte(NotificationService.this); // ✅ Context correct (méthode d'instance)
-                if (!phaseTexte.isEmpty()) {
-                    directiveDeCrise += phaseTexte + "\n";
-                }
-                directiveDeCrise += "\n";
-            } else if (simpleMentionGeo) {
-                directiveDeCrise =
-                    "ℹ️ [CONTEXTE : mention géopolitique détectée SANS confirmation d'impact physique réel]. " +
-                    "Ne PAS appliquer l'exception de hiérarchie automatiquement — traiter selon le rang normal " +
-                    "(TACTIQUE), sauf si un autre driver de la note confirme un choc d'offre réel.\n\n";
+        
+        String directiveDeCrise = "";
+        if (chocReelConfirme) {
+            directiveDeCrise =
+                "⚠️ [ALERTE SYSTÈME : CHOC D'OFFRE RÉEL CONFIRMÉ DÉTECTÉ]. " +
+                "DIRECTIVE OBLIGATOIRE ET NON NÉGOCIABLE (calculée en amont, ne pas recalculer) : " +
+                "GOLD = 🔴 ou NEUTRE (jamais 🟢, jamais justifié par 'refuge classique') | " +
+                "USDJPY = 🟢 (dollar renforcé par la demande pétrole, PAS un refuge ici) | " +
+                "GBPUSD = 🔴 | USOIL = 🟢 (choc d'offre = prix qui monte). " +
+                "Ta seule tâche : rédiger le mécanisme causal ≤8 mots pour chaque actif AVEC ces directions imposées, " +
+                "PAS recalculer les directions toi-même.\n";
+
+            String phaseTexte = EventValidator.getPhaseChocGeoTexte(NotificationService.this);
+            if (!phaseTexte.isEmpty()) {
+                directiveDeCrise += phaseTexte + "\n";
             }
+            directiveDeCrise += "\n";
+        } else if (simpleMentionGeo) {
+            directiveDeCrise =
+                "ℹ️ [CONTEXTE : mention géopolitique détectée SANS confirmation d'impact physique réel]. " +
+                "DIRECTIVE OBLIGATOIRE (calculée en amont) : GOLD = 🟢 (refuge classique, pas de contrepoids dollar) | " +
+                "USDJPY = 🔴 (yen refuge) | GBPUSD = 🔴 (même sens, régime RISK pur) | " +
+                "USOIL = 🟢 (prime de tension). Rédige uniquement le mécanisme causal ≤8 mots pour chaque actif, " +
+                "PAS recalculer les directions.\n\n";
+        }
             // ✅ Utilise basePrompt (contient le guidage mathématique si présent)
             return directiveDeCrise + basePrompt;
     }
