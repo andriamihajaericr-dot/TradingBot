@@ -142,6 +142,32 @@ public static CroisementTechniqueResult verifierCroisementTechnique(
         }
     }
 
+private static final String[] MOTS_PAYS_NON_US = {
+    "norvège", "norvégien", "norway", "norwegian", "suède", "suédois", "sweden",
+    "suisse", "swiss", "australie", "australien", "australia", "canada", "canadien",
+    "nouvelle-zélande", "new zealand", "corée du sud", "south korea", "inde", "india"
+};
+
+/**
+ * 🎯 Détecte un vecteur HAWKISH_US/DOVISH_US appliqué à une donnée d'un pays hors Fed/ECB/BoJ/BoE
+ * (ex: Norvège) — trou dans la taxonomie des banques centrales, mislabeling quasi certain.
+ */
+public static String verifierPaysHorsTaxonomieBanqueCentrale(String reportText) {
+    if (reportText == null) return null;
+    String reportUpper = reportText.toUpperCase(java.util.Locale.ROOT);
+    boolean estVecteurUS = reportUpper.contains("VECTEUR CIBLE : HAWKISH_US") || reportUpper.contains("VECTEUR CIBLE: HAWKISH_US")
+            || reportUpper.contains("VECTEUR CIBLE : DOVISH_US") || reportUpper.contains("VECTEUR CIBLE: DOVISH_US");
+    if (!estVecteurUS) return null;
+
+    String reportLower = reportLower0(reportText);
+    for (String pays : MOTS_PAYS_NON_US) {
+        if (reportLower.contains(pays)) {
+            return "VECTEUR CIBLE HAWKISH_US/DOVISH_US déclaré, mais la donnée concerne un pays hors taxonomie " +
+                   "(Fed/ECB/BoJ/BoE) : '" + pays + "' — probable mislabeling, aucun canal de transmission direct vers la Fed.";
+        }
+    }
+    return null;
+}
 private static final String[] MOTS_CONDITIONNEL_NON_CONFIRME = {
     "pourrait indiquer", "pourrait renforcer", "pourrait entraîner", "pourrait suggérer", "semble indiquer"
 };
