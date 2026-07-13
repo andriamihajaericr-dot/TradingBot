@@ -817,7 +817,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                     
                     jsonPayload.put("model", GROQ_MODEL_FALLBACK);
                     jsonPayload.put("temperature", 0.0);
-                    jsonPayload.put("max_tokens", 900);
+                    jsonPayload.put("max_tokens", 1400);
                     
                     // ✅ CORRECTION DU CRASH : On injecte le rappel de format directement dans la variable String du prompt
                     promptFinal += "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
@@ -833,7 +833,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 } else {
                     jsonPayload.put("model", GROQ_MODEL);
                     jsonPayload.put("temperature", 0.02);
-                    jsonPayload.put("max_tokens", 900);
+                    jsonPayload.put("max_tokens", 1600);
                 }
     
                 // Construction propre et sécurisée des messages JSON
