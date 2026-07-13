@@ -777,7 +777,6 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 List<String> historique = db.obtenirTexteEvenementsRecents();
                 String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
                 JSONObject jsonPayload = new JSONObject(); // ✅ déclaration restaurée (perdue lors du dernier collage)
-                
                 // Vérifier et réinitialiser le compteur à minuit UTC
                 long nowUtc = System.currentTimeMillis();
                 if (nowUtc >= tokenResetTime) {
