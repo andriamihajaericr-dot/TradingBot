@@ -692,14 +692,18 @@ String[] motsChocOffreReelElargis = {
         "iran", "israel", "hormuz", "ormuz", "ukrain", "russ" /* couvre russe/russie/russia */,
         "guerre", "war", "frappe", "missile", "drone", "militair", "military", "sanction", "embargo",
         "otan", "nato", "hezbollah", "houthi", "conflit", "invasion", "cessez-le-feu", "trêve", "treve",
-        "chine" /* tensions Taïwan/mer de Chine */, "taiwan", "corée du nord", "north korea"
+        "chine" /* tensions Taïwan/mer de Chine */, "taiwan", "corée du nord", "north korea",
+        "arabie saoudite", "saudi", "émirats", "uae", "qatar", "bahreïn", "bahrain", "koweït", "kuwait", "oman"
+        // ✅ Pays précis du Golfe = légitimes seuls. "moyen-orient"/"golfe" restent volontairement EXCLUS
+        // de cette liste — trop vagues seuls, voir MOTS_GEO_REGION_VAGUE + logique combinée ci-dessous.
     };
-    
-    /**
-     * 🎯 Vérifie que le VECTEUR CIBLE : GÉO déclaré est justifié par un vrai contenu géopolitique
-     * dans le FAIT MARQUANT — évite le mislabeling (ex: décision de compliance interne d'une banque
-     * classée à tort comme GÉO).
-     */
+
+    // ✅ Termes régionaux vagues : n'valident le vecteur GÉO QUE combinés à un mot d'action/conflit
+    // (déjà présent dans MOTS_GEO_LEGITIMES) — évite le cas "situation géopolitique au Moyen-Orient" sans détail.
+    private static final String[] MOTS_GEO_REGION_VAGUE = {
+        "moyen-orient", "middle east", "golfe", "gulf"
+    };
+  
     public static String verifierVecteurGeoPertinent(String reportText) {
         if (reportText == null) return null;
         String reportUpper = reportText.toUpperCase(java.util.Locale.ROOT);
@@ -709,12 +713,28 @@ String[] motsChocOffreReelElargis = {
     
         String reportLower = reportLower0(reportText);
         for (String mot : MOTS_GEO_LEGITIMES) {
-            if (reportLower.contains(mot)) return null; // légitime, un vrai mot-clé géopolitique est présent
+            if (reportLower.contains(mot)) return null; // légitime, un vrai mot-clé géopolitique est présent (pays/action précis)
+        }
+
+        // ✅ Cas région vague ("moyen-orient"/"golfe") : légitime UNIQUEMENT si combiné à un vrai mot d'action/conflit
+        boolean regionVague = false;
+        for (String mot : MOTS_GEO_REGION_VAGUE) {
+            if (reportLower.contains(mot)) { regionVague = true; break; }
+        }
+        if (regionVague) {
+            String[] motsAction = {"frappe", "missile", "drone", "guerre", "war", "militair", "military",
+                    "conflit", "invasion", "attaque", "sanction", "embargo"};
+            for (String mot : motsAction) {
+                if (reportLower.contains(mot)) return null; // région vague + action précise = légitime
+            }
+            return "VECTEUR CIBLE : GÉO déclaré avec une mention régionale vague ('Moyen-Orient'/'Golfe') " +
+                   "SANS pays ni action militaire/conflit précis — trop imprécis pour confirmer la pertinence géopolitique.";
         }
     
         return "VECTEUR CIBLE : GÉO déclaré mais aucun mot-clé géopolitique réel détecté dans le texte " +
                "(pays, conflit, militaire, sanction...) — probable mislabeling d'une news non-géopolitique (ex: compliance interne).";
     }
+    
    private static final String[] VECTEURS_BANQUE_ETRANGERE = {
         "HAWKISH_ECB", "DOVISH_ECB", "HAWKISH_BOJ", "DOVISH_BOJ", "HAWKISH_BOE", "DOVISH_BOE"
     };
