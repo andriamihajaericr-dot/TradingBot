@@ -1004,6 +1004,12 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 Log.w(TAG, "⚠️ [DOLLAR/NON-CONFIRMÉ] " + chocSurNonConfirme);
                                 footer.append("\n\n🎯 *Alerte logique* : ").append(chocSurNonConfirme);
                             }
+
+                            String paysHorsTaxonomie = EventValidator.verifierPaysHorsTaxonomieBanqueCentrale(filteredMessage.toString());
+                            if (paysHorsTaxonomie != null) {
+                                Log.w(TAG, "⚠️ [PAYS HORS TAXONOMIE] " + paysHorsTaxonomie);
+                                footer.append("\n\n🌍 *Alerte taxonomie* : ").append(paysHorsTaxonomie);
+                            }
                             String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
                             sendTelegramSecure(finalPayload, NotificationService.this);
                             // Extraire résumé directionnel pour affichage rappel inertie
@@ -1187,6 +1193,8 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         String chocSurNonConfirmeFb = EventValidator.verifierChocDollarSurNonConfirme(filteredFb.toString());
         if (chocSurNonConfirmeFb != null) footerFb.append("\n\n🎯 *Alerte logique* : ").append(chocSurNonConfirmeFb);
 
+        String paysHorsTaxonomieFb = EventValidator.verifierPaysHorsTaxonomieBanqueCentrale(filteredFb.toString());
+        if (paysHorsTaxonomieFb != null) footerFb.append("\n\n🌍 *Alerte taxonomie* : ").append(paysHorsTaxonomieFb);
         sendTelegramSecure("⚡ *[ANALYSE FONDAMENTALE]* " + filteredFb.toString().trim() + footerFb, NotificationService.this);
     } else {
         Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — ignoré.");
