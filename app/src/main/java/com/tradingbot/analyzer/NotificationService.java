@@ -66,10 +66,12 @@ public class NotificationService extends NotificationListenerService {
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
     // 🛡️ Compteur tokens Groq — protection quota TPD 100k/jour
-    private static final int TOKEN_BUDGET_DAILY = 90000; // marge 10k de sécurité
-    private static final int TOKEN_ESTIMATE_PER_CALL = 4000; // estimation moyenne input+output
-    private static final AtomicInteger dailyTokensUsed = new AtomicInteger(0);
-    private static long tokenResetTime = 0L; // minuit UTC du jour courant
+private static final int TOKEN_BUDGET_DAILY = 90000;      // llama-3.3-70b-versatile : 100k réel, marge 10k
+private static final int TOKEN_BUDGET_FALLBACK = 450000;  // llama-3.1-8b-instant : 500k réel, marge 50k
+private static final int TOKEN_ESTIMATE_PER_CALL = 4000;  // estimation moyenne input+output (par-événement)
+private static final AtomicInteger dailyTokensUsed = new AtomicInteger(0);    // ✅ dédié au modèle principal
+private static final AtomicInteger fallbackTokensUsed = new AtomicInteger(0); // ✅ dédié au modèle fallback, pool séparé
+private static long tokenResetTime = 0L; // minuit UTC du jour courant
     // Seuil minimal de prix pour considérer la donnée comme valide
     private static final double MIN_VALID_PRICE = 0.0;
     // Seuil de divergence (0.5% est plus sûr pour éviter le bruit sur le Forex)
@@ -795,15 +797,22 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 }
                 
                 // Vérifier budget restant
-                int used = dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
-                getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
-                    .putInt("daily_tokens_used", used)
-                    .putLong("token_reset_time", tokenResetTime)
-                    .apply();
-                
-                JSONObject jsonPayload = new JSONObject();
-                
-                if (used > TOKEN_BUDGET_DAILY) {
+                boolean dejaSurFallback = dailyTokensUsed.get() > TOKEN_BUDGET_DAILY;
+                int usedPrincipal = dejaSurFallback ? dailyTokensUsed.get() : dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                int usedFallback  = dejaSurFallback ? fallbackTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL) : 0;
+
+                boolean utiliserFallback = usedPrincipal > TOKEN_BUDGET_DAILY;
+                boolean fallbackAussiSature = usedFallback > TOKEN_BUDGET_FALLBACK;
+
+                if (utiliserFallback && fallbackAussiSature) {
+                    // ✅ Nouveau cas à gérer : même le fallback (500k) est épuisé — vraiment plus de marge Groq aujourd'hui
+                    Log.e(TAG, "🛑 [TOKEN] Fallback ÉGALEMENT épuisé (" + usedFallback + "/" + TOKEN_BUDGET_FALLBACK + ") — aucun appel Groq possible aujourd'hui.");
+                    if (MainActivity.instance != null)
+                        MainActivity.instance.addLog("🛑 [TOKEN] Budget principal ET fallback épuisés — en attente de minuit.");
+                    return; // ⛔ n'appelle plus Groq du tout pour cet événement
+                }
+                if (utiliserFallback) {
+                    // bascule fallback (utilise usedFallback pour ses propres logs, pas usedPrincipal)
                     Log.w(TAG, "[TOKEN] Budget TPD épuisé (" + used + ") — bascule directe fallback.");
                     if (MainActivity.instance != null)
                         MainActivity.instance.addLog("⚠️ [TOKEN] Budget 90k atteint — fallback préventif.");
