@@ -811,7 +811,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 }
                 if (utiliserFallback) {
                     // bascule fallback (utilise usedFallback pour ses propres logs, pas usedPrincipal)
-                    Log.w(TAG, "[TOKEN] Budget TPD épuisé (" + used + ") — bascule directe fallback.");
+                    Log.w(TAG, "[TOKEN] Budget TPD épuisé (" + usedFallback + "/" + TOKEN_BUDGET_FALLBACK + ") — bascule directe fallback.");
                     if (MainActivity.instance != null)
                         MainActivity.instance.addLog("⚠️ [TOKEN] Budget 90k atteint — fallback préventif.");
                     
