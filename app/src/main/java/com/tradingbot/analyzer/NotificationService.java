@@ -1037,7 +1037,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 try {
                                     jsonPayload.put("model", GROQ_MODEL_FALLBACK);
                                     jsonPayload.put("temperature", 0.0);
-                                    jsonPayload.put("max_tokens", 900);
+                                    jsonPayload.put("max_tokens", 1400);
                                     String contexteFallback = "";
                                     try {
                                 List<String> historiqueDb = db.obtenirTexteEvenementsRecents();
@@ -2759,7 +2759,7 @@ if (!tvSnap.isEmpty()) {
                             MainActivity.instance.addLog("⚠️ [DAILY] 429 TPD — bascule sur modèle léger.");
                         try {
                             payload.put("model", GROQ_MODEL_FALLBACK);
-                            payload.put("max_tokens", 1500);
+                            payload.put("max_tokens", 1600);
                             conn.disconnect();
                             URL urlFbD = new URL(GROQ_URL);
                             HttpURLConnection connFbD = (HttpURLConnection) urlFbD.openConnection();
@@ -2930,7 +2930,7 @@ connFbD.disconnect();
         }
         long now = System.currentTimeMillis() / 1000;
 String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
-final int MAX_MONTHLY_CHARS = 16000; // même seuil de sécurité que dailyDrivers, à ajuster ensemble une fois calibré
+final int MAX_MONTHLY_CHARS = 8500; // même seuil de sécurité que dailyDrivers, à ajuster ensemble une fois calibré
 if (monthlyRegistry != null && monthlyRegistry.length() > MAX_MONTHLY_CHARS) {
     Log.w(TAG, "[MONTHLY] Registre tronqué : " + monthlyRegistry.length() + " → " + MAX_MONTHLY_CHARS + " caractères");
     monthlyRegistry = monthlyRegistry.substring(0, MAX_MONTHLY_CHARS) + "\n[...tronqué...]";
@@ -3140,7 +3140,7 @@ if (responseCode == 429) {
         MainActivity.instance.addLog("⚠️ [MONTHLY] 429 TPD — bascule sur modèle léger.");
     try {
         payload.put("model", GROQ_MODEL_FALLBACK);
-        payload.put("max_tokens", 1500);
+        payload.put("max_tokens", 1600);
         conn.disconnect();
         URL urlFbM = new URL(GROQ_URL);
         HttpURLConnection connFbM = (HttpURLConnection) urlFbM.openConnection();
@@ -3354,7 +3354,7 @@ payload.put("temperature", 0.05);
             "REGISTRE MACRO DE LA SEMAINE :\n" + weeklyRegistry));
         payload.put("messages", messages);
         payload.put("temperature", 0.05);
-        payload.put("max_tokens", 1500);
+        payload.put("max_tokens", 1600);
         URL url = new URL(GROQ_URL);
         conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
