@@ -102,6 +102,11 @@ public static CroisementTechniqueResult verifierCroisementTechnique(
             break;
         }
     }
+
+    // ✅ Même déduplication défensive que validateAgainstRealMarket
+    List<String> anomaliesDedupliquees = new ArrayList<>(new java.util.LinkedHashSet<>(result.anomalies));
+    result.anomalies.clear();
+    result.anomalies.addAll(anomaliesDedupliquees);
     return result;
     }
     private static final Map<String, Long> recentFingerprints = new ConcurrentHashMap<>(256);
