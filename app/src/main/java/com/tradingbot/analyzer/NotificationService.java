@@ -66,12 +66,12 @@ public class NotificationService extends NotificationListenerService {
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
     // 🛡️ Compteur tokens Groq — protection quota TPD 100k/jour
-private static final int TOKEN_BUDGET_DAILY = 90000;      // llama-3.3-70b-versatile : 100k réel, marge 10k
-private static final int TOKEN_BUDGET_FALLBACK = 420000;  // llama-3.1-8b-instant : 500k réel, marge 50k
-private static final int TOKEN_ESTIMATE_PER_CALL = 6500;  // estimation moyenne input+output (par-événement)
-private static final AtomicInteger dailyTokensUsed = new AtomicInteger(0);    // ✅ dédié au modèle principal
-private static final AtomicInteger fallbackTokensUsed = new AtomicInteger(0); // ✅ dédié au modèle fallback, pool séparé
-private static long tokenResetTime = 0L; // minuit UTC du jour courant
+    private static final int TOKEN_BUDGET_DAILY = 90000;      // llama-3.3-70b-versatile : 100k réel, marge 10k
+    private static final int TOKEN_BUDGET_FALLBACK = 420000;  // llama-3.1-8b-instant : 500k réel, marge 50k
+    private static final int TOKEN_ESTIMATE_PER_CALL = 6500;  // estimation moyenne input+output (par-événement)
+    private static final AtomicInteger dailyTokensUsed = new AtomicInteger(0);    // ✅ dédié au modèle principal
+    private static final AtomicInteger fallbackTokensUsed = new AtomicInteger(0); // ✅ dédié au modèle fallback, pool séparé
+    private static long tokenResetTime = 0L; // minuit UTC du jour courant
     // Seuil minimal de prix pour considérer la donnée comme valide
     private static final double MIN_VALID_PRICE = 0.0;
     // Seuil de divergence (0.5% est plus sûr pour éviter le bruit sur le Forex)
@@ -247,11 +247,11 @@ private static long tokenResetTime = 0L; // minuit UTC du jour courant
     if (!report.contains("•")) return;
     try {
         // Prix depuis WebSocket TradingView — temps réel, gratuit, sans quota
-Map<String, Double> currentPrices = new HashMap<>();
-for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
-        TradingViewFetcher.getCache().entrySet()) {
-    currentPrices.put(e.getKey(), e.getValue().price);
-}
+    Map<String, Double> currentPrices = new HashMap<>();
+    for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
+            TradingViewFetcher.getCache().entrySet()) {
+        currentPrices.put(e.getKey(), e.getValue().price);
+    }
     long now = System.currentTimeMillis();
     
             for (String line : report.split("\n")) {
@@ -518,26 +518,26 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "TACTIQUE : Géopolitique,Tarifs,Chine,Michigan,Conference Board,Rumeurs.\n" +
     "DOMINANCE : le rang supérieur gagne toujours. Un driver tactique ne peut jamais annuler un driver suprême. Si conflit >40 points : suivre uniquement le driver dominant. Si conflit <20 points : FLUX MIXTE et conviction max 55%.\n" +
       
-"RÈGLE FED ABSOLUE : Powell,FOMC,Minutes FOMC,Dot Plot,Futur Chair FED sont toujours des drivers SUPRÊMES. Aucune news tactique ne peut les invalider.\n" +
-"EXCEPTION UNIQUE : choc géo avec impact PHYSIQUE CONFIRMÉ sur offre énergie (Hormuz bloqué, frappe infra pétrole/gaz, embargo appliqué) prime sur TOUS les drivers, pour les 6 actifs. Escalade verbale/menace = PAS d'exception, hiérarchie normale.\n" +
-"MOTEUR : 1-Identifier driver principal. 2-Régime dominant. 3-Matrice d'actifs. 4-Conviction. 5-Cohérence finale.\n" +
-"RÈGLE USD MAÎTRE : pour FED,CPI,PCE,NFP,GDP,ISM,GÉO-choc-confirmé déterminer d'abord DOLLAR FORT/FAIBLE avant tout autre actif.\n" +
-"VECTEURS : HAWKISH_US,DOVISH_US,HAWKISH_ECB,DOVISH_ECB,HAWKISH_BOJ,DOVISH_BOJ,HAWKISH_BOE,DOVISH_BOE,GÉO,TARIFS,CHINE,LIQUIDITÉ.\n" +
-"MONÉTAIRE US :\n" +
-"HAWKISH_US = USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ GBPUSD↓ USOIL=\n" +
-"DOVISH_US = USDJPY↓ GOLD↑ NASDAQ↑ SP500↑ GBPUSD↑ USOIL=\n" +
-
-"BANQUES CENTRALES ÉTRANGÈRES (HAWKISH/DOVISH_ECB/BOJ/BOE) :\n" +
-"BoJ HAWKISH=USDJPY↓ ; DOVISH=USDJPY↑. BoE HAWKISH=GBPUSD↑ ; DOVISH=GBPUSD↓.\n" +
-"ECB HAWKISH=GBPUSD légèrement↑ (EUR/GBP) SEULEMENT si pas de driver BoE propre ; DOVISH=inverse.\n" +
-"EURUSD jamais affiché seul (contexte calibration GBPUSD uniquement).\n" +
-"RÈGLE ABSOLUE BANQUE ÉTRANGÈRE : NASDAQ,SP500,GOLD,USOIL = NEUTRE (non listés) sauf choc global explicite.\n" +
-
-"GÉOPOLITIQUE ÉNERGIE (Iran/Hormuz) — PIVOT DOLLAR obligatoire avant conclusion :\n" +
-"Choc offre RÉEL confirmé (Hormuz bloqué/frappe infra/riposte US) → USD↑ : GOLD↓ou NEUTRE USOIL↑ USDJPY↑ GBPUSD↓ NASDAQ↓ SP500↓ | FLUX DOLLAR FORT(GÉO)\n" +
-"Escalade verbale SANS choc réel → USD stable/faible : GOLD↑ USOIL↑ USDJPY↓ GBPUSD↓ NASDAQ↓ SP500↓ | FLUX RISK-OFF GÉO\n" +
-"Désescalade → USD retour pré-choc : GOLD↓ USOIL↓ USDJPY↑ GBPUSD↑ NASDAQ↑ SP500↑ | FLUX RISK-ON\n" +
-"GÉO = réservé conflits armés/tensions inter-États/sanctions/terrorisme réels — jamais une décision interne d'entreprise.\n" +
+    "RÈGLE FED ABSOLUE : Powell,FOMC,Minutes FOMC,Dot Plot,Futur Chair FED sont toujours des drivers SUPRÊMES. Aucune news tactique ne peut les invalider.\n" +
+    "EXCEPTION UNIQUE : choc géo avec impact PHYSIQUE CONFIRMÉ sur offre énergie (Hormuz bloqué, frappe infra pétrole/gaz, embargo appliqué) prime sur TOUS les drivers, pour les 6 actifs. Escalade verbale/menace = PAS d'exception, hiérarchie normale.\n" +
+    "MOTEUR : 1-Identifier driver principal. 2-Régime dominant. 3-Matrice d'actifs. 4-Conviction. 5-Cohérence finale.\n" +
+    "RÈGLE USD MAÎTRE : pour FED,CPI,PCE,NFP,GDP,ISM,GÉO-choc-confirmé déterminer d'abord DOLLAR FORT/FAIBLE avant tout autre actif.\n" +
+    "VECTEURS : HAWKISH_US,DOVISH_US,HAWKISH_ECB,DOVISH_ECB,HAWKISH_BOJ,DOVISH_BOJ,HAWKISH_BOE,DOVISH_BOE,GÉO,TARIFS,CHINE,LIQUIDITÉ.\n" +
+    "MONÉTAIRE US :\n" +
+    "HAWKISH_US = USDJPY↑ GOLD↓ NASDAQ↓ SP500↓ GBPUSD↓ USOIL=\n" +
+    "DOVISH_US = USDJPY↓ GOLD↑ NASDAQ↑ SP500↑ GBPUSD↑ USOIL=\n" +
+    
+    "BANQUES CENTRALES ÉTRANGÈRES (HAWKISH/DOVISH_ECB/BOJ/BOE) :\n" +
+    "BoJ HAWKISH=USDJPY↓ ; DOVISH=USDJPY↑. BoE HAWKISH=GBPUSD↑ ; DOVISH=GBPUSD↓.\n" +
+    "ECB HAWKISH=GBPUSD légèrement↑ (EUR/GBP) SEULEMENT si pas de driver BoE propre ; DOVISH=inverse.\n" +
+    "EURUSD jamais affiché seul (contexte calibration GBPUSD uniquement).\n" +
+    "RÈGLE ABSOLUE BANQUE ÉTRANGÈRE : NASDAQ,SP500,GOLD,USOIL = NEUTRE (non listés) sauf choc global explicite.\n" +
+    
+    "GÉOPOLITIQUE ÉNERGIE (Iran/Hormuz) — PIVOT DOLLAR obligatoire avant conclusion :\n" +
+    "Choc offre RÉEL confirmé (Hormuz bloqué/frappe infra/riposte US) → USD↑ : GOLD↓ou NEUTRE USOIL↑ USDJPY↑ GBPUSD↓ NASDAQ↓ SP500↓ | FLUX DOLLAR FORT(GÉO)\n" +
+    "Escalade verbale SANS choc réel → USD stable/faible : GOLD↑ USOIL↑ USDJPY↓ GBPUSD↓ NASDAQ↓ SP500↓ | FLUX RISK-OFF GÉO\n" +
+    "Désescalade → USD retour pré-choc : GOLD↓ USOIL↓ USDJPY↑ GBPUSD↑ NASDAQ↑ SP500↑ | FLUX RISK-ON\n" +
+    "GÉO = réservé conflits armés/tensions inter-États/sanctions/terrorisme réels — jamais une décision interne d'entreprise.\n" +
     
     "EIA déficit=USOIL↑.\n" +
     "EIA surplus=USOIL↓.\n" +
@@ -725,11 +725,11 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
         }
     }
     return reportAjuste.toString().trim();
-} catch (Exception e) {
-    Log.e(TAG, "Erreur lors de l'injection des prix live", e);
-    return groqReport;
-}
-}
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur lors de l'injection des prix live", e);
+            return groqReport;
+        }
+    }
 private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, String fingerprint, String customSystemPrompt, boolean isSupremeRank,
     Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) { // ✅ Alignement sur le cache WebSocket TradingView (Twelve Data n'est plus utilisé)
     
@@ -1736,101 +1736,101 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                       Log.w(TAG, "[DATABASE] ⚠️ ÉCHEC saveEvent pour '" + title + "' (fingerprint=" + fingerprint + ") — doublon déjà connu ou erreur SQLite.");
                       }
                         // 9️⃣ Enrichissement dynamique et forcé du Prompt Système IA avec les flèches théoriques de l'analyseur
-// 9️⃣ Enrichissement dynamique du Prompt Système IA
-// 9️⃣ ENRICHISSEMENT MARKET DATA & PROMPT IA (Pipeline Intégré)
-// 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
-// ✅ CORRECTION : renommer la variable String pour éviter le conflit avec la Map
-String marketSnapshotString = "Marché non analysé.";
-          // ✅ Source unique : cache WebSocket TradingView (temps réel, gratuit, sans quota).
-java.util.Map<String, TradingViewFetcher.TVMarketData> batchSnapshot = null;
-try {
-    // Filtrer uniquement les actifs suivis par TradingView parmi enrichedAssets
-    List<String> twelveFiltered = new ArrayList<>();
-    for (String a : enrichedAssets) {
-        // Limiter aux 4 actifs core — conserve le même plafond qu'avant
-        if (MARKET_PRICE_ASSETS.contains(a)) twelveFiltered.add(a);
-        if (twelveFiltered.size() >= 4) break; // Cap strict à 4 actifs
-    }
-    if (!twelveFiltered.isEmpty()) {
-        java.util.Map<String, TradingViewFetcher.TVMarketData> liveCache = TradingViewFetcher.getCache();
-        batchSnapshot = new java.util.HashMap<>();
-        for (String a : twelveFiltered) {
-            TradingViewFetcher.TVMarketData d = liveCache.get(a);
-            if (d != null) batchSnapshot.put(a, d);
-        }
-    } else {
-        Log.w(TAG, "[SNAPSHOT] Aucun actif suivi par TradingView parmi les actifs enrichis — snapshot ignoré");
-    }
-    if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
-        StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
-        boolean premierActif = true;
-             
-        // ✅ Utilisation du type de données TradingViewFetcher pour l'itération du snapshot
-        for (java.util.Map.Entry<String, TradingViewFetcher.TVMarketData> entry : batchSnapshot.entrySet()) {
-            TradingViewFetcher.TVMarketData mData = entry.getValue();
-            
-            // 🛡️ MULTI-PROTECTION : Filtrage préventif des valeurs nulles ou prix aberrants (<= 0)
-            if (mData == null || mData.price <= 0) {
-                Log.w(TAG, "Snapshot - Actif ignoré car données invalides ou nulles : " + entry.getKey());
-                continue; 
-            }
-            // ✂️ SUPPRESSION DU SÉPARATEUR DE FIN : Ajouté uniquement avant les éléments suivants
-            if (!premierActif) {
-                sb.append(" | ");
-            }
-            premierActif = false;
-
-            String sign = (mData.changePercent >= 0) ? "+" : "";
-            String emojiVariation = (mData.changePercent > 0) ? "🟢"
-                : (mData.changePercent < 0) ? "🔴" : "⚪";
-            sb.append(entry.getKey())
-              .append(" => ")
-              .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)", mData.price, sign, mData.changePercent, emojiVariation));
-        }
-
-        // Vérification finale au cas où TOUS les actifs auraient été rejetés par le filtre de sécurité
-        if (premierActif) {
-            marketSnapshotString = "Données de marché indisponibles (aucun prix valide extrait).";
-        } else {
-            marketSnapshotString = sb.toString();
-        }
-    } else {
-        marketSnapshotString = "Données de marché indisponibles (cache WebSocket TradingView vide).";
-    }
-} catch (Exception e) {
-    Log.e(TAG, "Échec de la génération du snapshot marché", e);
-    marketSnapshotString = "Erreur technique lors de l'acquisition des données.";
-}
-
-// Construction du prompt enrichi (utilise la variable String renommée)
-String baseSystemPrompt = SYSTEM_PROMPT;
-String promptAI = "📊 [CONTEXTE MARCHÉ ACTUEL] : " + marketSnapshotString + "\n\n" + baseSystemPrompt;
-
-if (ecoResult.isParsed) {
-    promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
-            "L'analyseur mathématique déterministe a détecté un écart type. " +
-            "Direction recommandée : " + ecoResult.directionText + "\n\n" + promptAI;
-}
-// 🛡️ THROTTLE GÉO CIBLÉ (12 min) — seul angle mort non couvert par l'inertie macro 2h,
-// qui exclut volontairement les types GEO-* (cf. EventValidator.validate(), ÉTAPE 4).
-// Remplace l'ancien GEO_THROTTLE_MS mort de processIncomingMacroFeed(), sans réimporter
-// le reste de sa mécanique (rollback, etc.) devenue inutile face aux 3 autres garde-fous actifs.
-if (eventTypeStr.equals("GEOPOLITICAL")) {
-    if (!isSupremeRank && (currentTime - lastGeoTime < GEO_THROTTLE_MS)) {
-        Log.d(TAG, "[THROTTLE GÉO] Notification bloquée (12 min) - dernier choc géo il y a "
-                + (currentTime - lastGeoTime) / 1000 + "s");
-        return;
-    }
-    lastGeoTime = currentTime;
-}
-// 🔟 Exécution finale de l'analyse cognitive LLM
-// Réutilise batchSnapshot déjà récupéré ligne 1103 — 0 appel réseau supplémentaire
-boolean forceSend = isSupremeRank || (validationResult != null && validationResult.isCalendarIntercept);
-processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, forceSend, batchSnapshot);
-                   } catch (Exception e) {
-                        Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
-                    }
+            // 9️⃣ Enrichissement dynamique du Prompt Système IA
+            // 9️⃣ ENRICHISSEMENT MARKET DATA & PROMPT IA (Pipeline Intégré)
+            // 📋 IA (Pipeline Intégré) : Préparation du Snapshot Marché Temps Réel
+            // ✅ CORRECTION : renommer la variable String pour éviter le conflit avec la Map
+            String marketSnapshotString = "Marché non analysé.";
+                      // ✅ Source unique : cache WebSocket TradingView (temps réel, gratuit, sans quota).
+            java.util.Map<String, TradingViewFetcher.TVMarketData> batchSnapshot = null;
+            try {
+                // Filtrer uniquement les actifs suivis par TradingView parmi enrichedAssets
+                List<String> twelveFiltered = new ArrayList<>();
+                for (String a : enrichedAssets) {
+                    // Limiter aux 4 actifs core — conserve le même plafond qu'avant
+                    if (MARKET_PRICE_ASSETS.contains(a)) twelveFiltered.add(a);
+                    if (twelveFiltered.size() >= 4) break; // Cap strict à 4 actifs
                 }
+                if (!twelveFiltered.isEmpty()) {
+                    java.util.Map<String, TradingViewFetcher.TVMarketData> liveCache = TradingViewFetcher.getCache();
+                    batchSnapshot = new java.util.HashMap<>();
+                    for (String a : twelveFiltered) {
+                        TradingViewFetcher.TVMarketData d = liveCache.get(a);
+                        if (d != null) batchSnapshot.put(a, d);
+                    }
+                } else {
+                    Log.w(TAG, "[SNAPSHOT] Aucun actif suivi par TradingView parmi les actifs enrichis — snapshot ignoré");
+                }
+                if (batchSnapshot != null && !batchSnapshot.isEmpty()) {
+                    StringBuilder sb = new StringBuilder("Données de marché (Live Batch) : ");
+                    boolean premierActif = true;
+                         
+                    // ✅ Utilisation du type de données TradingViewFetcher pour l'itération du snapshot
+                    for (java.util.Map.Entry<String, TradingViewFetcher.TVMarketData> entry : batchSnapshot.entrySet()) {
+                        TradingViewFetcher.TVMarketData mData = entry.getValue();
+                        
+                        // 🛡️ MULTI-PROTECTION : Filtrage préventif des valeurs nulles ou prix aberrants (<= 0)
+                        if (mData == null || mData.price <= 0) {
+                            Log.w(TAG, "Snapshot - Actif ignoré car données invalides ou nulles : " + entry.getKey());
+                            continue; 
+                        }
+                        // ✂️ SUPPRESSION DU SÉPARATEUR DE FIN : Ajouté uniquement avant les éléments suivants
+                        if (!premierActif) {
+                            sb.append(" | ");
+                        }
+                        premierActif = false;
+            
+                        String sign = (mData.changePercent >= 0) ? "+" : "";
+                        String emojiVariation = (mData.changePercent > 0) ? "🟢"
+                            : (mData.changePercent < 0) ? "🔴" : "⚪";
+                        sb.append(entry.getKey())
+                          .append(" => ")
+                          .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)", mData.price, sign, mData.changePercent, emojiVariation));
+                    }
+            
+                    // Vérification finale au cas où TOUS les actifs auraient été rejetés par le filtre de sécurité
+                    if (premierActif) {
+                        marketSnapshotString = "Données de marché indisponibles (aucun prix valide extrait).";
+                    } else {
+                        marketSnapshotString = sb.toString();
+                    }
+                } else {
+                    marketSnapshotString = "Données de marché indisponibles (cache WebSocket TradingView vide).";
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Échec de la génération du snapshot marché", e);
+                marketSnapshotString = "Erreur technique lors de l'acquisition des données.";
+            }
+            
+            // Construction du prompt enrichi (utilise la variable String renommée)
+            String baseSystemPrompt = SYSTEM_PROMPT;
+            String promptAI = "📊 [CONTEXTE MARCHÉ ACTUEL] : " + marketSnapshotString + "\n\n" + baseSystemPrompt;
+            
+            if (ecoResult.isParsed) {
+                promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
+                        "L'analyseur mathématique déterministe a détecté un écart type. " +
+                        "Direction recommandée : " + ecoResult.directionText + "\n\n" + promptAI;
+            }
+            // 🛡️ THROTTLE GÉO CIBLÉ (12 min) — seul angle mort non couvert par l'inertie macro 2h,
+            // qui exclut volontairement les types GEO-* (cf. EventValidator.validate(), ÉTAPE 4).
+            // Remplace l'ancien GEO_THROTTLE_MS mort de processIncomingMacroFeed(), sans réimporter
+            // le reste de sa mécanique (rollback, etc.) devenue inutile face aux 3 autres garde-fous actifs.
+            if (eventTypeStr.equals("GEOPOLITICAL")) {
+                if (!isSupremeRank && (currentTime - lastGeoTime < GEO_THROTTLE_MS)) {
+                    Log.d(TAG, "[THROTTLE GÉO] Notification bloquée (12 min) - dernier choc géo il y a "
+                            + (currentTime - lastGeoTime) / 1000 + "s");
+                    return;
+                }
+                lastGeoTime = currentTime;
+            }
+            // 🔟 Exécution finale de l'analyse cognitive LLM
+            // Réutilise batchSnapshot déjà récupéré ligne 1103 — 0 appel réseau supplémentaire
+            boolean forceSend = isSupremeRank || (validationResult != null && validationResult.isCalendarIntercept);
+            processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, fingerprint, promptAI, forceSend, batchSnapshot);
+                               } catch (Exception e) {
+                                    Log.e(TAG, "Erreur critique au sein de l'exécution asynchrone de la pipeline", e);
+                                }
+                            }
                 });
             }
            /**
@@ -1897,27 +1897,27 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
         StringBuilder blocPrix = new StringBuilder();
     
         // Déclaré ici — accessible partout dans le try ET le catch
-java.util.Map<String, TradingViewFetcher.TVMarketData> batchPrices = null;
-
-if (assets != null && !assets.isEmpty()) {
-blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
-
-// Filtrer uniquement les actifs suivis par TradingView — assets complet va à Groq
-List<String> twelveAssets = new ArrayList<>();
-for (String asset : assets) {
-    if (MARKET_PRICE_ASSETS.contains(asset)) {
-        twelveAssets.add(asset);
-    }
-}
-
-if (!twelveAssets.isEmpty()) {
-// ✅ Lecture directe du cache WebSocket TradingView — plus de slot/quota à gérer
-java.util.Map<String, TradingViewFetcher.TVMarketData> liveCache = TradingViewFetcher.getCache();
-batchPrices = new java.util.HashMap<>();
-for (String asset : twelveAssets) {
-    TradingViewFetcher.TVMarketData d = liveCache.get(asset);
-    if (d != null) batchPrices.put(asset, d);
-}
+        java.util.Map<String, TradingViewFetcher.TVMarketData> batchPrices = null;
+        
+        if (assets != null && !assets.isEmpty()) {
+        blocPrix.append("\n\n📊 *COURS INSTANTANÉS AU MOMENT DE L'IMPACT :*");
+        
+        // Filtrer uniquement les actifs suivis par TradingView — assets complet va à Groq
+        List<String> twelveAssets = new ArrayList<>();
+        for (String asset : assets) {
+            if (MARKET_PRICE_ASSETS.contains(asset)) {
+                twelveAssets.add(asset);
+            }
+        }
+        
+        if (!twelveAssets.isEmpty()) {
+        // ✅ Lecture directe du cache WebSocket TradingView — plus de slot/quota à gérer
+        java.util.Map<String, TradingViewFetcher.TVMarketData> liveCache = TradingViewFetcher.getCache();
+        batchPrices = new java.util.HashMap<>();
+        for (String asset : twelveAssets) {
+            TradingViewFetcher.TVMarketData d = liveCache.get(asset);
+            if (d != null) batchPrices.put(asset, d);
+        }
         for (String asset : twelveAssets) {
         TradingViewFetcher.TVMarketData data = batchPrices.get(asset);
         if (data != null && data.price > 0) {
@@ -2621,32 +2621,32 @@ for (String asset : twelveAssets) {
                              // Prix depuis WebSocket TradingView — remplace MarketDataFetcher
                     StringBuilder sbM = new StringBuilder("📊 COURS AU MOMENT DU RAPPORT :\n");
                     boolean hasData = false;
-Map<String, TradingViewFetcher.TVMarketData> tvSnap = TradingViewFetcher.getCache();
-if (!tvSnap.isEmpty()) {
-    for (String asset : MARKET_PRICE_ASSETS) {
-        TradingViewFetcher.TVMarketData d = tvSnap.get(asset);
-        if (d != null && d.price > 0) {
-            String sign = d.changePercent >= 0 ? "+" : "";
-            String emojiVariation = (d.changePercent > 0) ? "🟢"
-                : (d.changePercent < 0) ? "🔴" : "⚪";
-            sbM.append(asset).append(" => ")
-               .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
-                   d.price, sign, d.changePercent, emojiVariation));
-            // 🏛️ Niveaux pivots natifs TradingView (Daily/Weekly), affichés seulement s'ils sont chargés
-            if (d.pdh > 0 || d.pdl > 0) {
-                sbM.append(" | PDH=").append(String.format(Locale.US, "%.4f", d.pdh))
-                   .append(" PDL=").append(String.format(Locale.US, "%.4f", d.pdl));
-                if (d.brokeAbovePDH) sbM.append(" 🔺PDH");
-                else if (d.brokeBelowPDL) sbM.append(" 🔻PDL");
-            }
-            if (d.pwh > 0 || d.pwl > 0) {
-                sbM.append(" | PWH=").append(String.format(Locale.US, "%.4f", d.pwh))
-                   .append(" PWL=").append(String.format(Locale.US, "%.4f", d.pwl));
-                if (d.brokeAbovePWH) sbM.append(" 🚀PWH");
-                else if (d.brokeBelowPWL) sbM.append(" 🔥PWL");
-            }
-            sbM.append("\n");
-            hasData = true;
+                    Map<String, TradingViewFetcher.TVMarketData> tvSnap = TradingViewFetcher.getCache();
+                    if (!tvSnap.isEmpty()) {
+                        for (String asset : MARKET_PRICE_ASSETS) {
+                            TradingViewFetcher.TVMarketData d = tvSnap.get(asset);
+                            if (d != null && d.price > 0) {
+                                String sign = d.changePercent >= 0 ? "+" : "";
+                                String emojiVariation = (d.changePercent > 0) ? "🟢"
+                                    : (d.changePercent < 0) ? "🔴" : "⚪";
+                                sbM.append(asset).append(" => ")
+                                   .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
+                                       d.price, sign, d.changePercent, emojiVariation));
+                                // 🏛️ Niveaux pivots natifs TradingView (Daily/Weekly), affichés seulement s'ils sont chargés
+                                if (d.pdh > 0 || d.pdl > 0) {
+                                    sbM.append(" | PDH=").append(String.format(Locale.US, "%.4f", d.pdh))
+                                       .append(" PDL=").append(String.format(Locale.US, "%.4f", d.pdl));
+                                    if (d.brokeAbovePDH) sbM.append(" 🔺PDH");
+                                    else if (d.brokeBelowPDL) sbM.append(" 🔻PDL");
+                                }
+                                if (d.pwh > 0 || d.pwl > 0) {
+                                    sbM.append(" | PWH=").append(String.format(Locale.US, "%.4f", d.pwh))
+                                       .append(" PWL=").append(String.format(Locale.US, "%.4f", d.pwl));
+                                    if (d.brokeAbovePWH) sbM.append(" 🚀PWH");
+                                    else if (d.brokeBelowPWL) sbM.append(" 🔥PWL");
+                                }
+                                sbM.append("\n");
+                                hasData = true;
                                 }
                             }
                         }
@@ -2781,64 +2781,64 @@ if (!tvSnap.isEmpty()) {
                                 osFbD.write(payload.toString().getBytes(StandardCharsets.UTF_8));
                             }
                             
-if (connFbD.getResponseCode() == HttpURLConnection.HTTP_OK) {
-    StringBuilder rFbD = new StringBuilder();
-    try (BufferedReader brFbD = new BufferedReader(new InputStreamReader(connFbD.getInputStream(), StandardCharsets.UTF_8))) {
-        String lineFbD;
-        while ((lineFbD = brFbD.readLine()) != null) rFbD.append(lineFbD);
-    }
-    String reportFbD = new JSONObject(rFbD.toString())
-        .getJSONArray("choices").getJSONObject(0)
-        .getJSONObject("message").getString("content");
-    
-    if (reportFbD != null && reportFbD.length() > 50) {
-        // 🎯 Même contrôle qualité que le chemin principal daily, appliqué sur reportFbD
-        StringBuilder footerDailyFb = new StringBuilder();
-
-        EventValidator.CoherenceRapportResult coherenceDailyFb = EventValidator.validerCoherenceRapport(reportFbD);
-        if (!coherenceDailyFb.estValide()) {
-            Log.w(TAG, "⚠️ [DAILY FALLBACK COHÉRENCE] " + coherenceDailyFb.resume());
-            footerDailyFb.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceDailyFb.resume());
-        }
-
-        String anomalieVecteurGeoDailyFb = EventValidator.verifierVecteurGeoPertinent(reportFbD);
-        if (anomalieVecteurGeoDailyFb != null) footerDailyFb.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoDailyFb);
-
-        String anomalieVecteurSurpriseDailyFb = EventValidator.verifierCoherenceVecteurSurprise(reportFbD);
-        if (anomalieVecteurSurpriseDailyFb != null) footerDailyFb.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseDailyFb);
-
-        List<String> violationsNeutraliteDailyFb = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(reportFbD);
-        if (!violationsNeutraliteDailyFb.isEmpty()) footerDailyFb.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteDailyFb));
-
-        List<String> duplicationsDailyFb = EventValidator.verifierJustificationsDupliquees(reportFbD);
-        if (!duplicationsDailyFb.isEmpty()) footerDailyFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsDailyFb));
-
-        sendTelegramSecure("📅 *[DAILY - FALLBACK]* " + reportFbD + footerDailyFb, NotificationService.this);
-        if (MainActivity.instance != null)
-            MainActivity.instance.addLog("✅ [DAILY] Rapport envoyé via modèle léger.");
-    } else {
-        Log.w(TAG, "[DAILY] Fallback : réponse trop courte (" + (reportFbD != null ? reportFbD.length() : 0) + " car.)");
-        if (MainActivity.instance != null)
-            MainActivity.instance.addLog("⚠️ [DAILY] Fallback : réponse Groq trop courte, non envoyée.");
-    }
-    
-} else {
-    // ✅ Ne plus supposer la cause : rapporter le code HTTP réel + un libellé indicatif seulement
-    String bodyErrFbD = "";
-    try (BufferedReader brErrFbD = new BufferedReader(new InputStreamReader(connFbD.getErrorStream(), StandardCharsets.UTF_8))) {
-        String l; StringBuilder sb = new StringBuilder();
-        while ((l = brErrFbD.readLine()) != null) sb.append(l);
-        bodyErrFbD = sb.toString();
-    } catch (Exception ignored) {}
-    int codeFbD = connFbD.getResponseCode();
-    String indication = (codeFbD == 429) ? "quota tokens épuisé"
-            : (codeFbD == 413) ? "payload trop volumineux (dailyDrivers probablement trop long)"
-            : "voir corps de réponse dans les logs";
-    Log.e(TAG, "[DAILY] Fallback HTTP " + codeFbD + " (" + indication + ") : " + bodyErrFbD);
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("❌ [DAILY] Fallback échoué (HTTP " + codeFbD + " — " + indication + ").");
-}
-connFbD.disconnect();
+                            if (connFbD.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                                StringBuilder rFbD = new StringBuilder();
+                                try (BufferedReader brFbD = new BufferedReader(new InputStreamReader(connFbD.getInputStream(), StandardCharsets.UTF_8))) {
+                                    String lineFbD;
+                                    while ((lineFbD = brFbD.readLine()) != null) rFbD.append(lineFbD);
+                                }
+                                String reportFbD = new JSONObject(rFbD.toString())
+                                    .getJSONArray("choices").getJSONObject(0)
+                                    .getJSONObject("message").getString("content");
+                                
+                                if (reportFbD != null && reportFbD.length() > 50) {
+                                    // 🎯 Même contrôle qualité que le chemin principal daily, appliqué sur reportFbD
+                                    StringBuilder footerDailyFb = new StringBuilder();
+                            
+                                    EventValidator.CoherenceRapportResult coherenceDailyFb = EventValidator.validerCoherenceRapport(reportFbD);
+                                    if (!coherenceDailyFb.estValide()) {
+                                        Log.w(TAG, "⚠️ [DAILY FALLBACK COHÉRENCE] " + coherenceDailyFb.resume());
+                                        footerDailyFb.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceDailyFb.resume());
+                                    }
+                            
+                                    String anomalieVecteurGeoDailyFb = EventValidator.verifierVecteurGeoPertinent(reportFbD);
+                                    if (anomalieVecteurGeoDailyFb != null) footerDailyFb.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoDailyFb);
+                            
+                                    String anomalieVecteurSurpriseDailyFb = EventValidator.verifierCoherenceVecteurSurprise(reportFbD);
+                                    if (anomalieVecteurSurpriseDailyFb != null) footerDailyFb.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseDailyFb);
+                            
+                                    List<String> violationsNeutraliteDailyFb = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(reportFbD);
+                                    if (!violationsNeutraliteDailyFb.isEmpty()) footerDailyFb.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteDailyFb));
+                            
+                                    List<String> duplicationsDailyFb = EventValidator.verifierJustificationsDupliquees(reportFbD);
+                                    if (!duplicationsDailyFb.isEmpty()) footerDailyFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsDailyFb));
+                            
+                                    sendTelegramSecure("📅 *[DAILY - FALLBACK]* " + reportFbD + footerDailyFb, NotificationService.this);
+                                    if (MainActivity.instance != null)
+                                        MainActivity.instance.addLog("✅ [DAILY] Rapport envoyé via modèle léger.");
+                                } else {
+                                    Log.w(TAG, "[DAILY] Fallback : réponse trop courte (" + (reportFbD != null ? reportFbD.length() : 0) + " car.)");
+                                    if (MainActivity.instance != null)
+                                        MainActivity.instance.addLog("⚠️ [DAILY] Fallback : réponse Groq trop courte, non envoyée.");
+                                }
+                                
+                            } else {
+                                // ✅ Ne plus supposer la cause : rapporter le code HTTP réel + un libellé indicatif seulement
+                                String bodyErrFbD = "";
+                                try (BufferedReader brErrFbD = new BufferedReader(new InputStreamReader(connFbD.getErrorStream(), StandardCharsets.UTF_8))) {
+                                    String l; StringBuilder sb = new StringBuilder();
+                                    while ((l = brErrFbD.readLine()) != null) sb.append(l);
+                                    bodyErrFbD = sb.toString();
+                                } catch (Exception ignored) {}
+                                int codeFbD = connFbD.getResponseCode();
+                                String indication = (codeFbD == 429) ? "quota tokens épuisé"
+                                        : (codeFbD == 413) ? "payload trop volumineux (dailyDrivers probablement trop long)"
+                                        : "voir corps de réponse dans les logs";
+                                Log.e(TAG, "[DAILY] Fallback HTTP " + codeFbD + " (" + indication + ") : " + bodyErrFbD);
+                                if (MainActivity.instance != null)
+                                    MainActivity.instance.addLog("❌ [DAILY] Fallback échoué (HTTP " + codeFbD + " — " + indication + ").");
+                            }
+                            connFbD.disconnect();
                         } catch (Exception eFbD) {
                             Log.e(TAG, "[DAILY] Fallback échoué", eFbD);
                         }
