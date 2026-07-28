@@ -700,6 +700,11 @@ private static final String DAILY_SYSTEM_PROMPT =
     Executors.newSingleThreadExecutor().execute(() -> {
         java.net.HttpURLConnection conn = null;
         EventDatabase db = EventDatabase.getInstance(NotificationService.this);
+        
+        // ✅ VARIABLES DÉCLARÉES ICI - PORTÉE GLOBALE DANS LE RUNNABLE
+        boolean utiliserFallback = false;
+        boolean tokensAlreadyCharged = false; // Flag pour éviter double remboursement
+        
         if (db == null || fingerprint == null) {
             Log.e(TAG, "Instance SQLite ou empreinte manquante.");
             return;
@@ -710,7 +715,7 @@ private static final String DAILY_SYSTEM_PROMPT =
             String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
             
             // ═══════════════════════════════════════════════════════
-            // GESTION BUDGET TOKENS - VERSION THREAD-SAFE
+            // GESTION BUDGET TOKENS
             // ═══════════════════════════════════════════════════════
             
             long nowUtc = System.currentTimeMillis();
@@ -735,29 +740,7 @@ private static final String DAILY_SYSTEM_PROMPT =
                     }
                 }
             }
-            // ✅ Variable finale pour usage dans bloc synchronized
-            final boolean[] fallbackConfig = new boolean[2]; // [0]=utiliserFallback, [1]=budgetEpuise
             
-            synchronized (dailyTokensUsed) {
-                int currentDaily = dailyTokensUsed.get();
-                int currentFallback = fallbackTokensUsed.get();
-                
-                fallbackConfig[0] = currentDaily >= TOKEN_BUDGET_DAILY; // utiliserFallback
-                
-                if (fallbackConfig[0]) {
-                    if (currentFallback >= TOKEN_BUDGET_FALLBACK) {
-                        fallbackConfig[1] = true; // budgetEpuise
-                    } else {
-                        fallbackConfig[1] = false;
-                        fallbackTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
-                    }
-                } else {
-                    fallbackConfig[1] = false;
-                    dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
-                }
-            }
-            // ✅ OPÉRATION ATOMIQUE : Check + Increment en une seule fois
-            boolean utiliserFallback;
             boolean budgetEpuise;
             
             synchronized (dailyTokensUsed) {
@@ -767,21 +750,22 @@ private static final String DAILY_SYSTEM_PROMPT =
                 utiliserFallback = currentDaily >= TOKEN_BUDGET_DAILY;
                 
                 if (utiliserFallback) {
-                    // Vérifier si fallback aussi saturé
                     if (currentFallback >= TOKEN_BUDGET_FALLBACK) {
                         budgetEpuise = true;
                     } else {
                         budgetEpuise = false;
                         fallbackTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                        tokensAlreadyCharged = true;
                     }
                 } else {
                     budgetEpuise = false;
                     dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                    tokensAlreadyCharged = true;
                 }
             }
             
             if (budgetEpuise) {
-                Log.e(TAG, "🛑 [TOKEN] Budgets épuisés — attente minuit.");
+                Log.e(TAG, "🛑 [TOKEN] Budgets épuisés.");
                 if (MainActivity.instance != null)
                     MainActivity.instance.addLog("🛑 [TOKEN] Budgets épuisés.");
                 db.markEventAsSynced(fingerprint, "BUDGET_EXHAUSTED");
@@ -836,13 +820,16 @@ private static final String DAILY_SYSTEM_PROMPT =
                 Log.e(TAG, "[GROQ] Clé API absente.");
                 db.markEventAsSynced(fingerprint, "FAILED_MISSING_API_KEY");
                 
-                // ✅ Rembourser les tokens puisque pas d'appel fait
-                synchronized (dailyTokensUsed) {
-                    if (utiliserFallback) {
-                        fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
-                    } else {
-                        dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                // Rembourser tokens
+                if (tokensAlreadyCharged) {
+                    synchronized (dailyTokensUsed) {
+                        if (utiliserFallback) {
+                            fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                        } else {
+                            dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                        }
                     }
+                    tokensAlreadyCharged = false;
                 }
                 return;
             }
@@ -890,7 +877,7 @@ private static final String DAILY_SYSTEM_PROMPT =
                     return;
                 }
 
-                // Filtrage + validation (même logique que votre code original)
+                // Filtrage
                 String filteredMessage = filtrerRapport(aiReport);
                 int activeSignalsCount = compterSignauxActifs(filteredMessage);
 
@@ -900,7 +887,7 @@ private static final String DAILY_SYSTEM_PROMPT =
                     if (convictionPercent >= 40 || isSupremeRank) {
                         String enrichedReport = injectLivePrices(filteredMessage, enrichedAssets);
                         
-                        // Validations (votre code existant)
+                        // Validations
                         StringBuilder footer = construireFooterValidation(
                             sourceName, filteredMessage, body, cachedMarketData);
                         
@@ -920,38 +907,41 @@ private static final String DAILY_SYSTEM_PROMPT =
                 }
                 
             } else if (status == 429) {
-                // ✅ GESTION 429 PROPRE : Pas de retry, juste log
-                Log.e(TAG, "[GROQ] 429 Rate Limit atteint.");
+                Log.e(TAG, "[GROQ] 429 Rate Limit.");
                 if (MainActivity.instance != null)
                     MainActivity.instance.addLog("⚠️ [GROQ] 429 — événement ignoré.");
                 
                 db.markEventAsSynced(fingerprint, "FAILED_429_RATE_LIMIT");
-                
-                // ✅ NE PAS rembourser les tokens : le 429 consomme quand même du quota
+                // NE PAS rembourser : le 429 consomme le quota
                 
             } else if (status >= 500) {
                 Log.w(TAG, "[GROQ] Erreur serveur " + status + " — réessai ultérieur.");
-                // Ne pas marquer synced pour laisser une chance de retry automatique
                 
-                // ✅ Rembourser tokens (requête pas comptabilisée côté serveur)
-                synchronized (dailyTokensUsed) {
-                    if (utiliserFallback) {
-                        fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
-                    } else {
-                        dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                // Rembourser tokens
+                if (tokensAlreadyCharged) {
+                    synchronized (dailyTokensUsed) {
+                        if (utiliserFallback) {
+                            fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                        } else {
+                            dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                        }
                     }
+                    tokensAlreadyCharged = false;
                 }
                 
             } else {
                 db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
                 
-                // ✅ Rembourser tokens
-                synchronized (dailyTokensUsed) {
-                    if (utiliserFallback) {
-                        fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
-                    } else {
-                        dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                // Rembourser tokens
+                if (tokensAlreadyCharged) {
+                    synchronized (dailyTokensUsed) {
+                        if (utiliserFallback) {
+                            fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                        } else {
+                            dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                        }
                     }
+                    tokensAlreadyCharged = false;
                 }
             }
             
@@ -965,12 +955,14 @@ private static final String DAILY_SYSTEM_PROMPT =
                 }
             }
             
-            // ✅ Rembourser tokens en cas d'exception
-            synchronized (dailyTokensUsed) {
-                if (utiliserFallback) {
-                    fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
-                } else {
-                    dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+            // ✅ Remboursement tokens (utiliserFallback accessible ici)
+            if (tokensAlreadyCharged) {
+                synchronized (dailyTokensUsed) {
+                    if (utiliserFallback) {
+                        fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                    } else {
+                        dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                    }
                 }
             }
             
