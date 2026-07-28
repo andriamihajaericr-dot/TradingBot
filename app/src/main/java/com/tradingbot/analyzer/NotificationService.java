@@ -671,563 +671,439 @@ private static final String DAILY_SYSTEM_PROMPT =
             return groqReport;
         }
     }
-private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, String fingerprint, String customSystemPrompt, boolean isSupremeRank,
-    Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) { // ✅ Alignement sur le cache WebSocket TradingView (Twelve Data n'est plus utilisé)
+  private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, 
+    String fingerprint, String customSystemPrompt, boolean isSupremeRank,
+    Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) {
     
     final String systemPrompt = (customSystemPrompt != null && !customSystemPrompt.isEmpty())
-       ? customSystemPrompt
-       : SYSTEM_PROMPT;
+       ? customSystemPrompt : SYSTEM_PROMPT;
        
-    // Génération dynamique de l'horodatage actuel au format de Madagascar (EAT)
+    // Horodatage Madagascar
     java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
     sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
     String currentMadaTime = sdf.format(new java.util.Date());
 
-    // Sécurisation anti-NullPointerException de la liste des actifs
     String assetsString = (enrichedAssets != null) ? enrichedAssets.toString() : "[]";
  
-    // APRÈS (version sûre, avec garde-fou isSupremeRank/calendrier)
+    // Filtre pertinence (sauf événements pré-qualifiés SUPREME)
     if (!isSupremeRank && !EventValidator.estMaterielPourMarche(title, body)) {
-        // ⚠️ Garde-fou : isSupremeRank couvre aussi les événements de calendrier déjà validés
-        // (isCalendarIntercept) — on ne filtre JAMAIS un événement déjà pré-qualifié en amont,
-        // uniquement les news brutes non classées, pour éviter de perdre un vrai signal SUPRÊME.
-        Log.w(TAG, "🚫 [FILTRE PERTINENCE] News jugée sans lien matériel avec les 6 actifs — appel IA annulé : " + title);
+        Log.w(TAG, "🚫 [FILTRE PERTINENCE] News hors-sujet ignorée : " + title);
         if (MainActivity.instance != null)
-            MainActivity.instance.addLog("🚫 [FILTRE] News hors-sujet ignorée : " + title);
+            MainActivity.instance.addLog("🚫 [FILTRE] News hors-sujet : " + title);
         return;
     }
 
-    
     final String userContent = "CONTEXTE TEMPOREL : " + currentMadaTime + "\n"
             + "SOURCE DE LA NEWS : " + sourceName + "\n"
             + "TITRE : " + title + "\n"
             + "CORPS DE LA NOTIFICATION : " + body + "\n"
             + "ACTIFS PRÉ-QUALIFIÉS : " + assetsString;
 
-    Executors.newSingleThreadExecutor().execute(new Runnable() {
-        @Override
-        public void run() {
-            java.net.HttpURLConnection conn = null;
-            EventDatabase db = EventDatabase.getInstance(NotificationService.this);
-            if (db == null || fingerprint == null) {
-                Log.e(TAG, "Instance SQLite ou empreinte manquante. Avortement du pipeline.");
+    Executors.newSingleThreadExecutor().execute(() -> {
+        java.net.HttpURLConnection conn = null;
+        EventDatabase db = EventDatabase.getInstance(NotificationService.this);
+        if (db == null || fingerprint == null) {
+            Log.e(TAG, "Instance SQLite ou empreinte manquante. Abandon.");
+            return;
+        }
+
+        try {
+            List<String> historique = db.obtenirTexteEvenementsRecents();
+            String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
+            
+            // ═══════════════════════════════════════════════════════
+            // GESTION BUDGET TOKENS - VERSION CORRIGÉE
+            // ═══════════════════════════════════════════════════════
+            
+            // Réinitialisation minuit Madagascar
+            long nowUtc = System.currentTimeMillis();
+            if (nowUtc >= tokenResetTime) {
+                java.util.Calendar madaMidnightCal = java.util.Calendar.getInstance(
+                    java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
+                madaMidnightCal.setTimeInMillis(nowUtc);
+                madaMidnightCal.add(java.util.Calendar.DAY_OF_MONTH, 1);
+                madaMidnightCal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+                madaMidnightCal.set(java.util.Calendar.MINUTE, 0);
+                madaMidnightCal.set(java.util.Calendar.SECOND, 0);
+                madaMidnightCal.set(java.util.Calendar.MILLISECOND, 0);
+                
+                dailyTokensUsed.set(0);
+                fallbackTokensUsed.set(0);
+                tokenResetTime = madaMidnightCal.getTimeInMillis();
+                
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("🔄 [TOKEN] Compteur réinitialisé (minuit Madagascar).");
+            }
+            
+            // ✅ NOUVELLE LOGIQUE : Vérifier AVANT d'incrémenter
+            int currentDailyUsed = dailyTokensUsed.get();
+            int currentFallbackUsed = fallbackTokensUsed.get();
+            
+            boolean utiliserFallback = currentDailyUsed >= TOKEN_BUDGET_DAILY;
+            boolean fallbackAussiSature = currentFallbackUsed >= TOKEN_BUDGET_FALLBACK;
+            
+            // Cas 1 : Même le fallback est saturé
+            if (utiliserFallback && fallbackAussiSature) {
+                Log.e(TAG, "🛑 [TOKEN] Budget principal (" + currentDailyUsed + "/" + TOKEN_BUDGET_DAILY + 
+                    ") ET fallback (" + currentFallbackUsed + "/" + TOKEN_BUDGET_FALLBACK + ") épuisés.");
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("🛑 [TOKEN] Budgets épuisés — attente minuit.");
+                db.markEventAsSynced(fingerprint, "BUDGET_EXHAUSTED");
                 return;
             }
-    
-            try {
-                List<String> historique = db.obtenirTexteEvenementsRecents();
-                String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
-                JSONObject jsonPayload = new JSONObject(); // ✅ déclaration restaurée (perdue lors du dernier collage)
-                // Vérifier et réinitialiser le compteur à minuit UTC
-                long nowUtc = System.currentTimeMillis();
-                if (nowUtc >= tokenResetTime) {
-                    java.util.Calendar madaMidnightCal = java.util.Calendar.getInstance(
-                        java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
-                    madaMidnightCal.setTimeInMillis(nowUtc);
-                    madaMidnightCal.add(java.util.Calendar.DAY_OF_MONTH, 1);
-                    madaMidnightCal.set(java.util.Calendar.HOUR_OF_DAY, 0);
-                    madaMidnightCal.set(java.util.Calendar.MINUTE, 0);
-                    madaMidnightCal.set(java.util.Calendar.SECOND, 0);
-                    madaMidnightCal.set(java.util.Calendar.MILLISECOND, 0);
-                    dailyTokensUsed.set(0);
-                    tokenResetTime = madaMidnightCal.getTimeInMillis();
-                    if (MainActivity.instance != null)
-                        MainActivity.instance.addLog("🔄 [TOKEN] Compteur TPD réinitialisé (minuit Madagascar).");
-                }
+            
+            // ═══════════════════════════════════════════════════════
+            // CONSTRUCTION PAYLOAD
+            // ═══════════════════════════════════════════════════════
+            
+            JSONObject jsonPayload = new JSONObject();
+            JSONArray messages = new JSONArray();
+            messages.put(new JSONObject().put("role", "system").put("content", promptFinal));
+            messages.put(new JSONObject().put("role", "user").put("content", userContent));
+            jsonPayload.put("messages", messages);
+            
+            // Cas 2 : Utiliser fallback (budget principal épuisé)
+            if (utiliserFallback) {
+                Log.w(TAG, "[TOKEN] Budget principal épuisé (" + currentDailyUsed + "/" + TOKEN_BUDGET_DAILY + 
+                    ") — bascule fallback.");
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("⚠️ [TOKEN] Bascule fallback.");
                 
-                // Vérifier budget restant
-                boolean dejaSurFallback = dailyTokensUsed.get() > TOKEN_BUDGET_DAILY;
-                int usedPrincipal = dejaSurFallback ? dailyTokensUsed.get() : dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
-                int usedFallback  = dejaSurFallback ? fallbackTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL) : 0;
+                jsonPayload.put("model", GROQ_MODEL_FALLBACK);
+                jsonPayload.put("temperature", 0.0);
+                jsonPayload.put("max_tokens", 1400);
+                
+                // Enrichissement contexte fallback
+                String contexteFallback = enrichirContexteFallback(db, cachedMarketData);
+                JSONObject userMsg = messages.getJSONObject(1);
+                userMsg.put("content", contexteFallback + userMsg.getString("content"));
+                
+                // Rappel format strict fallback
+                promptFinal += "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
+                    "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
+                    "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n" +
+                    "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'\n\n" +
+                    "RAPPEL GOLD/GÉO : Si contexte géo, directions GOLD/USDJPY/GBPUSD/USOIL DÉJÀ IMPOSÉES par DIRECTIVE " +
+                    "en tête (non négociable). NE PAS redéduire toi-même — copier EXACTEMENT + mécanisme ≤8 mots.";
+                
+                // ✅ Incrémenter UNIQUEMENT le compteur fallback
+                fallbackTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                
+            } else {
+                // Cas 3 : Utiliser modèle principal (budget OK)
+                jsonPayload.put("model", GROQ_MODEL);
+                jsonPayload.put("temperature", 0.02);
+                jsonPayload.put("max_tokens", 1600);
+                
+                // ✅ Incrémenter UNIQUEMENT le compteur principal
+                dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+            }
+            
+            // ═══════════════════════════════════════════════════════
+            // APPEL API GROQ
+            // ═══════════════════════════════════════════════════════
+            
+            String apiKey = getGroqApiKey();
+            if (apiKey.isEmpty()) {
+                Log.e(TAG, "[GROQ] Clé API absente.");
+                db.markEventAsSynced(fingerprint, "FAILED_MISSING_API_KEY");
+                return;
+            }
 
-                boolean utiliserFallback = usedPrincipal > TOKEN_BUDGET_DAILY;
-                boolean fallbackAussiSature = usedFallback > TOKEN_BUDGET_FALLBACK;
+            java.net.URL url = new java.net.URL(GROQ_URL);
+            conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
 
-                if (utiliserFallback && fallbackAussiSature) {
-                    // ✅ Nouveau cas à gérer : même le fallback (500k) est épuisé — vraiment plus de marge Groq aujourd'hui
-                    Log.e(TAG, "🛑 [TOKEN] Fallback ÉGALEMENT épuisé (" + usedFallback + "/" + TOKEN_BUDGET_FALLBACK + ") — aucun appel Groq possible aujourd'hui.");
-                    if (MainActivity.instance != null)
-                        MainActivity.instance.addLog("🛑 [TOKEN] Budget principal ET fallback épuisés — en attente de minuit.");
-                    return; // ⛔ n'appelle plus Groq du tout pour cet événement
+            try (java.io.OutputStream os = conn.getOutputStream()) {
+                byte[] input = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+                os.flush();
+            }
+
+            int status = conn.getResponseCode();
+            
+            // ═══════════════════════════════════════════════════════
+            // TRAITEMENT RÉPONSE
+            // ═══════════════════════════════════════════════════════
+            
+            if (status == java.net.HttpURLConnection.HTTP_OK) {
+                StringBuilder response = new StringBuilder();
+                try (java.io.BufferedReader br = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        response.append(line);
+                    }
                 }
-                if (utiliserFallback) {
-                    // bascule fallback (utilise usedFallback pour ses propres logs, pas usedPrincipal)
-                    Log.w(TAG, "[TOKEN] Budget TPD épuisé (" + usedFallback + "/" + TOKEN_BUDGET_FALLBACK + ") — bascule directe fallback.");
-                    if (MainActivity.instance != null)
-                        MainActivity.instance.addLog("⚠️ [TOKEN] Budget 90k atteint — fallback préventif.");
-                    
-                    jsonPayload.put("model", GROQ_MODEL_FALLBACK);
-                    jsonPayload.put("temperature", 0.0);
-                    jsonPayload.put("max_tokens", 1400);
-                    
-                    // ✅ CORRECTION DU CRASH : On injecte le rappel de format directement dans la variable String du prompt
-                    promptFinal += "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
-                                   "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
-                                   "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n" +
-                                   "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'\n\n" +
-                                   "RAPPEL GOLD/GÉO (ne pas recalculer) :\n" +
-                                   "Si un contexte géopolitique est présent, les directions GOLD/USDJPY/GBPUSD/USOIL sont DÉJÀ IMPOSÉES " +
-                                   "par la DIRECTIVE OBLIGATOIRE en tête de ce prompt (calculée en amont, non négociable). " +
-                                   "NE PAS les redéduire toi-même à partir de mots-clés dans le texte de la news — copie EXACTEMENT " +
-                                   "les directions données par cette directive, et rédige uniquement le mécanisme causal ≤8 mots pour chacune.\n" +
-                                   "INTERDIT : ignorer la directive du haut et déduire GOLD toi-même à partir du texte.";
-                } else {
-                    jsonPayload.put("model", GROQ_MODEL);
-                    jsonPayload.put("temperature", 0.02);
-                    jsonPayload.put("max_tokens", 1600);
-                }
-    
-                // Construction propre et sécurisée des messages JSON
-                JSONArray messages = new JSONArray();
-                messages.put(new JSONObject().put("role", "system").put("content", promptFinal));
-                messages.put(new JSONObject().put("role", "user").put("content", userContent));
-                jsonPayload.put("messages", messages);
-    
-                String apiKey = getGroqApiKey();
-                if (apiKey.isEmpty()) {
-                    Log.e(TAG, "[GROQ] Clé API absente. Analyse annulée.");
-                    db.markEventAsSynced(fingerprint, "FAILED_MISSING_API_KEY");
+
+                JSONObject jsonResponse = new JSONObject(response.toString());
+                String aiReport = jsonResponse.getJSONArray("choices")
+                        .getJSONObject(0)
+                        .getJSONObject("message")
+                        .getString("content");
+
+                if (aiReport == null || aiReport.length() < 50) {
+                    Log.w(TAG, "[GROQ] Rapport reçu trop court ou vide.");
+                    db.markEventAsSynced(fingerprint, "FAILED_EMPTY_LLM_REPORT");
                     return;
                 }
-    
-                java.net.URL url = new java.net.URL(GROQ_URL);
-                conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setDoOutput(true);
-                conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(15000);
-    
-                try (java.io.OutputStream os = conn.getOutputStream()) {
-                    byte[] input = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                    os.write(input, 0, input.length);
-                    os.flush();
-                }
-    
-                int status = conn.getResponseCode();
-                if (status == java.net.HttpURLConnection.HTTP_OK) {
-                    StringBuilder response = new StringBuilder();
-                    try (java.io.BufferedReader br = new java.io.BufferedReader(
-                            new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = br.readLine()) != null) {
-                            response.append(line);
-                        }
-                    }
-    
-                    JSONObject jsonResponse = new JSONObject(response.toString());
-                    String aiReport = jsonResponse.getJSONArray("choices")
-                            .getJSONObject(0)
-                            .getJSONObject("message")
-                            .getString("content");
-    
-                    if (aiReport == null || aiReport.length() < 50) {
-                        Log.w(TAG, "[GROQ] Rapport reçu trop court ou vide.");
-                        db.markEventAsSynced(fingerprint, "FAILED_EMPTY_LLM_REPORT");
-                        return;
-                    }
-    
-                    // Filtrage intelligent des signaux d'impacts macroéconomiques
-                    StringBuilder filteredMessage = new StringBuilder();
-                    String[] lines = aiReport.split("\n");
-                    int activeSignalsCount = 0;
-                    boolean inImpactSection = false;
-    
-                    java.util.Set<String> actifsDejaSeen = new java.util.HashSet<>();
-                    for (String line : lines) {
-                        // Masquer les actifs NEUTRE — inutiles pour le trading
-                        if (line.contains("NEUTRE") || line.matches(".*•.*:.*= \\|.*")) continue;
-                        // Masquer les doublons d'actifs (ex: EURUSD affiché 2 fois)
-                        if (line.trim().startsWith("•")) {
-                            String actifKey = line.trim().length() > 15 ? line.trim().substring(0, 15) : line.trim();
-                            if (!actifsDejaSeen.add(actifKey)) continue;
-                        }
-                        String trimmed = line.trim();
-                        if (trimmed.isEmpty()) continue;
-                        if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
-                            trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
-                            filteredMessage.append(line).append("\n");
-                            if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
-                            continue;
-                        }
-                        if (inImpactSection && trimmed.startsWith("•")) {
-                            String upperLine = line.toUpperCase(Locale.ROOT);
-                            boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
-                            boolean isSignificant = !isInclinationNeutral &&
-                                (upperLine.contains("BULLISH") || upperLine.contains("BEARISH"));
-                            if (isSignificant) {
-                                filteredMessage.append(line).append("\n");
-                                activeSignalsCount++;
-                            }
-                        }
-                    }
-    
-                    // ✅ Application du filtre conviction
-                    // APRÈS
-                    if (activeSignalsCount > 0) {
-                    int convictionPercent = extrairePourcentageConviction(aiReport);
-                           // APRÈS
-                        if (convictionPercent >= 40 || isSupremeRank) {
-                              String enrichedReport = injectLivePrices(
-                                filteredMessage.toString().trim(),
-                                enrichedAssets
-                            );
-                        
-                            // 🎯 Validation croisée : prédiction du rapport vs mouvement RÉEL du marché
-                            EventValidator.MarketValidationResult marketCheck =
-                                EventValidator.validateAgainstRealMarket(
-                                    NotificationService.this, sourceName,
-                                    filteredMessage.toString(), cachedMarketData);
-                        
-                            int fiabilite = EventValidator.getSourceReliability(sourceName);
-                            StringBuilder footer = new StringBuilder();
-                            if (!marketCheck.contradictions.isEmpty()) {
-                                footer.append("\n\n").append(marketCheck.warningLine());
-                            }
-                            if (fiabilite >= 0) {
-                                footer.append("\n📊 Fiabilité historique source \"").append(sourceName)
-                                      .append("\" : ").append(fiabilite).append("%");
-                            }
-                        
-                            // 🎯 Validation de cohérence interne : 6 actifs, texte/emoji, corrélation GOLD/USDJPY/GBPUSD
-                            EventValidator.CoherenceRapportResult coherence =
-                                EventValidator.validerCoherenceRapport(filteredMessage.toString());
-                            if (!coherence.estValide()) {
-                                Log.w(TAG, "⚠️ [COHÉRENCE] Rapport incohérent détecté (" + sourceName + ") : " + coherence.resume());
-                                footer.append("\n\n🔎 *Contrôle qualité* : ").append(coherence.resume());
-                            }
-                        
-                            List<String> anomaliesChiffres = EventValidator.verifierActualVsForecast(body + " " + filteredMessage.toString());
-                            if (!anomaliesChiffres.isEmpty()) {
-                                Log.w(TAG, "⚠️ [ACTUAL/FORECAST] " + String.join(" | ", anomaliesChiffres));
-                                footer.append("\n\n🔢 *Alerte lecture chiffrée* : ").append(String.join(" | ", anomaliesChiffres));
-                            }
-                            String anomaliePhase = EventValidator.verifierPhaseChocGeo(NotificationService.this, filteredMessage.toString());
-                            if (anomaliePhase != null) {
-                                Log.w(TAG, "⚠️ [PHASE CHOC GÉO] " + anomaliePhase);
-                                footer.append("\n\n⏱️ *Alerte phase temporelle* : ").append(anomaliePhase);
-                            }
-                        
-                            String anomalieVecteurGeo = EventValidator.verifierVecteurGeoPertinent(filteredMessage.toString());
-                            if (anomalieVecteurGeo != null) {
-                                Log.w(TAG, "⚠️ [VECTEUR GÉO] " + anomalieVecteurGeo);
-                                footer.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeo);
-                            }
-                        
-                            List<String> violationsNeutralite = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(filteredMessage.toString());
-                            if (!violationsNeutralite.isEmpty()) {
-                                Log.w(TAG, "⚠️ [NEUTRALITÉ US] " + String.join(" | ", violationsNeutralite));
-                                footer.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutralite));
-                            }
-                        
-                           // APRÈS
-                            String contaminationFed = EventValidator.verifierContaminationCausaleFed(filteredMessage.toString());
-                            if (contaminationFed != null) {
-                                Log.w(TAG, "⚠️ [CONTAMINATION CAUSALE] " + contaminationFed);
-                                footer.append("\n\n🔗 *Alerte mécanisme causal* : ").append(contaminationFed);
-                            }
-                        
-                            List<String> duplications = EventValidator.verifierJustificationsDupliquees(filteredMessage.toString());
-                            if (!duplications.isEmpty()) {
-                                Log.w(TAG, "⚠️ [JUSTIFICATIONS DUPLIQUÉES] " + String.join(" | ", duplications));
-                                footer.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplications));
-                            }
 
-                            EventValidator.CroisementTechniqueResult croisementTech = EventValidator.verifierCroisementTechnique(filteredMessage.toString(), cachedMarketData);
-                            if (!croisementTech.estValide()) {
-                                Log.w(TAG, "⚠️ [CROISEMENT TECHNIQUE] " + croisementTech.resume());
-                                footer.append("\n\n📉 *Alerte marché réel* : ").append(croisementTech.resume());
-                            }
-
-                            String chocSurNonConfirme = EventValidator.verifierChocDollarSurNonConfirme(filteredMessage.toString());
-                            if (chocSurNonConfirme != null) {
-                                Log.w(TAG, "⚠️ [DOLLAR/NON-CONFIRMÉ] " + chocSurNonConfirme);
-                                footer.append("\n\n🎯 *Alerte logique* : ").append(chocSurNonConfirme);
-                            }
-
-                            String paysHorsTaxonomie = EventValidator.verifierPaysHorsTaxonomieBanqueCentrale(filteredMessage.toString());
-                            if (paysHorsTaxonomie != null) {
-                                Log.w(TAG, "⚠️ [PAYS HORS TAXONOMIE] " + paysHorsTaxonomie);
-                                footer.append("\n\n🌍 *Alerte taxonomie* : ").append(paysHorsTaxonomie);
-                            }
-                            String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
-                            sendTelegramSecure(finalPayload, NotificationService.this);
-                            // Extraire résumé directionnel pour affichage rappel inertie
-                            StringBuilder impactResume = new StringBuilder();
-                            for (String l : aiReport.split("\n")) {
-                                if (l.matches(".*•.*:.*[🟢🔴].*")) {
-                                    String[] parts = l.split("\\|");
-                                    if (parts.length > 0) impactResume.append(parts[0].trim()).append(" ");
-                                }
-                            }
-                            String impactFinal = impactResume.length() > 0
-                                ? impactResume.toString().trim()
-                                : aiReport.contains("FLUX DOMINANT") ?
-                                  "Flux: " + aiReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim() : "N/A";
-                                  db.markEventAsSynced(fingerprint, impactFinal.length() > 200
-                                ? impactFinal.substring(0, 200) : impactFinal);
-                                                        } else {
-                                                            Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → message ignoré");
-                                                        db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
-                                                    }
-                                                } else {
-                                                    db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
-                                                }
-                                            } else {
-                                                Log.e(TAG, "[GROQ] Erreur de serveur HTTP Code : " + status);
-                                            if (status == 429) {
-                                Log.w(TAG, "[GROQ] 429 TPD — Bascule automatique vers " + GROQ_MODEL_FALLBACK);
-                                if (MainActivity.instance != null)
-                                    MainActivity.instance.addLog("⚠️ [GROQ] Quota épuisé — fallback sur modèle léger.");
-                                conn.disconnect();
-                                try {
-                                    jsonPayload.put("model", GROQ_MODEL_FALLBACK);
-                                    jsonPayload.put("temperature", 0.0);
-                                    jsonPayload.put("max_tokens", 1400);
-                                    String contexteFallback = "";
-                                    try {
-                                List<String> historiqueDb = db.obtenirTexteEvenementsRecents();
-                                if (historiqueDb != null && !historiqueDb.isEmpty()) {
-                                    contexteFallback += "CONTEXTE RÉCENT (derniers événements) :\n"
-                                        + String.join("\n", historiqueDb.subList(0, Math.min(3, historiqueDb.size())))
-                                        + "\n\n";
-                                }
-                                // 2. Prix LKV cache
-                                   if (cachedMarketData != null && !cachedMarketData.isEmpty()) {
-                                   StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
-                                   // ✅ Type aligné sur le nouveau cache de TradingViewFetcher :
-                                   for (Map.Entry<String, TradingViewFetcher.TVMarketData> e : cachedMarketData.entrySet()) {
-                                   prixLkv.append(e.getKey()).append(" : ")
-                                   .append(String.format(java.util.Locale.US, "%.4f", e.getValue().price))
-                                   .append("\n");
-                                    }
-                                   contexteFallback += prixLkv.toString() + "\n";
-                                   }
-                             // 3. Flux dominant sauvegardé
-                                String dernierFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-                                    .getString("last_dominant_flow", null);
-                                if (dernierFlux != null && !dernierFlux.isEmpty()) {
-                                    contexteFallback += "FLUX DOMINANT PRÉCÉDENT : " + dernierFlux + "\n"
-                                        + "RÈGLE : si le nouveau driver est cohérent, maintiens ce flux. "
-                                        + "Si contradictoire, justifie explicitement le changement de régime.\n\n";
-                                }
-            } catch (Exception eCtx) {
-                Log.w(TAG, "[FALLBACK] Enrichissement contexte échoué : " + eCtx.getMessage());
-            }
-            // Injecter dans le message user existant
-            JSONArray msgsFallback = jsonPayload.getJSONArray("messages");
-            JSONObject userMsg = msgsFallback.getJSONObject(msgsFallback.length() - 1);
-            String bodyEnrichi = contexteFallback + userMsg.getString("content");
-            userMsg.put("content", bodyEnrichi);
-                    java.net.URL urlFallback = new java.net.URL(GROQ_URL);
-                    java.net.HttpURLConnection connFallback = (java.net.HttpURLConnection) urlFallback.openConnection();
-                    connFallback.setRequestMethod("POST");
-                    connFallback.setDoOutput(true);
-                    connFallback.setRequestProperty("Authorization", "Bearer " + apiKey);
-                    connFallback.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                    connFallback.setConnectTimeout(15000);
-                    connFallback.setReadTimeout(15000);
-                    try (java.io.OutputStream osFb = connFallback.getOutputStream()) {
-                        byte[] inputFb = jsonPayload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                        osFb.write(inputFb, 0, inputFb.length);
-                        osFb.flush();
+                // Filtrage intelligent des signaux
+                StringBuilder filteredMessage = new StringBuilder();
+                String[] lines = aiReport.split("\n");
+                int activeSignalsCount = 0;
+                boolean inImpactSection = false;
+                java.util.Set<String> actifsDejaSeen = new java.util.HashSet<>();
+                
+                for (String line : lines) {
+                    // Masquer NEUTRE et doublons
+                    if (line.contains("NEUTRE") || line.matches(".*•.*:.*= \\|.*")) continue;
+                    
+                    if (line.trim().startsWith("•")) {
+                        String actifKey = line.trim().length() > 15 ? line.trim().substring(0, 15) : line.trim();
+                        if (!actifsDejaSeen.add(actifKey)) continue;
                     }
-                    int statusFb = connFallback.getResponseCode();
-                    if (statusFb == java.net.HttpURLConnection.HTTP_OK) {
-                        StringBuilder fbResp = new StringBuilder();
-                        try (java.io.BufferedReader brFb = new java.io.BufferedReader(
-                                new java.io.InputStreamReader(connFallback.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                            String lineFb;
-                            while ((lineFb = brFb.readLine()) != null) fbResp.append(lineFb);
-                        }
-                        JSONObject jsonFb = new JSONObject(fbResp.toString());
-                        String fallbackReport = jsonFb.getJSONArray("choices")
-                                .getJSONObject(0).getJSONObject("message").getString("content");
-                        if (fallbackReport != null && fallbackReport.length() >= 50) {
-                // Filtrer NEUTRE avant envoi — même logique que modèle principal
-                StringBuilder filteredFb = new StringBuilder();
-                boolean inImpactFb = false;
-                for (String lFb : fallbackReport.split("\n")) {
-                    if (lFb.contains("NEUTRE") || lFb.matches(".*•.*:.*= \\|.*")) continue;
-                    String trimFb = lFb.trim();
-                    if (trimFb.isEmpty()) continue;
-                    if (trimFb.startsWith("🚨") || trimFb.startsWith("🕒") || trimFb.startsWith("📊") ||
-                        trimFb.startsWith("🎯") || trimFb.startsWith("📢") || trimFb.startsWith("🏁") ||
-                        trimFb.startsWith("--- IMPACTS")) {
-                        filteredFb.append(lFb).append("\n");
-                        if (trimFb.startsWith("--- IMPACTS")) inImpactFb = true;
+                    
+                    String trimmed = line.trim();
+                    if (trimmed.isEmpty()) continue;
+                    
+                    if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
+                        trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
+                        filteredMessage.append(line).append("\n");
+                        if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
                         continue;
                     }
-                    if (inImpactFb && trimFb.startsWith("•")) {
-                        String upperFb = lFb.toUpperCase(Locale.ROOT);
-                        if (!upperFb.contains("MAIS NEUTRE") &&
-                            (upperFb.contains("BULLISH") || upperFb.contains("BEARISH") ||
-                             lFb.contains("🟢") || lFb.contains("🔴"))) {
-                            filteredFb.append(lFb).append("\n");
+                    
+                    if (inImpactSection && trimmed.startsWith("•")) {
+                        String upperLine = line.toUpperCase(Locale.ROOT);
+                        boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
+                        boolean isSignificant = !isInclinationNeutral &&
+                            (upperLine.contains("BULLISH") || upperLine.contains("BEARISH") ||
+                             line.contains("🟢") || line.contains("🔴"));
+                        if (isSignificant) {
+                            filteredMessage.append(line).append("\n");
+                            activeSignalsCount++;
                         }
                     }
-    }
-    // Seuil conviction plus élevé sur fallback — modèle léger moins fiable
-  
-    boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
-    if (fluxGeo) {
-        // ✅ Le prompt fallback applique désormais lui-même la chaîne dollar (Étape 1/2/3).
-        // On ne force plus GOLD/USOIL en 🟢 — on laisse la sortie du modèle telle quelle
-        // pour respecter le raisonnement dollar-fort vs refuge.
-        if (fallbackReport.contains("USOIL : 🔴") && !fallbackReport.toLowerCase().contains("surplus")) {
-            // Garde uniquement un garde-fou soft : log si USOIL baisse malgré un choc d'offre confirmé, sans écraser
-            Log.w(TAG, "[FALLBACK] USOIL 🔴 en régime GÉO — à vérifier manuellement (pas de correction automatique).");
+                }
+
+                // Filtre conviction
+                if (activeSignalsCount > 0) {
+                    int convictionPercent = extrairePourcentageConviction(aiReport);
+                    
+                    if (convictionPercent >= 40 || isSupremeRank) {
+                        // Injection prix live
+                        String enrichedReport = injectLivePrices(filteredMessage.toString().trim(), enrichedAssets);
+                        
+                        // Validation croisée marché
+                        EventValidator.MarketValidationResult marketCheck =
+                            EventValidator.validateAgainstRealMarket(
+                                NotificationService.this, sourceName, filteredMessage.toString(), cachedMarketData);
+                        
+                        // Batterie de validations (cohérence, actual/forecast, phase géo, etc.)
+                        StringBuilder footer = buildValidationFooter(
+                            sourceName, filteredMessage.toString(), body, cachedMarketData);
+                        
+                        String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
+                        sendTelegramSecure(finalPayload, NotificationService.this);
+                        
+                        // Résumé directionnel pour rappel inertie
+                        String impactResume = extractImpactSummary(aiReport);
+                        db.markEventAsSynced(fingerprint, impactResume.length() > 200
+                            ? impactResume.substring(0, 200) : impactResume);
+                            
+                    } else {
+                        Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → ignoré");
+                        db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
+                    }
+                } else {
+                    db.markEventAsSynced(fingerprint, "FILTERED_ALL_NEUTRAL");
+                }
+                
+            } else if (status == 429) {
+                // ✅ Gestion 429 PROPRE : Réessayer avec fallback si pas déjà dessus
+                if (!utiliserFallback) {
+                    Log.w(TAG, "[GROQ] 429 reçu — tentative fallback.");
+                    
+                    // ✅ IMPORTANT : Annuler l'incrément principal déjà fait
+                    dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                    
+                    // Réessayer récursivement avec fallback forcé
+                    processAnalysisWithAI(sourceName, title, body, enrichedAssets, fingerprint, 
+                        customSystemPrompt, isSupremeRank, cachedMarketData);
+                } else {
+                    Log.e(TAG, "[GROQ] 429 même sur fallback — vraiment saturé.");
+                    db.markEventAsSynced(fingerprint, "FAILED_429_FALLBACK");
+                }
+                
+            } else if (status >= 500) {
+                Log.w(TAG, "[GROQ] Erreur serveur " + status + " — événement en attente.");
+                // Ne pas marquer synced pour réessayer plus tard
+                
+            } else {
+                db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "[GROQ] Échec critique", e);
+            if (db != null) {
+                try {
+                    db.markEventAsSynced(fingerprint, "FAILED_CRITICAL_EXCEPTION");
+                } catch (Exception ex) {
+                    Log.e(TAG, "Impossible de marquer événement", ex);
+                }
+            }
+        } finally {
+            if (conn != null) conn.disconnect();
         }
-    }
+    });    
+}
 
-           // APRÈS
-    int convFb = extrairePourcentageConviction(fallbackReport);
-    // Vérifier cohérence vecteur/flux — rejeter si contradiction
-    boolean vecteurGeo = fallbackReport.contains("VECTEUR CIBLE : GÉO") || fallbackReport.contains("VECTEUR CIBLE : GÉOPOLITIQUE");
-    //boolean fluxGeo = fallbackReport.contains("FLUX DOMINANT : CRISE GÉOPOLITIQUE");
-    boolean fluxHawkish = fallbackReport.contains("FLUX DOMINANT : DOLLAR FORT") || fallbackReport.contains("VECTEUR CIBLE : HAWKISH");
-    boolean contradiction = (vecteurGeo && fluxHawkish) || (fluxGeo && fluxHawkish);
-    if (contradiction) {
-        Log.d(TAG, "[FALLBACK] Contradiction vecteur/flux détectée — rapport rejeté.");
-        if (MainActivity.instance != null)
-            MainActivity.instance.addLog("⚪ [FALLBACK] Contradiction régime — ignoré.");
-    } else if (convFb >= 55 || (isSupremeRank && convFb >= 45)) {
-        // 🎯 Contrôle qualité fallback — même batterie de 8 checks que le chemin principal,
-        // appliquée sur filteredFb (variable propre au fallback) au lieu de filteredMessage.
-        StringBuilder footerFb = new StringBuilder();
+// ═══════════════════════════════════════════════════════
+// MÉTHODES UTILITAIRES EXTRAITES
+// ═══════════════════════════════════════════════════════
 
-        EventValidator.MarketValidationResult marketCheckFb =
-            EventValidator.validateAgainstRealMarket(NotificationService.this, sourceName, filteredFb.toString(), cachedMarketData);
-        int fiabiliteFb = EventValidator.getSourceReliability(sourceName);
-        if (!marketCheckFb.contradictions.isEmpty()) footerFb.append("\n\n").append(marketCheckFb.warningLine());
-        if (fiabiliteFb >= 0) footerFb.append("\n📊 Fiabilité source \"").append(sourceName).append("\" : ").append(fiabiliteFb).append("%");
-
-        EventValidator.CoherenceRapportResult coherenceFb = EventValidator.validerCoherenceRapport(filteredFb.toString());
-        if (!coherenceFb.estValide()) {
-            Log.w(TAG, "⚠️ [FALLBACK COHÉRENCE] " + coherenceFb.resume());
-            footerFb.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceFb.resume());
+private String enrichirContexteFallback(EventDatabase db, Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) {
+    StringBuilder contexte = new StringBuilder();
+    
+    try {
+        // Historique récent
+        List<String> historiqueDb = db.obtenirTexteEvenementsRecents();
+        if (historiqueDb != null && !historiqueDb.isEmpty()) {
+            contexte.append("CONTEXTE RÉCENT (derniers événements) :\n")
+                .append(String.join("\n", historiqueDb.subList(0, Math.min(3, historiqueDb.size()))))
+                .append("\n\n");
         }
-
-        List<String> anomaliesChiffresFb = EventValidator.verifierActualVsForecast(filteredFb.toString());
-        if (!anomaliesChiffresFb.isEmpty()) footerFb.append("\n\n🔢 *Alerte lecture chiffrée* : ").append(String.join(" | ", anomaliesChiffresFb));
-
-        String anomaliePhaseFb = EventValidator.verifierPhaseChocGeo(NotificationService.this, filteredFb.toString());
-        if (anomaliePhaseFb != null) footerFb.append("\n\n⏱️ *Alerte phase temporelle* : ").append(anomaliePhaseFb);
-
-        String anomalieVecteurGeoFb = EventValidator.verifierVecteurGeoPertinent(filteredFb.toString());
-        if (anomalieVecteurGeoFb != null) footerFb.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoFb);
-
-        List<String> violationsNeutraliteFb = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(filteredFb.toString());
-        if (!violationsNeutraliteFb.isEmpty()) footerFb.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteFb));
-
-        String contaminationFedFb = EventValidator.verifierContaminationCausaleFed(filteredFb.toString());
-        if (contaminationFedFb != null) footerFb.append("\n\n🔗 *Alerte mécanisme causal* : ").append(contaminationFedFb);
-
-        List<String> duplicationsFb = EventValidator.verifierJustificationsDupliquees(filteredFb.toString());
-        if (!duplicationsFb.isEmpty()) footerFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsFb));
-
-        EventValidator.CroisementTechniqueResult croisementTechFb =
-            EventValidator.verifierCroisementTechnique(filteredFb.toString(), cachedMarketData);
-        if (!croisementTechFb.estValide()) footerFb.append("\n\n📉 *Alerte marché réel* : ").append(croisementTechFb.resume());
-
-        String chocSurNonConfirmeFb = EventValidator.verifierChocDollarSurNonConfirme(filteredFb.toString());
-        if (chocSurNonConfirmeFb != null) footerFb.append("\n\n🎯 *Alerte logique* : ").append(chocSurNonConfirmeFb);
-
-        String paysHorsTaxonomieFb = EventValidator.verifierPaysHorsTaxonomieBanqueCentrale(filteredFb.toString());
-        if (paysHorsTaxonomieFb != null) footerFb.append("\n\n🌍 *Alerte taxonomie* : ").append(paysHorsTaxonomieFb);
-        sendTelegramSecure("⚡ *[ANALYSE FONDAMENTALE]* " + filteredFb.toString().trim() + footerFb, NotificationService.this);
-    } else {
-        Log.d(TAG, "[FALLBACK] Conviction trop faible (" + convFb + "%) — ignoré.");
-        if (MainActivity.instance != null)
-            MainActivity.instance.addLog("⚪ [FALLBACK] Conviction " + convFb + "% insuffisante — ignoré.");
+        
+        // Prix LKV cache
+        if (cachedMarketData != null && !cachedMarketData.isEmpty()) {
+            StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
+            for (Map.Entry<String, TradingViewFetcher.TVMarketData> e : cachedMarketData.entrySet()) {
+                prixLkv.append(e.getKey()).append(" : ")
+                    .append(String.format(java.util.Locale.US, "%.4f", e.getValue().price))
+                    .append("\n");
+            }
+            contexte.append(prixLkv).append("\n");
+        }
+        
+        // Flux dominant précédent
+        String dernierFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+            .getString("last_dominant_flow", null);
+        if (dernierFlux != null && !dernierFlux.isEmpty()) {
+            contexte.append("FLUX DOMINANT PRÉCÉDENT : ").append(dernierFlux).append("\n")
+                .append("RÈGLE : si nouveau driver cohérent, maintenir flux. Si contradictoire, justifier changement.\n\n");
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "[FALLBACK] Enrichissement contexte échoué : " + e.getMessage());
     }
-        StringBuilder impactFb = new StringBuilder();
-    for (String l : fallbackReport.split("\n")) {
+    
+    return contexte.toString();
+}
+
+private StringBuilder buildValidationFooter(String sourceName, String filteredMessage, String body, 
+    Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) {
+    
+    StringBuilder footer = new StringBuilder();
+    
+    // Validation marché réel
+    EventValidator.MarketValidationResult marketCheck =
+        EventValidator.validateAgainstRealMarket(NotificationService.this, sourceName, filteredMessage, cachedMarketData);
+    int fiabilite = EventValidator.getSourceReliability(sourceName);
+    
+    if (!marketCheck.contradictions.isEmpty()) {
+        footer.append("\n\n").append(marketCheck.warningLine());
+    }
+    if (fiabilite >= 0) {
+        footer.append("\n📊 Fiabilité source \"").append(sourceName).append("\" : ").append(fiabilite).append("%");
+    }
+    
+    // Cohérence interne
+    EventValidator.CoherenceRapportResult coherence = EventValidator.validerCoherenceRapport(filteredMessage);
+    if (!coherence.estValide()) {
+        Log.w(TAG, "⚠️ [COHÉRENCE] " + coherence.resume());
+        footer.append("\n\n🔎 *Contrôle qualité* : ").append(coherence.resume());
+    }
+    
+    // Actual vs Forecast
+    List<String> anomaliesChiffres = EventValidator.verifierActualVsForecast(body + " " + filteredMessage);
+    if (!anomaliesChiffres.isEmpty()) {
+        footer.append("\n\n🔢 *Alerte lecture chiffrée* : ").append(String.join(" | ", anomaliesChiffres));
+    }
+    
+    // Phase choc géo
+    String anomaliePhase = EventValidator.verifierPhaseChocGeo(NotificationService.this, filteredMessage);
+    if (anomaliePhase != null) {
+        footer.append("\n\n⏱️ *Alerte phase temporelle* : ").append(anomaliePhase);
+    }
+    
+    // Vecteur géo pertinent
+    String anomalieVecteurGeo = EventValidator.verifierVecteurGeoPertinent(filteredMessage);
+    if (anomalieVecteurGeo != null) {
+        footer.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeo);
+    }
+    
+    // Neutralité actifs US
+    List<String> violationsNeutralite = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(filteredMessage);
+    if (!violationsNeutralite.isEmpty()) {
+        footer.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutralite));
+    }
+    
+    // Contamination causale Fed
+    String contaminationFed = EventValidator.verifierContaminationCausaleFed(filteredMessage);
+    if (contaminationFed != null) {
+        footer.append("\n\n🔗 *Alerte mécanisme causal* : ").append(contaminationFed);
+    }
+    
+    // Justifications dupliquées
+    List<String> duplications = EventValidator.verifierJustificationsDupliquees(filteredMessage);
+    if (!duplications.isEmpty()) {
+        footer.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplications));
+    }
+    
+    // Croisement technique
+    EventValidator.CroisementTechniqueResult croisementTech = 
+        EventValidator.verifierCroisementTechnique(filteredMessage, cachedMarketData);
+    if (!croisementTech.estValide()) {
+        footer.append("\n\n📉 *Alerte marché réel* : ").append(croisementTech.resume());
+    }
+    
+    // Choc dollar sur non-confirmé
+    String chocSurNonConfirme = EventValidator.verifierChocDollarSurNonConfirme(filteredMessage);
+    if (chocSurNonConfirme != null) {
+        footer.append("\n\n🎯 *Alerte logique* : ").append(chocSurNonConfirme);
+    }
+    
+    // Pays hors taxonomie
+    String paysHorsTaxonomie = EventValidator.verifierPaysHorsTaxonomieBanqueCentrale(filteredMessage);
+    if (paysHorsTaxonomie != null) {
+        footer.append("\n\n🌍 *Alerte taxonomie* : ").append(paysHorsTaxonomie);
+    }
+    
+    return footer;
+}
+
+private String extractImpactSummary(String aiReport) {
+    StringBuilder impactResume = new StringBuilder();
+    for (String l : aiReport.split("\n")) {
         if (l.matches(".*•.*:.*[🟢🔴].*")) {
             String[] parts = l.split("\\|");
-            if (parts.length > 0) impactFb.append(parts[0].trim()).append(" ");
+            if (parts.length > 0) impactResume.append(parts[0].trim()).append(" ");
         }
     }
-    String impactFinalFb = impactFb.length() > 0
-        ? impactFb.toString().trim()
-        : "Flux: " + (fallbackReport.contains("FLUX DOMINANT") ?
-          fallbackReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim() : "N/A");
-    if (db != null) db.markEventAsSynced(fingerprint, impactFinalFb.length() > 200
-        ? impactFinalFb.substring(0, 200) : impactFinalFb);
-        // Sauvegarder le flux dominant pour contexte fallback suivant
-        try {
-            Pattern fluxPattern = Pattern.compile("FLUX DOMINANT\\s*:\\s*(.+)");
-            Matcher fluxMatcher = fluxPattern.matcher(fallbackReport);
-            if (fluxMatcher.find()) {
-                String nouveauFlux = fluxMatcher.group(1).trim();
-    String ancienFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-        .getString("last_dominant_flow", null);
-    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-        .edit()
-        .putString("last_dominant_flow", nouveauFlux)
-        .apply();
-    // 🚨 Alerte changement de régime
-     String ancienFluxNorm = ancienFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
-    String nouveauFluxNorm = nouveauFlux.split("\\(")[0].trim().toUpperCase(Locale.ROOT);
-    // Envoyer UNIQUEMENT si le régime change réellement
-    if (ancienFlux != null && !ancienFlux.isEmpty()
-            && !ancienFluxNorm.equals(nouveauFluxNorm)
-            && !nouveauFluxNorm.isEmpty()) {
-        String alerteChangement =
-            "🔄 *CHANGEMENT DE RÉGIME DÉTECTÉ*\n" +
-            "━━━━━━━━━━━━━━━━━━━━\n" +
-            "📤 Ancien flux : *" + ancienFlux + "*\n" +
-            "📥 Nouveau flux : *" + nouveauFlux + "*\n" +
-            "⚡ Source : " + sourceName + "\n" +
-            "🕒 " + new java.util.function.Supplier<String>() {
-                public String get() {
-                    java.text.SimpleDateFormat sdfAlerte = new java.text.SimpleDateFormat(
-                        "dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
-                    sdfAlerte.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
-                    return sdfAlerte.format(new java.util.Date());
-                }
-            }.get();
-        sendTelegramSecure(alerteChangement, NotificationService.this);
-        if (MainActivity.instance != null)
-            MainActivity.instance.addLog("🔄 [RÉGIME] " + ancienFlux + " → " + nouveauFlux);
-    }
-        }
-    } catch (Exception eFlux) {
-        Log.w(TAG, "[FALLBACK] Sauvegarde flux dominant échouée : " + eFlux.getMessage());
-    }
-            } else {
-                db.markEventAsSynced(fingerprint, "FAILED_FALLBACK_EMPTY");
-            }
-        } else {
-            db.markEventAsSynced(fingerprint, "FAILED_FALLBACK_HTTP_" + statusFb);
-        }
-        connFallback.disconnect();
-    } catch (Exception eFb) {
-        Log.e(TAG, "[GROQ] Erreur lors du fallback modèle léger", eFb);
-        db.markEventAsSynced(fingerprint, "FAILED_FALLBACK_EXCEPTION");
-    }
-    } else if (status >= 500) {
-        Log.w(TAG, "[GROQ] Statut " + status + " serveur transitoire — événement laissé en attente.");
+    
+    if (impactResume.length() > 0) {
+        return impactResume.toString().trim();
+    } else if (aiReport.contains("FLUX DOMINANT")) {
+        return "Flux: " + aiReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim();
     } else {
-        db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
-                        }
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "[GROQ] Échec lors de l'exécution réseau / SQLite", e);
-                    if (db != null) {
-                        try {
-                            db.markEventAsSynced(fingerprint, "FAILED_CRITICAL_EXCEPTION");
-                        } catch (Exception ex) {
-                            Log.e(TAG, "Impossible de forcer la mise à jour du verrou SQLite", ex);
-                        }
-                    }
-                } finally {
-                    if (conn != null) conn.disconnect();
-                }
-            }
-        });    
+        return "N/A";
     }
+}
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
