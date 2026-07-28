@@ -735,7 +735,27 @@ private static final String DAILY_SYSTEM_PROMPT =
                     }
                 }
             }
+            // ✅ Variable finale pour usage dans bloc synchronized
+            final boolean[] fallbackConfig = new boolean[2]; // [0]=utiliserFallback, [1]=budgetEpuise
             
+            synchronized (dailyTokensUsed) {
+                int currentDaily = dailyTokensUsed.get();
+                int currentFallback = fallbackTokensUsed.get();
+                
+                fallbackConfig[0] = currentDaily >= TOKEN_BUDGET_DAILY; // utiliserFallback
+                
+                if (fallbackConfig[0]) {
+                    if (currentFallback >= TOKEN_BUDGET_FALLBACK) {
+                        fallbackConfig[1] = true; // budgetEpuise
+                    } else {
+                        fallbackConfig[1] = false;
+                        fallbackTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                    }
+                } else {
+                    fallbackConfig[1] = false;
+                    dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                }
+            }
             // ✅ OPÉRATION ATOMIQUE : Check + Increment en une seule fois
             boolean utiliserFallback;
             boolean budgetEpuise;
