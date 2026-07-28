@@ -66,9 +66,9 @@ public class NotificationService extends NotificationListenerService {
     private volatile long lastAnalysisTime = 0;
     private volatile long lastGeoTime = 0;
     // 🛡️ Compteur tokens Groq — protection quota TPD 100k/jour
-    private static final int TOKEN_BUDGET_DAILY = 90000;      // llama-3.3-70b-versatile : 100k réel, marge 10k
-    private static final int TOKEN_BUDGET_FALLBACK = 420000;  // llama-3.1-8b-instant : 500k réel, marge 50k
-    private static final int TOKEN_ESTIMATE_PER_CALL = 6500;  // estimation moyenne input+output (par-événement)
+    private static final int TOKEN_BUDGET_DAILY = 100000;     // Marge 22% (safe)
+    private static final int TOKEN_BUDGET_FALLBACK = 50000;   // Moitié du principal
+    private static final int TOKEN_ESTIMATE_PER_CALL = 5000;  // Marge 4%
     private static final AtomicInteger dailyTokensUsed = new AtomicInteger(0);    // ✅ dédié au modèle principal
     private static final AtomicInteger fallbackTokensUsed = new AtomicInteger(0); // ✅ dédié au modèle fallback, pool séparé
     private static long tokenResetTime = 0L; // minuit UTC du jour courant
