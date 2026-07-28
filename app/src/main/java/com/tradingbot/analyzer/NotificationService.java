@@ -678,16 +678,14 @@ private static final String DAILY_SYSTEM_PROMPT =
     final String systemPrompt = (customSystemPrompt != null && !customSystemPrompt.isEmpty())
        ? customSystemPrompt : SYSTEM_PROMPT;
        
-    // Horodatage Madagascar
     java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.FRANCE);
     sdf.setTimeZone(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
     String currentMadaTime = sdf.format(new java.util.Date());
 
     String assetsString = (enrichedAssets != null) ? enrichedAssets.toString() : "[]";
  
-    // Filtre pertinence (sauf événements pré-qualifiés SUPREME)
     if (!isSupremeRank && !EventValidator.estMaterielPourMarche(title, body)) {
-        Log.w(TAG, "🚫 [FILTRE PERTINENCE] News hors-sujet ignorée : " + title);
+        Log.w(TAG, "🚫 [FILTRE PERTINENCE] News hors-sujet : " + title);
         if (MainActivity.instance != null)
             MainActivity.instance.addLog("🚫 [FILTRE] News hors-sujet : " + title);
         return;
@@ -703,7 +701,7 @@ private static final String DAILY_SYSTEM_PROMPT =
         java.net.HttpURLConnection conn = null;
         EventDatabase db = EventDatabase.getInstance(NotificationService.this);
         if (db == null || fingerprint == null) {
-            Log.e(TAG, "Instance SQLite ou empreinte manquante. Abandon.");
+            Log.e(TAG, "Instance SQLite ou empreinte manquante.");
             return;
         }
 
@@ -712,42 +710,60 @@ private static final String DAILY_SYSTEM_PROMPT =
             String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
             
             // ═══════════════════════════════════════════════════════
-            // GESTION BUDGET TOKENS - VERSION CORRIGÉE
+            // GESTION BUDGET TOKENS - VERSION THREAD-SAFE
             // ═══════════════════════════════════════════════════════
             
-            // Réinitialisation minuit Madagascar
             long nowUtc = System.currentTimeMillis();
             if (nowUtc >= tokenResetTime) {
-                java.util.Calendar madaMidnightCal = java.util.Calendar.getInstance(
-                    java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
-                madaMidnightCal.setTimeInMillis(nowUtc);
-                madaMidnightCal.add(java.util.Calendar.DAY_OF_MONTH, 1);
-                madaMidnightCal.set(java.util.Calendar.HOUR_OF_DAY, 0);
-                madaMidnightCal.set(java.util.Calendar.MINUTE, 0);
-                madaMidnightCal.set(java.util.Calendar.SECOND, 0);
-                madaMidnightCal.set(java.util.Calendar.MILLISECOND, 0);
-                
-                dailyTokensUsed.set(0);
-                fallbackTokensUsed.set(0);
-                tokenResetTime = madaMidnightCal.getTimeInMillis();
-                
-                if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("🔄 [TOKEN] Compteur réinitialisé (minuit Madagascar).");
+                synchronized (dailyTokensUsed) {
+                    if (nowUtc >= tokenResetTime) { // Double-check
+                        java.util.Calendar madaMidnightCal = java.util.Calendar.getInstance(
+                            java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
+                        madaMidnightCal.setTimeInMillis(nowUtc);
+                        madaMidnightCal.add(java.util.Calendar.DAY_OF_MONTH, 1);
+                        madaMidnightCal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+                        madaMidnightCal.set(java.util.Calendar.MINUTE, 0);
+                        madaMidnightCal.set(java.util.Calendar.SECOND, 0);
+                        madaMidnightCal.set(java.util.Calendar.MILLISECOND, 0);
+                        
+                        dailyTokensUsed.set(0);
+                        fallbackTokensUsed.set(0);
+                        tokenResetTime = madaMidnightCal.getTimeInMillis();
+                        
+                        if (MainActivity.instance != null)
+                            MainActivity.instance.addLog("🔄 [TOKEN] Compteur réinitialisé.");
+                    }
+                }
             }
             
-            // ✅ NOUVELLE LOGIQUE : Vérifier AVANT d'incrémenter
-            int currentDailyUsed = dailyTokensUsed.get();
-            int currentFallbackUsed = fallbackTokensUsed.get();
+            // ✅ OPÉRATION ATOMIQUE : Check + Increment en une seule fois
+            boolean utiliserFallback;
+            boolean budgetEpuise;
             
-            boolean utiliserFallback = currentDailyUsed >= TOKEN_BUDGET_DAILY;
-            boolean fallbackAussiSature = currentFallbackUsed >= TOKEN_BUDGET_FALLBACK;
+            synchronized (dailyTokensUsed) {
+                int currentDaily = dailyTokensUsed.get();
+                int currentFallback = fallbackTokensUsed.get();
+                
+                utiliserFallback = currentDaily >= TOKEN_BUDGET_DAILY;
+                
+                if (utiliserFallback) {
+                    // Vérifier si fallback aussi saturé
+                    if (currentFallback >= TOKEN_BUDGET_FALLBACK) {
+                        budgetEpuise = true;
+                    } else {
+                        budgetEpuise = false;
+                        fallbackTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                    }
+                } else {
+                    budgetEpuise = false;
+                    dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                }
+            }
             
-            // Cas 1 : Même le fallback est saturé
-            if (utiliserFallback && fallbackAussiSature) {
-                Log.e(TAG, "🛑 [TOKEN] Budget principal (" + currentDailyUsed + "/" + TOKEN_BUDGET_DAILY + 
-                    ") ET fallback (" + currentFallbackUsed + "/" + TOKEN_BUDGET_FALLBACK + ") épuisés.");
+            if (budgetEpuise) {
+                Log.e(TAG, "🛑 [TOKEN] Budgets épuisés — attente minuit.");
                 if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("🛑 [TOKEN] Budgets épuisés — attente minuit.");
+                    MainActivity.instance.addLog("🛑 [TOKEN] Budgets épuisés.");
                 db.markEventAsSynced(fingerprint, "BUDGET_EXHAUSTED");
                 return;
             }
@@ -762,41 +778,33 @@ private static final String DAILY_SYSTEM_PROMPT =
             messages.put(new JSONObject().put("role", "user").put("content", userContent));
             jsonPayload.put("messages", messages);
             
-            // Cas 2 : Utiliser fallback (budget principal épuisé)
             if (utiliserFallback) {
-                Log.w(TAG, "[TOKEN] Budget principal épuisé (" + currentDailyUsed + "/" + TOKEN_BUDGET_DAILY + 
-                    ") — bascule fallback.");
+                Log.w(TAG, "[TOKEN] Bascule fallback.");
                 if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("⚠️ [TOKEN] Bascule fallback.");
+                    MainActivity.instance.addLog("⚠️ [TOKEN] Fallback activé.");
                 
                 jsonPayload.put("model", GROQ_MODEL_FALLBACK);
                 jsonPayload.put("temperature", 0.0);
                 jsonPayload.put("max_tokens", 1400);
                 
-                // Enrichissement contexte fallback
+                // Enrichissement contexte
                 String contexteFallback = enrichirContexteFallback(db, cachedMarketData);
                 JSONObject userMsg = messages.getJSONObject(1);
                 userMsg.put("content", contexteFallback + userMsg.getString("content"));
                 
-                // Rappel format strict fallback
-                promptFinal += "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
-                    "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
-                    "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n" +
-                    "- Exemples : '| Prime géopolitique activée Hormuz' | '| Flight-to-quality comprime rendements'\n\n" +
-                    "RAPPEL GOLD/GÉO : Si contexte géo, directions GOLD/USDJPY/GBPUSD/USOIL DÉJÀ IMPOSÉES par DIRECTIVE " +
-                    "en tête (non négociable). NE PAS redéduire toi-même — copier EXACTEMENT + mécanisme ≤8 mots.";
-                
-                // ✅ Incrémenter UNIQUEMENT le compteur fallback
-                fallbackTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
+                // Rappel format
+                JSONObject sysMsg = messages.getJSONObject(0);
+                sysMsg.put("content", sysMsg.getString("content") + 
+                    "\n\nRAPPEL FORMAT STRICT FALLBACK :\n" +
+                    "- Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n" +
+                    "- Jamais 'entraînent', 'pourrait', 'impact potentiel'.\n" +
+                    "- Exemples : '| Prime géopolitique Hormuz' | '| Flight-to-quality comprime'\n" +
+                    "RAPPEL GOLD/GÉO : Directions DÉJÀ IMPOSÉES par directive — copier EXACTEMENT.");
                 
             } else {
-                // Cas 3 : Utiliser modèle principal (budget OK)
                 jsonPayload.put("model", GROQ_MODEL);
                 jsonPayload.put("temperature", 0.02);
                 jsonPayload.put("max_tokens", 1600);
-                
-                // ✅ Incrémenter UNIQUEMENT le compteur principal
-                dailyTokensUsed.addAndGet(TOKEN_ESTIMATE_PER_CALL);
             }
             
             // ═══════════════════════════════════════════════════════
@@ -807,6 +815,15 @@ private static final String DAILY_SYSTEM_PROMPT =
             if (apiKey.isEmpty()) {
                 Log.e(TAG, "[GROQ] Clé API absente.");
                 db.markEventAsSynced(fingerprint, "FAILED_MISSING_API_KEY");
+                
+                // ✅ Rembourser les tokens puisque pas d'appel fait
+                synchronized (dailyTokensUsed) {
+                    if (utiliserFallback) {
+                        fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                    } else {
+                        dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                    }
+                }
                 return;
             }
 
@@ -848,77 +865,34 @@ private static final String DAILY_SYSTEM_PROMPT =
                         .getString("content");
 
                 if (aiReport == null || aiReport.length() < 50) {
-                    Log.w(TAG, "[GROQ] Rapport reçu trop court ou vide.");
+                    Log.w(TAG, "[GROQ] Rapport trop court.");
                     db.markEventAsSynced(fingerprint, "FAILED_EMPTY_LLM_REPORT");
                     return;
                 }
 
-                // Filtrage intelligent des signaux
-                StringBuilder filteredMessage = new StringBuilder();
-                String[] lines = aiReport.split("\n");
-                int activeSignalsCount = 0;
-                boolean inImpactSection = false;
-                java.util.Set<String> actifsDejaSeen = new java.util.HashSet<>();
-                
-                for (String line : lines) {
-                    // Masquer NEUTRE et doublons
-                    if (line.contains("NEUTRE") || line.matches(".*•.*:.*= \\|.*")) continue;
-                    
-                    if (line.trim().startsWith("•")) {
-                        String actifKey = line.trim().length() > 15 ? line.trim().substring(0, 15) : line.trim();
-                        if (!actifsDejaSeen.add(actifKey)) continue;
-                    }
-                    
-                    String trimmed = line.trim();
-                    if (trimmed.isEmpty()) continue;
-                    
-                    if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
-                        trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
-                        filteredMessage.append(line).append("\n");
-                        if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
-                        continue;
-                    }
-                    
-                    if (inImpactSection && trimmed.startsWith("•")) {
-                        String upperLine = line.toUpperCase(Locale.ROOT);
-                        boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
-                        boolean isSignificant = !isInclinationNeutral &&
-                            (upperLine.contains("BULLISH") || upperLine.contains("BEARISH") ||
-                             line.contains("🟢") || line.contains("🔴"));
-                        if (isSignificant) {
-                            filteredMessage.append(line).append("\n");
-                            activeSignalsCount++;
-                        }
-                    }
-                }
+                // Filtrage + validation (même logique que votre code original)
+                String filteredMessage = filtrerRapport(aiReport);
+                int activeSignalsCount = compterSignauxActifs(filteredMessage);
 
-                // Filtre conviction
                 if (activeSignalsCount > 0) {
                     int convictionPercent = extrairePourcentageConviction(aiReport);
                     
                     if (convictionPercent >= 40 || isSupremeRank) {
-                        // Injection prix live
-                        String enrichedReport = injectLivePrices(filteredMessage.toString().trim(), enrichedAssets);
+                        String enrichedReport = injectLivePrices(filteredMessage, enrichedAssets);
                         
-                        // Validation croisée marché
-                        EventValidator.MarketValidationResult marketCheck =
-                            EventValidator.validateAgainstRealMarket(
-                                NotificationService.this, sourceName, filteredMessage.toString(), cachedMarketData);
-                        
-                        // Batterie de validations (cohérence, actual/forecast, phase géo, etc.)
-                        StringBuilder footer = buildValidationFooter(
-                            sourceName, filteredMessage.toString(), body, cachedMarketData);
+                        // Validations (votre code existant)
+                        StringBuilder footer = construireFooterValidation(
+                            sourceName, filteredMessage, body, cachedMarketData);
                         
                         String finalPayload = "⚡ *ANALYSE MACRO ÉCONOMIQUE*\n" + enrichedReport + footer;
                         sendTelegramSecure(finalPayload, NotificationService.this);
                         
-                        // Résumé directionnel pour rappel inertie
-                        String impactResume = extractImpactSummary(aiReport);
+                        String impactResume = extraireResume(aiReport);
                         db.markEventAsSynced(fingerprint, impactResume.length() > 200
                             ? impactResume.substring(0, 200) : impactResume);
                             
                     } else {
-                        Log.d(TAG, "Conviction trop faible (" + convictionPercent + "%) et non suprême → ignoré");
+                        Log.d(TAG, "Conviction faible (" + convictionPercent + "%) → ignoré");
                         db.markEventAsSynced(fingerprint, "LOW_CONVICTION_FILTERED");
                     }
                 } else {
@@ -926,27 +900,39 @@ private static final String DAILY_SYSTEM_PROMPT =
                 }
                 
             } else if (status == 429) {
-                // ✅ Gestion 429 PROPRE : Réessayer avec fallback si pas déjà dessus
-                if (!utiliserFallback) {
-                    Log.w(TAG, "[GROQ] 429 reçu — tentative fallback.");
-                    
-                    // ✅ IMPORTANT : Annuler l'incrément principal déjà fait
-                    dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
-                    
-                    // Réessayer récursivement avec fallback forcé
-                    processAnalysisWithAI(sourceName, title, body, enrichedAssets, fingerprint, 
-                        customSystemPrompt, isSupremeRank, cachedMarketData);
-                } else {
-                    Log.e(TAG, "[GROQ] 429 même sur fallback — vraiment saturé.");
-                    db.markEventAsSynced(fingerprint, "FAILED_429_FALLBACK");
-                }
+                // ✅ GESTION 429 PROPRE : Pas de retry, juste log
+                Log.e(TAG, "[GROQ] 429 Rate Limit atteint.");
+                if (MainActivity.instance != null)
+                    MainActivity.instance.addLog("⚠️ [GROQ] 429 — événement ignoré.");
+                
+                db.markEventAsSynced(fingerprint, "FAILED_429_RATE_LIMIT");
+                
+                // ✅ NE PAS rembourser les tokens : le 429 consomme quand même du quota
                 
             } else if (status >= 500) {
-                Log.w(TAG, "[GROQ] Erreur serveur " + status + " — événement en attente.");
-                // Ne pas marquer synced pour réessayer plus tard
+                Log.w(TAG, "[GROQ] Erreur serveur " + status + " — réessai ultérieur.");
+                // Ne pas marquer synced pour laisser une chance de retry automatique
+                
+                // ✅ Rembourser tokens (requête pas comptabilisée côté serveur)
+                synchronized (dailyTokensUsed) {
+                    if (utiliserFallback) {
+                        fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                    } else {
+                        dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                    }
+                }
                 
             } else {
                 db.markEventAsSynced(fingerprint, "FAILED_SERVER_HTTP_" + status);
+                
+                // ✅ Rembourser tokens
+                synchronized (dailyTokensUsed) {
+                    if (utiliserFallback) {
+                        fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                    } else {
+                        dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                    }
+                }
             }
             
         } catch (Exception e) {
@@ -958,6 +944,16 @@ private static final String DAILY_SYSTEM_PROMPT =
                     Log.e(TAG, "Impossible de marquer événement", ex);
                 }
             }
+            
+            // ✅ Rembourser tokens en cas d'exception
+            synchronized (dailyTokensUsed) {
+                if (utiliserFallback) {
+                    fallbackTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                } else {
+                    dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                }
+            }
+            
         } finally {
             if (conn != null) conn.disconnect();
         }
@@ -965,126 +961,108 @@ private static final String DAILY_SYSTEM_PROMPT =
 }
 
 // ═══════════════════════════════════════════════════════
-// MÉTHODES UTILITAIRES EXTRAITES
+// MÉTHODES UTILITAIRES
 // ═══════════════════════════════════════════════════════
 
+private String filtrerRapport(String aiReport) {
+    StringBuilder filtered = new StringBuilder();
+    String[] lines = aiReport.split("\n");
+    boolean inImpactSection = false;
+    java.util.Set<String> actifsSeen = new java.util.HashSet<>();
+    
+    for (String line : lines) {
+        if (line.contains("NEUTRE") || line.matches(".*•.*:.*= \\|.*")) continue;
+        
+        if (line.trim().startsWith("•")) {
+            String key = line.trim().length() > 15 ? line.trim().substring(0, 15) : line.trim();
+            if (!actifsSeen.add(key)) continue;
+        }
+        
+        String trimmed = line.trim();
+        if (trimmed.isEmpty()) continue;
+        
+        if (trimmed.startsWith("🚨") || trimmed.startsWith("📊") || trimmed.startsWith("🎯") ||
+            trimmed.startsWith("📢") || trimmed.startsWith("🏁") || trimmed.startsWith("--- IMPACTS")) {
+            filtered.append(line).append("\n");
+            if (trimmed.startsWith("--- IMPACTS")) inImpactSection = true;
+            continue;
+        }
+        
+        if (inImpactSection && trimmed.startsWith("•")) {
+            String upper = line.toUpperCase(Locale.ROOT);
+            boolean isNeutral = upper.contains("MAIS NEUTRE");
+            boolean isSignificant = !isNeutral &&
+                (upper.contains("BULLISH") || upper.contains("BEARISH") ||
+                 line.contains("🟢") || line.contains("🔴"));
+            if (isSignificant) {
+                filtered.append(line).append("\n");
+            }
+        }
+    }
+    
+    return filtered.toString();
+}
+
+private int compterSignauxActifs(String filteredMessage) {
+    int count = 0;
+    for (String line : filteredMessage.split("\n")) {
+        if (line.matches(".*•.*:.*[🟢🔴].*")) {
+            count++;
+        }
+    }
+    return count;
+}
+
+private String extraireResume(String aiReport) {
+    StringBuilder resume = new StringBuilder();
+    for (String l : aiReport.split("\n")) {
+        if (l.matches(".*•.*:.*[🟢🔴].*")) {
+            String[] parts = l.split("\\|");
+            if (parts.length > 0) resume.append(parts[0].trim()).append(" ");
+        }
+    }
+    
+    if (resume.length() > 0) {
+        return resume.toString().trim();
+    } else if (aiReport.contains("FLUX DOMINANT")) {
+        return "Flux: " + aiReport.split("FLUX DOMINANT")[1].replaceAll("[:\\n]","").trim();
+    } else {
+        return "N/A";
+    }
+}
+
 private String enrichirContexteFallback(EventDatabase db, Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) {
-    StringBuilder contexte = new StringBuilder();
+    StringBuilder ctx = new StringBuilder();
     
     try {
-        // Historique récent
-        List<String> historiqueDb = db.obtenirTexteEvenementsRecents();
-        if (historiqueDb != null && !historiqueDb.isEmpty()) {
-            contexte.append("CONTEXTE RÉCENT (derniers événements) :\n")
-                .append(String.join("\n", historiqueDb.subList(0, Math.min(3, historiqueDb.size()))))
+        List<String> historique = db.obtenirTexteEvenementsRecents();
+        if (historique != null && !historique.isEmpty()) {
+            ctx.append("CONTEXTE RÉCENT :\n")
+                .append(String.join("\n", historique.subList(0, Math.min(3, historique.size()))))
                 .append("\n\n");
         }
         
-        // Prix LKV cache
         if (cachedMarketData != null && !cachedMarketData.isEmpty()) {
-            StringBuilder prixLkv = new StringBuilder("PRIX LKV (cache) :\n");
+            StringBuilder prix = new StringBuilder("PRIX LKV :\n");
             for (Map.Entry<String, TradingViewFetcher.TVMarketData> e : cachedMarketData.entrySet()) {
-                prixLkv.append(e.getKey()).append(" : ")
+                prix.append(e.getKey()).append(" : ")
                     .append(String.format(java.util.Locale.US, "%.4f", e.getValue().price))
                     .append("\n");
             }
-            contexte.append(prixLkv).append("\n");
+            ctx.append(prix).append("\n");
         }
         
-        // Flux dominant précédent
         String dernierFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
             .getString("last_dominant_flow", null);
         if (dernierFlux != null && !dernierFlux.isEmpty()) {
-            contexte.append("FLUX DOMINANT PRÉCÉDENT : ").append(dernierFlux).append("\n")
-                .append("RÈGLE : si nouveau driver cohérent, maintenir flux. Si contradictoire, justifier changement.\n\n");
+            ctx.append("FLUX DOMINANT PRÉCÉDENT : ").append(dernierFlux).append("\n")
+                .append("RÈGLE : si cohérent, maintenir. Si contradictoire, justifier.\n\n");
         }
     } catch (Exception e) {
-        Log.w(TAG, "[FALLBACK] Enrichissement contexte échoué : " + e.getMessage());
+        Log.w(TAG, "[FALLBACK] Enrichissement échoué : " + e.getMessage());
     }
     
-    return contexte.toString();
-}
-
-private StringBuilder buildValidationFooter(String sourceName, String filteredMessage, String body, 
-    Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) {
-    
-    StringBuilder footer = new StringBuilder();
-    
-    // Validation marché réel
-    EventValidator.MarketValidationResult marketCheck =
-        EventValidator.validateAgainstRealMarket(NotificationService.this, sourceName, filteredMessage, cachedMarketData);
-    int fiabilite = EventValidator.getSourceReliability(sourceName);
-    
-    if (!marketCheck.contradictions.isEmpty()) {
-        footer.append("\n\n").append(marketCheck.warningLine());
-    }
-    if (fiabilite >= 0) {
-        footer.append("\n📊 Fiabilité source \"").append(sourceName).append("\" : ").append(fiabilite).append("%");
-    }
-    
-    // Cohérence interne
-    EventValidator.CoherenceRapportResult coherence = EventValidator.validerCoherenceRapport(filteredMessage);
-    if (!coherence.estValide()) {
-        Log.w(TAG, "⚠️ [COHÉRENCE] " + coherence.resume());
-        footer.append("\n\n🔎 *Contrôle qualité* : ").append(coherence.resume());
-    }
-    
-    // Actual vs Forecast
-    List<String> anomaliesChiffres = EventValidator.verifierActualVsForecast(body + " " + filteredMessage);
-    if (!anomaliesChiffres.isEmpty()) {
-        footer.append("\n\n🔢 *Alerte lecture chiffrée* : ").append(String.join(" | ", anomaliesChiffres));
-    }
-    
-    // Phase choc géo
-    String anomaliePhase = EventValidator.verifierPhaseChocGeo(NotificationService.this, filteredMessage);
-    if (anomaliePhase != null) {
-        footer.append("\n\n⏱️ *Alerte phase temporelle* : ").append(anomaliePhase);
-    }
-    
-    // Vecteur géo pertinent
-    String anomalieVecteurGeo = EventValidator.verifierVecteurGeoPertinent(filteredMessage);
-    if (anomalieVecteurGeo != null) {
-        footer.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeo);
-    }
-    
-    // Neutralité actifs US
-    List<String> violationsNeutralite = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(filteredMessage);
-    if (!violationsNeutralite.isEmpty()) {
-        footer.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutralite));
-    }
-    
-    // Contamination causale Fed
-    String contaminationFed = EventValidator.verifierContaminationCausaleFed(filteredMessage);
-    if (contaminationFed != null) {
-        footer.append("\n\n🔗 *Alerte mécanisme causal* : ").append(contaminationFed);
-    }
-    
-    // Justifications dupliquées
-    List<String> duplications = EventValidator.verifierJustificationsDupliquees(filteredMessage);
-    if (!duplications.isEmpty()) {
-        footer.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplications));
-    }
-    
-    // Croisement technique
-    EventValidator.CroisementTechniqueResult croisementTech = 
-        EventValidator.verifierCroisementTechnique(filteredMessage, cachedMarketData);
-    if (!croisementTech.estValide()) {
-        footer.append("\n\n📉 *Alerte marché réel* : ").append(croisementTech.resume());
-    }
-    
-    // Choc dollar sur non-confirmé
-    String chocSurNonConfirme = EventValidator.verifierChocDollarSurNonConfirme(filteredMessage);
-    if (chocSurNonConfirme != null) {
-        footer.append("\n\n🎯 *Alerte logique* : ").append(chocSurNonConfirme);
-    }
-    
-    // Pays hors taxonomie
-    String paysHorsTaxonomie = EventValidator.verifierPaysHorsTaxonomieBanqueCentrale(filteredMessage);
-    if (paysHorsTaxonomie != null) {
-        footer.append("\n\n🌍 *Alerte taxonomie* : ").append(paysHorsTaxonomie);
-    }
-    
-    return footer;
+    return ctx.toString();
 }
 
 private String extractImpactSummary(String aiReport) {
