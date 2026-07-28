@@ -963,7 +963,90 @@ private static final String DAILY_SYSTEM_PROMPT =
 // ═══════════════════════════════════════════════════════
 // MÉTHODES UTILITAIRES
 // ═══════════════════════════════════════════════════════
-
+/**
+ * Construit le footer de validation avec toutes les alertes EventValidator
+ */
+private StringBuilder construireFooterValidation(String sourceName, String filteredMessage, 
+    String body, Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) {
+    
+    StringBuilder footer = new StringBuilder();
+    
+    // Validation marché réel
+    EventValidator.MarketValidationResult marketCheck =
+        EventValidator.validateAgainstRealMarket(NotificationService.this, sourceName, filteredMessage, cachedMarketData);
+    int fiabilite = EventValidator.getSourceReliability(sourceName);
+    
+    if (!marketCheck.contradictions.isEmpty()) {
+        footer.append("\n\n").append(marketCheck.warningLine());
+    }
+    if (fiabilite >= 0) {
+        footer.append("\n📊 Fiabilité source \"").append(sourceName).append("\" : ").append(fiabilite).append("%");
+    }
+    
+    // Cohérence interne
+    EventValidator.CoherenceRapportResult coherence = EventValidator.validerCoherenceRapport(filteredMessage);
+    if (!coherence.estValide()) {
+        Log.w(TAG, "⚠️ [COHÉRENCE] " + coherence.resume());
+        footer.append("\n\n🔎 *Contrôle qualité* : ").append(coherence.resume());
+    }
+    
+    // Actual vs Forecast
+    List<String> anomaliesChiffres = EventValidator.verifierActualVsForecast(body + " " + filteredMessage);
+    if (!anomaliesChiffres.isEmpty()) {
+        footer.append("\n\n🔢 *Alerte lecture chiffrée* : ").append(String.join(" | ", anomaliesChiffres));
+    }
+    
+    // Phase choc géo
+    String anomaliePhase = EventValidator.verifierPhaseChocGeo(NotificationService.this, filteredMessage);
+    if (anomaliePhase != null) {
+        footer.append("\n\n⏱️ *Alerte phase temporelle* : ").append(anomaliePhase);
+    }
+    
+    // Vecteur géo pertinent
+    String anomalieVecteurGeo = EventValidator.verifierVecteurGeoPertinent(filteredMessage);
+    if (anomalieVecteurGeo != null) {
+        footer.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeo);
+    }
+    
+    // Neutralité actifs US
+    List<String> violationsNeutralite = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(filteredMessage);
+    if (!violationsNeutralite.isEmpty()) {
+        footer.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutralite));
+    }
+    
+    // Contamination causale Fed
+    String contaminationFed = EventValidator.verifierContaminationCausaleFed(filteredMessage);
+    if (contaminationFed != null) {
+        footer.append("\n\n🔗 *Alerte mécanisme causal* : ").append(contaminationFed);
+    }
+    
+    // Justifications dupliquées
+    List<String> duplications = EventValidator.verifierJustificationsDupliquees(filteredMessage);
+    if (!duplications.isEmpty()) {
+        footer.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplications));
+    }
+    
+    // Croisement technique
+    EventValidator.CroisementTechniqueResult croisementTech = 
+        EventValidator.verifierCroisementTechnique(filteredMessage, cachedMarketData);
+    if (!croisementTech.estValide()) {
+        footer.append("\n\n📉 *Alerte marché réel* : ").append(croisementTech.resume());
+    }
+    
+    // Choc dollar sur non-confirmé
+    String chocSurNonConfirme = EventValidator.verifierChocDollarSurNonConfirme(filteredMessage);
+    if (chocSurNonConfirme != null) {
+        footer.append("\n\n🎯 *Alerte logique* : ").append(chocSurNonConfirme);
+    }
+    
+    // Pays hors taxonomie
+    String paysHorsTaxonomie = EventValidator.verifierPaysHorsTaxonomieBanqueCentrale(filteredMessage);
+    if (paysHorsTaxonomie != null) {
+        footer.append("\n\n🌍 *Alerte taxonomie* : ").append(paysHorsTaxonomie);
+    }
+    
+    return footer;
+}
 private String filtrerRapport(String aiReport) {
     StringBuilder filtered = new StringBuilder();
     String[] lines = aiReport.split("\n");
