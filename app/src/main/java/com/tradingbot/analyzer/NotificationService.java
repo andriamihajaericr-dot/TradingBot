@@ -1768,7 +1768,9 @@ processAnalysisWithAI(finalSourceName, title, bodyTextRaw, enrichedAssets, finge
                 Log.w(TAG, "[sendToGroqAndTelegram] Sauvegarde DB ignorée (service/DB indisponible) pour : " + title);
             }
            // 🚀 INJECTION : Déportation réseau simplifiée et ultra-rapide via Batch API
-        new Thread(new Runnable() {
+        NotificationService svc = serviceInstance;
+        ExecutorService pool = (svc != null) ? svc.exec : Executors.newSingleThreadExecutor();
+        pool.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -1837,8 +1839,8 @@ for (String asset : twelveAssets) {
             sendTelegramSecure(msg, context);
         }
     }
-            }
-    }).start();
+    }
+    });
     }
 
     @Override
