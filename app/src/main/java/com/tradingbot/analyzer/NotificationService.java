@@ -2837,7 +2837,7 @@ if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
         String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
             .getString("last_dominant_flow", "INDÉTERMINÉ");
                 JSONObject payload = new JSONObject();
-        int usedM = dailyTokensUsed.addAndGet(2000);
+        int usedM = dailyTokensUsed.addAndGet(9000);
         getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
             .putInt("daily_tokens_used", usedM)
             .putLong("token_reset_time", tokenResetTime)
@@ -3125,7 +3125,7 @@ if (weeklyRegistry == null || weeklyRegistry.isEmpty()) {
 String currentFlowW = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
     .getString("last_dominant_flow", "INDÉTERMINÉ");
         JSONObject payload = new JSONObject();
-int usedW = dailyTokensUsed.addAndGet(2000);
+int usedW = dailyTokensUsed.addAndGet(9000);
 getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
     .putInt("daily_tokens_used", usedW)
     .putLong("token_reset_time", tokenResetTime)
