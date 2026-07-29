@@ -956,6 +956,14 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             JSONArray msgsFallback = jsonPayload.getJSONArray("messages");
             JSONObject userMsg = msgsFallback.getJSONObject(msgsFallback.length() - 1);
             String bodyEnrichi = contexteFallback + userMsg.getString("content");
+             // AJOUT — le chemin réactif (429 en plein appel) ne recevait jamais ce rappel,
+             // contrairement au chemin préventif (budget atteint avant l'appel)
+             JSONObject sysMsgFallback = msgsFallback.getJSONObject(0);
+             String sysContentFb = sysMsgFallback.getString("content")
+             + "\n\nRAPPEL FORMAT STRICT FALLBACK :\n"
+             + "- Justification : INTERDIT ce mot. Format obligatoire : '• emoji ACTIF : 🟢/🔴 | mécanisme ≤8 mots'\n"
+             + "- Jamais de phrase complète. Jamais de 'entraînent', 'pourrait', 'impact potentiel'.\n";
+            sysMsgFallback.put("content", sysContentFb);
             userMsg.put("content", bodyEnrichi);
                     java.net.URL urlFallback = new java.net.URL(GROQ_URL);
                     java.net.HttpURLConnection connFallback = (java.net.HttpURLConnection) urlFallback.openConnection();
