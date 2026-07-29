@@ -1682,7 +1682,7 @@ try {
 
 // Construction du prompt enrichi (utilise la variable String renommée)
 String baseSystemPrompt = SYSTEM_PROMPT;
-String promptAI = "📊 [CONTEXTE MARCHÉ ACTUEL] : " + marketSnapshotString + "\n\n" + baseSystemPrompt;
+String promptAI = baseSystemPrompt + "\n\n📊 [CONTEXTE MARCHÉ ACTUEL] : " + marketSnapshotString;
 
 if (ecoResult.isParsed) {
     promptAI = "⚠️ [GUIDAGE MATRICIEL INTERNE] : \n" +
@@ -2055,7 +2055,7 @@ for (String asset : twelveAssets) {
             JSONObject payload = new JSONObject();
             payload.put("model", GROQ_MODEL);
             payload.put("temperature", 0.1);
-
+            payload.put("max_tokens", 800);
             JSONArray messages = new JSONArray();
             messages.put(new JSONObject().put("role", "system").put("content", "Tu es un Macro-Strategist de premier plan. Analyse ce relevé complet de données à fort impact."));
             messages.put(new JSONObject().put("role", "user").put("content", "DONNÉES EXTRAITES :\n" + bulkData));
