@@ -64,7 +64,7 @@ public class NotificationService extends NotificationListenerService {
     // 🛡️ Compteur tokens Groq — protection quota TPD 100k/jour
 private static final int TOKEN_BUDGET_DAILY = 90000;      // llama-3.3-70b-versatile : 100k réel, marge 10k
 private static final int TOKEN_BUDGET_FALLBACK = 420000;  // llama-3.1-8b-instant : 500k réel, marge 50k
-private static final int TOKEN_ESTIMATE_PER_CALL = 2800;  // estimation moyenne input+output (par-événement)
+private static final int TOKEN_ESTIMATE_PER_CALL = 2500;  // estimation moyenne input+output (par-événement)
 private static final AtomicInteger dailyTokensUsed = new AtomicInteger(0);    // ✅ dédié au modèle principal
 private static final AtomicInteger fallbackTokensUsed = new AtomicInteger(0); // ✅ dédié au modèle fallback, pool séparé
 private static long tokenResetTime = 0L; // minuit UTC du jour courant
@@ -2129,14 +2129,15 @@ for (String asset : twelveAssets) {
                 JSONObject payload = new JSONObject();
                 payload.put("model", GROQ_MODEL);
                 payload.put("temperature", 0.02);
+                payload.put("max_tokens", 1600);
                 JSONArray messages = new JSONArray();
 
                 messages.put(new JSONObject().put("role", "system").put("content", SYSTEM_PROMPT));
 
-                String assetSpecs = "Spécifications strictes des Pictogrammes d'Actifs à insérer devant chaque ligne :\n" +
-                    "GOLD: 🏆, USOIL: 🛢️, NASDAQ: 💻, SP500: 📊, " +
-                    "GBPUSD: 🇬🇧, USDJPY: 🇯🇵";
-                messages.put(new JSONObject().put("role", "system").put("content", assetSpecs));
+                //String assetSpecs = "Spécifications strictes des Pictogrammes d'Actifs à insérer devant chaque ligne :\n" +
+                  //  "GOLD: 🏆, USOIL: 🛢️, NASDAQ: 💻, SP500: 📊, " +
+                    //"GBPUSD: 🇬🇧, USDJPY: 🇯🇵";
+                //messages.put(new JSONObject().put("role", "system").put("content", assetSpecs));
                 messages.put(new JSONObject().put("role", "user").put("content", "Flux brut reçu : " + feed + "\nMémoire contextuelle ordonnée par importance :\n" + history));
                 payload.put("messages", messages);
                 if (history != null && history.length() > 1000) {
