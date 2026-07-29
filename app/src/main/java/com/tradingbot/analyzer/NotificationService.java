@@ -8,30 +8,26 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.Network;
-import java.io.OutputStream;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+
 import java.nio.charset.StandardCharsets;
 import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Bundle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
-import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import java.io.*;
-import java.net.*;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
+import android.content.SharedPreferences;
+import java.io.*;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
-import android.content.SharedPreferences;
-import java.util.regex.*;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.*;
+import android.util.Log;
 
 public class NotificationService extends NotificationListenerService {
 
