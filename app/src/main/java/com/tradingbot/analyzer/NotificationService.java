@@ -2139,7 +2139,9 @@ for (String asset : twelveAssets) {
                 messages.put(new JSONObject().put("role", "system").put("content", assetSpecs));
                 messages.put(new JSONObject().put("role", "user").put("content", "Flux brut reçu : " + feed + "\nMémoire contextuelle ordonnée par importance :\n" + history));
                 payload.put("messages", messages);
-
+                if (history != null && history.length() > 1000) {
+                    history = history.substring(0, 1000) + "\n...[tronqué]";
+                }
                 // Protection automatique de l'OutputStream (Try-with-resources)
                try (OutputStream os = conn.getOutputStream()) {
                    os.write(payload.toString().getBytes("UTF-8"));
@@ -2459,7 +2461,7 @@ for (String asset : twelveAssets) {
         }
         // =========================================================================
         Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser (avant plafonnement)");
-        final int MAX_DAILY_DRIVERS_CHARS = 16000; // ✅ ~6000 tokens, marge large avant tout risque de 413
+        final int MAX_DAILY_DRIVERS_CHARS = 1500; // ✅ ~6000 tokens, marge large avant tout risque de 413
         if (dailyDrivers.length() > MAX_DAILY_DRIVERS_CHARS) {
              Log.w(TAG, "[DAILY] dailyDrivers tronqué : " + dailyDrivers.length() + " → " + MAX_DAILY_DRIVERS_CHARS + " caractères");
              dailyDrivers = dailyDrivers.substring(0, MAX_DAILY_DRIVERS_CHARS) + "\n[...tronqué, voir événements les plus récents ci-dessus...]";
@@ -2479,7 +2481,7 @@ for (String asset : twelveAssets) {
                         "Tu es un expert en macroéconomie. Tu dois rédiger ton rapport en terminant obligatoirement par la ligne suivante formatée de cette exacte façon :\n" +
                         "🏁 FLUX DOMINANT : [Insère ici le flux sélectionné]";
                             JSONObject payload = new JSONObject();
-                    int usedD = dailyTokensUsed.addAndGet(3000);
+                    int usedD = dailyTokensUsed.addAndGet(8000);
                     getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
                         .putInt("daily_tokens_used", usedD)
                         .putLong("token_reset_time", tokenResetTime)
