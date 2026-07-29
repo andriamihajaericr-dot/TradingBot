@@ -641,7 +641,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             + "CORPS DE LA NOTIFICATION : " + body + "\n"
             + "ACTIFS PRÉ-QUALIFIÉS : " + assetsString;
 
-    Executors.newSingleThreadExecutor().execute(new Runnable() {
+    exec.execute(new Runnable() {
         @Override
         public void run() {
             java.net.HttpURLConnection conn = null;
