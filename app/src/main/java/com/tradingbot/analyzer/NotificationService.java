@@ -2044,9 +2044,6 @@ for (String asset : twelveAssets) {
         if (apiMacroBlock.length() > 0) {
             dispatchHistoricalBulkToGroq(apiMacroBlock.toString());
         }
-        if (apiMacroBlock.length() > 0) {
-            dispatchHistoricalBulkToGroq(apiMacroBlock.toString());
-        }
     }
 
     private void dispatchHistoricalBulkToGroq(String bulkData) {
