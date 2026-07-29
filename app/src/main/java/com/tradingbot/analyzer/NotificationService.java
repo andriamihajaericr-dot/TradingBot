@@ -1015,9 +1015,20 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                             String lineFb;
                             while ((lineFb = brFb.readLine()) != null) fbResp.append(lineFb);
                         }
+
                         JSONObject jsonFb = new JSONObject(fbResp.toString());
                         String fallbackReport = jsonFb.getJSONArray("choices")
                                 .getJSONObject(0).getJSONObject("message").getString("content");
+
+                        // 🎯 CORRECTION BUDGET RÉEL : cet appel avait été réservé par erreur dans le pool
+                        // PRINCIPAL (dailyTokensUsed) lors du 1er essai, alors qu'il utilise en réalité
+                        // GROQ_MODEL_FALLBACK. On retire la réservation mal attribuée et on comptabilise
+                        // la consommation RÉELLE dans le bon pool (fallbackTokensUsed).
+                        JSONObject usageFb = jsonFb.optJSONObject("usage");
+                        dailyTokensUsed.addAndGet(-TOKEN_ESTIMATE_PER_CALL);
+                        int reelTokensFb = (usageFb != null) ? usageFb.optInt("total_tokens", TOKEN_ESTIMATE_PER_CALL) : TOKEN_ESTIMATE_PER_CALL;
+                        fallbackTokensUsed.addAndGet(reelTokensFb);
+
                         if (fallbackReport != null && fallbackReport.length() >= 50) {
                 // Filtrer NEUTRE avant envoi — même logique que modèle principal
                 StringBuilder filteredFb = new StringBuilder();
