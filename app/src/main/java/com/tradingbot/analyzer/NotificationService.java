@@ -765,11 +765,26 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                         }
                     }
     
+            
                     JSONObject jsonResponse = new JSONObject(response.toString());
                     String aiReport = jsonResponse.getJSONArray("choices")
                             .getJSONObject(0)
                             .getJSONObject("message")
                             .getString("content");
+
+                    // 🎯 CORRECTION BUDGET RÉEL : remplace l'estimation forfaitaire par la
+                    // consommation RÉELLE renvoyée par Groq — élimine la dérive du compteur.
+                    JSONObject usage = jsonResponse.optJSONObject("usage");
+                    if (usage != null) {
+                        int reelTokens = usage.optInt("total_tokens", TOKEN_ESTIMATE_PER_CALL);
+                        int delta = reelTokens - TOKEN_ESTIMATE_PER_CALL;
+                        if (delta != 0) {
+                            int nouveauTotal = dailyTokensUsed.addAndGet(delta);
+                            if (MainActivity.instance != null && Math.abs(delta) > 500)
+                                MainActivity.instance.addLog("📐 [TOKEN] Estimation corrigée : " + reelTokens
+                                    + " réels vs " + TOKEN_ESTIMATE_PER_CALL + " estimés (compteur=" + nouveauTotal + ").");
+                        }
+                    }
     
                     if (aiReport == null || aiReport.length() < 50) {
                         Log.w(TAG, "[GROQ] Rapport reçu trop court ou vide.");
