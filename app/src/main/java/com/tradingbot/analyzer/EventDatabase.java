@@ -633,7 +633,7 @@ if (impact == null) {
         return "Aucun historique trouvé pour ce driver.";
     }
 
-    public List<String> obtenirTexteEvenementsRecents() {
+       public List<String> obtenirTexteEvenementsRecents() {
         List<String> historique = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
@@ -641,13 +641,37 @@ if (impact == null) {
         long trenteMinutesEnSec = (System.currentTimeMillis() / 1000L) - (30 * 60);
         
         try {
+            // ✅ AJOUT : Sélection enrichie + LIMIT 5 strict
             cursor = db.rawQuery(
-                "SELECT feed_content FROM " + TABLE_EVENTS + " WHERE unix_timestamp >= ? ORDER BY unix_timestamp DESC",
+                "SELECT source, title, feed_content, impact FROM " + TABLE_EVENTS + 
+                " WHERE unix_timestamp >= ? AND sync_status = 'synced' ORDER BY unix_timestamp DESC LIMIT 5",
                 new String[]{String.valueOf(trenteMinutesEnSec)}
             );
             if (cursor != null && cursor.moveToFirst()) {
                 do {
-                    historique.add(cursor.getString(0));
+                    String source  = cursor.getString(0);
+                    String title   = cursor.getString(1);
+                    String content = cursor.getString(2);
+                    String impact  = cursor.getString(3);
+
+                    // Nettoyage et tronquage pour ne pas polluer la fenêtre de l'IA
+                    if (content != null) {
+                        content = content.replace("\n", " ").trim();
+                        if (content.length() > 100) content = content.substring(0, 100) + "…";
+                    } else {
+                        content = "";
+                    }
+
+                    // ✅ FORMAT INSTITUTIONNEL DENSE SUR 1 LIGNE
+                    StringBuilder ligne = new StringBuilder();
+                    ligne.append("[").append(source != null ? source : "src").append("] ")
+                         .append(title != null ? title : "").append(" -> ").append(content);
+
+                    if (impact != null && !impact.equals("NEUTRE")) {
+                        ligne.append(" | Impact: ").append(impact);
+                    }
+
+                    historique.add(ligne.toString());
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
