@@ -945,10 +945,12 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 String dernierFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
                                     .getString("last_dominant_flow", null);
                                 if (dernierFlux != null && !dernierFlux.isEmpty()) {
-                                    contexteFallback += "FLUX DOMINANT PRÉCÉDENT : " + dernierFlux + "\n"
-                                        + "RÈGLE : si le nouveau driver est cohérent, maintiens ce flux. "
-                                        + "Si contradictoire, justifie explicitement le changement de régime.\n\n";
+                                    contexteFallback += "FLUX DOMINANT PRÉCÉDENT (INFORMATION SEULE, PAS UNE JUSTIFICATION) : " + dernierFlux + "\n"
+                                        + "RÈGLE 11 (RAPPEL) : le FLUX DOMINANT de CE rapport doit se justifier UNIQUEMENT par le contenu de la news actuelle. "
+                                        + "INTERDIT d'écrire 'maintenu, car', 'cohérent avec le flux précédent' ou toute référence au régime précédent comme justification — "
+                                        + "même si la conclusion finale est identique.\n\n";
                                 }
+                                
             } catch (Exception eCtx) {
                 Log.w(TAG, "[FALLBACK] Enrichissement contexte échoué : " + eCtx.getMessage());
             }
