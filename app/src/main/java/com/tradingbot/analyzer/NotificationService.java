@@ -608,6 +608,18 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     return groqReport;
 }
 }
+    // 🛡️ Anti-contamination : ne conserve que la valeur matricielle (ex: "DOLLAR FORT"),
+// jamais une justification ou une parenthèse que le modèle aurait ajoutée en violation du format.
+// Empêche la propagation d'une phrase interdite (ex: "maintenu, car...") dans les futurs
+// appels fallback/DAILY/WEEKLY/MONTHLY qui réinjectent ce flux comme contexte.
+private static String sanitiserFluxDominant(String flux) {
+    if (flux == null) return null;
+    String f = flux.trim();
+    int idxParen = f.indexOf('(');
+    if (idxParen >= 0) f = f.substring(0, idxParen).trim();
+    if (f.length() > 40) f = f.substring(0, 40).trim();
+    return f;
+    }
 private void processAnalysisWithAI(String sourceName, String title, String body, List<String> enrichedAssets, String fingerprint, String customSystemPrompt, boolean isSupremeRank,
     Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) { // ✅ Alignement sur le cache WebSocket TradingView (Twelve Data n'est plus utilisé)
     
@@ -1107,7 +1119,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             Pattern fluxPattern = Pattern.compile("FLUX DOMINANT\\s*:\\s*(.+)");
             Matcher fluxMatcher = fluxPattern.matcher(fallbackReport);
             if (fluxMatcher.find()) {
-                String nouveauFlux = fluxMatcher.group(1).trim();
+                String nouveauFlux = sanitiserFluxDominant(fluxMatcher.group(1).trim());
     String ancienFlux = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
         .getString("last_dominant_flow", null);
     getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
