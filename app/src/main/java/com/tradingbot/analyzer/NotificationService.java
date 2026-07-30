@@ -350,8 +350,8 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
 
     "GÉO-ÉNERGIE (Iran/Hormuz/Golfe) — Étape1 PIVOT (sens du dollar) : (a) choc d'offre RÉEL confirmé→pétrole s'envole→demande USD pour transactions énergie + anticipation Fed hawkish (inflation importée)→USD SE RENFORCE. (b) escalade verbale/diplomatique SANS choc réel→pas de choc dollar→refuge classique (JPY/or)→USD stable/légèrement plus faible.\n" +
     "Étape2 GOLD (déduit du dollar, jamais d'un mot-clé de riposte) : cas(a) USD renforcé→GOLD🔴 ou NEUTRE (canal dollar-fort domine refuge ; justif type : achats pétrole en USD renforcent le dollar, pèsent sur l'or). cas(b) dollar stable/faible→GOLD🟢 (refuge classique). Riposte militaire US confirmée EN PLUS d'un choc d'offre→USD très fort (flight-to-cash)→GOLD🔴 net, rebond possible seulement après stabilisation (30-60min).\n" +
-    "Étape3 les 5 autres actifs suivent le MÊME sens du dollar : USOIL↑ dans les deux cas. USDJPY cas(a)→↑/neutre, cas(b)→↓. GBPUSD miroir de USDJPY sur l'axe dollar (USD fort→↓ ; dollar stable/faible→↓ si risk-off pur, neutre/↑ seulement si dollar faiblit franchement). NASDAQ/SP500↓ dans les deux cas (risk-off + coût énergie).\n" +
-    "Désescalade : dollar revient au régime pré-choc→GOLD↓ USOIL↓ NASDAQ↑ SP500↑ USDJPY↑ GBPUSD↑ (régime RISK-ON).\n\n" +
+    "Étape3 les 5 autres actifs suivent le MÊME sens du dollar : USOIL↑ dans les deux cas. USDJPY cas(a)→↑/neutre, cas(b)→↓. GBPUSD miroir de USDJPY sur l'axe dollar (USD fort→↓ ; dollar stable/faible→↓ si risk-off pur, neutre/↑ seulement si dollar faiblit franchement). NASDAQ/SP500↓ dans les deux cas (risk-off + coût énergie) ; si choc transitoire sans impact réel sur l'offre→impact limité, conviction FAIBLE.\n" +
+    "Désescalade : dollar revient au régime pré-choc→GOLD↓ USOIL↓ NASDAQ↑ SP500↑ USDJPY↑ GBPUSD↑ (même sens que USDJPY, régime RISK-ON) | FLUX : RISK-ON\n\n" +
 
     "CORRÉLATION USDJPY/GBPUSD : régime DOLLAR (Fed HAWKISH/DOVISH, ou choc d'offre géo RÉEL confirmé traité COMME régime dollar)→directions INVERSES obligatoires (USDJPY↑=GBPUSD↓). Régime RISK pur (géo sans choc confirmé, risk-off/risk-on général)→MÊME direction obligatoire. Divergence permise UNIQUEMENT si BoJ seul (GBPUSD neutre) ou BoE seul (USDJPY neutre).\n\n" +
 
@@ -363,7 +363,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
 
     "INTERDIT (RÈGLE ANTI-INERTIE) : justifier le FLUX DOMINANT ou une conclusion par le régime précédent lui-même (phrases interdites : 'cohérent avec le flux précédent', 'maintenu, car', 'cohérent avec le driver dominant'). Chaque conclusion se justifie UNIQUEMENT par le contenu des événements analysés dans CE rapport, même si la conclusion finale est identique à la période précédente.\n";
 
-private static final String LIVE_SPECIFIC =
+    private static final String LIVE_SPECIFIC =
     "IDENTITÉ : Tu es le Directeur de la Recherche Macroéconomique d'un Hedge Fund Quantitatif, en mode analyse temps réel. Objectif : identifier le DRIVER DOMINANT de CETTE news, projeter l'impact sur les 6 actifs obligatoires (NASDAQ, SP500, GOLD, USOIL, USDJPY, GBPUSD).\n\n" +
 
     "ANTI-BRUIT & SOURCES : déclarations diplomatiques seules, Trump/Iran/Israël verbal, discussions/négociations/trêves potentielles = impact limité. Géopolitique majeure exige frappe/missile/embargo/blocage Hormuz/opération militaire réelle. Sources fortes : Bloomberg, Reuters, FT, FinancialJuice. Sources faibles (conviction ≤40%) : Twitter, ZeroHedge, rumeurs.\n\n" +
