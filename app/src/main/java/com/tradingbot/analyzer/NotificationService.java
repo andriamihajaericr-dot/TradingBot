@@ -2529,8 +2529,9 @@ for (String asset : twelveAssets) {
                         baseSystemPrompt + "\n\n" +
                         "Tu es un expert en macroéconomie. Tu dois rédiger ton rapport en terminant obligatoirement par la ligne suivante formatée de cette exacte façon :\n" +
                         "🏁 FLUX DOMINANT : [Insère ici le flux sélectionné]";
-                            JSONObject payload = new JSONObject();
-                    int usedD = dailyTokensUsed.addAndGet(8000);
+                          
+                     JSONObject payload = new JSONObject();
+                     int usedD = dailyTokensUsed.addAndGet(8000);
                     getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
                         .putInt("daily_tokens_used", usedD)
                         .putLong("token_reset_time", tokenResetTime)
@@ -2541,40 +2542,37 @@ for (String asset : twelveAssets) {
                     payload.put("temperature", 0.02);
                     
                     JSONArray messages = new JSONArray();
-                    messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));
-                            // ✅ Snapshot marché injecté dans le daily comme dans le pipeline news live
-                    
+                    messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));                  
                     String dailyMarketSnapshot = "Données de marché indisponibles.";
                     try {
-                             // Prix depuis WebSocket TradingView — remplace MarketDataFetcher
                     StringBuilder sbM = new StringBuilder("📊 COURS AU MOMENT DU RAPPORT :\n");
                     boolean hasData = false;
-Map<String, TradingViewFetcher.TVMarketData> tvSnap = TradingViewFetcher.getCache();
-if (!tvSnap.isEmpty()) {
-    for (String asset : MARKET_PRICE_ASSETS) {
-        TradingViewFetcher.TVMarketData d = tvSnap.get(asset);
-        if (d != null && d.price > 0) {
-            String sign = d.changePercent >= 0 ? "+" : "";
-            String emojiVariation = (d.changePercent > 0) ? "🟢"
-                : (d.changePercent < 0) ? "🔴" : "⚪";
-            sbM.append(asset).append(" => ")
-               .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
-                   d.price, sign, d.changePercent, emojiVariation));
-            // 🏛️ Niveaux pivots natifs TradingView (Daily/Weekly), affichés seulement s'ils sont chargés
-            if (d.pdh > 0 || d.pdl > 0) {
-                sbM.append(" | PDH=").append(String.format(Locale.US, "%.4f", d.pdh))
-                   .append(" PDL=").append(String.format(Locale.US, "%.4f", d.pdl));
-                if (d.brokeAbovePDH) sbM.append(" 🔺PDH");
-                else if (d.brokeBelowPDL) sbM.append(" 🔻PDL");
-            }
-            if (d.pwh > 0 || d.pwl > 0) {
-                sbM.append(" | PWH=").append(String.format(Locale.US, "%.4f", d.pwh))
-                   .append(" PWL=").append(String.format(Locale.US, "%.4f", d.pwl));
-                if (d.brokeAbovePWH) sbM.append(" 🚀PWH");
-                else if (d.brokeBelowPWL) sbM.append(" 🔥PWL");
-            }
-            sbM.append("\n");
-            hasData = true;
+                    Map<String, TradingViewFetcher.TVMarketData> tvSnap = TradingViewFetcher.getCache();
+                    if (!tvSnap.isEmpty()) {
+                        for (String asset : MARKET_PRICE_ASSETS) {
+                            TradingViewFetcher.TVMarketData d = tvSnap.get(asset);
+                            if (d != null && d.price > 0) {
+                                String sign = d.changePercent >= 0 ? "+" : "";
+                                String emojiVariation = (d.changePercent > 0) ? "🟢"
+                                    : (d.changePercent < 0) ? "🔴" : "⚪";
+                                sbM.append(asset).append(" => ")
+                                   .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
+                                       d.price, sign, d.changePercent, emojiVariation));
+                                // 🏛️ Niveaux pivots natifs TradingView (Daily/Weekly), affichés seulement s'ils sont chargés
+                                if (d.pdh > 0 || d.pdl > 0) {
+                                    sbM.append(" | PDH=").append(String.format(Locale.US, "%.4f", d.pdh))
+                                       .append(" PDL=").append(String.format(Locale.US, "%.4f", d.pdl));
+                                    if (d.brokeAbovePDH) sbM.append(" 🔺PDH");
+                                    else if (d.brokeBelowPDL) sbM.append(" 🔻PDL");
+                                }
+                                if (d.pwh > 0 || d.pwl > 0) {
+                                    sbM.append(" | PWH=").append(String.format(Locale.US, "%.4f", d.pwh))
+                                       .append(" PWL=").append(String.format(Locale.US, "%.4f", d.pwl));
+                                    if (d.brokeAbovePWH) sbM.append(" 🚀PWH");
+                                    else if (d.brokeBelowPWL) sbM.append(" 🔥PWL");
+                                }
+                                sbM.append("\n");
+                                hasData = true;
                                 }
                             }
                         }
@@ -2629,16 +2627,20 @@ if (!tvSnap.isEmpty()) {
                                     }
                                 }
                                 
+                               
                                 JSONObject jsonResponse = new JSONObject(r.toString());
                                 String aiResult = jsonResponse.getJSONArray("choices")
                                                              .getJSONObject(0)
                                                              .getJSONObject("message")
                                                              .getString("content");
+                                  JSONObject usageD = jsonResponse.optJSONObject("usage");
+                                                        if (usageD != null) {
+                                                            int reelD = usageD.optInt("total_tokens", 8000);
+                                                            int deltaD = reelD - 8000;
+                                                            if (deltaD != 0) dailyTokensUsed.addAndGet(deltaD);
+                                                        }
                         
                         if (aiResult != null && aiResult.trim().length() > 50) {
-                        // 🎯 Contrôle qualité daily — sous-ensemble pertinent pour un rapport agrégé
-                        // (pas de validateAgainstRealMarket/getSourceReliability : pensés par source unique,
-                        // pas applicables à un rapport multi-sources agrégé sur 24h).
                         StringBuilder footerDaily = new StringBuilder();
 
                         EventValidator.CoherenceRapportResult coherenceDaily = EventValidator.validerCoherenceRapport(aiResult);
@@ -2998,11 +3000,20 @@ if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
                 while ((line = br.readLine()) != null) r.append(line);
             }
 
-            String report = new JSONObject(r.toString())
+            JSONObject jsonRespM = new JSONObject(r.toString());
+            String report = jsonRespM
                 .getJSONArray("choices")
                 .getJSONObject(0)
                 .getJSONObject("message")
                 .getString("content");
+
+            // 🎯 CORRECTION BUDGET RÉEL : remplace le forfait 9000 par la consommation RÉELLE.
+            JSONObject usageM = jsonRespM.optJSONObject("usage");
+            if (usageM != null) {
+                int reelM = usageM.optInt("total_tokens", 9000);
+                int deltaM = reelM - 9000;
+                if (deltaM != 0) dailyTokensUsed.addAndGet(deltaM);
+            }
 
             if (report != null && report.trim().length() > 300) {
                 StringBuilder footerMonthly = new StringBuilder();
