@@ -200,12 +200,16 @@ private static long tokenResetTime = 0L; // minuit UTC du jour courant
     }
     
     @Override
+    // APRÈS
+    @Override
     public void onListenerDisconnected() {
         super.onListenerDisconnected();
         Log.e(TAG, "🔴 [LISTENER] DÉCONNECTÉ — plus aucune notification ne sera captée !");
         if (MainActivity.instance != null) {
-            MainActivity.instance.addLog("🔴 [SYSTÈME] Accès notifications COUPÉ (vérifie Paramètres > Accès aux notifications).");
+            MainActivity.instance.addLog("🔴 [SYSTÈME] Accès notifications COUPÉ — tentative de reconnexion automatique...");
         }
+        // Demande explicite à Android de rebrancher le listener sans intervention manuelle
+        requestRebind(new android.content.ComponentName(this, NotificationService.class));
     }
     // Ajoutez cette méthode à la fin de votre classe NotificationService.java
     public static String formatEventForDisplay(EconomicCalendarAPI.CalendarEvent e) {
