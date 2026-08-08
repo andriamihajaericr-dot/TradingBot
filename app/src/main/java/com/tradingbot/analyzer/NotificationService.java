@@ -662,7 +662,35 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     }
     // === AJOUT À FAIRE ===
     private final ExecutorService tradingPipelineExecutor = Executors.newSingleThreadExecutor();
-    private final ExecutorService exec = Executors.newFixedThreadPool(5);
+    // APRÈS
+    private final ExecutorService exec = Executors.newFixedThreadPool(2);
+    // ↓ réduit de 5 à 2 : avec ~4000 tokens/appel réels, 5 appels simultanés (20 000 tokens)
+    // pulvérisaient le plafond Groq de 6000 tokens/minute à eux seuls, peu importe le budget journalier restant.
+
+    // 🎯 LIMITEUR TPM (tokens par minute) — absent jusqu'ici, cause principale de l'épuisement
+    // avec peu d'événements : le compteur dailyTokensUsed ne surveille QUE le total journalier,
+    // jamais le débit par minute, qui est la vraie limite Groq (6000 TPM confirmé par le fallback).
+    private static final int TPM_LIMITE_SURE = 5000; // marge sous le plafond Groq (6000 sur le modèle léger)
+    private final java.util.ArrayDeque<long[]> fenetreTPM = new java.util.ArrayDeque<>(); // [timestampMs, tokens]
+
+    private synchronized void attendreSiNecessairePourTPM(int tokensEstimes) {
+        long maintenant = System.currentTimeMillis();
+        while (true) {
+            // purge les entrées de plus de 60s
+            while (!fenetreTPM.isEmpty() && maintenant - fenetreTPM.peekFirst()[0] > 60_000) {
+                fenetreTPM.pollFirst();
+            }
+            int utiliseSurLaMinute = fenetreTPM.stream().mapToInt(e -> (int) e[1]).sum();
+            if (utiliseSurLaMinute + tokensEstimes <= TPM_LIMITE_SURE) {
+                fenetreTPM.addLast(new long[]{maintenant, tokensEstimes});
+                return;
+            }
+            // pas de place : attendre que la plus vieille entrée sorte de la fenêtre
+            long aAttendre = 60_000 - (maintenant - fenetreTPM.peekFirst()[0]) + 100;
+            try { Thread.sleep(Math.max(200, aAttendre)); } catch (InterruptedException ignored) {}
+            maintenant = System.currentTimeMillis();
+        }
+    }
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private EventDatabase eventDb;
     private volatile boolean isSyncing = false;
