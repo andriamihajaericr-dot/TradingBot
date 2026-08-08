@@ -32,7 +32,7 @@ import android.util.Log;
 public class NotificationService extends NotificationListenerService {
 
     private static final String TAG = "NotificationService";
-    private ScheduledExecutorService scheduler;
+    //private ScheduledExecutorService scheduler;
     // ✅ Singleton
     private static NotificationService serviceInstance;
     public static NotificationService getInstance() {
