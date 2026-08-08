@@ -110,6 +110,17 @@ public class MainActivity extends AppCompatActivity {
 
         loadSavedKeys();
         updateStatus();
+        String pkg = getPackageName();
+        android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+        if (pm != null && !pm.isIgnoringBatteryOptimizations(pkg)) {
+            Intent batteryIntent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+            batteryIntent.setData(Uri.parse("package:" + pkg));
+            try {
+                startActivity(batteryIntent);
+            } catch (Exception e) {
+                addLog("⚠️ Impossible d'ouvrir la demande d'exemption batterie : " + e.getMessage());
+            }
+        }
 
         saveBtn.setOnClickListener(v -> saveKeys());
         permBtn.setOnClickListener(v -> {
