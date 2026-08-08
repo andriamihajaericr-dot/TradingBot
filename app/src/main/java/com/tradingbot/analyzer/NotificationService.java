@@ -909,6 +909,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                 }
     
                 java.net.URL url = new java.net.URL(GROQ_URL);
+                attendreSiNecessairePourTPM(TOKEN_ESTIMATE_PER_CALL); 
                 conn = (java.net.HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setDoOutput(true);
@@ -1164,6 +1165,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             sysMsgFallback.put("content", sysContentFb);
             userMsg.put("content", bodyEnrichi);
                     java.net.URL urlFallback = new java.net.URL(GROQ_URL);
+                    attendreSiNecessairePourTPM(TOKEN_ESTIMATE_PER_CALL);
                     java.net.HttpURLConnection connFallback = (java.net.HttpURLConnection) urlFallback.openConnection();
                     connFallback.setRequestMethod("POST");
                     connFallback.setDoOutput(true);
@@ -2281,6 +2283,7 @@ for (String asset : twelveAssets) {
             payload.put("messages", messages);
 
             URL url = new URL(GROQ_URL);
+            attendreSiNecessairePourTPM(TOKEN_ESTIMATE_PER_CALL);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
@@ -2335,6 +2338,7 @@ for (String asset : twelveAssets) {
                 String timeString = sdf.format(new Date(ts));
 
                 URL url = new URL(GROQ_URL);
+                attendreSiNecessairePourTPM(TOKEN_ESTIMATE_PER_CALL);
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
@@ -2771,6 +2775,7 @@ for (String asset : twelveAssets) {
                             payload.put("temperature", 0.02);
                             payload.put("max_tokens", 1500);
                             URL url = new URL(GROQ_URL);
+                            attendreSiNecessairePourTPM(8000);
                             conn = (HttpURLConnection) url.openConnection();
                             conn.setRequestMethod("POST");
                             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
@@ -2869,6 +2874,7 @@ for (String asset : twelveAssets) {
                             payload.put("max_tokens", 1600);
                             conn.disconnect();
                             URL urlFbD = new URL(GROQ_URL);
+                            attendreSiNecessairePourTPM(8000);
                             HttpURLConnection connFbD = (HttpURLConnection) urlFbD.openConnection();
                             connFbD.setRequestMethod("POST");
                             connFbD.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
@@ -3076,6 +3082,7 @@ if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
         payload.put("temperature", 0.05);
         payload.put("max_tokens", 1500);
         URL url = new URL(GROQ_URL);
+        attendreSiNecessairePourTPM(9000);
         conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
@@ -3188,6 +3195,7 @@ if (responseCode == 429) {
         payload.put("max_tokens", 1600);
         conn.disconnect();
         URL urlFbM = new URL(GROQ_URL);
+        attendreSiNecessairePourTPM(9000);
         HttpURLConnection connFbM = (HttpURLConnection) urlFbM.openConnection();
         connFbM.setRequestMethod("POST");
         connFbM.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
@@ -3303,6 +3311,7 @@ payload.put("temperature", 0.05);
         payload.put("temperature", 0.05);
         payload.put("max_tokens", 1600);
         URL url = new URL(GROQ_URL);
+        attendreSiNecessairePourTPM(9000);
         conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
@@ -3392,6 +3401,7 @@ if (responseCode == 429) {
         payload.put("max_tokens", 1500);
         conn.disconnect();
         URL urlFbW = new URL(GROQ_URL);
+        attendreSiNecessairePourTPM(9000);
         HttpURLConnection connFbW = (HttpURLConnection) urlFbW.openConnection();
         connFbW.setRequestMethod("POST");
         connFbW.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
