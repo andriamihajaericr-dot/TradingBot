@@ -201,8 +201,6 @@ private static long tokenResetTime = 0L; // minuit UTC du jour courant
     }
     
     @Override
-    // APRÈS
-    @Override
     public void onListenerDisconnected() {
         super.onListenerDisconnected();
         Log.e(TAG, "🔴 [LISTENER] DÉCONNECTÉ — plus aucune notification ne sera captée !");
