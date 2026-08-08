@@ -104,7 +104,7 @@ private static long tokenResetTime = 0L; // minuit UTC du jour courant
         }
 
         Notification fgNotification = new Notification.Builder(this, FOREGROUND_CHANNEL_ID)
-            .setContentTitle("TradingBot actif")
+            .setContentTitle("Analyse Fondamentale")
             .setContentText("Surveillance macro en cours…")
             .setSmallIcon(android.R.drawable.stat_notify_sync) // ⚠️ remplace par ta propre icône si tu en as une (ex: R.drawable.ic_launcher)
             .setOngoing(true)
