@@ -2090,8 +2090,7 @@ for (String asset : twelveAssets) {
             dailyTokensUsed.set(0);
             tokenResetTime = (nowInit / 86400000L + 1) * 86400000L;
             Log.i(TAG, "[TOKEN] Nouveau jour — compteur remis à zéro.");
-        // ── Initialisation du scheduler de heartbeat ──
-        scheduler = Executors.newSingleThreadScheduledExecutor();
+        // ── Heartbeat toutes les 5 minutes ──
         scheduler.scheduleAtFixedRate(() -> {
             getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
                 .edit()
