@@ -3699,6 +3699,11 @@ private void registerNetworkCallback() {
   @Override
   public void onDestroy() {
     super.onDestroy();
+    // 🎯 Alerte visible : sans ça, la disparition de la notification est le seul signal,
+    // et personne ne la surveille activement.
+    sendTelegramSecure("🔴 *TradingBot ARRÊTÉ* — surveillance macro interrompue.\n"
+        + "Heure : " + new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.FRANCE).format(new java.util.Date()),
+        getApplicationContext());
      // Ajouter dans onDestroy() ligne 3326 :
     TradingViewFetcher.stop();
     serviceInstance = null; // ✅ Libération immédiate du singleton
