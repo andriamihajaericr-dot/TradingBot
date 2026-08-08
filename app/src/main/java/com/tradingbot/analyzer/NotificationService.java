@@ -32,6 +32,7 @@ import android.util.Log;
 public class NotificationService extends NotificationListenerService {
 
     private static final String TAG = "NotificationService";
+    private ScheduledExecutorService scheduler;
     // ✅ Singleton
     private static NotificationService serviceInstance;
     public static NotificationService getInstance() {
@@ -2091,7 +2092,16 @@ for (String asset : twelveAssets) {
             dailyTokensUsed.set(0);
             tokenResetTime = (nowInit / 86400000L + 1) * 86400000L;
             Log.i(TAG, "[TOKEN] Nouveau jour — compteur remis à zéro.");
-    }                 // ✅ Assure la survie de l'instance pour l'IA
+        // ── Initialisation du scheduler de heartbeat ──
+        scheduler = Executors.newSingleThreadScheduledExecutor();
+        scheduler.scheduleAtFixedRate(() -> {
+            getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                .edit()
+                .putLong("last_heartbeat", System.currentTimeMillis())
+                .apply();
+        }, 0, 5, TimeUnit.MINUTES);
+        Log.d(TAG, "💓 Heartbeat programmé toutes les 5 minutes");
+    }          
         
         // ── Déportation du préchargement réseau dans un thread d'arrière-plan ──
     new Thread(new Runnable() {
