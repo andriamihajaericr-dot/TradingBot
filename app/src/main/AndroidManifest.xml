@@ -50,6 +50,7 @@
 
         <receiver
             android:name=".BootReceiver"
+            android:name=".WatchdogReceiver"
             android:enabled="true"
             android:exported="true"
             android:directBootAware="true"> <intent-filter>
