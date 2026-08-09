@@ -257,7 +257,6 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
                 if (!line.startsWith("•")) continue;
                 String[] parts = line.split(":");
                 if (parts.length < 2) continue;
-    
                 // Robustesse : trim pour ignorer les espaces avant/après
                 String leftPart = parts[0].trim();
                 String rightPart = parts[1].trim();
