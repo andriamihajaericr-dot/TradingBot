@@ -2096,10 +2096,17 @@ for (String asset : twelveAssets) {
             dailyTokensUsed.set(savedTokens);
             tokenResetTime = savedResetTime;
             Log.i(TAG, "[TOKEN] Compteur restauré : " + savedTokens + " tokens utilisés.");
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("🔄 [TOKEN] Compteur restauré au démarrage : " + savedTokens + " tokens déjà utilisés (reset prévu à "
+                    + new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.FRANCE).format(new java.util.Date(tokenResetTime)) + ").");
+            }
         } else {
             dailyTokensUsed.set(0);
             tokenResetTime = prochainMinuitMada;
             Log.i(TAG, "[TOKEN] Nouveau jour — compteur remis à zéro.");
+            if (MainActivity.instance != null) {
+                MainActivity.instance.addLog("🔄 [TOKEN] Nouveau jour détecté — compteur remis à zéro au démarrage.");
+            }
         }
 
         // ── Heartbeat toutes les 5 minutes (hors du if/else : doit tourner à chaque démarrage) ──
