@@ -2077,20 +2077,32 @@ for (String asset : twelveAssets) {
         serviceInstance = this;
         // Ajouter dans onCreate() après ligne 1751 :
         TradingViewFetcher.start(this);
-        // 🛡️ Restaurer compteur tokens depuis SharedPreferences
+        // 🛡️ Restaurer compteur tokens depuis SharedPreferenc
         SharedPreferences tokenPrefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
         long savedResetTime = tokenPrefs.getLong("token_reset_time", 0L);
         int savedTokens = tokenPrefs.getInt("daily_tokens_used", 0);
         long nowInit = System.currentTimeMillis();
+
+        // Minuit RÉEL à Madagascar (UTC+3), pas minuit UTC
+        java.util.Calendar calMada = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Indian/Antananarivo"));
+        calMada.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        calMada.set(java.util.Calendar.MINUTE, 0);
+        calMada.set(java.util.Calendar.SECOND, 0);
+        calMada.set(java.util.Calendar.MILLISECOND, 0);
+        calMada.add(java.util.Calendar.DAY_OF_YEAR, 1);
+        long prochainMinuitMada = calMada.getTimeInMillis();
+
         if (nowInit < savedResetTime) {
             dailyTokensUsed.set(savedTokens);
             tokenResetTime = savedResetTime;
             Log.i(TAG, "[TOKEN] Compteur restauré : " + savedTokens + " tokens utilisés.");
         } else {
             dailyTokensUsed.set(0);
-            tokenResetTime = (nowInit / 86400000L + 1) * 86400000L;
+            tokenResetTime = prochainMinuitMada;
             Log.i(TAG, "[TOKEN] Nouveau jour — compteur remis à zéro.");
-        // ── Heartbeat toutes les 5 minutes ──
+        }
+
+        // ── Heartbeat toutes les 5 minutes (hors du if/else : doit tourner à chaque démarrage) ──
         scheduler.scheduleAtFixedRate(() -> {
             getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
                 .edit()
@@ -2098,7 +2110,7 @@ for (String asset : twelveAssets) {
                 .apply();
         }, 0, 5, TimeUnit.MINUTES);
         Log.d(TAG, "💓 Heartbeat programmé toutes les 5 minutes");
-    }          
+    }
         
         // ── Déportation du préchargement réseau dans un thread d'arrière-plan ──
     new Thread(new Runnable() {
