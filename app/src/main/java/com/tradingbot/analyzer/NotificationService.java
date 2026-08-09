@@ -392,8 +392,8 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "DIRECTION OBLIGATOIRE : exclusivement 🟢(BULLISH) 🔴(BEARISH) NEUTRE. Interdit d'écrire 'BULLISH','BEARISH','↑','↓','='.\n" +
     "5-VECTEUR CIBLE autorisé : HAWKISH_US, DOVISH_US, HAWKISH_ECB, DOVISH_ECB, HAWKISH_BOJ, DOVISH_BOJ, HAWKISH_BOE, DOVISH_BOE, GÉO, LIQUIDITÉ, CHINE, TARIFS, IPO.\n" +
     "6-ROUTAGE VECTEUR : Fed/US→HAWKISH_US/DOVISH_US. BCE/ECB/zone euro/PMI européen→HAWKISH_ECB/DOVISH_ECB. BoJ/Japon→HAWKISH_BOJ/DOVISH_BOJ. BoE/UK→HAWKISH_BOE/DOVISH_BOE. Pour ces 6 derniers tags (banque centrale NON-Fed) : appliquer OBLIGATOIREMENT BANQUES CENTRALES ÉTRANGÈRES + RÈGLE ABSOLUE (NASDAQ,SP500,GOLD,USOIL=NEUTRE non listés sauf choc global explicite) — NE JAMAIS appliquer HAWKISH_US/DOVISH_US à une banque centrale étrangère.\n" +
-    "7-Choc géopolitique énergétique : évaluer explicitement le sens du dollar (Étape1 GÉO-ÉNERGIE du tronc commun) AVANT de conclure sur GOLD. N'écrire 'Régime Safe-Haven' que si Étape1 conclut à un dollar stable/faible — sinon 'Régime Dollar Fort (demande pétrole)'.\n\n" +
-     
+    "7-Choc géopolitique énergétique : AVANT de rédiger un seul impact, écrire explicitement 'PIVOT : cas(a) choc réel confirmé' OU 'PIVOT : cas(b) escalade non confirmée' — UNE SEULE FOIS. Dériver ENSUITE les 6 actifs de ce pivot unique. INTERDIT d'utiliser un libellé de cas(a) ('choc d'offre confirmé') pour un actif et un libellé de cas(b) ('refuge classique') pour un autre, dans le même rapport.\n\n" +
+    
     "AUTO-VÉRIFICATION FINALE (relire AVANT d'émettre, corriger silencieusement si besoin) :\n" +
     "A-EMOJI=TEXTE : si la justification contient 'hausse','refuge','renforce','soutient','flight-to-quality' → emoji 🟢 obligatoire. Si elle contient 'baisse','pèse sur','comprime','risk-off' pour CET actif → 🔴 obligatoire. Un emoji qui contredit son propre texte est INTERDIT.\n" +
     "B-CORRÉLATION USDJPY/GBPUSD : relire la règle du tronc commun et vérifier explicitement que la paire respecte le régime (inverse si DOLLAR, identique si RISK pur) avant d'émettre.\n" +
