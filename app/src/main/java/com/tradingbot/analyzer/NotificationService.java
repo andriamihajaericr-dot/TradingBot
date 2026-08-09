@@ -2117,7 +2117,7 @@ for (String asset : twelveAssets) {
                 .apply();
         }, 0, 5, TimeUnit.MINUTES);
         Log.d(TAG, "💓 Heartbeat programmé toutes les 5 minutes");
-    }
+    
         
         // ── Déportation du préchargement réseau dans un thread d'arrière-plan ──
     new Thread(new Runnable() {
