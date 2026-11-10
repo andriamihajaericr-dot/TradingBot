@@ -3116,10 +3116,13 @@ for (String asset : twelveAssets) {
         }
         return true;
 
-    } catch (Exception e) {
+       } catch (Exception e) {
         Log.e(TAG, "[DAILY] Échec critique lors du traitement du briefing journalier", e);
+        StackTraceElement[] pile = e.getStackTrace();
+        String ligne = (pile.length > 0) ? pile[0].getFileName() + ":" + pile[0].getLineNumber() : "?";
         if (MainActivity.instance != null)
-            MainActivity.instance.addLog("❌ [DAILY] Échec : " + e.getClass().getSimpleName() + " — " + e.getMessage());
+            MainActivity.instance.addLog("❌ [DAILY] Échec : " + e.getClass().getSimpleName()
+                + " — " + e.getMessage() + " @ " + ligne);
         return false;
     }
 }
