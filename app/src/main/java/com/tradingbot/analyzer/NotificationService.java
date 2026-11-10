@@ -683,25 +683,24 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     private static final int TPM_LIMITE_SURE = 5000; // marge sous le plafond Groq (6000 sur le modèle léger)
     private final java.util.ArrayDeque<long[]> fenetreTPM = new java.util.ArrayDeque<>(); // [timestampMs, tokens]
 
-    private synchronized void attendreSiNecessairePourTPM(int tokensEstimes) {
-        long maintenant = System.currentTimeMillis();
+    private void attendreSiNecessairePourTPM(int tokensEstimes) {
         while (true) {
-            // purge les entrées de plus de 60s
-            while (!fenetreTPM.isEmpty() && maintenant - fenetreTPM.peekFirst()[0] > 60_000) {
-                fenetreTPM.pollFirst();
+            long attente;
+            synchronized (fenetreTPM) {
+                long maintenant = System.currentTimeMillis();
+                while (!fenetreTPM.isEmpty() && maintenant - fenetreTPM.peekFirst()[0] > 60_000)
+                    fenetreTPM.pollFirst();
+                int utilise = fenetreTPM.stream().mapToInt(e -> (int) e[1]).sum();
+                if (utilise + tokensEstimes <= TPM_LIMITE_SURE) {
+                    fenetreTPM.addLast(new long[]{maintenant, tokensEstimes});
+                    return;
+                }
+                attente = Math.max(200, 60_000 - (maintenant - fenetreTPM.peekFirst()[0]) + 100);
             }
-            int utiliseSurLaMinute = fenetreTPM.stream().mapToInt(e -> (int) e[1]).sum();
-            if (utiliseSurLaMinute + tokensEstimes <= TPM_LIMITE_SURE) {
-                fenetreTPM.addLast(new long[]{maintenant, tokensEstimes});
-                return;
-            }
-            // pas de place : attendre que la plus vieille entrée sorte de la fenêtre
-            long aAttendre = 60_000 - (maintenant - fenetreTPM.peekFirst()[0]) + 100;
-            try { Thread.sleep(Math.max(200, aAttendre)); } catch (InterruptedException ignored) {}
-            maintenant = System.currentTimeMillis();
+            try { Thread.sleep(attente); } catch (InterruptedException ignored) {}
         }
     }
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+        private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private EventDatabase eventDb;
     private volatile boolean isSyncing = false;
     private static final String PREF_LAST_DAILY_REPORT = "last_daily_report_";
@@ -843,7 +842,13 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             }
     
             try {
-                List<String> historique = db.obtenirTexteEvenementsRecents();
+               List<String> historique = db.obtenirTexteEvenementsRecents();
+                if (historique != null && historique.size() > 3) historique = historique.subList(0, 3);
+                if (historique != null) {
+                    List<String> tronques = new ArrayList<>();
+                    for (String h : historique) tronques.add(h.length() > 300 ? h.substring(0, 300) + "…" : h);
+                    historique = tronques;
+                }
                 String promptFinal = construirePromptFinalAvecPrompt(body, historique, systemPrompt);
                 JSONObject jsonPayload = new JSONObject(); // ✅ déclaration restaurée (perdue lors du dernier collage)
                 // Vérifier et réinitialiser le compteur à minuit UTC
