@@ -306,7 +306,13 @@ public class MainActivity extends AppCompatActivity {
             addLog("📱 Terminal prêt pour l'acquisition.");
         }
         eventDb.diagnostiquerTableEvents();
-
+        java.util.List<String> problemesMatrice = MatriceMacro.verifierTable();
+        if (problemesMatrice.isEmpty()) {
+            addLog("✅ [MATRICE] Table cohérente.");
+        } else {
+            for (String p : problemesMatrice) addLog("❌ [MATRICE] " + p);
+        }
+        
         if (keysReady) {
             new Thread(() -> {
                 try {
