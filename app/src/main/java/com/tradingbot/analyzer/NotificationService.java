@@ -919,24 +919,29 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     private static final int TPM_LIMITE_SURE = 5000; // marge sous le plafond Groq (6000 sur le modèle léger)
     private final java.util.ArrayDeque<long[]> fenetreTPM = new java.util.ArrayDeque<>(); // [timestampMs, tokens]
 
-    private void attendreSiNecessairePourTPM(int tokensEstimes) {
+   private void attendreSiNecessairePourTPM(int tokensEstimes) {
+        // Une demande plus grosse que la limite ne peut jamais tenir dans la fenêtre :
+        // on la plafonne pour qu'elle passe quand la fenêtre est vide.
+        int demande = Math.min(tokensEstimes, TPM_LIMITE_SURE);
         while (true) {
             long attente;
             synchronized (fenetreTPM) {
                 long maintenant = System.currentTimeMillis();
                 while (!fenetreTPM.isEmpty() && maintenant - fenetreTPM.peekFirst()[0] > 60_000)
                     fenetreTPM.pollFirst();
-                int utilise = fenetreTPM.stream().mapToInt(e -> (int) e[1]).sum();
-                if (utilise + tokensEstimes <= TPM_LIMITE_SURE) {
-                    fenetreTPM.addLast(new long[]{maintenant, tokensEstimes});
+                int utilise = 0;
+                for (long[] e : fenetreTPM) utilise += (int) e[1];
+                if (utilise + demande <= TPM_LIMITE_SURE || fenetreTPM.isEmpty()) {
+                    fenetreTPM.addLast(new long[]{maintenant, demande});
                     return;
                 }
-                attente = Math.max(200, 60_000 - (maintenant - fenetreTPM.peekFirst()[0]) + 100);
+                long[] plusVieux = fenetreTPM.peekFirst();
+                attente = Math.max(200, 60_000 - (maintenant - plusVieux[0]) + 100);
             }
             try { Thread.sleep(attente); } catch (InterruptedException ignored) {}
         }
     }
-        private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private EventDatabase eventDb;
     private volatile boolean isSyncing = false;
     private static final String PREF_LAST_DAILY_REPORT = "last_daily_report_";
