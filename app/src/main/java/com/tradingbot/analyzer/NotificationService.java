@@ -998,8 +998,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                         if (inImpactSection && trimmed.startsWith("•")) {
                             String upperLine = line.toUpperCase(Locale.ROOT);
                             boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
-                            boolean isSignificant = !isInclinationNeutral &&
-                                (upperLine.contains("BULLISH") || upperLine.contains("BEARISH"));
+                            boolean isSignificant = !isInclinationNeutral &&(line.contains("🟢") || line.contains("🔴"));
                             if (isSignificant) {
                                 filteredMessage.append(line).append("\n");
                                 activeSignalsCount++;
@@ -2461,7 +2460,7 @@ for (String asset : twelveAssets) {
                       String upperLine = line.toUpperCase(Locale.ROOT);
 
                       boolean isInclinationNeutral = upperLine.contains("MAIS NEUTRE");
-                      boolean isSignificant = !isInclinationNeutral && (upperLine.contains("BULLISH") || upperLine.contains("BEARISH"));
+                     boolean isSignificant = !isInclinationNeutral &&(line.contains("🟢") || line.contains("🔴"));
 
                       if (isSignificant) {
                           filteredMessage.append(line).append("\n");
