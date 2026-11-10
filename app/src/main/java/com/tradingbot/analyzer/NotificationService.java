@@ -2919,45 +2919,37 @@ for (String asset : twelveAssets) {
         scheduleDailyBriefAt(targetHour, tz);
     }, delay, TimeUnit.MILLISECONDS);
    }
-    
-   public boolean generateAndSendDailyBrief() {
-    HttpURLConnection conn = null;
+    public boolean generateAndSendDailyBrief() {
     try {
         String apiKey = getGroqApiKey();
         if (apiKey.isEmpty()) {
             Log.w(TAG, "[DAILY] Clé API Groq absente — rapport annulé.");
-            if (MainActivity.instance != null) {
+            if (MainActivity.instance != null)
                 MainActivity.instance.addLog("❌ [DAILY] Clé API Groq absente — vérifie l'onglet Clés API.");
-            }
             return false;
         }
 
         long nowSec = System.currentTimeMillis() / 1000;
         String dailyDrivers = eventDb.getDailyMacroSummary(nowSec);
 
-        // Date locale pour le message (Mada UTC+3)
         SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE);
         sdfDate.setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
-        String dateStr = sdfDate.format(Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo")).getTime());
+        String dateStr = sdfDate.format(new Date());
 
-           if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
+        if (dailyDrivers == null || dailyDrivers.trim().isEmpty()) {
             Log.w(TAG, "[DAILY] Aucun driver macro trouvé pour les dernières 24h.");
-    
-            // Éviter les envois multiples : utiliser SharedPreferences avec un délai
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
             long lastReminderTime = prefs.getLong("last_empty_db_reminder", 0);
             long now = System.currentTimeMillis();
-            if (now - lastReminderTime > 60 * 60 * 1000) { // 1 heure
+            if (now - lastReminderTime > 60 * 60 * 1000) {
                 prefs.edit().putLong("last_empty_db_reminder", now).apply();
-        
                 String dernierDriverConnu = eventDb.obtenirLeToutDernierDriver();
                 if (dernierDriverConnu != null && !dernierDriverConnu.trim().isEmpty()) {
-                    String messageRappel = "⚠️ *[RAPPEL : AUCUN NOUVEAU DRIVER DEPUIS 24H]*\n" +
-                                           "🕒 Rapport périodique du " + dateStr + " (Mada)\n\n" +
-                                           "Le flux de collecte n'a détecté aucun nouveau catalyseur macroéconomique.\n" +
-                                           "Voici le dernier état de marché enregistré à titre de rappel pour l'équipe :\n\n" +
-                                           dernierDriverConnu;
-                    sendTelegramSecure(messageRappel, this);
+                    sendTelegramSecure("⚠️ *[RAPPEL : AUCUN NOUVEAU DRIVER DEPUIS 24H]*\n" +
+                            "🕒 Rapport périodique du " + dateStr + " (Mada)\n\n" +
+                            "Le flux de collecte n'a détecté aucun nouveau catalyseur macroéconomique.\n" +
+                            "Voici le dernier état de marché enregistré à titre de rappel pour l'équipe :\n\n" +
+                            dernierDriverConnu, this);
                 } else {
                     sendTelegramSecure("⚪ *RAPPEL SYSTEME :* Base de données entièrement vide. Aucun historique macroéconomique disponible.", this);
                 }
@@ -2966,790 +2958,281 @@ for (String asset : twelveAssets) {
             }
             return false;
         }
-        // =========================================================================
-        Log.d(TAG, "[DAILY] " + dailyDrivers.length() + " caractères de données à analyser (avant plafonnement)");
-        final int MAX_DAILY_DRIVERS_CHARS = 1500; // ✅ ~6000 tokens, marge large avant tout risque de 413
+
+        final int MAX_DAILY_DRIVERS_CHARS = 1500;
         if (dailyDrivers.length() > MAX_DAILY_DRIVERS_CHARS) {
-             Log.w(TAG, "[DAILY] dailyDrivers tronqué : " + dailyDrivers.length() + " → " + MAX_DAILY_DRIVERS_CHARS + " caractères");
-             dailyDrivers = dailyDrivers.substring(0, MAX_DAILY_DRIVERS_CHARS) + "\n[...tronqué, voir événements les plus récents ci-dessus...]";
+            Log.w(TAG, "[DAILY] dailyDrivers tronqué : " + dailyDrivers.length() + " → " + MAX_DAILY_DRIVERS_CHARS);
+            dailyDrivers = dailyDrivers.substring(0, MAX_DAILY_DRIVERS_CHARS) + "\n[...tronqué...]";
         }
-        String baseSystemPrompt = DAILY_SYSTEM_PROMPT;
-        // Ajout de la directive de crise géopolitique si nécessaire
-        baseSystemPrompt = construirePromptQuotidienSystem(dailyDrivers, baseSystemPrompt);
 
-        // Récupération de la mémoire d'inertie du marché (SharedPreferences)
+        String baseSystemPrompt = construirePromptQuotidienSystem(dailyDrivers, DAILY_SYSTEM_PROMPT);
+
         SharedPreferences prefs = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE);
-        String lastDominantFlow = prefs.getString("last_daily_flow", "NEUTRE / PRUDENCE RECOMMANDÉE");
-                    String systemPromptFinal = "CONTEXTE HIER (INERTIE DE MARCHÉ) : Le flux dominant de la veille était : " + lastDominantFlow + ".\n" +
-                    "Si les événements actuels ne contredisent pas ce flux de manière écrasante (>70% de conviction), " +
-                    "tu peux conserver la MÊME conclusion, mais tu dois quand même justifier le FAIT MARQUANT par les " +
-                    "événements RÉELS du jour analysés — jamais par la simple continuité du flux de la veille.\n\n" +
-                        baseSystemPrompt + "\n\n" +
-                        "Tu es un expert en macroéconomie. Tu dois rédiger ton rapport en terminant obligatoirement par la ligne suivante formatée de cette exacte façon :\n" +
-                        "🏁 FLUX DOMINANT : [Insère ici le flux sélectionné]";
-                          
-                     JSONObject payload = new JSONObject();
-                     int usedD = dailyTokensUsed.addAndGet(8000);
-                    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
-                        .putInt("daily_tokens_used", usedD)
-                        .putLong("token_reset_time", tokenResetTime)
-                        .apply();
-                    payload.put("model", usedD > TOKEN_BUDGET_DAILY ? GROQ_MODEL_FALLBACK : GROQ_MODEL);
-                    if (usedD > TOKEN_BUDGET_DAILY && MainActivity.instance != null)
-                        MainActivity.instance.addLog("⚠️ [DAILY] Budget token atteint — modèle léger.");
-                    payload.put("temperature", 0.02);
-                    
-                    JSONArray messages = new JSONArray();
-                    messages.put(new JSONObject().put("role", "system").put("content", systemPromptFinal));                  
-                    String dailyMarketSnapshot = "Données de marché indisponibles.";
-                    try {
-                    StringBuilder sbM = new StringBuilder("📊 COURS AU MOMENT DU RAPPORT :\n");
-                    boolean hasData = false;
-                    Map<String, TradingViewFetcher.TVMarketData> tvSnap = TradingViewFetcher.getCache();
-                    if (!tvSnap.isEmpty()) {
-                        for (String asset : MARKET_PRICE_ASSETS) {
-                            TradingViewFetcher.TVMarketData d = tvSnap.get(asset);
-                            if (d != null && d.price > 0) {
-                                String sign = d.changePercent >= 0 ? "+" : "";
-                                String emojiVariation = (d.changePercent > 0) ? "🟢"
-                                    : (d.changePercent < 0) ? "🔴" : "⚪";
-                                sbM.append(asset).append(" => ")
-                                   .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)",
-                                       d.price, sign, d.changePercent, emojiVariation));
-                                // 🏛️ Niveaux pivots natifs TradingView (Daily/Weekly), affichés seulement s'ils sont chargés
-                                if (d.pdh > 0 || d.pdl > 0) {
-                                    sbM.append(" | PDH=").append(String.format(Locale.US, "%.4f", d.pdh))
-                                       .append(" PDL=").append(String.format(Locale.US, "%.4f", d.pdl));
-                                    if (d.brokeAbovePDH) sbM.append(" 🔺PDH");
-                                    else if (d.brokeBelowPDL) sbM.append(" 🔻PDL");
-                                }
-                                if (d.pwh > 0 || d.pwl > 0) {
-                                    sbM.append(" | PWH=").append(String.format(Locale.US, "%.4f", d.pwh))
-                                       .append(" PWL=").append(String.format(Locale.US, "%.4f", d.pwl));
-                                    if (d.brokeAbovePWH) sbM.append(" 🚀PWH");
-                                    else if (d.brokeBelowPWL) sbM.append(" 🔥PWL");
-                                }
-                                sbM.append("\n");
-                                hasData = true;
-                                }
-                            }
-                        }
-                    
-                        if (hasData) {
-                            dailyMarketSnapshot = sbM.toString();
-                        }
-                    
-                    } catch (Exception e) {
-                        Log.w(TAG, "[DAILY] Snapshot marché indisponible : " + e.getMessage());
-                    }
-                    String currentFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-                        .getString("last_dominant_flow", "INDÉTERMINÉ");
-                    messages.put(new JSONObject().put("role", "user").put("content",
-                        "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n\n" +
-                        "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlow + "\n" +
-                        "─────────────────────────────\n" +
-                        dailyMarketSnapshot + "\n" +
-                        "─────────────────────────────\n" +
-                        "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers + "\n" +
-                        "─────────────────────────────\n\n" +
-                        "⚠️ INSTRUCTION SPÉCIALE : Identifie dans le texte la source de chaque événement (Bloomberg, FinancialJuice, etc.) " +
-                        "et applique la RÈGLE 12 (Pondération des sources et comptage des signaux).\n" +
-                        "Tu dois impérativement fournir dans le rapport le nombre d'événements en faveur de RISK-OFF et RISK-ON.\n" +
-                        "Si plus de 60% du poids penche vers RISK-OFF, le FLUX DOMINANT doit refléter cette majorité écrasante."));
-                            payload.put("messages", messages);
-                            payload.put("temperature", 0.02);
-                            payload.put("max_tokens", 1500);
-                            URL url = new URL(GROQ_URL);
-                            attendreSiNecessairePourTPM(8000);
-                            conn = (HttpURLConnection) url.openConnection();
-                            conn.setRequestMethod("POST");
-                            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-                            conn.setConnectTimeout(15000); 
-                            conn.setReadTimeout(20000);
-                            conn.setDoOutput(true);
-                    
-                            // ✅ Gestion sécurisée de l'OutputStream
-                            try (OutputStream os = conn.getOutputStream()) {
-                                byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-                                os.write(input, 0, input.length);
-                                os.flush();
-                            }
-                    
-                            int responseCode = conn.getResponseCode();
-                            if (responseCode == HttpURLConnection.HTTP_OK) {
-                                StringBuilder r = new StringBuilder();
-                                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                                    String line;
-                                    while ((line = br.readLine()) != null) {
-                                        r.append(line);
-                                    }
-                                }
-                                
-                               
-                                JSONObject jsonResponse = new JSONObject(r.toString());
-                                String aiResult = jsonResponse.getJSONArray("choices")
-                                                             .getJSONObject(0)
-                                                             .getJSONObject("message")
-                                                             .getString("content");
-                                  JSONObject usageD = jsonResponse.optJSONObject("usage");
-                                                        if (usageD != null) {
-                                                            int reelD = usageD.optInt("total_tokens", 8000);
-                                                            int deltaD = reelD - 8000;
-                                                            if (deltaD != 0) dailyTokensUsed.addAndGet(deltaD);
-                                                        }
-                        
-                        if (aiResult != null && aiResult.trim().length() > 50) {
-                        StringBuilder footerDaily = new StringBuilder();
+        String lastDailyFlow = prefs.getString("last_daily_flow", "NEUTRE / PRUDENCE RECOMMANDÉE");
+        String systemPromptFinal = "CONTEXTE HIER (INERTIE DE MARCHÉ) : Le flux dominant de la veille était : " + lastDailyFlow + ".\n" +
+                "Si les événements actuels ne contredisent pas ce flux de manière écrasante (>70% de conviction), " +
+                "tu peux conserver la MÊME conclusion, mais tu dois quand même justifier le FAIT MARQUANT par les " +
+                "événements RÉELS du jour analysés — jamais par la simple continuité du flux de la veille.\n\n" +
+                baseSystemPrompt + "\n\n" +
+                "Tu es un expert en macroéconomie. Tu dois rédiger ton rapport en terminant obligatoirement par la ligne suivante formatée de cette exacte façon :\n" +
+                "🏁 FLUX DOMINANT : [Insère ici le flux sélectionné]";
 
-                        EventValidator.CoherenceRapportResult coherenceDaily = EventValidator.validerCoherenceRapport(aiResult);
-                        if (!coherenceDaily.estValide()) {
-                            Log.w(TAG, "⚠️ [DAILY COHÉRENCE] " + coherenceDaily.resume());
-                            footerDaily.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceDaily.resume());
-                        }
+        String dailyMarketSnapshot = construireSnapshotDaily();
 
-                        String anomalieVecteurGeoDaily = EventValidator.verifierVecteurGeoPertinent(aiResult);
-                        if (anomalieVecteurGeoDaily != null) footerDaily.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoDaily);
+        String currentFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                .getString("last_dominant_flow", "INDÉTERMINÉ");
 
-                        String anomalieVecteurSurpriseDaily = EventValidator.verifierCoherenceVecteurSurprise(aiResult);
-                        if (anomalieVecteurSurpriseDaily != null) footerDaily.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseDaily);
+        String userDaily =
+                "Génère le rapport périodique pour la date/heure : " + dateStr + " (Mada).\n\n" +
+                "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlow + "\n" +
+                "─────────────────────────────\n" +
+                dailyMarketSnapshot + "\n" +
+                "─────────────────────────────\n" +
+                "DONNÉES BRUTES DES DERNIÈRES 24H :\n" + dailyDrivers + "\n" +
+                "─────────────────────────────\n\n" +
+                "⚠️ INSTRUCTION SPÉCIALE : Identifie dans le texte la source de chaque événement (Bloomberg, FinancialJuice, etc.) " +
+                "et applique la RÈGLE 12 (Pondération des sources et comptage des signaux).\n" +
+                "Tu dois impérativement fournir dans le rapport le nombre d'événements en faveur de RISK-OFF et RISK-ON.\n" +
+                "Si plus de 60% du poids penche vers RISK-OFF, le FLUX DOMINANT doit refléter cette majorité écrasante.";
 
-                        List<String> violationsNeutraliteDaily = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(aiResult);
-                        if (!violationsNeutraliteDaily.isEmpty()) footerDaily.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteDaily));
-
-                        List<String> duplicationsDaily = EventValidator.verifierJustificationsDupliquees(aiResult);
-                        if (!duplicationsDaily.isEmpty()) footerDaily.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsDaily));
-
-                        sendTelegramSecure(aiResult.trim() + footerDaily, this);
-                        Log.d(TAG, "[DAILY] Rapport IA standard généré et envoyé avec succès.");
-                        // Parsing et persistance du flux dominant pour le lendemain
-                        Pattern flowPattern = Pattern.compile("(?i)🏁\\s*FLUX\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
-                        Matcher flowMatcher = flowPattern.matcher(aiResult);
-                        if (flowMatcher.find()) {
-                            String newFlow = flowMatcher.group(1).trim();
-                            getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-                                .edit()
-                                .putString("last_daily_flow", newFlow)
-                                .apply();
-                            Log.d(TAG, "💾 Inertie mise à jour. Flux enregistré pour demain : " + newFlow);
-                        } else {
-                            Log.w(TAG, "[DAILY] Balise '🏁 FLUX DOMINANT :' introuvable. Préférences inchangées.");
-                        }
-                            return true ;
-                                } else {
-                                   Log.w(TAG, "[DAILY] Groq réponse vide — contenu : "
-                                   + (aiResult != null ? aiResult.trim() : "null"));
-                                  if (MainActivity.instance != null) {
-                                  MainActivity.instance.addLog("⚠️ [DAILY] Groq réponse vide ou insuffisante");
-                                  }
-                                }
-                            } else {
-                                try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
-                                    StringBuilder errorResponse = new StringBuilder();
-                                    String line;
-                                    while ((line = errorReader.readLine()) != null) {
-                                        errorResponse.append(line);
-                                    }
-                                    Log.e(TAG, "[DAILY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
-                    if (responseCode == 429) {
-                        if (MainActivity.instance != null)
-                            MainActivity.instance.addLog("⚠️ [DAILY] 429 TPD — bascule sur modèle léger.");
-                        try {
-                            payload.put("model", GROQ_MODEL_FALLBACK);
-                            payload.put("max_tokens", 1600);
-                            conn.disconnect();
-                            URL urlFbD = new URL(GROQ_URL);
-                            attendreSiNecessairePourTPM(8000);
-                            HttpURLConnection connFbD = (HttpURLConnection) urlFbD.openConnection();
-                            connFbD.setRequestMethod("POST");
-                            connFbD.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                            connFbD.setRequestProperty("Authorization", "Bearer " + apiKey);
-                            connFbD.setConnectTimeout(15000);
-                            connFbD.setReadTimeout(20000);
-                            connFbD.setDoOutput(true);
-                            try (OutputStream osFbD = connFbD.getOutputStream()) {
-                                osFbD.write(payload.toString().getBytes(StandardCharsets.UTF_8));
-                            }
-                            
-if (connFbD.getResponseCode() == HttpURLConnection.HTTP_OK) {
-    StringBuilder rFbD = new StringBuilder();
-    try (BufferedReader brFbD = new BufferedReader(new InputStreamReader(connFbD.getInputStream(), StandardCharsets.UTF_8))) {
-        String lineFbD;
-        while ((lineFbD = brFbD.readLine()) != null) rFbD.append(lineFbD);
-    }
-    String reportFbD = new JSONObject(rFbD.toString())
-        .getJSONArray("choices").getJSONObject(0)
-        .getJSONObject("message").getString("content");
-    
-    if (reportFbD != null && reportFbD.length() > 50) {
-        // 🎯 Même contrôle qualité que le chemin principal daily, appliqué sur reportFbD
-        StringBuilder footerDailyFb = new StringBuilder();
-
-        EventValidator.CoherenceRapportResult coherenceDailyFb = EventValidator.validerCoherenceRapport(reportFbD);
-        if (!coherenceDailyFb.estValide()) {
-            Log.w(TAG, "⚠️ [DAILY FALLBACK COHÉRENCE] " + coherenceDailyFb.resume());
-            footerDailyFb.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceDailyFb.resume());
-        }
-
-        String anomalieVecteurGeoDailyFb = EventValidator.verifierVecteurGeoPertinent(reportFbD);
-        if (anomalieVecteurGeoDailyFb != null) footerDailyFb.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoDailyFb);
-
-        String anomalieVecteurSurpriseDailyFb = EventValidator.verifierCoherenceVecteurSurprise(reportFbD);
-        if (anomalieVecteurSurpriseDailyFb != null) footerDailyFb.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseDailyFb);
-
-        List<String> violationsNeutraliteDailyFb = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(reportFbD);
-        if (!violationsNeutraliteDailyFb.isEmpty()) footerDailyFb.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteDailyFb));
-
-        List<String> duplicationsDailyFb = EventValidator.verifierJustificationsDupliquees(reportFbD);
-        if (!duplicationsDailyFb.isEmpty()) footerDailyFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsDailyFb));
-
-        sendTelegramSecure("📅 *[DAILY - FALLBACK]* " + reportFbD + footerDailyFb, NotificationService.this);
-        if (MainActivity.instance != null)
-            MainActivity.instance.addLog("✅ [DAILY] Rapport envoyé via modèle léger.");
-    } else {
-        Log.w(TAG, "[DAILY] Fallback : réponse trop courte (" + (reportFbD != null ? reportFbD.length() : 0) + " car.)");
-        if (MainActivity.instance != null)
-            MainActivity.instance.addLog("⚠️ [DAILY] Fallback : réponse Groq trop courte, non envoyée.");
-    }
-    
-} else {
-    // ✅ Ne plus supposer la cause : rapporter le code HTTP réel + un libellé indicatif seulement
-    String bodyErrFbD = "";
-    try (BufferedReader brErrFbD = new BufferedReader(new InputStreamReader(connFbD.getErrorStream(), StandardCharsets.UTF_8))) {
-        String l; StringBuilder sb = new StringBuilder();
-        while ((l = brErrFbD.readLine()) != null) sb.append(l);
-        bodyErrFbD = sb.toString();
-    } catch (Exception ignored) {}
-    int codeFbD = connFbD.getResponseCode();
-    String indication = (codeFbD == 429) ? "quota tokens épuisé"
-            : (codeFbD == 413) ? "payload trop volumineux (dailyDrivers probablement trop long)"
-            : "voir corps de réponse dans les logs";
-    Log.e(TAG, "[DAILY] Fallback HTTP " + codeFbD + " (" + indication + ") : " + bodyErrFbD);
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("❌ [DAILY] Fallback échoué (HTTP " + codeFbD + " — " + indication + ").");
-}
-connFbD.disconnect();
-                        } catch (Exception eFbD) {
-                            Log.e(TAG, "[DAILY] Fallback échoué", eFbD);
-                        }
-                    } else if (MainActivity.instance != null) {
-                        MainActivity.instance.addLog("❌ [DAILY] Erreur HTTP " + responseCode + " de Groq : "
-                            + truncateForLog(errorResponse.toString()));
-                    }
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "[DAILY] Échec critique lors du traitement du briefing journalier", e);
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("❌ [DAILY] Échec : " + e.getClass().getSimpleName() + " — " + e.getMessage());
-                }
-            } finally {
-                if (conn != null) conn.disconnect();
-            }
-       return false ; 
-    }
-
-    public void startMonthlyReportScheduler() {
-    // ── Rapport MENSUEL — dernier jour du mois à 23h00 (Mada) ──
-    Calendar nextMonthly = Calendar.getInstance(
-        TimeZone.getTimeZone("Indian/Antananarivo"));
-    nextMonthly.set(Calendar.DAY_OF_MONTH,
-        nextMonthly.getActualMaximum(Calendar.DAY_OF_MONTH));
-    nextMonthly.set(Calendar.HOUR_OF_DAY, 23);
-    nextMonthly.set(Calendar.MINUTE, 0);
-    nextMonthly.set(Calendar.SECOND, 0);
-    if (nextMonthly.getTimeInMillis() <= System.currentTimeMillis()) {
-        nextMonthly.add(Calendar.MONTH, 1);
-        nextMonthly.set(Calendar.DAY_OF_MONTH,
-            nextMonthly.getActualMaximum(Calendar.DAY_OF_MONTH));
-    }
-   // APRÈS — on remplace scheduleAtFixedRate par un schedule one-shot
-// qui se reprogramme lui-même à chaque exécution
-    scheduler.schedule(new Runnable() {
-        @Override
-        public void run() {
-            generateAndPurgeMonthlyReport();
-            // Recalcule la vraie fin du mois suivant après exécution
-            Calendar next = Calendar.getInstance(
-                TimeZone.getTimeZone("Indian/Antananarivo"));
-            next.add(Calendar.MONTH, 1);
-            next.set(Calendar.DAY_OF_MONTH,
-                next.getActualMaximum(Calendar.DAY_OF_MONTH));
-            next.set(Calendar.HOUR_OF_DAY, 23);
-            next.set(Calendar.MINUTE, 0);
-            next.set(Calendar.SECOND, 0);
-            long delayMs = next.getTimeInMillis() - System.currentTimeMillis();
-            if (delayMs > 0) scheduler.schedule(this, delayMs, TimeUnit.MILLISECONDS);
-        }
-    }, nextMonthly.getTimeInMillis() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-    // ── Rapport HEBDOMADAIRE — chaque vendredi à 22h00 (Mada) ──
-    Calendar nextWeekly = Calendar.getInstance(
-        TimeZone.getTimeZone("Indian/Antananarivo"));
-    nextWeekly.set(Calendar.HOUR_OF_DAY, 22);
-    nextWeekly.set(Calendar.MINUTE, 0);
-    nextWeekly.set(Calendar.SECOND, 0);
-    while (nextWeekly.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY
-           || nextWeekly.getTimeInMillis() <= System.currentTimeMillis()) {
-        nextWeekly.add(Calendar.DAY_OF_MONTH, 1);
-    }
-    scheduler.scheduleAtFixedRate(this::generateAndSendWeeklyReport,
-        nextWeekly.getTimeInMillis() - System.currentTimeMillis(),
-        7L * 24 * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
-
-    Log.d(TAG, "[SCHEDULER] Rapport mensuel → " + nextMonthly.getTime());
-    Log.d(TAG, "[SCHEDULER] Rapport hebdo → " + nextWeekly.getTime());
-
-    // ── Rattrapares au démarrage ──
-    checkAndSendMissedWeeklyReport();
-    checkAndSendMissedMonthlyReport();
-    }
-
-    private static volatile long lastCalendarBackfillMillis = 0L;
-    private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
-
-   // 🛡️ Surcharge : la version sans paramètre garde le comportement actuel (purge active),
-// pour ne rien casser chez les appelants existants (scheduler automatique).
-        public boolean generateAndPurgeMonthlyReport() {
-            return generateAndPurgeMonthlyReport(true);
-        }
-        
-        // 🛡️ Nouvelle version avec contrôle de la purge — utilisée par le bouton manuel
-        // (purgeAfterSend = false) pour préserver le registre avant le vrai rapport de fin de mois.
-        public boolean generateAndPurgeMonthlyReport(boolean purgeAfterSend) {
-            HttpURLConnection conn = null;
-            try {
-                String apiKey = getGroqApiKey();
-        if (apiKey.isEmpty()) {
-            Log.w(TAG, "[MONTHLY] Clé API Groq absente — rapport annulé.");
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("❌ [MONTHLY] Clé API Groq absente — vérifie l'onglet Clés API.");
-            }
+        ReponseGroq rep = appelerAvecBudget(apiKey, systemPromptFinal, userDaily, 1500, 0.02, 8000);
+        if (!rep.ok()) {
+            Log.w(TAG, "[DAILY] Échec Groq (HTTP " + rep.status + ") : " + rep.erreur);
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("❌ [DAILY] Échec Groq HTTP " + rep.status + " — " + rep.erreur);
             return false;
         }
-        long now = System.currentTimeMillis() / 1000;
-String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
-final int MAX_MONTHLY_CHARS = 8500; // même seuil de sécurité que dailyDrivers, à ajuster ensemble une fois calibré
-if (monthlyRegistry != null && monthlyRegistry.length() > MAX_MONTHLY_CHARS) {
-    Log.w(TAG, "[MONTHLY] Registre tronqué : " + monthlyRegistry.length() + " → " + MAX_MONTHLY_CHARS + " caractères");
-    monthlyRegistry = monthlyRegistry.substring(0, MAX_MONTHLY_CHARS) + "\n[...tronqué...]";
-}
-if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
-            Log.w(TAG, "[MONTHLY] Registre mensuel vide — rapport annulé");
-            if (MainActivity.instance != null) {
-                MainActivity.instance.addLog("⚠️ [MONTHLY] Aucune donnée disponible pour le rapport mensuel");
-            }
-            return false; // ✅ Type de retour fixé
+
+        String aiResult = rep.contenu;
+        if (aiResult == null || aiResult.trim().length() <= 50) {
+            Log.w(TAG, "[DAILY] Groq réponse vide ou insuffisante.");
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("⚠️ [DAILY] Groq réponse vide ou insuffisante");
+            return false;
         }
 
-        // Mémoire d'inertie mensuelle — contexte du mois précédent
-        String lastMonthlyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-            .getString("last_monthly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
-        String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-            .getString("last_dominant_flow", "INDÉTERMINÉ");
-                JSONObject payload = new JSONObject();
-        int usedM = dailyTokensUsed.addAndGet(9000);
-        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
-            .putInt("daily_tokens_used", usedM)
-            .putLong("token_reset_time", tokenResetTime)
-            .apply();
-        payload.put("model", usedM > TOKEN_BUDGET_DAILY ? GROQ_MODEL_FALLBACK : GROQ_MODEL);
-        if (usedM > TOKEN_BUDGET_DAILY && MainActivity.instance != null)
-            MainActivity.instance.addLog("⚠️ [MONTHLY] Budget token atteint — modèle léger.");
-        payload.put("temperature", 0.05);
-        JSONArray messages = new JSONArray();
-        messages.put(new JSONObject().put("role", "system").put("content", MONTHLY_SYSTEM_PROMPT));
-        messages.put(new JSONObject().put("role", "user").put("content",
-            "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlowM + "\n" +
-            "📊 FLUX MENSUEL PRÉCÉDENT : " + lastMonthlyFlow + "\n" +
-            "─────────────────────────────\n" +
-            "REGISTRE MACRO DU MOIS :\n" + monthlyRegistry));
-        payload.put("messages", messages);
-        payload.put("temperature", 0.05);
-        payload.put("max_tokens", 1500);
-        URL url = new URL(GROQ_URL);
-        attendreSiNecessairePourTPM(9000);
-        conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(25000);
-        conn.setDoOutput(true);
+        String footerDaily = construireFooterControles(aiResult, "Daily", null);
+        sendTelegramSecure(aiResult.trim() + footerDaily, this);
+        Log.d(TAG, "[DAILY] Rapport IA généré et envoyé avec succès.");
 
-        try (OutputStream os = conn.getOutputStream()) {
-            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-            os.write(input, 0, input.length);
-            os.flush();
-        }
-
-        int responseCode = conn.getResponseCode();
-        if (responseCode == HttpURLConnection.HTTP_OK) {
-            StringBuilder r = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = br.readLine()) != null) r.append(line);
-            }
-
-            JSONObject jsonRespM = new JSONObject(r.toString());
-            String report = jsonRespM
-                .getJSONArray("choices")
-                .getJSONObject(0)
-                .getJSONObject("message")
-                .getString("content");
-
-            // 🎯 CORRECTION BUDGET RÉEL : remplace le forfait 9000 par la consommation RÉELLE.
-            JSONObject usageM = jsonRespM.optJSONObject("usage");
-            if (usageM != null) {
-                int reelM = usageM.optInt("total_tokens", 9000);
-                int deltaM = reelM - 9000;
-                if (deltaM != 0) dailyTokensUsed.addAndGet(deltaM);
-            }
-
-            if (report != null && report.trim().length() > 300) {
-                StringBuilder footerMonthly = new StringBuilder();
-
-                EventValidator.CoherenceRapportResult coherenceMonthly = EventValidator.validerCoherenceRapport(report);
-                if (!coherenceMonthly.estValide()) {
-                    Log.w(TAG, "⚠️ [MONTHLY COHÉRENCE] " + coherenceMonthly.resume());
-                    footerMonthly.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceMonthly.resume());
-                }
-                String anomalieVecteurGeoMonthly = EventValidator.verifierVecteurGeoPertinent(report);
-                if (anomalieVecteurGeoMonthly != null) footerMonthly.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoMonthly);
-                String anomalieVecteurSurpriseMonthly = EventValidator.verifierCoherenceVecteurSurprise(report);
-                if (anomalieVecteurSurpriseMonthly != null) footerMonthly.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseMonthly);
-                List<String> violationsNeutraliteMonthly = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(report);
-                if (!violationsNeutraliteMonthly.isEmpty()) footerMonthly.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteMonthly));
-                List<String> duplicationsMonthly = EventValidator.verifierJustificationsDupliquees(report);
-                if (!duplicationsMonthly.isEmpty()) footerMonthly.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsMonthly));
-
-                String monthlyFlowLine = "📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report.trim() + footerMonthly;
-                sendTelegramSecure(monthlyFlowLine, this);
-                
-                // Mémoriser le timestamp pour le rattrapage
-                getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-                    .edit()
-                    .putLong("last_monthly_sent_ms", System.currentTimeMillis())
+        Matcher flowMatcher = Pattern.compile("(?i)🏁\\s*FLUX\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)").matcher(aiResult);
+        if (flowMatcher.find()) {
+            getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+                    .putString("last_daily_flow", flowMatcher.group(1).trim())
                     .apply();
-                Log.d(TAG, "[MONTHLY] Rapport mensuel envoyé avec succès.");
-
-                // Persistance du flux mensuel dominant
-                Pattern monthlyFlowPattern = Pattern.compile("(?i)🏁\\s*FLUX\\s*MENSUEL\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
-                Matcher monthlyFlowMatcher = monthlyFlowPattern.matcher(report);
-                if (monthlyFlowMatcher.find()) {
-                    String newMonthlyFlow = monthlyFlowMatcher.group(1).trim();
-                    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-                        .edit()
-                        .putString("last_monthly_flow", newMonthlyFlow)
-                        .apply();
-                    Log.d(TAG, "💾 [MONTHLY] Flux mensuel enregistré : " + newMonthlyFlow);
-                }
-                
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("✅ [MONTHLY] Rapport mensuel envoyé");
-                }
-                // ✅ Purge sécurisée uniquement si le rapport a été généré et transmis avec succès
-                // 🛡️ Sautée si appelée manuellement avec purgeAfterSend=false (bouton de test)
-                if (purgeAfterSend) {
-                    eventDb.purgeOldEvents(now);
-                } else {
-                    Log.d(TAG, "[MONTHLY] Purge ignorée (déclenchement manuel/test) — registre préservé.");
-                    if (MainActivity.instance != null) {
-                        MainActivity.instance.addLog("ℹ️ [MONTHLY] Purge ignorée (mode test) — registre préservé.");
-                    }
-                }
-                return true; // ✅ Succès total : On retourne true au planificateur !
-            } else {
-                Log.w(TAG, "[MONTHLY] Groq réponse vide ou insuffisante — purge annulée");
-                if (MainActivity.instance != null) {
-                    MainActivity.instance.addLog("⚠️ [MONTHLY] Rapport mensuel vide — non envoyé");
-                }
-            }
         } else {
-            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
-                StringBuilder errorResponse = new StringBuilder();
-                String line;
-                while ((line = errorReader.readLine()) != null) {
-                    errorResponse.append(line);
-                }
-                Log.e(TAG, "[MONTHLY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
-if (responseCode == 429) {
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("⚠️ [MONTHLY] 429 TPD — bascule sur modèle léger.");
+            Log.w(TAG, "[DAILY] Balise '🏁 FLUX DOMINANT :' introuvable. Préférences inchangées.");
+        }
+        return true;
+
+    } catch (Exception e) {
+        Log.e(TAG, "[DAILY] Échec critique lors du traitement du briefing journalier", e);
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("❌ [DAILY] Échec : " + e.getClass().getSimpleName() + " — " + e.getMessage());
+        return false;
+    }
+}
+public boolean generateAndPurgeMonthlyReport(boolean purgeAfterSend) {
     try {
-        payload.put("model", GROQ_MODEL_FALLBACK);
-        payload.put("max_tokens", 1600);
-        conn.disconnect();
-        URL urlFbM = new URL(GROQ_URL);
-        attendreSiNecessairePourTPM(9000);
-        HttpURLConnection connFbM = (HttpURLConnection) urlFbM.openConnection();
-        connFbM.setRequestMethod("POST");
-        connFbM.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        connFbM.setRequestProperty("Authorization", "Bearer " + apiKey);
-        connFbM.setConnectTimeout(15000);
-        connFbM.setReadTimeout(20000);
-        connFbM.setDoOutput(true);
-        try (OutputStream osFbM = connFbM.getOutputStream()) {
-            osFbM.write(payload.toString().getBytes(StandardCharsets.UTF_8));
+        String apiKey = getGroqApiKey();
+        if (apiKey.isEmpty()) {
+            Log.w(TAG, "[MONTHLY] Clé API Groq absente — rapport annulé.");
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("❌ [MONTHLY] Clé API Groq absente — vérifie l'onglet Clés API.");
+            return false;
         }
-        if (connFbM.getResponseCode() == HttpURLConnection.HTTP_OK) {
-            StringBuilder rFbM = new StringBuilder();
-            try (BufferedReader brFbM = new BufferedReader(new InputStreamReader(connFbM.getInputStream(), StandardCharsets.UTF_8))) {
-                String lineFbM;
-                while ((lineFbM = brFbM.readLine()) != null) rFbM.append(lineFbM);
-            }
-            String reportFbM = new JSONObject(rFbM.toString())
-                .getJSONArray("choices").getJSONObject(0)
-                .getJSONObject("message").getString("content");
-            
-            if (reportFbM != null && reportFbM.length() > 50) {
-                StringBuilder footerMonthlyFb = new StringBuilder();
 
-                EventValidator.CoherenceRapportResult coherenceMonthlyFb = EventValidator.validerCoherenceRapport(reportFbM);
-                if (!coherenceMonthlyFb.estValide()) {
-                    Log.w(TAG, "⚠️ [MONTHLY FALLBACK COHÉRENCE] " + coherenceMonthlyFb.resume());
-                    footerMonthlyFb.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceMonthlyFb.resume());
-                }
-                String anomalieVecteurGeoMonthlyFb = EventValidator.verifierVecteurGeoPertinent(reportFbM);
-                if (anomalieVecteurGeoMonthlyFb != null) footerMonthlyFb.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoMonthlyFb);
-                String anomalieVecteurSurpriseMonthlyFb = EventValidator.verifierCoherenceVecteurSurprise(reportFbM);
-                if (anomalieVecteurSurpriseMonthlyFb != null) footerMonthlyFb.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseMonthlyFb);
-                List<String> violationsNeutraliteMonthlyFb = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(reportFbM);
-                if (!violationsNeutraliteMonthlyFb.isEmpty()) footerMonthlyFb.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteMonthlyFb));
-                List<String> duplicationsMonthlyFb = EventValidator.verifierJustificationsDupliquees(reportFbM);
-                if (!duplicationsMonthlyFb.isEmpty()) footerMonthlyFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsMonthlyFb));
+        long now = System.currentTimeMillis() / 1000;
+        String monthlyRegistry = eventDb.getMonthlyMacroRegistry(now);
+        final int MAX_MONTHLY_CHARS = 8500;
+        if (monthlyRegistry != null && monthlyRegistry.length() > MAX_MONTHLY_CHARS) {
+            Log.w(TAG, "[MONTHLY] Registre tronqué : " + monthlyRegistry.length() + " → " + MAX_MONTHLY_CHARS);
+            monthlyRegistry = monthlyRegistry.substring(0, MAX_MONTHLY_CHARS) + "\n[...tronqué...]";
+        }
+        if (monthlyRegistry == null || monthlyRegistry.isEmpty()) {
+            Log.w(TAG, "[MONTHLY] Registre mensuel vide — rapport annulé");
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("⚠️ [MONTHLY] Aucune donnée disponible pour le rapport mensuel");
+            return false;
+        }
 
-                sendTelegramSecure("📊 *[MONTHLY - FALLBACK]* " + reportFbM + footerMonthlyFb, NotificationService.this);
-                if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("✅ [MONTHLY] Rapport envoyé via modèle léger.");
-            }
+        String lastMonthlyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                .getString("last_monthly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
+        String currentFlowM = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                .getString("last_dominant_flow", "INDÉTERMINÉ");
+
+        String userMonthly =
+                "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlowM + "\n" +
+                "📊 FLUX MENSUEL PRÉCÉDENT : " + lastMonthlyFlow + "\n" +
+                "─────────────────────────────\n" +
+                "REGISTRE MACRO DU MOIS :\n" + monthlyRegistry;
+
+        ReponseGroq rep = appelerAvecBudget(apiKey, MONTHLY_SYSTEM_PROMPT, userMonthly, 1500, 0.05, 9000);
+        if (!rep.ok()) {
+            Log.w(TAG, "[MONTHLY] Échec Groq (HTTP " + rep.status + ") : " + rep.erreur);
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("❌ [MONTHLY] Échec Groq HTTP " + rep.status + " — " + rep.erreur);
+            return false;
         }
-        connFbM.disconnect();
-    } catch (Exception eFbM) {
-        Log.e(TAG, "[MONTHLY] Fallback échoué", eFbM);
-    }
-} else if (MainActivity.instance != null) {
-    MainActivity.instance.addLog("❌ [MONTHLY] Erreur HTTP " + responseCode + " de Groq : "
-        + truncateForLog(errorResponse.toString()));
-}
-            }
+
+        String report = rep.contenu;
+        if (report == null || report.trim().length() <= 300) {
+            Log.w(TAG, "[MONTHLY] Groq réponse vide ou insuffisante — purge annulée");
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("⚠️ [MONTHLY] Rapport mensuel vide — non envoyé");
+            return false;
         }
-    } catch (Exception e) { 
-        Log.e(TAG, "Erreur Rapport Mensuel", e); 
-        if (MainActivity.instance != null) {
+
+        String footerMonthly = construireFooterControles(report, "Monthly", null);
+        sendTelegramSecure("📊 *RAPPORT DE TRANSITION MACROÉCONOMIQUE MENSUEL*\n\n" + report.trim() + footerMonthly, this);
+
+        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+                .putLong("last_monthly_sent_ms", System.currentTimeMillis())
+                .apply();
+        Log.d(TAG, "[MONTHLY] Rapport mensuel envoyé avec succès.");
+
+        Matcher monthlyFlowMatcher = Pattern.compile(
+                "(?i)🏁\\s*FLUX\\s*MENSUEL\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)").matcher(report);
+        if (monthlyFlowMatcher.find()) {
+            getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+                    .putString("last_monthly_flow", monthlyFlowMatcher.group(1).trim())
+                    .apply();
+        }
+
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("✅ [MONTHLY] Rapport mensuel envoyé");
+
+        if (purgeAfterSend) {
+            eventDb.purgeOldEvents(now);
+        } else {
+            Log.d(TAG, "[MONTHLY] Purge ignorée (mode test) — registre préservé.");
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("ℹ️ [MONTHLY] Purge ignorée (mode test) — registre préservé.");
+        }
+        return true;
+
+    } catch (Exception e) {
+        Log.e(TAG, "Erreur Rapport Mensuel", e);
+        if (MainActivity.instance != null)
             MainActivity.instance.addLog("❌ [MONTHLY] Échec : " + e.getClass().getSimpleName() + " — " + e.getMessage());
-        }
-    } finally {
-        if (conn != null) conn.disconnect();
+        return false;
     }
-    return false; // ❌ Échec : Renvoie false pour signaler une anomalie et permettre un rattrapage
 }
 
+public boolean generateAndPurgeMonthlyReport() {
+    return generateAndPurgeMonthlyReport(true);
+}
 public boolean generateAndSendWeeklyReport() {
-    HttpURLConnection conn = null;
     try {
         String apiKey = getGroqApiKey();
         if (apiKey.isEmpty()) {
             Log.w(TAG, "[WEEKLY] Clé API Groq absente — rapport annulé.");
-            if (MainActivity.instance != null) {
+            if (MainActivity.instance != null)
                 MainActivity.instance.addLog("❌ [WEEKLY] Clé API Groq absente — vérifie l'onglet Clés API.");
-            }
             return false;
         }
+
         long now = System.currentTimeMillis() / 1000;
-        // Récupère les événements des 7 derniers jours (poids >= 2)
-String weeklyRegistry = eventDb.getWeeklyMacroSummary(now);
-final int MAX_WEEKLY_CHARS = 16000;
-if (weeklyRegistry != null && weeklyRegistry.length() > MAX_WEEKLY_CHARS) {
-    Log.w(TAG, "[WEEKLY] Registre tronqué : " + weeklyRegistry.length() + " → " + MAX_WEEKLY_CHARS + " caractères");
-    weeklyRegistry = weeklyRegistry.substring(0, MAX_WEEKLY_CHARS) + "\n[...tronqué...]";
-}
-if (weeklyRegistry == null || weeklyRegistry.isEmpty()) {
+        String weeklyRegistry = eventDb.getWeeklyMacroSummary(now);
+        final int MAX_WEEKLY_CHARS = 16000;
+        if (weeklyRegistry != null && weeklyRegistry.length() > MAX_WEEKLY_CHARS) {
+            Log.w(TAG, "[WEEKLY] Registre tronqué : " + weeklyRegistry.length() + " → " + MAX_WEEKLY_CHARS);
+            weeklyRegistry = weeklyRegistry.substring(0, MAX_WEEKLY_CHARS) + "\n[...tronqué...]";
+        }
+        if (weeklyRegistry == null || weeklyRegistry.isEmpty()) {
             Log.w(TAG, "[WEEKLY] Registre hebdo vide — rapport annulé");
             if (MainActivity.instance != null)
                 MainActivity.instance.addLog("⚠️ [WEEKLY] Aucune donnée pour le rapport hebdomadaire");
-            return false; // ✅ Type de retour fixé
+            return false;
         }
 
         String lastWeeklyFlow = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-    .getString("last_weekly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
-String currentFlowW = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-    .getString("last_dominant_flow", "INDÉTERMINÉ");
-        JSONObject payload = new JSONObject();
-int usedW = dailyTokensUsed.addAndGet(9000);
-getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
-    .putInt("daily_tokens_used", usedW)
-    .putLong("token_reset_time", tokenResetTime)
-    .apply();
-payload.put("model", usedW > TOKEN_BUDGET_DAILY ? GROQ_MODEL_FALLBACK : GROQ_MODEL);
-if (usedW > TOKEN_BUDGET_DAILY && MainActivity.instance != null)
-    MainActivity.instance.addLog("⚠️ [WEEKLY] Budget token atteint — modèle léger.");
-payload.put("temperature", 0.05);
+                .getString("last_weekly_flow", "NEUTRE / DONNÉES INSUFFISANTES");
+        String currentFlowW = getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
+                .getString("last_dominant_flow", "INDÉTERMINÉ");
 
-        JSONArray messages = new JSONArray();
-       messages.put(new JSONObject().put("role", "system").put("content", WEEKLY_SYSTEM_PROMPT));
-        messages.put(new JSONObject().put("role", "user").put("content",
-            "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlowW + "\n" +
-            "📅 FLUX HEBDO PRÉCÉDENT : " + lastWeeklyFlow + "\n" +
-            "─────────────────────────────\n" +
-            "REGISTRE MACRO DE LA SEMAINE :\n" + weeklyRegistry));
-        payload.put("messages", messages);
-        payload.put("temperature", 0.05);
-        payload.put("max_tokens", 1600);
-        URL url = new URL(GROQ_URL);
-        attendreSiNecessairePourTPM(9000);
-        conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(25000);
-        conn.setDoOutput(true);
+        String userWeekly =
+                "⚡ FLUX DOMINANT ACTUEL (dernière analyse live) : " + currentFlowW + "\n" +
+                "📅 FLUX HEBDO PRÉCÉDENT : " + lastWeeklyFlow + "\n" +
+                "─────────────────────────────\n" +
+                "REGISTRE MACRO DE LA SEMAINE :\n" + weeklyRegistry;
 
-        try (OutputStream os = conn.getOutputStream()) {
-            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-            os.write(input, 0, input.length);
-            os.flush();
+        ReponseGroq rep = appelerAvecBudget(apiKey, WEEKLY_SYSTEM_PROMPT, userWeekly, 1600, 0.05, 9000);
+        if (!rep.ok()) {
+            Log.w(TAG, "[WEEKLY] Échec Groq (HTTP " + rep.status + ") : " + rep.erreur);
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("❌ [WEEKLY] Échec Groq HTTP " + rep.status + " — " + rep.erreur);
+            return false;
         }
 
-        int responseCode = conn.getResponseCode();
-        if (responseCode == HttpURLConnection.HTTP_OK) {
-            StringBuilder r = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = br.readLine()) != null) r.append(line);
-            }
+        String report = rep.contenu;
+        if (report == null || report.trim().length() <= 300) {
+            Log.w(TAG, "[WEEKLY] Réponse Groq insuffisante");
+            return false;
+        }
 
-            String report = new JSONObject(r.toString())
-                .getJSONArray("choices")
-                .getJSONObject(0)
-                .getJSONObject("message")
-                .getString("content");
+        String footerWeekly = construireFooterControles(report, "Weekly", null);
+        sendTelegramSecure("📅 *BILAN MACRO HEBDOMADAIRE — VENDREDI*\n\n" + report.trim() + footerWeekly, this);
 
-            if (report != null && report.trim().length() > 300) {
-                StringBuilder footerWeekly = new StringBuilder();
+        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+                .putLong("last_weekly_sent_ms", System.currentTimeMillis())
+                .apply();
+        Log.d(TAG, "[WEEKLY] Rapport hebdomadaire envoyé.");
 
-                EventValidator.CoherenceRapportResult coherenceWeekly = EventValidator.validerCoherenceRapport(report);
-                if (!coherenceWeekly.estValide()) {
-                    Log.w(TAG, "⚠️ [WEEKLY COHÉRENCE] " + coherenceWeekly.resume());
-                    footerWeekly.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceWeekly.resume());
-                }
-                String anomalieVecteurGeoWeekly = EventValidator.verifierVecteurGeoPertinent(report);
-                if (anomalieVecteurGeoWeekly != null) footerWeekly.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoWeekly);
-                String anomalieVecteurSurpriseWeekly = EventValidator.verifierCoherenceVecteurSurprise(report);
-                if (anomalieVecteurSurpriseWeekly != null) footerWeekly.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseWeekly);
-                List<String> violationsNeutraliteWeekly = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(report);
-                if (!violationsNeutraliteWeekly.isEmpty()) footerWeekly.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteWeekly));
-                List<String> duplicationsWeekly = EventValidator.verifierJustificationsDupliquees(report);
-                if (!duplicationsWeekly.isEmpty()) footerWeekly.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsWeekly));
-
-                sendTelegramSecure("📅 *BILAN MACRO HEBDOMADAIRE — VENDREDI*\n\n" + report.trim() + footerWeekly, this);
-                
-                getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-                    .edit()
-                    .putLong("last_weekly_sent_ms", System.currentTimeMillis())
+        Matcher weeklyMatcher = Pattern.compile(
+                "(?i)🏁\\s*FLUX\\s*HEBDO\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)").matcher(report);
+        if (weeklyMatcher.find()) {
+            getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+                    .putString("last_weekly_flow", weeklyMatcher.group(1).trim())
                     .apply();
-
-                Log.d(TAG, "[WEEKLY] Rapport hebdomadaire envoyé.");
-
-                // Persistance flux hebdo
-                Pattern weeklyPattern = Pattern.compile(
-                    "(?i)🏁\\s*FLUX\\s*HEBDO\\s*DOMINANT\\s*:\\s*(.{3,60})(?:\\n|$)");
-                Matcher weeklyMatcher = weeklyPattern.matcher(report);
-                if (weeklyMatcher.find()) {
-                    getSharedPreferences("TradingBotPrefs", MODE_PRIVATE)
-                        .edit()
-                        .putString("last_weekly_flow", weeklyMatcher.group(1).trim())
-                        .apply();
-                }
-                
-                if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("✅ [WEEKLY] Rapport hebdomadaire envoyé");
-
-                return true; // ✅ Succès : On retourne true au planificateur !
-            } else {
-                Log.w(TAG, "[WEEKLY] Réponse Groq insuffisante");
-            }
-        } else {
-            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
-                StringBuilder errorResponse = new StringBuilder();
-                String line;
-                while ((line = errorReader.readLine()) != null) {
-                    errorResponse.append(line);
-                }
-                Log.e(TAG, "[WEEKLY] Erreur HTTP " + responseCode + " de l'API Groq : " + errorResponse.toString());
-if (responseCode == 429) {
-    if (MainActivity.instance != null)
-        MainActivity.instance.addLog("⚠️ [WEEKLY] 429 TPD — bascule sur modèle léger.");
-    try {
-        payload.put("model", GROQ_MODEL_FALLBACK);
-        payload.put("max_tokens", 1500);
-        conn.disconnect();
-        URL urlFbW = new URL(GROQ_URL);
-        attendreSiNecessairePourTPM(9000);
-        HttpURLConnection connFbW = (HttpURLConnection) urlFbW.openConnection();
-        connFbW.setRequestMethod("POST");
-        connFbW.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        connFbW.setRequestProperty("Authorization", "Bearer " + apiKey);
-        connFbW.setConnectTimeout(15000);
-        connFbW.setReadTimeout(20000);
-        connFbW.setDoOutput(true);
-        try (OutputStream osFbW = connFbW.getOutputStream()) {
-            osFbW.write(payload.toString().getBytes(StandardCharsets.UTF_8));
         }
-        if (connFbW.getResponseCode() == HttpURLConnection.HTTP_OK) {
-            StringBuilder rFbW = new StringBuilder();
-            try (BufferedReader brFbW = new BufferedReader(new InputStreamReader(connFbW.getInputStream(), StandardCharsets.UTF_8))) {
-                String lineFbW;
-                while ((lineFbW = brFbW.readLine()) != null) rFbW.append(lineFbW);
-            }
-            String reportFbW = new JSONObject(rFbW.toString())
-                .getJSONArray("choices").getJSONObject(0)
-                .getJSONObject("message").getString("content");
-            
-            if (reportFbW != null && reportFbW.length() > 50) {
-                StringBuilder footerWeeklyFb = new StringBuilder();
 
-                EventValidator.CoherenceRapportResult coherenceWeeklyFb = EventValidator.validerCoherenceRapport(reportFbW);
-                if (!coherenceWeeklyFb.estValide()) {
-                    Log.w(TAG, "⚠️ [WEEKLY FALLBACK COHÉRENCE] " + coherenceWeeklyFb.resume());
-                    footerWeeklyFb.append("\n\n🔎 *Contrôle qualité* : ").append(coherenceWeeklyFb.resume());
-                }
-                String anomalieVecteurGeoWeeklyFb = EventValidator.verifierVecteurGeoPertinent(reportFbW);
-                if (anomalieVecteurGeoWeeklyFb != null) footerWeeklyFb.append("\n\n🏷️ *Alerte classification* : ").append(anomalieVecteurGeoWeeklyFb);
-                String anomalieVecteurSurpriseWeeklyFb = EventValidator.verifierCoherenceVecteurSurprise(reportFbW);
-                if (anomalieVecteurSurpriseWeeklyFb != null) footerWeeklyFb.append("\n\n🔀 *Alerte vecteur* : ").append(anomalieVecteurSurpriseWeeklyFb);
-                List<String> violationsNeutraliteWeeklyFb = EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(reportFbW);
-                if (!violationsNeutraliteWeeklyFb.isEmpty()) footerWeeklyFb.append("\n\n🌐 *Alerte neutralité* : ").append(String.join(" | ", violationsNeutraliteWeeklyFb));
-                List<String> duplicationsWeeklyFb = EventValidator.verifierJustificationsDupliquees(reportFbW);
-                if (!duplicationsWeeklyFb.isEmpty()) footerWeeklyFb.append("\n\n📋 *Alerte justification* : ").append(String.join(" | ", duplicationsWeeklyFb));
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("✅ [WEEKLY] Rapport hebdomadaire envoyé");
+        return true;
 
-                sendTelegramSecure("📆 *[WEEKLY - FALLBACK]* " + reportFbW + footerWeeklyFb, NotificationService.this);
-                if (MainActivity.instance != null)
-                    MainActivity.instance.addLog("✅ [WEEKLY] Rapport envoyé via modèle léger.");
-            }
-        }
-        connFbW.disconnect();
-    } catch (Exception eFbW) {
-        Log.e(TAG, "[WEEKLY] Fallback échoué", eFbW);
-    }
-} else if (MainActivity.instance != null) {
-    MainActivity.instance.addLog("❌ [WEEKLY] Erreur HTTP " + responseCode + " de Groq : "
-        + truncateForLog(errorResponse.toString()));
-                                 }
-            }
-        }
     } catch (Exception e) {
         Log.e(TAG, "[WEEKLY] Erreur rapport hebdomadaire", e);
-        if (MainActivity.instance != null) {
+        if (MainActivity.instance != null)
             MainActivity.instance.addLog("❌ [WEEKLY] Échec : " + e.getClass().getSimpleName() + " — " + e.getMessage());
-        }
-    } finally {
-        if (conn != null) conn.disconnect();
+        return false;
     }
-
-    return false; // ❌ Échec ou anomalie : Le planificateur pourra retenter l'envoi
 }
+    
+/** Snapshot des prix TradingView pour le rapport daily. */
+private String construireSnapshotDaily() {
+    StringBuilder sb = new StringBuilder("📊 COURS AU MOMENT DU RAPPORT :\n");
+    boolean hasData = false;
+    try {
+        Map<String, TradingViewFetcher.TVMarketData> tvSnap = TradingViewFetcher.getCache();
+        for (String asset : MARKET_PRICE_ASSETS) {
+            TradingViewFetcher.TVMarketData d = tvSnap.get(asset);
+            if (d == null || d.price <= 0) continue;
+            String sign = d.changePercent >= 0 ? "+" : "";
+            String emoji = d.changePercent > 0 ? "🟢" : (d.changePercent < 0 ? "🔴" : "⚪");
+            sb.append(asset).append(" => ")
+              .append(String.format(Locale.US, "%.4f (%s%.2f%% %s)", d.price, sign, d.changePercent, emoji));
+            if (d.pdh > 0 || d.pdl > 0) {
+                sb.append(" | PDH=").append(String.format(Locale.US, "%.4f", d.pdh))
+                  .append(" PDL=").append(String.format(Locale.US, "%.4f", d.pdl));
+                if (d.brokeAbovePDH) sb.append(" 🔺PDH");
+                else if (d.brokeBelowPDL) sb.append(" 🔻PDL");
+            }
+            if (d.pwh > 0 || d.pwl > 0) {
+                sb.append(" | PWH=").append(String.format(Locale.US, "%.4f", d.pwh))
+                  .append(" PWL=").append(String.format(Locale.US, "%.4f", d.pwl));
+                if (d.brokeAbovePWH) sb.append(" 🚀PWH");
+                else if (d.brokeBelowPWL) sb.append(" 🔥PWL");
+            }
+            sb.append("\n");
+            hasData = true;
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "[DAILY] Snapshot marché indisponible : " + e.getMessage());
+    }
+    return hasData ? sb.toString() : "Données de marché indisponibles.";
+}
+   
 
 private void registerNetworkCallback() {
     ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
