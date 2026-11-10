@@ -1687,6 +1687,49 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         }).start();
     }
 
+        private static void ajouterAlerte(StringBuilder f, String libelle, String message) {
+        if (message != null && !message.isEmpty()) f.append("\n\n").append(libelle).append(" : ").append(message);
+    }
+
+    private static void ajouterAlerte(StringBuilder f, String libelle, List<String> messages) {
+        if (messages != null && !messages.isEmpty()) ajouterAlerte(f, libelle, String.join(" | ", messages));
+    }
+
+    /** Tous les contrôles post-génération. marche peut être null (contrôles marché ignorés). */
+    private String construireFooterControles(String rapport, String source,
+                                             Map<String, TradingViewFetcher.TVMarketData> marche) {
+        StringBuilder f = new StringBuilder();
+
+        if (marche != null) {
+            EventValidator.MarketValidationResult mv =
+                    EventValidator.validateAgainstRealMarket(this, source, rapport, marche);
+            if (!mv.contradictions.isEmpty()) f.append("\n\n").append(mv.warningLine());
+        }
+
+        int fiab = EventValidator.getSourceReliability(source);
+        if (fiab >= 0) f.append("\n📊 Fiabilité historique source \"").append(source).append("\" : ").append(fiab).append("%");
+
+        EventValidator.CoherenceRapportResult coh = EventValidator.validerCoherenceRapport(rapport);
+        if (!coh.estValide()) ajouterAlerte(f, "🔎 *Contrôle qualité*", coh.resume());
+
+        ajouterAlerte(f, "🔢 *Alerte lecture chiffrée*", EventValidator.verifierActualVsForecast(rapport));
+        ajouterAlerte(f, "⏱️ *Alerte phase temporelle*", EventValidator.verifierPhaseChocGeo(this, rapport));
+        ajouterAlerte(f, "🏷️ *Alerte classification*", EventValidator.verifierVecteurGeoPertinent(rapport));
+        ajouterAlerte(f, "🔀 *Alerte vecteur*", EventValidator.verifierCoherenceVecteurSurprise(rapport));
+        ajouterAlerte(f, "🌐 *Alerte neutralité*", EventValidator.verifierNeutraliteActifsUSSurBanqueEtrangere(rapport));
+        ajouterAlerte(f, "🔗 *Alerte mécanisme causal*", EventValidator.verifierContaminationCausaleFed(rapport));
+        ajouterAlerte(f, "📋 *Alerte justification*", EventValidator.verifierJustificationsDupliquees(rapport));
+
+        if (marche != null) {
+            EventValidator.CroisementTechniqueResult cross = EventValidator.verifierCroisementTechnique(rapport, marche);
+            if (!cross.estValide()) ajouterAlerte(f, "📉 *Alerte marché réel*", cross.resume());
+        }
+
+        ajouterAlerte(f, "🎯 *Alerte logique*", EventValidator.verifierChocDollarSurNonConfirme(rapport));
+        ajouterAlerte(f, "🌍 *Alerte taxonomie*", EventValidator.verifierPaysHorsTaxonomieBanqueCentrale(rapport));
+        return f.toString();
+    }
+
     // ✅ NOUVELLE méthode helper — envoie un seul chunk, retente en texte brut si Markdown rejeté
     private static void sendChunkToTelegram(String text, String token,
                                              String chatId, String parseMode) {
@@ -2919,6 +2962,51 @@ for (String asset : twelveAssets) {
         scheduleDailyBriefAt(targetHour, tz);
     }, delay, TimeUnit.MILLISECONDS);
    }
+        public void startMonthlyReportScheduler() {
+        // ── Rapport MENSUEL — dernier jour du mois à 23h00 (Mada) ──
+        Calendar nextMonthly = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+        nextMonthly.set(Calendar.DAY_OF_MONTH, nextMonthly.getActualMaximum(Calendar.DAY_OF_MONTH));
+        nextMonthly.set(Calendar.HOUR_OF_DAY, 23);
+        nextMonthly.set(Calendar.MINUTE, 0);
+        nextMonthly.set(Calendar.SECOND, 0);
+        if (nextMonthly.getTimeInMillis() <= System.currentTimeMillis()) {
+            nextMonthly.add(Calendar.MONTH, 1);
+            nextMonthly.set(Calendar.DAY_OF_MONTH, nextMonthly.getActualMaximum(Calendar.DAY_OF_MONTH));
+        }
+        scheduler.schedule(new Runnable() {
+            @Override
+            public void run() {
+                generateAndPurgeMonthlyReport();
+                Calendar next = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+                next.add(Calendar.MONTH, 1);
+                next.set(Calendar.DAY_OF_MONTH, next.getActualMaximum(Calendar.DAY_OF_MONTH));
+                next.set(Calendar.HOUR_OF_DAY, 23);
+                next.set(Calendar.MINUTE, 0);
+                next.set(Calendar.SECOND, 0);
+                long delayMs = next.getTimeInMillis() - System.currentTimeMillis();
+                if (delayMs > 0) scheduler.schedule(this, delayMs, TimeUnit.MILLISECONDS);
+            }
+        }, nextMonthly.getTimeInMillis() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+
+        // ── Rapport HEBDOMADAIRE — chaque vendredi à 22h00 (Mada) ──
+        Calendar nextWeekly = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+        nextWeekly.set(Calendar.HOUR_OF_DAY, 22);
+        nextWeekly.set(Calendar.MINUTE, 0);
+        nextWeekly.set(Calendar.SECOND, 0);
+        while (nextWeekly.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY
+               || nextWeekly.getTimeInMillis() <= System.currentTimeMillis()) {
+            nextWeekly.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        scheduler.scheduleAtFixedRate(this::generateAndSendWeeklyReport,
+            nextWeekly.getTimeInMillis() - System.currentTimeMillis(),
+            7L * 24 * 60 * 60 * 1000, TimeUnit.MILLISECONDS);
+
+        Log.d(TAG, "[SCHEDULER] Rapport mensuel → " + nextMonthly.getTime());
+        Log.d(TAG, "[SCHEDULER] Rapport hebdo → " + nextWeekly.getTime());
+
+        checkAndSendMissedWeeklyReport();
+        checkAndSendMissedMonthlyReport();
+    }
     public boolean generateAndSendDailyBrief() {
     try {
         String apiKey = getGroqApiKey();
