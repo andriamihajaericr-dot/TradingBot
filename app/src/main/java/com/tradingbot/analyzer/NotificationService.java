@@ -1111,11 +1111,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                             }
                             String impactFinal = impactResume.length() > 0
                                 ? impactResume.toString().trim()
-                               private static String extraireFlux(String rapport) {
-                                    if (rapport == null) return "N/A";
-                                    Matcher m = Pattern.compile("FLUX DOMINANT\\s*:\\s*(.+)").matcher(rapport);
-                                    return m.find() ? "Flux: " + m.group(1).trim() : "N/A";
-                                }
+                               
                                   db.markEventAsSynced(fingerprint, impactFinal.length() > 200
                                 ? impactFinal.substring(0, 200) : impactFinal);
                                                         } else {
@@ -1401,6 +1397,11 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             }
         });    
     }
+    private static String extraireFlux(String rapport) {
+                                    if (rapport == null) return "N/A";
+                                    Matcher m = Pattern.compile("FLUX DOMINANT\\s*:\\s*(.+)").matcher(rapport);
+                                    return m.find() ? "Flux: " + m.group(1).trim() : "N/A";
+                                }
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
