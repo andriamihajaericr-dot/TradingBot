@@ -1111,7 +1111,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                             }
                             String impactFinal = impactResume.length() > 0
                                 ? impactResume.toString().trim()
-                               
+                                 : extraireFlux(aiReport);
                                   db.markEventAsSynced(fingerprint, impactFinal.length() > 200
                                 ? impactFinal.substring(0, 200) : impactFinal);
                                                         } else {
