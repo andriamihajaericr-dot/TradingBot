@@ -2962,6 +2962,9 @@ for (String asset : twelveAssets) {
         scheduleDailyBriefAt(targetHour, tz);
     }, delay, TimeUnit.MILLISECONDS);
    }
+
+    private static volatile long lastCalendarBackfillMillis = 0L;
+    private static final long CALENDAR_BACKFILL_GUARD_MS = 30 * 60 * 1000L;
         public void startMonthlyReportScheduler() {
         // ── Rapport MENSUEL — dernier jour du mois à 23h00 (Mada) ──
         Calendar nextMonthly = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
