@@ -6,8 +6,8 @@ import java.util.Locale;
 
 /**
  * Table directionnelle fixe : vecteur macro -> sens des 6 actifs autorisés.
- * Remplace les matrices écrites dans les prompts. Le LLM ne fournit que le vecteur ;
- * la direction, la conviction et la validité sont calculées ici.
+ * Le LLM ne fournit que le vecteur et quelques faits ; la direction, la conviction
+ * et la validité sont calculées ici.
  *
  * Ordre des actifs (index du tableau sens) : NASDAQ, SP500, GOLD, USOIL, USDJPY, GBPUSD.
  * Valeurs : +1 = 🟢 (BULLISH), -1 = 🔴 (BEARISH), 0 = NEUTRE (omis du message).
@@ -30,7 +30,7 @@ public final class MatriceMacro {
         TARIFS(Regime.RISK_OFF,               new int[]{-1, -1, +1, -1, -1, -1}, "escalade tarifaire, risk-off"),
         CHINE(Regime.RISK_ON,                 new int[]{+1, +1,  0, +1,  0,  0}, "croissance chinoise forte"),
         SENTIMENT_FAIBLE(Regime.RISK_OFF,     new int[]{-1, -1, +1, -1,  0,  0}, "sentiment consommateur faible"),
-        IPO(Regime.RISK_ON,                   new int[]{+1, +1, -1,  0, -1,  0}, "IPO majeure, appétit pour le risque"),
+        IPO(Regime.RISK_ON,                   new int[]{+1, +1,  0,  0, -1,  0}, "IPO majeure, appétit pour le risque"),
         HAWKISH_BOJ(Regime.BANQUE_CENTRALE,   new int[]{ 0,  0,  0,  0, -1,  0}, "yen renforcé, BoJ hawkish"),
         DOVISH_BOJ(Regime.BANQUE_CENTRALE,    new int[]{ 0,  0,  0,  0, +1,  0}, "yen affaibli, BoJ dovish"),
         HAWKISH_BOE(Regime.BANQUE_CENTRALE,   new int[]{ 0,  0,  0,  0,  0, +1}, "livre renforcée, BoE hawkish"),
@@ -107,14 +107,22 @@ public final class MatriceMacro {
      * @param speculatif        le texte source est conditionnel (voir detecterSpeculatif)
      * @param surpriseChiffree  actual et forecast disponibles et différents
      * @param sourceForte       source de référence (Bloomberg, Reuters, FT, FinancialJuice...)
+     * @param confirmeParAutre  un autre driver du même lot (30 min) confirme ce vecteur.
+     *                          Requis pour émettre un signal ECB, qui n'est jamais seul.
      */
     public static Resultat evaluer(Vecteur v, boolean confirme, boolean speculatif,
-                                   boolean surpriseChiffree, boolean sourceForte) {
+                                   boolean surpriseChiffree, boolean sourceForte,
+                                   boolean confirmeParAutre) {
         int[] s = v.sens();
         List<String> viol = new ArrayList<>();
 
         if (speculatif && v == Vecteur.GEO_CAS_A) {
             viol.add("choc géo cas A appliqué à un texte conditionnel");
+        }
+
+        // ECB seul : jamais émis sans driver confirmant dans le même lot
+        if ((v == Vecteur.HAWKISH_ECB || v == Vecteur.DOVISH_ECB) && !confirmeParAutre) {
+            viol.add("signal ECB seul : non émis sans driver confirmant");
         }
 
         // NASDAQ et SP500 : même sens
@@ -231,12 +239,14 @@ public final class MatriceMacro {
 
     /**
      * Contrôle de cohérence de toute la table, à lancer une fois au démarrage (log uniquement).
-     * Retourne la liste des lignes qui violent un invariant, sans les modifier.
+     * Chaque vecteur est évalué comme confirmé, surpris, avec source forte et confirmé par un
+     * autre driver, afin que seuls les invariants réels remontent.
+     * Retourne la liste des violations. Doit être vide.
      */
     public static List<String> verifierTable() {
         List<String> problemes = new ArrayList<>();
         for (Vecteur v : Vecteur.values()) {
-            Resultat r = evaluer(v, true, false, true, true);
+            Resultat r = evaluer(v, true, false, true, true, true);
             for (String p : r.violations) problemes.add(v.name() + " : " + p);
         }
         return problemes;
