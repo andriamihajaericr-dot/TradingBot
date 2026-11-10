@@ -17,7 +17,7 @@ import java.util.ArrayList;
 public class EventDatabase extends SQLiteOpenHelper {
     private static final String TAG = "EventDatabase";   
     private static final String DATABASE_NAME = "trading_bot.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
     public static final String TABLE_EVENTS = "events";
     
     // Implémentation du Singleton pour la sécurité d'accès concurrentiel (WAL)
@@ -178,6 +178,69 @@ public class EventDatabase extends SQLiteOpenHelper {
     /**
      * Extrait intelligemment le nombre lié à la publication (gère "Actual: 3.4%", "Réel: -0.1", etc.)
      */
+        /** Écrit une décision. Appelé uniquement depuis les points d'écriture existants. */
+    private void enregistrerDecisionDirecte(SQLiteDatabase db, String fingerprint, String source,
+                                            String decision, String vecteur, String raison) {
+        try {
+            ContentValues cv = new ContentValues();
+            cv.put("fingerprint", fingerprint);
+            cv.put("source", source != null ? source : "inconnu");
+            cv.put("decision", decision);
+            cv.put("vecteur", vecteur);
+            cv.put("raison", raison != null && raison.length() > 200 ? raison.substring(0, 200) : raison);
+            cv.put("horodatage", System.currentTimeMillis() / 1000L);
+            db.insert("decisions", null, cv);
+        } catch (Exception e) {
+            Log.e(TAG, "Impossible d'enregistrer la décision pour " + fingerprint, e);
+        }
+    }
+
+    /** Déduit la décision à partir de la valeur d'impact écrite dans la base. */
+    private void enregistrerDecisionDepuisImpact(SQLiteDatabase db, String fingerprint, String impact) {
+        String i = (impact != null) ? impact : "";
+        String decision;
+        String vecteur = null;
+
+        if (i.startsWith("PROCESSED_MATRICE_")) {
+            decision = "EMIS";
+            vecteur = i.substring("PROCESSED_MATRICE_".length());
+        } else if (i.startsWith("PROCESSED")) {
+            decision = "EMIS";
+        } else if (i.startsWith("FILTERED") || i.startsWith("LOW_CONVICTION") || i.startsWith("TOO_SHORT")) {
+            decision = "FILTRE";
+        } else if (i.startsWith("FAILED")) {
+            decision = "ECHEC";
+        } else if (i.contains("🟢") || i.contains("🔴") || i.startsWith("Flux:")) {
+            decision = "EMIS_ANCIEN";   // chemin Groq historique, lignes d'impact copiées
+        } else {
+            decision = "INCONNU";       // tout ce qui n'est pas classé : à investiguer
+        }
+        enregistrerDecisionDirecte(db, fingerprint, sourceDe(db, fingerprint), decision, vecteur, i);
+    }
+
+    private String sourceDe(SQLiteDatabase db, String fingerprint) {
+        try (Cursor c = db.query(TABLE_EVENTS, new String[]{"source"},
+                "fingerprint = ?", new String[]{fingerprint}, null, null, null, "1")) {
+            if (c != null && c.moveToFirst()) return c.getString(0);
+        } catch (Exception ignored) {}
+        return "inconnu";
+    }
+
+    /** Résumé des décisions sur une fenêtre, pour les logs ou un test manuel. */
+    public synchronized String resumeDecisions(long depuisSec) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        StringBuilder sb = new StringBuilder("📋 Décisions : ");
+        try (Cursor c = db.rawQuery(
+                "SELECT decision, COUNT(*) FROM decisions WHERE horodatage >= ? GROUP BY decision ORDER BY decision",
+                new String[]{String.valueOf(depuisSec)})) {
+            while (c.moveToNext()) {
+                sb.append(c.getString(0)).append("=").append(c.getInt(1)).append(" | ");
+            }
+        } catch (Exception e) {
+            return "Erreur résumé décisions : " + e.getMessage();
+        }
+        return sb.toString();
+    }
     private String extractActualFromText(String text) {
         if (text == null || text.isEmpty()) return null;
         
@@ -224,6 +287,19 @@ public class EventDatabase extends SQLiteOpenHelper {
         db.enableWriteAheadLogging();
     }
 
+        private void creerTableDecisions(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS decisions (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "fingerprint TEXT, " +
+                "source TEXT, " +
+                "decision TEXT, " +
+                "vecteur TEXT, " +
+                "raison TEXT, " +
+                "horodatage INTEGER)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_decisions_fp ON decisions(fingerprint)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_decisions_time ON decisions(horodatage)");
+    }
+    
     @Override
     public void onCreate(SQLiteDatabase db) {
         String createTable = "CREATE TABLE " + TABLE_EVENTS + " (" +
@@ -243,6 +319,7 @@ public class EventDatabase extends SQLiteOpenHelper {
 
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_time_weight ON " + 
                    TABLE_EVENTS + "(unix_timestamp, driver_weight);");
+          creerTableDecisions(db); 
     }
 
     @Override
@@ -255,6 +332,9 @@ public class EventDatabase extends SQLiteOpenHelper {
             }
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_time_weight ON " +
                        TABLE_EVENTS + "(unix_timestamp, driver_weight);");
+        }
+        if (oldVersion < 4) {
+            creerTableDecisions(db);   // AJOUT
         }
     }
 
@@ -275,7 +355,10 @@ public class EventDatabase extends SQLiteOpenHelper {
         cv.put("sync_status", status);
         cv.put("driver_weight", weight);
 
-        long result = db.insertWithOnConflict(TABLE_EVENTS, null, cv, SQLiteDatabase.CONFLICT_IGNORE);
+                long result = db.insertWithOnConflict(TABLE_EVENTS, null, cv, SQLiteDatabase.CONFLICT_IGNORE);
+        if (result == -1) {
+            enregistrerDecisionDirecte(db, fingerprint, src, "DOUBLON", null, "fingerprint déjà présent");   // AJOUT
+        }
         return result != -1;
     }
 
@@ -288,12 +371,13 @@ public class EventDatabase extends SQLiteOpenHelper {
                 null, null, "unix_timestamp ASC");
     }
 
-    public synchronized void markEventAsSynced(String fingerprint, String finalImpact) {
+       public synchronized void markEventAsSynced(String fingerprint, String finalImpact) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues cv = new ContentValues();
         cv.put("sync_status", "synced");
         cv.put("impact", finalImpact);
         db.update(TABLE_EVENTS, cv, "fingerprint = ?", new String[]{fingerprint});
+        enregistrerDecisionDepuisImpact(db, fingerprint, finalImpact);   // AJOUT
     }
     
     public synchronized void updateEventWeight(String hash, int weight) {
@@ -560,6 +644,10 @@ String[] whereArgs = new String[]{
             if (outOfRangeDeleted > 0) {
                 Log.w("EventDatabase", "Purge filet de sécurité (poids hors plage, >48h) : " + outOfRangeDeleted + " lignes supprimées.");
             }
+
+                       int decisionsPurgees = db.delete("decisions", "horodatage < ?",
+                    new String[]{String.valueOf(currentUnixTime - 30L * 24 * 60 * 60)});
+            Log.d("EventDatabase", "Purge décisions (>30j) : " + decisionsPurgees + " lignes.");
 
             db.setTransactionSuccessful();
         } finally {
@@ -1139,6 +1227,8 @@ if (impact == null) {
                         cv.put("sync_status", "synced"); // On verrouille l'état comme traité/synchronisé
                         
                         db.update(TABLE_EVENTS, cv, "id = ?", new String[]{String.valueOf(id)});
+                        enregistrerDecisionDirecte(db, "UPD_" + id, "CalendarSync", "EMIS_CALENDRIER", null,
+                                "actual mis à jour : " + actualValue);   // AJOUT
                         
                         // 🚀 PIPELINE TELEGRAM : Recherche résiliente du contexte Android actif pour l'expédition
                         android.content.Context context = (MainActivity.instance != null) ? MainActivity.instance : NotificationService.getInstance();
