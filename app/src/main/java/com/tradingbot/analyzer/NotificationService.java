@@ -343,6 +343,91 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
         }
     }
    }
+
+        /**
+     * Chemin live basé sur MatriceMacro. Le LLM ne fournit que le vecteur et des faits ;
+     * la direction, la conviction et la validité sont calculées en Java.
+     */
+    private void analyserAvecMatrice(String sourceName, String title, String body,
+                                     String fingerprint, boolean isSupremeRank,
+                                     Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) {
+        EventDatabase db = EventDatabase.getInstance(this);
+        try {
+            String userContent = "TITRE : " + title + "\nCORPS : " + body;
+            ReponseGroq rep = appelerAvecBudget(getGroqApiKey(), PROMPT_EXTRACTION, userContent, 200, 0.0, 600);
+
+            if (!rep.ok()) {
+                db.markEventAsSynced(fingerprint, "FAILED_LLM_" + rep.status);
+                return;
+            }
+
+            JSONObject extrait = new JSONObject(extraireJsonObjet(rep.contenu));
+            MatriceMacro.Vecteur vecteur = MatriceMacro.vecteurDepuisTag(extrait.optString("vecteur", "AUCUN"));
+            if (vecteur == null) {
+                db.markEventAsSynced(fingerprint, "FILTERED_VECTEUR_INCONNU");
+                return;
+            }
+
+            boolean confirme = extrait.optBoolean("confirme", false);
+            double surprise = extrait.optDouble("surprise_signee", 0.0);
+            boolean surpriseChiffree = Math.abs(surprise) > 0.0;
+            boolean speculatif = MatriceMacro.detecterSpeculatif(body);
+            boolean sourceForte = sourceForteParNom(sourceName);
+
+            // ECB : jamais seul. Un autre driver du même lot doit être présent (vérification à brancher en partie 3).
+            boolean confirmeParAutre = false;
+
+            MatriceMacro.Resultat res = MatriceMacro.evaluer(
+                    vecteur, confirme, speculatif, surpriseChiffree, sourceForte, confirmeParAutre);
+
+            if (!res.emissible()) {
+                String raison = res.violations.isEmpty() ? "AUCUN_ACTIF" : "INVARIANT : " + res.violations.get(0);
+                db.markEventAsSynced(fingerprint, "FILTERED_" + raison);
+                Log.w(TAG, "[MATRICE] Non émis (" + title + ") : " + raison);
+                return;
+            }
+
+            String heure = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.FRANCE) {{
+                setTimeZone(TimeZone.getTimeZone("Indian/Antananarivo"));
+            }}.format(new Date());
+
+            String message = MatriceMacro.construireMessage(res, sourceName, heure, extrait.optString("fait_marquant", title));
+            sendTelegramSecure(message, this);
+            db.markEventAsSynced(fingerprint, "PROCESSED_MATRICE_" + vecteur.name());
+            Log.i(TAG, "[MATRICE] Émis : " + vecteur.name() + " conviction=" + res.conviction);
+
+        } catch (Exception e) {
+            Log.e(TAG, "[MATRICE] Échec analyse", e);
+            db.markEventAsSynced(fingerprint, "FAILED_MATRICE_EXCEPTION");
+        }
+    }
+
+    private static boolean sourceForteParNom(String source) {
+        if (source == null) return false;
+        String s = source.toLowerCase(Locale.ROOT);
+        return s.contains("bloomberg") || s.contains("reuters") || s.contains("financial")
+            || s.contains("financialjuice") || s.contains("wall street");
+    }
+
+    /** Extrait le premier objet JSON d'une réponse, au cas où le modèle ajoute du texte autour. */
+    private static String extraireJsonObjet(String texte) {
+        int debut = texte.indexOf('{');
+        int fin = texte.lastIndexOf('}');
+        if (debut < 0 || fin <= debut) throw new IllegalArgumentException("pas de JSON dans la réponse");
+        return texte.substring(debut, fin + 1);
+    }
+        // Prompt d'extraction : le LLM ne décide plus de la direction, il décrit l'événement.
+    private static final String PROMPT_EXTRACTION =
+        "Tu extrais des faits d'une dépêche macro-économique. Tu ne donnes AUCUNE direction de marché.\n" +
+        "Réponds UNIQUEMENT par un objet JSON valide, sans texte autour, avec exactement ces clés :\n" +
+        "{\n" +
+        "  \"vecteur\": one of [\"HAWKISH_US\",\"DOVISH_US\",\"EIA_DEFICIT\",\"EIA_SURPLUS\",\"TARIFS\",\"CHINE\",\"SENTIMENT_FAIBLE\",\"IPO\",\"HAWKISH_BOJ\",\"DOVISH_BOJ\",\"HAWKISH_BOE\",\"DOVISH_BOE\",\"HAWKISH_ECB\",\"DOVISH_ECB\",\"GEO_CAS_A\",\"GEO_CAS_B\",\"DESESCALADE\",\"AUCUN\"],\n" +
+        "  \"confirme\": true ou false (true seulement si l'événement a eu lieu, pas une annonce, menace ou rumeur),\n" +
+        "  \"surprise_signee\": nombre (actual - forecast, ou 0 si indisponible),\n" +
+        "  \"fait_marquant\": une phrase de 25 mots maximum, factuelle, sans jugement de marché\n" +
+        "}\n" +
+        "Choisis \"AUCUN\" si l'événement ne correspond à aucun vecteur.\n" +
+        "Pour GEO_CAS_A : frappe ou blocage physique confirmé sur l'énergie. GEO_CAS_B : tension ou menace sans impact physique confirmé.\n";
     
     private static final String MACRO_CORE_RULES =
     "HIÉRARCHIE : SUPRÊME(FED,FOMC,CPI,Core CPI,PCE,Core PCE,NFP,Chômage,GDP,Powell,Warsh) > SECONDAIRE(PMI,ISM,Retail Sales,EIA,OPEC,Stocks pétrole,Stimulus) > TACTIQUE(Géopolitique,Tarifs,Sentiment conso,Chine,IPO,M&A,Rumeurs). Un rang supérieur écrase toujours un rang inférieur.\n" +
@@ -625,6 +710,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "• Style technique, institutionnel, concis et quantitatif.\n" +
     "• Aucune formule de politesse.\n" +
     "• Aucun texte hors du format demandé.";
+     private static final boolean UTILISER_MATRICE = true;
     private static final String MONTHLY_SYSTEM_PROMPT = MACRO_CORE_RULES + "\n" + MONTHLY_SPECIFIC;
     
     private String getGroqApiKey() {
@@ -823,7 +909,11 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             MainActivity.instance.addLog("🚫 [FILTRE] News hors-sujet ignorée : " + title);
         return;
     }
-
+    
+            if (UTILISER_MATRICE) {
+            analyserAvecMatrice(sourceName, title, body, fingerprint, isSupremeRank, cachedMarketData);
+            return;
+        }
     
     final String userContent = "CONTEXTE TEMPOREL : " + currentMadaTime + "\n"
             + "SOURCE DE LA NEWS : " + sourceName + "\n"
