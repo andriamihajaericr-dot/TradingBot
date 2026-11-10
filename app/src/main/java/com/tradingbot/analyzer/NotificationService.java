@@ -354,7 +354,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
         EventDatabase db = EventDatabase.getInstance(this);
         try {
             String userContent = "TITRE : " + title + "\nCORPS : " + body;
-            ReponseGroq rep = appelerAvecBudget(getGroqApiKey(), PROMPT_EXTRACTION, userContent, 200, 0.0, 600);
+            ReponseGroq rep = appelerAvecBudget(ApiKey(), PROMPT_EXTRACTION, userContent, 200, 0.0, 600);
 
             if (!rep.ok()) {
                 db.markEventAsSynced(fingerprint, "FAILED_LLM_" + rep.status);
@@ -712,6 +712,156 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "• Aucun texte hors du format demandé.";
      private static final boolean UTILISER_MATRICE = true;
     private static final String MONTHLY_SYSTEM_PROMPT = MACRO_CORE_RULES + "\n" + MONTHLY_SPECIFIC;
+
+        // ================= LOT 2 : appel Groq unique et budget centralisé =================
+
+    private static final class ReponseGroq {
+        final int status;
+        final String contenu;     // null si erreur
+        final int tokensReels;
+        final String erreur;      // corps tronqué si erreur
+        final String modele;
+
+        ReponseGroq(int status, String contenu, int tokensReels, String erreur, String modele) {
+            this.status = status;
+            this.contenu = contenu;
+            this.tokensReels = tokensReels;
+            this.erreur = erreur;
+            this.modele = modele;
+        }
+
+        boolean ok() { return status == HttpURLConnection.HTTP_OK && contenu != null; }
+    }
+
+    private static String lire(InputStream is) throws IOException {
+        if (is == null) return "";
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String l;
+            while ((l = br.readLine()) != null) sb.append(l).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /** Appel HTTP unique vers Groq. Aucune logique de budget ici. */
+    private ReponseGroq appelerGroq(String apiKey, String modele, String systemPrompt,
+                                    String userContent, int maxTokens, double temperature,
+                                    int tokensEstimes) throws Exception {
+        JSONObject payload = new JSONObject()
+                .put("model", modele)
+                .put("temperature", temperature)
+                .put("max_tokens", maxTokens)
+                .put("messages", new JSONArray()
+                        .put(new JSONObject().put("role", "system").put("content", systemPrompt))
+                        .put(new JSONObject().put("role", "user").put("content", userContent)));
+
+        attendreSiNecessairePourTPM(tokensEstimes);
+        HttpURLConnection conn = (HttpURLConnection) new URL(GROQ_URL).openConnection();
+        try {
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(25000);
+            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(payload.toString().getBytes(StandardCharsets.UTF_8));
+            }
+            int status = conn.getResponseCode();
+            if (status != HttpURLConnection.HTTP_OK) {
+                return new ReponseGroq(status, null, 0, truncateForLog(lire(conn.getErrorStream())), modele);
+            }
+            JSONObject json = new JSONObject(lire(conn.getInputStream()));
+            String contenu = json.getJSONArray("choices").getJSONObject(0)
+                    .getJSONObject("message").getString("content");
+            JSONObject usage = json.optJSONObject("usage");
+            int reels = (usage != null) ? usage.optInt("total_tokens", tokensEstimes) : tokensEstimes;
+            return new ReponseGroq(status, contenu, reels, null, modele);
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    /** Réserve des tokens sur le budget du jour. Retourne le modèle à utiliser, ou null si épuisé. */
+    private synchronized String reserverModele(int estimation) {
+        verifierResetQuotidien();
+        if (dailyTokensUsed.get() + estimation <= TOKEN_BUDGET_DAILY) {
+            dailyTokensUsed.addAndGet(estimation);
+            return GROQ_MODEL;
+        }
+        if (fallbackTokensUsed.get() + estimation <= TOKEN_BUDGET_FALLBACK) {
+            fallbackTokensUsed.addAndGet(estimation);
+            return GROQ_MODEL_FALLBACK;
+        }
+        return null;
+    }
+
+    /** Remplace l'estimation par la consommation réelle (reel = 0 si l'appel a échoué). */
+    private synchronized void corrigerReservation(String modele, int estimation, int reel) {
+        AtomicInteger compteur = GROQ_MODEL.equals(modele) ? dailyTokensUsed : fallbackTokensUsed;
+        compteur.addAndGet(reel - estimation);
+        persisterCompteurs();
+    }
+
+    private synchronized void verifierResetQuotidien() {
+        long now = System.currentTimeMillis();
+        if (now < tokenResetTime) return;
+        Calendar c = Calendar.getInstance(TimeZone.getTimeZone("Indian/Antananarivo"));
+        c.setTimeInMillis(now);
+        c.add(Calendar.DAY_OF_MONTH, 1);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        dailyTokensUsed.set(0);
+        fallbackTokensUsed.set(0);
+        tokenResetTime = c.getTimeInMillis();
+        persisterCompteurs();
+        if (MainActivity.instance != null)
+            MainActivity.instance.addLog("🔄 [TOKEN] Compteurs réinitialisés (minuit Madagascar).");
+    }
+
+    private void persisterCompteurs() {
+        getSharedPreferences("TradingBotPrefs", MODE_PRIVATE).edit()
+                .putInt("daily_tokens_used", dailyTokensUsed.get())
+                .putInt("fallback_tokens_used", fallbackTokensUsed.get())
+                .putLong("token_reset_time", tokenResetTime)
+                .apply();
+    }
+
+    /**
+     * Point d'entrée unique pour tout appel Groq : budget, appel, bascule 429 vers le modèle
+     * léger (une seule fois), comptabilisation réelle.
+     */
+    private ReponseGroq appelerAvecBudget(String apiKey, String systemPrompt, String userContent,
+                                          int maxTokens, double temperature, int estimation) throws Exception {
+        String modele = reserverModele(estimation);
+        if (modele == null) {
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("🛑 [TOKEN] Budget principal ET fallback épuisés.");
+            return new ReponseGroq(-1, null, 0, "budget épuisé", null);
+        }
+
+        ReponseGroq r = appelerGroq(apiKey, modele, systemPrompt, userContent, maxTokens, temperature, estimation);
+
+        if (r.status == 429) {
+            // Quota du modèle principal épuisé : un seul essai sur le modèle léger
+            corrigerReservation(modele, estimation, 0);
+            if (GROQ_MODEL_FALLBACK.equals(modele)) return r;  // déjà sur le léger : pas de bascule
+            String modeleLeger = reserverModele(estimation);
+            if (modeleLeger == null) return r;
+            if (MainActivity.instance != null)
+                MainActivity.instance.addLog("⚠️ [GROQ] 429 — bascule sur " + GROQ_MODEL_FALLBACK);
+            r = appelerGroq(apiKey, modeleLeger, systemPrompt, userContent, maxTokens, temperature, estimation);
+            corrigerReservation(modeleLeger, estimation, r.ok() ? r.tokensReels : 0);
+            return r;
+        }
+
+        corrigerReservation(modele, estimation, r.ok() ? r.tokensReels : 0);
+        return r;
+    }
+
+    // ================= FIN LOT 2 =================
     
     private String getGroqApiKey() {
         return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_GROQ_KEY, "");
