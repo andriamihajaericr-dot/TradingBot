@@ -1065,10 +1065,12 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         return;
     }
     
-            if (UTILISER_MATRICE) {
-            analyserAvecMatrice(sourceName, title, body, fingerprint, isSupremeRank, cachedMarketData);
-            return;
-        }
+     if (UTILISER_MATRICE) {
+                 if (MainActivity.instance != null)
+                            MainActivity.instance.addLog("[MATRICE] Entrée : " + sourceName + " | " + title);
+                        analyserAvecMatrice(sourceName, title, body, fingerprint, isSupremeRank, cachedMarketData);
+                        return;
+    }
     
     final String userContent = "CONTEXTE TEMPOREL : " + currentMadaTime + "\n"
             + "SOURCE DE LA NEWS : " + sourceName + "\n"
@@ -1833,9 +1835,16 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         
             // Extraction sécurisée des chaînes de caractères brutes fournies par Android
             Bundle extras = sbn.getNotification().extras;
-            final String title = extras.getString(Notification.EXTRA_TITLE, "");
+            String titreBrut = extras.getString(Notification.EXTRA_TITLE, "");
             String bigText = extras.getString(Notification.EXTRA_BIG_TEXT, "");
             String text = extras.getString(Notification.EXTRA_TEXT, "");
+
+            // Titre de secours : FinancialJuice et d'autres sources n'envoient souvent
+            // aucun titre, seulement le texte. On prend les premiers caractères du corps.
+            String corpsPourTitre = (bigText.length() > text.length()) ? bigText : text;
+            final String title = (titreBrut != null && !titreBrut.trim().isEmpty())
+                    ? titreBrut
+                    : corpsPourTitre.substring(0, Math.min(80, corpsPourTitre.length())).trim();
         
             // 🔴 SÉCURITÉ REGEX : Conservation du texte brut le plus complet pour l'extraction mathématique d'EconomicAnalyzer
             final String bodyTextRaw = bigText.length() > text.length() ? bigText : text;
@@ -2043,6 +2052,8 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                         }
                         // Coupe-circuit du Validateur : On bloque les doublons temporels, sauf s'il s'agit d'un choc absolu de poids 4
                         if (validationResult != null && !validationResult.isConfirmed) {
+                            if (MainActivity.instance != null)
+                                MainActivity.instance.addLog("[REJET] " + finalSourceName + " | " + title + " → " + validationResult.reason);
                         // Cas particulier : inertie macro (driver déjà actif) → on envoie un rappel Telegram
                         if (validationResult.isInertiaBlock) {
                          // qui est plus stable que celui de EventValidator.
