@@ -354,7 +354,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
         EventDatabase db = EventDatabase.getInstance(this);
         try {
             String userContent = "TITRE : " + title + "\nCORPS : " + body;
-            ReponseGroq rep = appelerAvecBudget(ApiKey(), PROMPT_EXTRACTION, userContent, 200, 0.0, 600);
+            ReponseGroq rep = appelerAvecBudget(getGroqApiKey(), PROMPT_EXTRACTION, userContent, 200, 0.0, 600);
 
             if (!rep.ok()) {
                 db.markEventAsSynced(fingerprint, "FAILED_LLM_" + rep.status);
