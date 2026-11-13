@@ -1847,7 +1847,11 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         
             // 🔴 SÉCURITÉ REGEX : Conservation du texte brut le plus complet pour l'extraction mathématique d'EconomicAnalyzer
             final String bodyTextRaw = bigText.length() > text.length() ? bigText : text;
-        
+            // Correction du libellé : le package X/Twitter relaie souvent FinancialJuice
+            if ("X /Twitter".equals(sourceName)
+                    && (titreBrut + " " + bodyTextRaw).toLowerCase(Locale.ROOT).contains("financialjuice")) {
+                sourceName = "FinancialJuice";
+            }
             // Reconstruction standard du flux texte unifié pour le reste des modules
             String subText = extras.getString(Notification.EXTRA_SUB_TEXT, "");
             String summary = extras.getString(Notification.EXTRA_SUMMARY_TEXT, "");
