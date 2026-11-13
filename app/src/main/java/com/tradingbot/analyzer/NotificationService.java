@@ -1659,6 +1659,7 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         }
     }
     public static void sendTelegramSecure(String message, Context context) {
+          espacerTelegram();
         new Thread(() -> {
             try {
                 android.content.SharedPreferences prefs =
