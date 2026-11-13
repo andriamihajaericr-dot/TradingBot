@@ -1649,6 +1649,15 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                     return m.find() ? "Flux: " + m.group(1).trim() : "N/A";
                                 }
     // Point 5 : Déconnexion sécurisée encapsulée dans un bloc finally
+    private static final Object TG_LOCK = new Object();
+    private static long tgDernierEnvoiMs = 0L;
+    private static void espacerTelegram() {
+        synchronized (TG_LOCK) {
+            long attente = 2500 - (System.currentTimeMillis() - tgDernierEnvoiMs);
+            if (attente > 0) { try { Thread.sleep(attente); } catch (InterruptedException ignored) {} }
+            tgDernierEnvoiMs = System.currentTimeMillis();
+        }
+    }
     public static void sendTelegramSecure(String message, Context context) {
         new Thread(() -> {
             try {
