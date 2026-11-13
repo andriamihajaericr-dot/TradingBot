@@ -358,6 +358,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
 
             if (!rep.ok()) {
                 db.markEventAsSynced(fingerprint, "FAILED_LLM_" + rep.status);
+                if (MainActivity.instance != null) MainActivity.instance.addLog("⛔ [MATRICE] LLM KO (" + rep.status + ") — " + title);
                 return;
             }
 
@@ -396,9 +397,10 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
             db.markEventAsSynced(fingerprint, "PROCESSED_MATRICE_" + vecteur.name());
             Log.i(TAG, "[MATRICE] Émis : " + vecteur.name() + " conviction=" + res.conviction);
 
-        } catch (Exception e) {
+       } catch (Exception e) {
             Log.e(TAG, "[MATRICE] Échec analyse", e);
             db.markEventAsSynced(fingerprint, "FAILED_MATRICE_EXCEPTION");
+            if (MainActivity.instance != null) MainActivity.instance.addLog("⛔ [MATRICE] Exception — " + e.getMessage() + " — " + title);
         }
     }
 
@@ -920,8 +922,6 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     private final java.util.ArrayDeque<long[]> fenetreTPM = new java.util.ArrayDeque<>(); // [timestampMs, tokens]
 
    private void attendreSiNecessairePourTPM(int tokensEstimes) {
-        // Une demande plus grosse que la limite ne peut jamais tenir dans la fenêtre :
-        // on la plafonne pour qu'elle passe quand la fenêtre est vide.
         int demande = Math.min(tokensEstimes, TPM_LIMITE_SURE);
         while (true) {
             long attente;
@@ -929,8 +929,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
                 long maintenant = System.currentTimeMillis();
                 while (!fenetreTPM.isEmpty() && maintenant - fenetreTPM.peekFirst()[0] > 60_000)
                     fenetreTPM.pollFirst();
-                int utilise = 0;
-                for (long[] e : fenetreTPM) utilise += (int) e[1];
+                int utilise = fenetreTPM.stream().mapToInt(e -> (int) e[1]).sum();
                 if (utilise + demande <= TPM_LIMITE_SURE || fenetreTPM.isEmpty()) {
                     fenetreTPM.addLast(new long[]{maintenant, demande});
                     return;
