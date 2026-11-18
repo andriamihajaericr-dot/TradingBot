@@ -344,6 +344,15 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     }
    }
 
+        private static boolean indicateurFinancialJuiceRetenu(String texte) {
+            String t = texte.toLowerCase(Locale.ROOT);
+            String[] mots = {"cpi", "inflation", "pce", "payrolls", "nonfarm", "unemployment",
+                    "gdp", "retail sales", "industrial production", "ism", "pmi",
+                    "fed", "rate", "fomc", "treasury", "boj", "boe", "ecb",
+                    "crude", "inventories", "eia", "tariff", "china"};
+            for (String m : mots) if (t.contains(m)) return true;
+            return false;
+        }
         /**
      * Chemin live basé sur MatriceMacro. Le LLM ne fournit que le vecteur et des faits ;
      * la direction, la conviction et la validité sont calculées en Java.
