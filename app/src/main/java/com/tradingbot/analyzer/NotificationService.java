@@ -1694,7 +1694,11 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
         }
     }
     public static void sendTelegramSecure(String message, Context context) {
-          espacerTelegram();
+        if (!EMISSION_ACTIVE) {
+            Log.w(TAG, "[TELEGRAM] Envoi bloqué (EMISSION_ACTIVE=false) : " + message.split("\n")[0]);
+            return;
+        }
+        espacerTelegram();
         new Thread(() -> {
             try {
                 android.content.SharedPreferences prefs =
