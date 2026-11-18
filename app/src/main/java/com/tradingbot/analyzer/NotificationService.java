@@ -386,7 +386,13 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
                 tracerMatrice("🚫 [MATRICE] Vecteur inconnu — " + title);
                 return;
             }
-
+                         // Liste blanche FinancialJuice : seuls les indicateurs majeurs passent
+            if (sourceName != null && sourceName.toLowerCase(Locale.ROOT).contains("financialjuice")
+                    && !indicateurFinancialJuiceRetenu(texteComplet)) {
+                db.markEventAsSynced(fingerprint, "FILTERED_INDICATEUR_HORS_LISTE");
+                tracerMatrice("🚫 [MATRICE] Indicateur hors liste — " + title);
+                return;
+            }
             // GEO_CAS_A et GEO_CAS_B exigent que le texte parle de l'Iran ou du Golfe
             String texteComplet = title + " " + body;
             if ((vecteur == MatriceMacro.Vecteur.GEO_CAS_A || vecteur == MatriceMacro.Vecteur.GEO_CAS_B)
