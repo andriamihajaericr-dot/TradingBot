@@ -348,6 +348,14 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
      * Chemin live basé sur MatriceMacro. Le LLM ne fournit que le vecteur et des faits ;
      * la direction, la conviction et la validité sont calculées en Java.
      */
+        /** Dernière émission par vecteur : évite de renvoyer le même vecteur dans la fenêtre de 30 min. */
+    private static final Map<String, Long> DERNIERE_EMISSION_VECTEUR = new HashMap<>();
+    private static final long FENETRE_DOUBLON_VECTEUR_MS = 30 * 60 * 1000L;
+
+    private static void tracerMatrice(String msg) {
+        if (MainActivity.instance != null) MainActivity.instance.addLog(msg);
+    }
+
     private void analyserAvecMatrice(String sourceName, String title, String body,
                                      String fingerprint, boolean isSupremeRank,
                                      Map<String, TradingViewFetcher.TVMarketData> cachedMarketData) {
@@ -358,7 +366,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
 
             if (!rep.ok()) {
                 db.markEventAsSynced(fingerprint, "FAILED_LLM_" + rep.status);
-                if (MainActivity.instance != null) MainActivity.instance.addLog("⛔ [MATRICE] LLM KO (" + rep.status + ") — " + title);
+                tracerMatrice("⛔ [MATRICE] LLM KO (" + rep.status + ") — " + title);
                 return;
             }
 
@@ -366,12 +374,23 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
             MatriceMacro.Vecteur vecteur = MatriceMacro.vecteurDepuisTag(extrait.optString("vecteur", "AUCUN"));
             if (vecteur == null) {
                 db.markEventAsSynced(fingerprint, "FILTERED_VECTEUR_INCONNU");
+                tracerMatrice("🚫 [MATRICE] Vecteur inconnu — " + title);
+                return;
+            }
+
+            // GEO_CAS_A et GEO_CAS_B exigent que le texte parle de l'Iran ou du Golfe
+            String texteComplet = title + " " + body;
+            if ((vecteur == MatriceMacro.Vecteur.GEO_CAS_A || vecteur == MatriceMacro.Vecteur.GEO_CAS_B)
+                    && !MatriceMacro.mentionneIranOuGolfe(texteComplet)) {
+                db.markEventAsSynced(fingerprint, "FILTERED_GEO_SANS_IRAN");
+                tracerMatrice("🚫 [MATRICE] GEO sans Iran/Golfe — " + vecteur.name() + " — " + title);
                 return;
             }
 
             boolean confirme = extrait.optBoolean("confirme", false);
             double surprise = extrait.optDouble("surprise_signee", 0.0);
             boolean surpriseChiffree = Math.abs(surprise) > 0.0;
+            int sensSurprise = surprise > 0 ? 1 : (surprise < 0 ? -1 : 0);
             boolean speculatif = MatriceMacro.detecterSpeculatif(body);
             boolean sourceForte = sourceForteParNom(sourceName);
 
@@ -379,13 +398,29 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
             boolean confirmeParAutre = false;
 
             MatriceMacro.Resultat res = MatriceMacro.evaluer(
-                    vecteur, confirme, speculatif, surpriseChiffree, sourceForte, confirmeParAutre);
+                    vecteur, confirme, speculatif, surpriseChiffree, sourceForte, confirmeParAutre, sensSurprise);
 
             if (!res.emissible()) {
-                String raison = res.violations.isEmpty() ? "AUCUN_ACTIF" : "INVARIANT : " + res.violations.get(0);
+                String raison;
+                if (!res.violations.isEmpty())                            raison = "INVARIANT : " + res.violations.get(0);
+                else if (res.conviction < MatriceMacro.CONVICTION_MIN)    raison = "CONVICTION_" + res.conviction;
+                else                                                      raison = "AUCUN_ACTIF";
                 db.markEventAsSynced(fingerprint, "FILTERED_" + raison);
                 Log.w(TAG, "[MATRICE] Non émis (" + title + ") : " + raison);
+                tracerMatrice("🚫 [MATRICE] Non émis — " + raison + " — " + vecteur.name() + " — " + title);
                 return;
+            }
+
+            // Anti-doublon par vecteur : le même vecteur ne repart pas avant 30 min
+            long maintenant = System.currentTimeMillis();
+            synchronized (DERNIERE_EMISSION_VECTEUR) {
+                Long dernier = DERNIERE_EMISSION_VECTEUR.get(vecteur.name());
+                if (dernier != null && maintenant - dernier < FENETRE_DOUBLON_VECTEUR_MS) {
+                    db.markEventAsSynced(fingerprint, "FILTERED_DOUBLON_VECTEUR");
+                    tracerMatrice("🔁 [MATRICE] Doublon vecteur " + vecteur.name() + " (30 min) — " + title);
+                    return;
+                }
+                DERNIERE_EMISSION_VECTEUR.put(vecteur.name(), maintenant);
             }
 
             String heure = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.FRANCE) {{
@@ -397,10 +432,10 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
             db.markEventAsSynced(fingerprint, "PROCESSED_MATRICE_" + vecteur.name());
             Log.i(TAG, "[MATRICE] Émis : " + vecteur.name() + " conviction=" + res.conviction);
 
-       } catch (Exception e) {
+        } catch (Exception e) {
             Log.e(TAG, "[MATRICE] Échec analyse", e);
             db.markEventAsSynced(fingerprint, "FAILED_MATRICE_EXCEPTION");
-            if (MainActivity.instance != null) MainActivity.instance.addLog("⛔ [MATRICE] Exception — " + e.getMessage() + " — " + title);
+            tracerMatrice("⛔ [MATRICE] Exception — " + e.getMessage() + " — " + title);
         }
     }
 
@@ -2108,7 +2143,8 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
                                 || lastImpact.contains("Filtré – tous les actifs neutres")
                                 || lastImpact.contains("Filtré – conviction trop faible")
                                 || lastImpact.contains("FAILED_FALLBACK")
-                                || lastImpact.contains("Historique — impact non disponible");
+                                || lastImpact.contains("Historique — impact non disponible")
+                                || lastImpact.contains("FILTERED");
                             if (impactInsignifiant) {
                                 Log.d(TAG, "[RAPPEL] Impact précédent insignifiant — rappel ignoré.");
                                 return;
