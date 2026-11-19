@@ -1,3 +1,6 @@
-plugins {
-    id 'com.android.application' version '8.2.2' apply false
-}
+- name: Install & Setup Gradle
+  uses: gradle/actions/setup-gradle@v3
+  with:
+    gradle-version: '8.2.1'
+    cache-read-only: false
+    cache-key-prefix: fonda-v2
