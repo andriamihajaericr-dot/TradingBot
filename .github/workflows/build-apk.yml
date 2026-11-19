@@ -12,6 +12,7 @@ jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
@@ -23,19 +24,19 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Crée la variable de date pour GitHub
+      # Crée la variable de date pour GitHub (même format qu'avant : JJMMAAAA-HHHMM)
       - name: Generate Build Date for GitHub
         id: date
-        run: echo "CURRENT_DATE=$(date +'%d%m%Y-%H'H'%M')" >> $GITHUB_ENV
+        run: echo "CURRENT_DATE=$(date +'%d%m%Y-%HH%M')" >> $GITHUB_ENV
 
+      # Gradle 8.1.1 + cache des dépendances activé (évite de retélécharger à chaque build)
       - name: Install & Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.1.1'
-          cache-disabled: true
+          cache-read-only: false
 
-      # 🟢 STRATÉGIE 1 : RESTAURATION ET PRÉPARATION DU CACHE DE LA BASE DE DONNÉES
-      # Cette étape cherche une sauvegarde existante sur les serveurs de GitHub.
+      # Cache de la base SQLite du bot (inchangé)
       - name: Restaurer la base de données SQLite du Bot
         uses: actions/cache@v4
         with:
@@ -43,21 +44,23 @@ jobs:
             **/databases/trading_bot.db
             **/databases/trading_bot.db-shm
             **/databases/trading_bot.db-wal
-          # Clé unique basée sur le commit actuel pour la sauvegarde
           key: trading-bot-db-${{ github.sha }}
-          # Si aucune clé exacte n'est trouvée, GitHub récupère la sauvegarde la plus récente qui commence par ce préfixe
           restore-keys: |
             trading-bot-db-
 
-      # On compile le projet
+      # Compilation avec relance automatique en cas d'erreur réseau (429 notamment)
       - name: Build Debug APK
-        run: gradle assembleDebug
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 120
+          command: gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          # Ici on écrit en dur le début "V1.0.1" pour correspondre au build.gradle
-          # et on ajoute la date dynamique juste après
+          # Début fixe "V1.0.1" pour correspondre au build.gradle, suivi de la date dynamique
           name: Fonda_IOF_V1.0.1_${{ env.CURRENT_DATE }}
           path: app/build/outputs/apk/debug/**/*.apk
           retention-days: 30
