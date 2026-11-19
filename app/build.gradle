@@ -1,17 +1,13 @@
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.TimeZone // ← Import requis pour gérer le fuseau horaire
+import java.util.TimeZone
 
-// Fonction pour générer l'horodatage strict calé sur UTC+3 (Exemple : 23052026-14H22)
+// Horodatage calé sur UTC+3 (Exemple : 23052026-14H22)
 def getBuildTimestamp() {
     def date = new Date()
     def formattedDate = new SimpleDateFormat("ddMMyyyy-HH'H'mm", Locale.FRANCE)
-    
-    // FORCE LE FUSEAU : Indique à Gradle d'appliquer UTC+3 (GMT+3)
-    // Même si le serveur GitHub compile aux États-Unis, l'heure écrite sera la tienne.
     formattedDate.setTimeZone(TimeZone.getTimeZone("GMT+3"))
-    
     return formattedDate.format(date)
 }
 
@@ -45,24 +41,14 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    // Application du format combiné complet : Fonda_IOF_V1.0.1_23052026-14H22.apk
+    // Nom de fichier : Fonda_IOF_V1.0.1_23052026-14H22.apk
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach { output ->
             def timestamp = getBuildTimestamp()
-            def vName = variant.versionName      // Récupère "1.0"
-            def vCode = variant.versionCode      // Récupère "1"
-            
-            // Construit dynamiquement le nom complet demandé
+            def vName = variant.versionName
+            def vCode = variant.versionCode
             outputFileName = "Fonda_IOF_V${vName}.${vCode}_${timestamp}.apk"
         }
-    }
-}
-
-configurations.all {
-    resolutionStrategy {
-        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.10'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.10'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.10'
     }
 }
 
