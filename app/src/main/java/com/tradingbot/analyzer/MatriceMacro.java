@@ -11,8 +11,17 @@ import java.util.Locale;
  *
  * Ordre des actifs (index du tableau sens) : NASDAQ, SP500, GOLD, USOIL, USDJPY, GBPUSD.
  * Valeurs : +1 = 🟢 (BULLISH), -1 = 🔴 (BEARISH), 0 = NEUTRE (omis du message).
+ *
+ * Version 2 :
+ *  - CHINE exige le sens de la surprise (actual vs forecast). Une donnée inférieure
+ *    au consensus inverse le sens et passe en RISK_OFF. Sans sens, le signal n'est pas émis.
+ *  - GEO_CAS_B passe en DOLLAR_FORT (dollar refuge, yen non refuge), or neutre.
+ *  - Seuil d'émission : conviction minimale CONVICTION_MIN.
  */
 public final class MatriceMacro {
+
+    /** En dessous de ce seuil, aucun signal n'est émis. */
+    public static final int CONVICTION_MIN = 55;
 
     public enum Actif {
         NASDAQ("💻"), SP500("📊"), GOLD("🏆"), USOIL("🛢️"), USDJPY("🇯🇵"), GBPUSD("🇬🇧");
@@ -28,7 +37,8 @@ public final class MatriceMacro {
         EIA_DEFICIT(Regime.NEUTRE,            new int[]{ 0,  0,  0, +1,  0,  0}, "stocks pétrole inférieurs aux attentes"),
         EIA_SURPLUS(Regime.NEUTRE,            new int[]{ 0,  0,  0, -1,  0,  0}, "stocks pétrole supérieurs aux attentes"),
         TARIFS(Regime.RISK_OFF,               new int[]{-1, -1, +1, -1, -1, -1}, "escalade tarifaire, risk-off"),
-        CHINE(Regime.RISK_ON,                 new int[]{+1, +1,  0, +1,  0,  0}, "croissance chinoise forte"),
+        // Sens donné pour une surprise POSITIVE. Une surprise négative inverse le sens (voir evaluer).
+        CHINE(Regime.RISK_ON,                 new int[]{+1, +1,  0, +1,  0,  0}, "croissance chinoise (surprise)"),
         SENTIMENT_FAIBLE(Regime.RISK_OFF,     new int[]{-1, -1, +1, -1,  0,  0}, "sentiment consommateur faible"),
         IPO(Regime.RISK_ON,                   new int[]{+1, +1,  0,  0, -1,  0}, "IPO majeure, appétit pour le risque"),
         HAWKISH_BOJ(Regime.BANQUE_CENTRALE,   new int[]{ 0,  0,  0,  0, -1,  0}, "yen renforcé, BoJ hawkish"),
@@ -38,7 +48,8 @@ public final class MatriceMacro {
         HAWKISH_ECB(Regime.BANQUE_CENTRALE,   new int[]{ 0,  0,  0,  0,  0, +1}, "calibrage EUR/GBP, signal faible"),
         DOVISH_ECB(Regime.BANQUE_CENTRALE,    new int[]{ 0,  0,  0,  0,  0, -1}, "calibrage EUR/GBP, signal faible"),
         GEO_CAS_A(Regime.DOLLAR_FORT,         new int[]{-1, -1, -1, +1, +1, -1}, "choc d'offre réel confirmé"),
-        GEO_CAS_B(Regime.RISK_OFF,            new int[]{-1, -1, +1, +1, -1, -1}, "escalade géopolitique non confirmée"),
+        // Révisé : dollar refuge, yen non refuge, or neutre (données de la guerre mixtes).
+        GEO_CAS_B(Regime.DOLLAR_FORT,         new int[]{-1, -1,  0, +1, +1, -1}, "escalade géopolitique non confirmée, dollar refuge"),
         DESESCALADE(Regime.RISK_ON,           new int[]{+1, +1, -1, -1, +1, +1}, "désescalade, retour au régime pré-choc");
 
         public final Regime regime;
@@ -56,20 +67,24 @@ public final class MatriceMacro {
 
     public static final class Resultat {
         public final Vecteur vecteur;
+        /** Régime effectif (peut différer de vecteur.regime, ex. CHINE avec surprise négative). */
+        public final Regime regime;
         public final int[] sens;
         public final int conviction;
         public final List<String> violations;
 
-        Resultat(Vecteur vecteur, int[] sens, int conviction, List<String> violations) {
+        Resultat(Vecteur vecteur, Regime regime, int[] sens, int conviction, List<String> violations) {
             this.vecteur = vecteur;
+            this.regime = regime;
             this.sens = sens;
             this.conviction = conviction;
             this.violations = violations;
         }
 
-        /** Émis seulement si aucune incohérence et au moins un actif directionnel. */
+        /** Émis seulement si aucune incohérence, conviction suffisante et au moins un actif directionnel. */
         public boolean emissible() {
             if (!violations.isEmpty()) return false;
+            if (conviction < CONVICTION_MIN) return false;
             for (int s : sens) if (s != 0) return true;
             return false;
         }
@@ -101,6 +116,26 @@ public final class MatriceMacro {
     }
 
     /**
+     * Vérifie qu'un texte parle bien de l'Iran ou du Golfe avant d'attribuer GEO_CAS_A ou GEO_CAS_B.
+     * L'appelant doit l'utiliser : un texte sans ces mots ne reçoit pas de vecteur géopolitique.
+     */
+    public static boolean mentionneIranOuGolfe(String texte) {
+        if (texte == null) return false;
+        String t = texte.toLowerCase(Locale.ROOT);
+        String[] mots = {"iran", "hormuz", "ormuz", "golfe persique", "persian gulf",
+                "bahre", "bahrain", "houthi", "irgc"};
+        for (String m : mots) if (t.contains(m)) return true;
+        return false;
+    }
+
+    /** Évaluation sans sens de surprise : pour CHINE, le signal est bloqué (sens inconnu). */
+    public static Resultat evaluer(Vecteur v, boolean confirme, boolean speculatif,
+                                   boolean surpriseChiffree, boolean sourceForte,
+                                   boolean confirmeParAutre) {
+        return evaluer(v, confirme, speculatif, surpriseChiffree, sourceForte, confirmeParAutre, 0);
+    }
+
+    /**
      * Évalue un vecteur. Les invariants sont vérifiés ; une violation rend le signal non émissible.
      *
      * @param confirme          l'événement est un fait observé (pas une annonce ou une menace)
@@ -109,12 +144,25 @@ public final class MatriceMacro {
      * @param sourceForte       source de référence (Bloomberg, Reuters, FT, FinancialJuice...)
      * @param confirmeParAutre  un autre driver du même lot (30 min) confirme ce vecteur.
      *                          Requis pour émettre un signal ECB, qui n'est jamais seul.
+     * @param sensSurprise      +1 si actual > forecast, -1 si actual < forecast, 0 si inconnu.
+     *                          Requis pour CHINE ; ignoré pour les autres vecteurs.
      */
     public static Resultat evaluer(Vecteur v, boolean confirme, boolean speculatif,
                                    boolean surpriseChiffree, boolean sourceForte,
-                                   boolean confirmeParAutre) {
+                                   boolean confirmeParAutre, int sensSurprise) {
         int[] s = v.sens();
+        Regime regime = v.regime;
         List<String> viol = new ArrayList<>();
+
+        // CHINE : le sens dépend de la surprise. Donnée inférieure au consensus = sens inversé.
+        if (v == Vecteur.CHINE) {
+            if (sensSurprise == 0) {
+                viol.add("CHINE sans sens de surprise : non émis");
+            } else if (sensSurprise < 0) {
+                for (int i = 0; i < s.length; i++) s[i] = -s[i];
+                regime = Regime.RISK_OFF;
+            }
+        }
 
         if (speculatif && v == Vecteur.GEO_CAS_A) {
             viol.add("choc géo cas A appliqué à un texte conditionnel");
@@ -137,10 +185,10 @@ public final class MatriceMacro {
 
         // USDJPY et GBPUSD : inverses en régime dollar, identiques en régime risque
         if (s[4] != 0 && s[5] != 0) {
-            if ((v.regime == Regime.DOLLAR_FORT || v.regime == Regime.DOLLAR_FAIBLE) && s[4] == s[5]) {
+            if ((regime == Regime.DOLLAR_FORT || regime == Regime.DOLLAR_FAIBLE) && s[4] == s[5]) {
                 viol.add("régime dollar : USDJPY et GBPUSD doivent être inverses");
             }
-            if ((v.regime == Regime.RISK_ON || v.regime == Regime.RISK_OFF) && s[4] != s[5]) {
+            if ((regime == Regime.RISK_ON || regime == Regime.RISK_OFF) && s[4] != s[5]) {
                 viol.add("régime risque : USDJPY et GBPUSD doivent être identiques");
             }
         }
@@ -153,20 +201,30 @@ public final class MatriceMacro {
         if (v == Vecteur.HAWKISH_ECB || v == Vecteur.DOVISH_ECB) conviction = Math.min(conviction, 50);
         conviction = Math.max(25, Math.min(95, conviction));
 
-        return new Resultat(v, s, conviction, viol);
+        return new Resultat(v, regime, s, conviction, viol);
     }
 
-    /** Explication causale par actif, selon le régime. Une phrase courte, jamais de régime seul. */
+    /** Explication causale par actif, selon le régime de la vue. Une phrase courte, jamais de régime seul. */
     public static String mecanisme(Vecteur v, Actif a) {
+        return mecanisme(v, v.regime, a);
+    }
+
+    public static String mecanisme(Vecteur v, Regime regime, Actif a) {
         if (v == Vecteur.GEO_CAS_A && a == Actif.USOIL) return "choc d'offre réel, prime géopolitique";
         if (v == Vecteur.GEO_CAS_A && a == Actif.GOLD)  return "dollar renforcé par achats énergie";
         if (v == Vecteur.GEO_CAS_B && a == Actif.USOIL) return "prime géopolitique activée";
-        if (v == Vecteur.GEO_CAS_B && a == Actif.GOLD)  return "refuge classique soutient l'or";
+        if (v == Vecteur.GEO_CAS_B && a == Actif.GOLD)  return "or neutre : refuge et dollar se compensent";
+        if (v == Vecteur.GEO_CAS_B && (a == Actif.NASDAQ || a == Actif.SP500)) return "appétit pour le risque dégradé";
+        if (v == Vecteur.GEO_CAS_B && a == Actif.USDJPY) return "flux refuge vers le dollar, yen non refuge";
+        if (v == Vecteur.GEO_CAS_B && a == Actif.GBPUSD) return "dollar refuge comprime la livre";
         if (v == Vecteur.DESESCALADE && a == Actif.USOIL) return "prime géopolitique retirée";
         if (v == Vecteur.DESESCALADE && a == Actif.GOLD)  return "refuge géopolitique retiré";
-        if (v == Vecteur.CHINE && a == Actif.USOIL) return "demande chinoise soutient le pétrole";
+        if (v == Vecteur.CHINE && a == Actif.USOIL && regime == Regime.RISK_ON)
+            return "demande chinoise soutient le pétrole";
+        if (v == Vecteur.CHINE && a == Actif.USOIL && regime == Regime.RISK_OFF)
+            return "demande chinoise décevante pèse sur le pétrole";
 
-        switch (v.regime) {
+        switch (regime) {
             case DOLLAR_FORT:   return mecanismeDollarFort(a);
             case DOLLAR_FAIBLE: return mecanismeDollarFaible(a);
             case RISK_ON:       return mecanismeRiskOn(a);
@@ -231,23 +289,26 @@ public final class MatriceMacro {
             int s = r.sens[a.ordinal()];
             if (s == 0) continue;
             sb.append("• ").append(a.emoji).append(" ").append(a.name()).append(" : ")
-              .append(s > 0 ? "🟢" : "🔴").append(" | ").append(mecanisme(r.vecteur, a)).append("\n");
+              .append(s > 0 ? "🟢" : "🔴").append(" | ")
+              .append(mecanisme(r.vecteur, r.regime, a)).append("\n");
         }
-        sb.append("🏁 FLUX : ").append(r.vecteur.regime.name());
+        sb.append("🏁 FLUX : ").append(r.regime.name());
         return sb.toString();
     }
 
     /**
      * Contrôle de cohérence de toute la table, à lancer une fois au démarrage (log uniquement).
      * Chaque vecteur est évalué comme confirmé, surpris, avec source forte et confirmé par un
-     * autre driver, afin que seuls les invariants réels remontent.
+     * autre driver, dans les deux sens de surprise, afin que seuls les invariants réels remontent.
      * Retourne la liste des violations. Doit être vide.
      */
     public static List<String> verifierTable() {
         List<String> problemes = new ArrayList<>();
         for (Vecteur v : Vecteur.values()) {
-            Resultat r = evaluer(v, true, false, true, true, true);
-            for (String p : r.violations) problemes.add(v.name() + " : " + p);
+            for (int sens : new int[]{+1, -1}) {
+                Resultat r = evaluer(v, true, false, true, true, true, sens);
+                for (String p : r.violations) problemes.add(v.name() + " (surprise " + sens + ") : " + p);
+            }
         }
         return problemes;
     }
