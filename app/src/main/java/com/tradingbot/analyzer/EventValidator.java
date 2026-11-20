@@ -1184,6 +1184,15 @@ public static String verifierCoherenceVecteurSurprise(String reportText) {
             this.reason      = reason;        }
     }
 
+    /** Vrai si le texte parle d'une menace ou d'une hypothèse, pas d'un fait. */
+    private static boolean contientMenaceOuConditionnel(String texte) {
+        if (texte == null) return false;
+        String t = texte.toLowerCase(Locale.ROOT);
+        String[] indices = {"threat", "warn", "could ", "might ", "may ", "pourrait",
+                "menace", "envisage", "if "};
+        for (String i : indices) if (t.contains(i)) return true;
+        return false;
+    }
     /**
      * Méthode principale de validation et d'enrichissement de la matrice d'actifs
      */
@@ -1221,7 +1230,8 @@ public static String verifierCoherenceVecteurSurprise(String reportText) {
             }
             // Pas de return : on laisse couler pour capter le rebond macro économique
         } 
-        else {
+        else if (!contientMenaceOuConditionnel(combined)) {
+            // Verrou de guerre réservé aux faits, pas aux menaces ou hypothèses
             setWarRegime(context, true); // 🚨 Activation / Reconduction persistante (remet à zéro le compteur des 36h)
             result.isConfirmed = true;
             result.confidence  = geo.confidence;
