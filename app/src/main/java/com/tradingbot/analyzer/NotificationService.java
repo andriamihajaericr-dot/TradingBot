@@ -771,7 +771,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "• Aucun texte hors du format demandé.";
         private static final boolean UTILISER_MATRICE = true;
     // Verrou général : false = aucun message envoyé à Telegram
-    private static final boolean EMISSION_ACTIVE = false;
+    private static final boolean EMISSION_ACTIVE = true;
     private static final String MONTHLY_SYSTEM_PROMPT = MACRO_CORE_RULES + "\n" + MONTHLY_SPECIFIC;
 
         // ================= LOT 2 : appel Groq unique et budget centralisé =================
