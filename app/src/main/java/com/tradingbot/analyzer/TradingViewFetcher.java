@@ -869,7 +869,7 @@ if (h4Candles != null && h4Candles.length >= 2 && h4Candles[0] != null && h4Cand
             String msg = "⚡ *[FONDA IOF]* — *" + key + "*\n" +
                          "🔻 Zone *Previous Day Low* touchée (`" + String.format(Locale.US, "%.4f", data.pdl) + "`)\n" +
                          "✅ *Confirmation : Reversal Bullish H4 validé* à `" + String.format(Locale.US, "%.4f", data.price) + "` !";
-            NotificationService.sendTelegramSecure(msg, appContext);
+            envoyerAlerteNiveau(msg, appContext);
         }
     }
 
@@ -889,7 +889,7 @@ if (h4Candles != null && h4Candles.length >= 2 && h4Candles[0] != null && h4Cand
             String msg = "⚡ *[FONDA IOF]* — *" + key + "*\n" +
                          "🔺 Zone *Previous Day High* touchée (`" + String.format(Locale.US, "%.4f", data.pdh) + "`)\n" +
                          "🚨 *Confirmation : Reversal Bearish H4 validé* à `" + String.format(Locale.US, "%.4f", data.price) + "` !";
-            NotificationService.sendTelegramSecure(msg, appContext);
+           envoyerAlerteNiveau(msg, appContext);
         }
     }
 }
@@ -909,7 +909,7 @@ if (h4Candles != null && h4Candles.length >= 2 && h4Candles[0] != null && h4Cand
                            if (data.pdh > 0) sb.append("PDH `").append(String.format(Locale.US, fmt, data.pdh)).append("` | PDL `").append(String.format(Locale.US, fmt, data.pdl)).append("` | ");
                            if (data.pwh > 0) sb.append("PWH `").append(String.format(Locale.US, fmt, data.pwh)).append("` | PWL `").append(String.format(Locale.US, fmt, data.pwl)).append("`");
                            sb.append("\n");
-                           NotificationService.sendTelegramSecure(sb.toString(), appContext);
+                          envoyerAlerteNiveau(sb.toString(), appContext);
                           lastAlertTime.put(key, now);
                     }
                 }
@@ -921,35 +921,35 @@ if (h4Candles != null && h4Candles.length >= 2 && h4Candles[0] != null && h4Cand
 
              if (data.brokeAboveP4HH && !Boolean.TRUE.equals(alertFiredP4HH.get(key))) {
     alertFiredP4HH.put(key, true);
-    NotificationService.sendTelegramSecure("🧭 *" + key + "* — Cassure du *Previous High H4* (`" + prixFormate + "`)\n↳ " + buildTechnicalInterpretation(key, data), appContext);
+    envoyerAlerteNiveau("🧭 *" + key + "* — Cassure du *Previous High H4* (`" + prixFormate + "`)\n↳ " + buildTechnicalInterpretation(key, data), appContext);
 }
 if (data.brokeBelowP4HL && !Boolean.TRUE.equals(alertFiredP4HL.get(key))) {
     alertFiredP4HL.put(key, true);
-    NotificationService.sendTelegramSecure("📉 *" + key + "* — Cassure du *Previous Low H4* (`" + prixFormate + "`)\n↳ " + buildTechnicalInterpretation(key, data), appContext);
+    envoyerAlerteNiveau("📉 *" + key + "* — Cassure du *Previous Low H4* (`" + prixFormate + "`)\n↳ " + buildTechnicalInterpretation(key, data), appContext);
 }
 if (data.brokeAbovePDH && !Boolean.TRUE.equals(alertFiredPDH.get(key))) {
     alertFiredPDH.put(key, true);
-    NotificationService.sendTelegramSecure("🔺 *" + key + "* — Cassure réelle du *Previous Day High* (`" + prixFormate + "`)\n↳ " + buildTechnicalInterpretation(key, data), appContext);
+    envoyerAlerteNiveau("🔺 *" + key + "* — Cassure réelle du *Previous Day High* (`" + prixFormate + "`)\n↳ " + buildTechnicalInterpretation(key, data), appContext);
 }
 if (data.brokeBelowPDL && !Boolean.TRUE.equals(alertFiredPDL.get(key))) {
     alertFiredPDL.put(key, true);
-    NotificationService.sendTelegramSecure("🔻 *" + key + "* — Cassure réelle du *Previous Day Low* (`" + prixFormate + "`)\n↳ " + buildTechnicalInterpretation(key, data), appContext);
+    envoyerAlerteNiveau("🔻 *" + key + "* — Cassure réelle du *Previous Day Low* (`" + prixFormate + "`)\n↳ " + buildTechnicalInterpretation(key, data), appContext);
 }
 if (data.brokeAbovePWH && !Boolean.TRUE.equals(alertFiredPWH.get(key))) {
     alertFiredPWH.put(key, true);
-    NotificationService.sendTelegramSecure("🚀 *" + key + "* — Breakout validé du *Previous Week High* (`" + prixFormate + "`) !\n↳ " + buildTechnicalInterpretation(key, data), appContext);
+    envoyerAlerteNiveau("🚀 *" + key + "* — Breakout validé du *Previous Week High* (`" + prixFormate + "`) !\n↳ " + buildTechnicalInterpretation(key, data), appContext);
 }
 if (data.brokeBelowPWL && !Boolean.TRUE.equals(alertFiredPWL.get(key))) {
     alertFiredPWL.put(key, true);
-    NotificationService.sendTelegramSecure("🔥 *" + key + "* — Breakdown validé du *Previous Week Low* (`" + prixFormate + "`) !\n↳ " + buildTechnicalInterpretation(key, data), appContext);
+    envoyerAlerteNiveau("🔥 *" + key + "* — Breakdown validé du *Previous Week Low* (`" + prixFormate + "`) !\n↳ " + buildTechnicalInterpretation(key, data), appContext);
 }
 if (data.brokeAbovePMH && !Boolean.TRUE.equals(alertFiredPMH.get(key))) {
     alertFiredPMH.put(key, true);
-    NotificationService.sendTelegramSecure("🌌 *" + key + "* — Macro Breakout du *Previous Month High* (`" + prixFormate + "`) !!\n↳ " + buildTechnicalInterpretation(key, data), appContext);
+   envoyerAlerteNiveau("🌌 *" + key + "* — Macro Breakout du *Previous Month High* (`" + prixFormate + "`) !!\n↳ " + buildTechnicalInterpretation(key, data), appContext);
 }
 if (data.brokeBelowPML && !Boolean.TRUE.equals(alertFiredPML.get(key))) {
     alertFiredPML.put(key, true);
-    NotificationService.sendTelegramSecure("⚡ *" + key + "* — Macro Breakdown du *Previous Month Low* (`" + prixFormate + "`) !!\n↳ " + buildTechnicalInterpretation(key, data), appContext);
+    envoyerAlerteNiveau("⚡ *" + key + "* — Macro Breakdown du *Previous Month Low* (`" + prixFormate + "`) !!\n↳ " + buildTechnicalInterpretation(key, data), appContext);
 }
             }
 
@@ -971,6 +971,16 @@ if (data.brokeBelowPML && !Boolean.TRUE.equals(alertFiredPML.get(key))) {
                 }
             }
         });
+    }
+        // Alertes de niveaux TradingView : désactivées tant que la logique n'est pas validée
+    private static final boolean ALERTES_NIVEAUX_ACTIVES = false;
+
+    private static void envoyerAlerteNiveau(String msg, Context ctx) {
+        if (!ALERTES_NIVEAUX_ACTIVES) {
+            Log.d("TradingViewFetcher", "[NIVEAUX] Alerte masquée : " + msg.split("\n")[0]);
+            return;
+        }
+        NotificationService.sendTelegramSecure(msg, ctx);
     }
 
     private static boolean isLiveBarActiveAtNewYork() {
