@@ -407,6 +407,15 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
             boolean speculatif = MatriceMacro.detecterSpeculatif(body);
             boolean sourceForte = sourceForteParNom(sourceName);
 
+                        // Filtre de pertinence : rejette les vecteurs que le texte ne justifie pas
+            String motifPertinence = MatriceMacro.motifRejetPertinence(
+                    vecteur, texteComplet, sourceForte, confirme, surpriseChiffree);
+            if (motifPertinence != null) {
+                db.markEventAsSynced(fingerprint, "FILTERED_PERTINENCE_" + motifPertinence);
+                tracerMatrice("🚫 [MATRICE] Hors pertinence — " + motifPertinence + " — "
+                        + vecteur.name() + " — " + title);
+                return;
+            }
             // ECB : jamais seul. Un autre driver du même lot doit être présent (vérification à brancher en partie 3).
             boolean confirmeParAutre = false;
 
