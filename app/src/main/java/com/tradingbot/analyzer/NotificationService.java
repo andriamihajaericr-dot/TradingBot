@@ -387,6 +387,10 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
                 return;
             }
                          // Liste blanche FinancialJuice : seuls les indicateurs majeurs passent
+                       // Texte source complet, utilisé par les filtres ci-dessous
+            final String texteComplet = (title == null ? "" : title) + " " + (body == null ? "" : body);
+
+            // Liste blanche FinancialJuice : seuls les indicateurs majeurs passent
             if (sourceName != null && sourceName.toLowerCase(Locale.ROOT).contains("financialjuice")
                     && !indicateurFinancialJuiceRetenu(texteComplet)) {
                 db.markEventAsSynced(fingerprint, "FILTERED_INDICATEUR_HORS_LISTE");
@@ -394,7 +398,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
                 return;
             }
             // GEO_CAS_A et GEO_CAS_B exigent que le texte parle de l'Iran ou du Golfe
-            String texteComplet = title + " " + body;
+           
             if ((vecteur == MatriceMacro.Vecteur.GEO_CAS_A || vecteur == MatriceMacro.Vecteur.GEO_CAS_B)
                     && !MatriceMacro.mentionneIranOuGolfe(texteComplet)) {
                 db.markEventAsSynced(fingerprint, "FILTERED_GEO_SANS_IRAN");
@@ -762,7 +766,9 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
     "• Style technique, institutionnel, concis et quantitatif.\n" +
     "• Aucune formule de politesse.\n" +
     "• Aucun texte hors du format demandé.";
-     private static final boolean UTILISER_MATRICE = true;
+        private static final boolean UTILISER_MATRICE = true;
+    // Verrou général : false = aucun message envoyé à Telegram
+    private static final boolean EMISSION_ACTIVE = false;
     private static final String MONTHLY_SYSTEM_PROMPT = MACRO_CORE_RULES + "\n" + MONTHLY_SPECIFIC;
 
         // ================= LOT 2 : appel Groq unique et budget centralisé =================
