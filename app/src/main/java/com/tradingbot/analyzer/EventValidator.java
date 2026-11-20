@@ -2523,8 +2523,13 @@ private static String parseTimestampToSeconds(String rawTimestamp) {
         String lastDay = "";
         int totalAffiche = 0;
 
+        long maintenantMs = System.currentTimeMillis();
         for (EconomicCalendarAPI.CalendarEvent event : sortedEvents) {
             if (event == null || event.indicator == null || event.timestamp == null) continue;
+
+            // Ignorer les événements déjà passés (marge d'une heure pour une publication récente)
+            long tsEvenement = parseTimestamp(event.timestamp);
+            if (tsEvenement > 0 && tsEvenement < maintenantMs - 60L * 60 * 1000) continue;
 
             // ✅ Filtrer les variantes de jours fériés pour l'affichage du rapport
             String indUpper = event.indicator.toUpperCase(Locale.ROOT);
