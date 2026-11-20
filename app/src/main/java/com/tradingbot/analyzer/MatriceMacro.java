@@ -128,6 +128,46 @@ public final class MatriceMacro {
         return false;
     }
 
+        private static boolean contientUn(String texte, String... mots) {
+        if (texte == null) return false;
+        String t = texte.toLowerCase(Locale.ROOT);
+        for (String m : mots) if (t.contains(m)) return true;
+        return false;
+    }
+
+    /**
+     * Retourne le motif de rejet, ou null si le texte justifie le vecteur.
+     */
+    public static String motifRejetPertinence(Vecteur v, String texte, boolean sourceForte,
+                                              boolean confirme, boolean surpriseChiffree) {
+        switch (v) {
+            case GEO_CAS_A:
+            case GEO_CAS_B:
+                if (!mentionneIranOuGolfe(texte)) return "GEO_SANS_IRAN_GOLFE";
+                if (!sourceForte) return "GEO_SOURCE_FAIBLE";
+                if (!confirme) return "GEO_NON_CONFIRME";
+                return null;
+            case CHINE:
+                if (!contientUn(texte, "gdp", "pib", "industrial", "industrie", "retail sales",
+                        "exports", "exportations", "pmi")) return "CHINE_SANS_DONNEE";
+                if (!surpriseChiffree) return "CHINE_SANS_SURPRISE";
+                return null;
+            case TARIFS:
+                if (!contientUn(texte, "tariff", "droits de douane", "tarif")) return "TARIFS_SANS_MOT_CLE";
+                if (!confirme) return "TARIFS_NON_CONFIRME";
+                return null;
+            case HAWKISH_US:
+            case DOVISH_US:
+                if (!contientUn(texte, "cpi", "inflation", "payroll", "employment", "unemployment",
+                        "fed", "fomc", "powell", "treasury", "yield", "pce", "jobless", "ppi",
+                        "retail sales", "ism", "pmi")) return "US_SANS_INDICATEUR";
+                if (!sourceForte) return "US_SOURCE_FAIBLE";
+                return null;
+            default:
+                return null;
+        }
+    }
+
     /** Évaluation sans sens de surprise : pour CHINE, le signal est bloqué (sens inconnu). */
     public static Resultat evaluer(Vecteur v, boolean confirme, boolean speculatif,
                                    boolean surpriseChiffree, boolean sourceForte,
