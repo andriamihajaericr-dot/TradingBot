@@ -390,13 +390,7 @@ for (Map.Entry<String, TradingViewFetcher.TVMarketData> e :
                        // Texte source complet, utilisé par les filtres ci-dessous
             final String texteComplet = (title == null ? "" : title) + " " + (body == null ? "" : body);
 
-            // Liste blanche FinancialJuice : seuls les indicateurs majeurs passent
-            if (sourceName != null && sourceName.toLowerCase(Locale.ROOT).contains("financialjuice")
-                    && !indicateurFinancialJuiceRetenu(texteComplet)) {
-                db.markEventAsSynced(fingerprint, "FILTERED_INDICATEUR_HORS_LISTE");
-                tracerMatrice("🚫 [MATRICE] Indicateur hors liste — " + title);
-                return;
-            }
+           
             // GEO_CAS_A et GEO_CAS_B exigent que le texte parle de l'Iran ou du Golfe
            
             if ((vecteur == MatriceMacro.Vecteur.GEO_CAS_A || vecteur == MatriceMacro.Vecteur.GEO_CAS_B)
@@ -1911,9 +1905,12 @@ private void processAnalysisWithAI(String sourceName, String title, String body,
             // Titre de secours : FinancialJuice et d'autres sources n'envoient souvent
             // aucun titre, seulement le texte. On prend les premiers caractères du corps.
             String corpsPourTitre = (bigText.length() > text.length()) ? bigText : text;
-            final String title = (titreBrut != null && !titreBrut.trim().isEmpty())
-                    ? titreBrut
-                    : corpsPourTitre.substring(0, Math.min(80, corpsPourTitre.length())).trim();
+                       // Un titre « FinancialJuice » seul n'est pas utile : on prend le début du corps
+            boolean titreGenerique = titreBrut == null || titreBrut.trim().isEmpty()
+                    || titreBrut.trim().equalsIgnoreCase("FinancialJuice");
+            final String title = titreGenerique
+                    ? corpsPourTitre.substring(0, Math.min(80, corpsPourTitre.length())).trim()
+                    : titreBrut;
         
             // 🔴 SÉCURITÉ REGEX : Conservation du texte brut le plus complet pour l'extraction mathématique d'EconomicAnalyzer
             final String bodyTextRaw = bigText.length() > text.length() ? bigText : text;
